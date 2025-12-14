@@ -1,0 +1,23 @@
+{
+    "compilerOptions": {
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        "target": "ES2022", // Set the JavaScript version to compile to
+        "module": "ES2022",
+        "lib": ["ES2022"],
+        "jsx": "react",
+        "moduleResolution": "bundler",
+        "outDir": "./dist", // Where to put the compiled JavaScript
+        "rootDir": "./src", // Where your TypeScript source code is
+        "strict": true, // Enable all strict type-checking
+        "esModuleInterop": true, // Helps with importing older modules
+        "skipLibCheck": true, // Skip type checking of declaration files
+        "typeRoots": [
+            "./node_modules/@types",
+            "./@types"
+        ],
+        "types": ["node"]
+    },
+    "include": ["src/**/*"], // Only compile files inside the 'src' folder
+    "exclude": ["node_modules", "cache"]
+}

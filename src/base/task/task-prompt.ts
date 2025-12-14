@@ -1,0 +1,165 @@
+import { StatusType, TaskStatus } from "./task-status";
+
+export enum PromptType {
+    Confirm = "confirm",
+    Select = "select",
+    Input = "input",
+}
+
+export interface BasePrompt {
+    id: string;
+    type: PromptType;
+    status: string;
+    title: string;
+    message?: string;
+}
+
+export interface ConfirmPrompt extends BasePrompt {
+    type: PromptType.Confirm;
+    defaultValue?: boolean;
+}
+
+export interface SelectPrompt extends BasePrompt {
+    type: PromptType.Select;
+    options: { label: string; value: string }[];
+}
+
+export interface InputPrompt extends BasePrompt {
+    type: PromptType.Input;
+    status: string;
+    title: string;
+    message: string;
+    defaultValue?: string;
+    hint?: string;
+}
+
+export type UserPrompt = ConfirmPrompt | SelectPrompt | InputPrompt;
+
+export interface PendingPrompt<T = any> {
+    prompt: UserPrompt;
+    resolve: (value: T) => void;
+    reject: (error: Error) => void;
+}
+
+export class TaskPrompt {
+    private id: string;
+    private status: TaskStatus;
+    private current: PendingPrompt | null = null;
+    private notifySubscribers: () => void;
+
+    public constructor(id: string, status: TaskStatus, notifyTaskSubscribers: () => void) {
+        this.id = id
+        this.status = status
+        this.notifySubscribers = notifyTaskSubscribers;
+    }
+
+    public get() {
+        return this.current?.prompt ?? null;
+    }
+
+    async askConfirm(message: string, defaultValue = false): Promise<boolean> {
+        const prompt: ConfirmPrompt = {
+            id: `${this.id}-confirm-${Date.now()}`,
+            type: PromptType.Confirm,
+            message,
+            defaultValue,
+        };
+
+        return this.requestUserInput<boolean>(prompt);
+    }
+
+    async askSelect(message: string, options: { label: string; value: string }[]): Promise<string> {
+        const prompt: SelectPrompt = {
+            id: `${this.id}-select-${Date.now()}`,
+            type: PromptType.Select,
+            message,
+            options,
+        };
+
+        return this.requestUserInput<string>(prompt);
+    }
+
+    async askInput(options: { status: string, title: string, message: string, defaultValue?: string, hint?: string }): Promise<string> {
+        const prompt: InputPrompt = {
+            id: `${this.id}-input-${Date.now()}`,
+            type: PromptType.Input,
+            ...options
+        };
+
+        return this.requestUserInput<string>(prompt);
+    }
+
+    // Generic method to request user input
+    private async requestUserInput<T>(prompt: UserPrompt): Promise<T> {
+        // Set status to pending
+        this.status.update({
+            type: StatusType.PendingUserAction,
+            message: prompt.status,
+        });
+
+        // Create a promise that will be resolved when user responds
+        return new Promise<T>((resolve, reject) => {
+            this.current = {
+                prompt,
+                resolve: resolve as (value: any) => void,
+                reject,
+            };
+
+            // Notify subscribers that a prompt is now active
+            this.notifySubscribers();
+        });
+    }
+
+    // Called by UI when user provides input
+    resolvePrompt<T>(value: T): void {
+        if (!this.current) {
+            console.warn(`No pending prompt for task ${this.id}`);
+            return;
+        }
+
+        const resolve = this.current.resolve;
+        this.current = null;
+
+        // Notify subscribers first (to update UI)
+        this.notifySubscribers();
+
+        // Clear pending status
+        this.status.update({
+            type: StatusType.Processing,
+            message: "Continuing...",
+        });
+
+        // Resolve the promise last (this will continue task execution)
+        resolve(value);
+    }
+
+    // Called by UI if user cancels
+    cancelPrompt(error?: Error): void {
+        if (!this.current) {
+            return;
+        }
+
+        const reject = this.current.reject;
+        this.current = null;
+
+        // Notify subscribers first
+        this.notifySubscribers();
+
+        this.status.update({
+            type: StatusType.Error,
+            message: "Cancelled by user",
+        });
+
+        // Reject the promise last
+        reject(error || new Error("User cancelled"));
+    }
+
+    // Check if task is waiting for user input
+    isPendingUserInput(): boolean {
+        return this.current !== null;
+    }
+
+    getCurrentPrompt(): UserPrompt | null {
+        return this.current?.prompt || null;
+    }
+}
