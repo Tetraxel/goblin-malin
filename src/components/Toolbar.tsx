@@ -2,22 +2,43 @@ import React from "react";
 import { Box, Text, useInput } from "ink";
 import stringWidth from "string-width";
 import { useFocusContext } from "../contexts/FocusContext";
+import { FlowSelector } from "./FlowSelector";
 import { Separator } from "./Separator";
+import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
+import { ToolbarButtonInvoker } from "./ToolbarButtonInvoker";
+import { FlowBase } from "../base/flow/flow-base";
 
-export type ToolbarButton = {
-  label: string;
-  icon: string;
-  color: React.ComponentProps<typeof Text>["color"];
+export type ToolbarButtonHook<TFlow = FlowBase> = ({
+  isSelected,
+  flow,
+  orchestrator,
+}: {
+  isSelected: boolean;
+  flow: TFlow;
+  orchestrator: FlowOrchestrator;
+}) => {
+  enabled: boolean;
+  label?: string;
+  icon?: string;
+  color?: React.ComponentProps<typeof Text>["color"];
   bold?: boolean;
-  hook: ({ isSelected }: { isSelected: boolean }) => { enabled?: boolean };
+  italic?: boolean;
 };
 
 export const Toolbar = ({
   buttons,
   width,
+  flows,
+  onFlowChange,
+  flow,
+  orchestrator,
 }: {
-  buttons: ToolbarButton[];
+  buttons: ToolbarButtonHook[];
   width: number;
+  flows: ReturnType<FlowOrchestrator["getAllFlows"]>;
+  onFlowChange: (flowId: string) => void;
+  flow: FlowBase;
+  orchestrator: FlowOrchestrator;
 }) => {
   const { focusState, ...focusManager } = useFocusContext();
   const isActive = focusState.activeWindow === "toolbar";
@@ -32,7 +53,7 @@ export const Toolbar = ({
     { isActive }
   );
 
-  const name = "😈 Goblin Malin";
+  const name = "😉 Goblin Malin";
   const nameWidth = stringWidth(name);
   const splitPositions = [nameWidth + 3]; // left border + padding
 
@@ -57,6 +78,7 @@ export const Toolbar = ({
           borderLeft={false}
           marginRight={1}
           width={nameWidth + 2}
+          minWidth={nameWidth + 2}
           height={height}
           overflow="hidden"
         >
@@ -65,25 +87,41 @@ export const Toolbar = ({
           </Text>
         </Box>
 
-        {buttons.map((button, index) => {
+        {buttons.map((hook, index) => {
           const isSelected =
             isActive && focusState.toolbar.selectedButtonIndex === index;
-          const { enabled } = button.hook({ isSelected });
+
+          return (
+            <ToolbarButtonInvoker
+              key={index}
+              hook={hook}
+              isSelected={isSelected}
+              index={index}
+              flow={flow}
+              orchestrator={orchestrator}
+            />
+          );
+        })}
+
+        {/* {buttons.map((hook, index) => {
+          const isSelected =
+            isActive && focusState.toolbar.selectedButtonIndex === index;
+          const { enabled, label, icon, color, bold } = hook({ isSelected });
 
           if (!enabled) return null;
 
           return (
             <Box key={index} marginRight={0}>
               <Text
-                backgroundColor={isSelected ? button.color : undefined}
-                color={isSelected ? "white" : button.color}
-                bold={button.bold}
+                backgroundColor={isSelected ? color : undefined}
+                color={isSelected ? "white" : color}
+                bold={bold}
               >
-                {` ${button.icon} ${button.label} `}
+                {` ${icon} ${label} `}
               </Text>
             </Box>
           );
-        })}
+        })} */}
 
         <Box
           flexDirection={"row"}
@@ -93,9 +131,14 @@ export const Toolbar = ({
           gap={1}
           height={height}
         >
-          <Text color={"gray"} italic={true}>
+          <FlowSelector
+            flows={flows}
+            currentFlow={flow}
+            onFlowChange={onFlowChange}
+          />
+          {/* <Text color={"gray"} italic={true}>
             Music Download Flow
-          </Text>
+          </Text> */}
         </Box>
       </Box>
       <Separator

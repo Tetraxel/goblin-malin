@@ -1,5 +1,6 @@
 import { StatusAttributes, TaskStatus } from './task-status';
 import { TaskPrompt, UserPrompt } from './task-prompt';
+import { Logger } from '../logger/logger';
 
 export interface DownloadTaskData {
     id: string;
@@ -21,16 +22,31 @@ export type TaskSnapshot<TAttributes = TaskAttributes> = {
 
 export class Task<TAttributes = TaskAttributes> {
     protected id: string;
+    protected flowId: string;
     protected initialInput?: string;
     protected attributes?: TAttributes;
+    protected logger: Logger;
     protected status: TaskStatus;
     protected prompt: TaskPrompt;
     protected subscribers: TaskSubscribers<TAttributes> = new Set();
 
-    constructor({ id, initialInput, attributes }: { id: string; initialInput?: string; attributes?: TAttributes }) {
+    public enabled: boolean = true
+    public running: boolean = false
+    public runnedAt: Date | undefined
+    public finishedAt: Date | undefined
+    public attempt: number = 0
+    public success: boolean = false
+
+    constructor({ id, initialInput, attributes, flowId, logger }: {
+        id: string; initialInput?: string; attributes?: TAttributes, flowId: string, logger: Logger
+    }) {
         this.id = id;
+        this.flowId = flowId
         this.initialInput = initialInput;
         this.attributes = attributes;
+        this.logger = logger.createChild({
+            task: this,
+        });
 
         // Initialize status
         this.status = new TaskStatus();
@@ -54,6 +70,10 @@ export class Task<TAttributes = TaskAttributes> {
 
     public getId(): string {
         return this.id;
+    }
+
+    public getFlowId(): string {
+        return this.flowId;
     }
 
     public getInitialInput() {
@@ -80,6 +100,14 @@ export class Task<TAttributes = TaskAttributes> {
     public setAttributes(track: TAttributes): void {
         this.attributes = track;
         this.notifyTaskSubscribers();
+    }
+
+    async start(): Promise<void> {
+        throw Error('Not implemented')
+    }
+
+    async stop(): Promise<void> {
+        throw Error('Not implemented')
     }
 
     // Subscribe to any changes in the task (including status changes)

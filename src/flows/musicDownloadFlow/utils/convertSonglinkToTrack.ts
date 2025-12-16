@@ -1,14 +1,10 @@
-import type { Track as SpotifyTrack } from "@spotify/web-api-ts-sdk";
-import type { SonglinkResponse, Entity, APIProvider, Platform } from '../../../services/apis/songlink-client';
-import { YoutubeService } from "../../../services/youtube";
 import { SongFull as YoutubeTrack } from 'ytmusic-api';
-import { StandardTrack } from './types';
+import type { Track as SpotifyTrack } from "@spotify/web-api-ts-sdk";
+import { StandardTrack } from '../types';
+import { YoutubeService } from "../../../services/youtube";
+import { SpotifyService } from "../../../services/spotify";
+import type { SonglinkResponse, Entity, APIProvider, Platform } from '../../../services/apis/songlink-client';
 
-
-// Spotify Service interface
-interface SpotifyService {
-    getTrackInfo(trackId: string): Promise<SpotifyTrack | null>;
-}
 
 // Priority order for fallback sources
 const FALLBACK_PRIORITY: APIProvider[] = [

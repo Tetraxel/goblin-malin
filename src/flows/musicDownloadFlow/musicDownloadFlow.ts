@@ -1,141 +1,131 @@
 import fs from 'fs/promises';
-import path from 'path';
-import { StatusType } from '../../base/task/task-status';
-import { Task } from '../../base/task/task';
-import { FlowBase } from "../../base/flow-base";
+import { FlowOrchestrator } from '../../base/flow/flow-orchestrator';
+import { FlowBase } from "../../base/flow/flow-base";
 import { Logger } from "../../base/logger/logger";
-import { MusicBrainzService } from '../../services/musicbrainz';
-import { SpotifyService } from "../../services/spotify";
-import { SoulseekService } from "../../services/soulseek";
-import { YtDlpService } from "../../services/ytdlp";
-import { YoutubeService } from '../../services/youtube';
-import { SonglinkService } from "../../services/songlink";
-import { SonglinkResponse } from '../../services/apis/songlink-client';
-import { convertSonglinkToTrack } from './utils/convertSonglinkToTrack';
-import { StandardTrack } from './utils/types';
-import { PROJECT_ROOT } from '../../constants';
+import { Task } from '../../base/task/task';
+import { DownloadTask, DownloadTaskAttributes } from './utils/downloadTask';
+import { InputLoader } from './utils/input-loader';
+import { ToolbarButtonHook } from '../../components/Toolbar';
+import { ColumnDefinition } from '../../components/TaskListPanel';
+import { useExitButton } from './toolbar/useExitButton';
+import { useRunAllButton } from './toolbar/useRunAllButton';
+import { useImportButton } from './toolbar/useImportButton';
+import { MbCell } from './columns/MbCell';
+import { UrlCell } from './columns/UrlCell';
+import { ArtistCell } from './columns/ArtistCell';
+import { TrackCell } from './columns/TrackCell';
+import { StatusCell } from './columns/StatusCell';
 
 
-type SongMetadata = SonglinkResponse
+export class MusicDownloadFlow extends FlowBase<DownloadTaskAttributes> {
+    public readonly id = "music-downloader";
+    public readonly displayName = "Music Downloader";
+    public readonly author = "Tetraxel";
+    static inputLoader: InputLoader = InputLoader.getInstance()
+    protected tasks: Task[] = []
 
-export class MusicDownloadFlow extends FlowBase {
-    private songlinkService: SonglinkService;
-    private musicBrainzService: MusicBrainzService;
-    private spotifyService: SpotifyService;
-    private soulseekService: SoulseekService;
-    private ytDlpService: YtDlpService;
-    private youtubeService: YoutubeService;
+    protected maxConcurrentTasks = 2; // Flow-specific limit
 
-    constructor(logger: Logger, task: Task) {
-        super(logger, task);
-        this.songlinkService = new SonglinkService(task, this.logger);
-        this.musicBrainzService = new MusicBrainzService(task, this.logger);
-        this.spotifyService = new SpotifyService(task, this.logger);
-        this.soulseekService = new SoulseekService(task, this.logger);
-        this.ytDlpService = new YtDlpService(task, this.logger);
-        this.youtubeService = new YoutubeService(task, this.logger);
+    private static instance: MusicDownloadFlow;
+
+    static getInstance(logger: Logger, defaultEnabled: boolean, orchestrator: FlowOrchestrator): MusicDownloadFlow {
+        if (!MusicDownloadFlow.instance) {
+            MusicDownloadFlow.instance = new MusicDownloadFlow(logger, defaultEnabled, orchestrator);
+        }
+        return MusicDownloadFlow.instance;
     }
 
-    async start(): Promise<void> {
+    async importTasks(): Promise<void> {
+        const filePath = "inputs.txt"
         try {
-            const task = this.task
-            this.logger.info(`Starting to process ${task.getInitialInput()}`);
+            const content = await fs.readFile(filePath, 'utf-8');
+            const lines = content
+                .split('\n')
+                .map(line => line.trim())
+                // Filter empty lines and comments
+                .filter(line => line.length > 0 && !line.startsWith('#'));
 
-            // Step 1: Determine source and fetch metadata
-            const track = await this.fetchTrackMetadata(task);
-            this.logger.info(`Fetched track metadata ${track.artists[0]?.name} - ${track.trackName} (${track?.duration ?? 0 / 1000}s)`);
-
-            // Step 2: Download the track
-            // await fs.writeFile('samples/track.json', JSON.stringify(track, null, 2));
-            const localTrackPath = await this.downloadTrack(track);
-            if (!localTrackPath)
-                throw new Error("No candidate url for download")
-            track.localRelativePath = path.relative(PROJECT_ROOT, localTrackPath);
-            task.setAttributes({ track });
-
-            // Step 3: Musicbrainz
-            const musicBrainzReleases = await this.musicBrainzService.searchTracks(track.artists?.[0].name, track.trackName, track.album?.albumName);
-            await fs.writeFile('samples/musicBrainzReleases.json', JSON.stringify(musicBrainzReleases, null, 2));
-            track.musicBrainzRecording = musicBrainzReleases[0] ?? null;
-            task.setAttributes({ track });
-
-            // Step 4: Mark as complete
-            this.status.set({
-                type: StatusType.Success,
-                message: "Completed",
-                progress: 100,
-            });
-
-
+            const tasks: Task[] = lines.map(
+                (url, index) => {
+                    return new DownloadTask({
+                        id: `item-${index}`,
+                        initialInput: url,
+                        attributes: {},
+                        flowId: this.id,
+                        logger: this.logger,
+                    })
+                }
+            );
+            this.orchestrator.addTasks(tasks)
+            this.logger.info(`Loaded ${tasks.length} items from ${filePath}`);
         } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+                this.logger.error(`File not found: ${filePath}`);
+                throw new Error(`Input file '${filePath}' does not exist`);
+            }
+
+            this.logger.error(`Failed to read ${filePath}`, { error });
             throw error;
         }
     }
 
-    // Fetch metadata from appropriate service
-    private async fetchTrackMetadata(task: Task): Promise<StandardTrack> {
-        this.logger.info(`fetchMetadata`);
-        this.status.set({
-            type: StatusType.Processing,
-            message: "Fetch metadata",
-            timeTracking: true,
-            progress: 0,
-        });
-
-        try {
-            // Try to get metadata from Songlink first
-            const url = task.getInitialInput()
-            if (!url)
-                throw new Error('No initial input')
-
-            const songlinkResponse = await this.songlinkService.getSonglinkData(url);
-            if (!songlinkResponse)
-                throw new Error('No response from api')
-
-            const track = await convertSonglinkToTrack(songlinkResponse, this.spotifyService, this.youtubeService);
-            task.setAttributes({ track });
-            return track;
-        } catch (error) {
-            this.logger.error(`Songlink failed for ${task.getInitialInput()}: ${error}`);
-            return { id: crypto.randomUUID(), trackName: 'Unknown', artists: [], url: "Unknown" };
-        }
+    async runAll(): Promise<void> {
+        this.orchestrator.processTasks()
+        // this.tasks.start()
+        // await this.orchestrator.startProcessing();
     }
 
-    // Download the track
-    private async downloadTrack(track: StandardTrack): Promise<string | undefined> {
-        const filename = `${track.artists[0].name} - ${track.trackName}`
-
-        if (track.linksByPlatform?.["youtubeMusic"])
-            return await this.ytDlpService.downloadTrack(track.linksByPlatform["youtubeMusic"], filename);
-
-        // Fallback to downloading from youtube
-        if (track.linksByPlatform?.["youtube"])
-            return await this.ytDlpService.downloadTrack(track.linksByPlatform["youtube"], filename);
-
+    async stopAll(): Promise<void> {
 
     }
 
-    // // Search on Soulseek
-    // private async searchSoulseek(metadata: SongMetadata): Promise<any> {
-    //     return await this.soulseekService.searchMusic({
-    //         query: {
-    //             artistName: metadata.artist,
-    //             trackTitle: metadata.title,
-    //             albumName: undefined,
-    //             extension: undefined,
-    //             durationMs: undefined,
-    //         },
-    //         waitTimeMs: 3000,
-    //     });
-    // }
+    getToolbarButtons(): ToolbarButtonHook[] {
+        return [
+            useImportButton,
+            useRunAllButton,
+            () => ({
+                label: "Settings",
+                icon: "⛭",
+                color: "gray",
+                enabled: true,
+            }),
+            useExitButton
+        ];
+    }
 
-    // // Download from Soulseek
-    // private async downloadFromSoulseek(item: DownloadItem, results: any): Promise<void> {
-    //     const { SoulseekService } = await import('./api/soulseek');
-    //     const soulseek = SoulseekService.getInstance();
-
-    //     await soulseek.download(results.file, (progress) => {
-    //         this.updateItem(item.id, { progress });
-    //     });
-    // }
+    getColumns(): ColumnDefinition<DownloadTaskAttributes>[] {
+        return [
+            {
+                label: "URL",
+                weight: 35,
+                flexGrow: 0,
+                component: UrlCell,
+            },
+            {
+                label: "MB",
+                weight: 1,
+                flexGrow: 0,
+                component: MbCell,
+            },
+            {
+                label: "ARTIST",
+                weight: 16,
+                flexGrow: 0,
+                component: ArtistCell,
+            },
+            {
+                label: "TRACK",
+                weight: 30,
+                flexGrow: 0,
+                component: TrackCell,
+            },
+            {
+                label: "STATUS",
+                weight: 28,
+                minWidth: 20,
+                flexGrow: 0,
+                component: StatusCell,
+            },
+        ]
+    }
 }

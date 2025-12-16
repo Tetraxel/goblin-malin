@@ -18,7 +18,7 @@ export interface LogMetadata {
     message: string
     service?: string
     flow?: string
-    task?: Task
+    task?: Task<any>
     details?: LogDetails // will be printed in the terminal
     [key: string]: any // Allow additional context fields
 }

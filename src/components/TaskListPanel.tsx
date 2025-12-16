@@ -3,21 +3,26 @@ import { Box, Text, useInput } from "ink";
 import { TaskRow } from "./TaskRow";
 import { Task, TaskSnapshot } from "../base/task/task";
 import { useFocusContext } from "../contexts/FocusContext";
+import { FlowBase } from "../base/flow/flow-base";
+
+export type ColumnComponent<TAttributes> = ({
+  task,
+  width,
+  isSelected,
+  flow,
+}: {
+  task: TaskSnapshot<TAttributes>;
+  width: number;
+  isSelected: boolean;
+  flow: FlowBase;
+}) => React.ReactNode;
 
 export type ColumnDefinition<TAttributes = any> = {
   label: string;
   weight: number;
   minWidth?: number;
   flexGrow?: number;
-  render: ({
-    task,
-    width,
-    isSelected,
-  }: {
-    task: TaskSnapshot<TAttributes>;
-    width: number;
-    isSelected: boolean;
-  }) => React.ReactNode;
+  component: ColumnComponent<TAttributes>;
 };
 
 export type CalculatedColumn<TAttributes = any> =
@@ -81,7 +86,7 @@ export function calculateColumnWidths<TAttributes>(
       weight: col.weight,
       minWidth: col.minWidth,
       flexGrow: col.flexGrow,
-      render: col.render,
+      component: col.component,
       width,
     };
   });
@@ -91,7 +96,8 @@ export const TaskListPanel: React.FC<{
   columns: ColumnDefinition[];
   tasks: Task[];
   width: number;
-}> = ({ columns, tasks, width }) => {
+  flow: FlowBase;
+}> = ({ columns, tasks, width, flow }) => {
   const { focusState, ...focusManager } = useFocusContext();
   const isActive = focusState.activeWindow === "taskList";
   const height = focusState.taskList.height;
@@ -146,7 +152,7 @@ export const TaskListPanel: React.FC<{
 
       {/* Task Rows */}
       <Box flexDirection="column" height={height} overflow="hidden">
-        {tasks.slice(Math.max(0, height + 1), height).map((task, index) => {
+        {tasks.slice(0, height).map((task, index) => {
           return (
             <TaskRow
               key={task.getId()}
@@ -155,6 +161,7 @@ export const TaskListPanel: React.FC<{
                 isActive && focusState.taskList.selectedTaskIndex === index
               }
               columns={calculatedColumns}
+              flow={flow}
             />
           );
         })}

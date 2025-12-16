@@ -1,5 +1,5 @@
-import type { Platform } from '../../../services/apis/songlink-client';
-import { MusicBrainzRecording } from '../../../services/musicbrainz';
+import type { Platform } from '../../services/apis/songlink-client';
+import { MusicBrainzRecording } from '../../services/musicbrainz';
 
 
 // Standard Track type definition

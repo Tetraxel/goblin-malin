@@ -1,9 +1,10 @@
 import * as path from 'path';
 import fs from 'fs/promises';
 import { readFileSync } from 'fs';
-import { PROJECT_ROOT } from '../constants';
-import { Task } from '../base/task/task';
-import { globalLogger } from '../base/logger/logger';
+import { PROJECT_ROOT } from '../../../constants';
+import { Task } from '../../../base/task/task';
+import { globalLogger } from '../../../base/logger/logger';
+import { MusicDownloadFlow } from '../musicDownloadFlow';
 
 interface TrackInput {
   trackUrl: string;
@@ -24,18 +25,15 @@ export class InputLoader {
   }
 
   // Load URLs from inputs.txt and convert to DownloadItems
-  async loadFromFile(filepath: string = 'inputs.txt'): Promise<Task[]> {
+  async loadLinesFromFile(filepath: string): Promise<string[]> {
     try {
       const content = await fs.readFile(filepath, 'utf-8');
-      const urls = content
+      const lines = content
         .split('\n')
         .map(line => line.trim())
         .filter(line => line.length > 0 && !line.startsWith('#')); // Filter empty lines and comments
 
-      const tasks: Task[] = urls.map((url, index) => new Task({ id: `item-${index}`, initialInput: url }));
-
-      globalLogger.info(`Loaded ${tasks.length} items from ${filepath}`);
-      return tasks;
+      return lines;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         globalLogger.error(`File not found: ${filepath}`);
@@ -47,37 +45,37 @@ export class InputLoader {
     }
   }
 
-  // Validate if a string is a valid URL
-  private isValidUrl(url: string): boolean {
-    try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
-    }
-  }
+  // // Validate if a string is a valid URL
+  // private isValidUrl(url: string): boolean {
+  //   try {
+  //     new URL(url);
+  //     return true;
+  //   } catch {
+  //     return false;
+  //   }
+  // }
 
-  // Load and validate URLs
-  async loadAndValidate(filepath: string = 'inputs.txt'): Promise<{
-    valid: Task[];
-    invalid: string[];
-  }> {
-    const items = await this.loadFromFile(filepath);
-    const valid: Task[] = [];
-    const invalid: string[] = [];
+  // // Load and validate URLs
+  // async loadAndValidate(filepath: string = 'inputs.txt'): Promise<{
+  //   valid: Task[];
+  //   invalid: string[];
+  // }> {
+  //   const items = await this.loadLinesFromFile(filepath);
+  //   const valid: Task[] = [];
+  //   const invalid: string[] = [];
 
-    items.forEach(item => {
-      const initialInput = item.getInitialInput() ?? ""
-      if (this.isValidUrl(initialInput)) {
-        valid.push(item);
-      } else {
-        invalid.push(initialInput);
-        globalLogger.warn(`Invalid URL skipped: ${initialInput}`);
-      }
-    });
+  //   items.forEach(item => {
+  //     const initialInput = item.getInitialInput() ?? ""
+  //     if (this.isValidUrl(initialInput)) {
+  //       valid.push(item);
+  //     } else {
+  //       invalid.push(initialInput);
+  //       globalLogger.warn(`Invalid URL skipped: ${initialInput}`);
+  //     }
+  //   });
 
-    return { valid, invalid };
-  }
+  //   return { valid, invalid };
+  // }
 
 
   public parseTrackInput(line: string): TrackInput | null {

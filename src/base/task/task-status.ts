@@ -8,6 +8,7 @@ export enum StatusType {
   Skipped = "skipped",
   Error = "error",
   Success = "success",
+  NoStatus = "noStatus"
 }
 
 export interface StatusAttributes {
@@ -21,8 +22,8 @@ export interface StatusAttributes {
 }
 
 const DEFAULT_ATTRIBUTES: StatusAttributes = {
-  type: StatusType.Default,
-  message: "",
+  type: StatusType.NoStatus,
+  message: "No status",
   timeTracking: false,
 };
 
