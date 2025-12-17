@@ -97,7 +97,7 @@ export class MusicDownloadFlow extends FlowBase<DownloadTaskAttributes> {
         return [
             {
                 label: "URL",
-                weight: 35,
+                weight: 45,
                 flexGrow: 0,
                 component: UrlCell,
             },

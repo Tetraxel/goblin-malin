@@ -9,6 +9,7 @@ import {
   MusicBrainzRelease,
 } from "../../../services/musicbrainz";
 import { useFocusContext } from "../../../contexts/FocusContext";
+import { globalLogger } from "../../../base/logger/logger";
 
 function getBestRelease(
   recording: MusicBrainzRecording
@@ -43,7 +44,6 @@ export const MbCell: ColumnComponent<DownloadTaskAttributes> = ({
   isSelected,
 }) => {
   const { focusState } = useFocusContext();
-  const isActive = focusState.activeWindow === "taskList";
   const track = task.attributes?.track;
 
   const musicBrainzRecording = track?.musicBrainzRecording;
@@ -69,10 +69,6 @@ export const MbCell: ColumnComponent<DownloadTaskAttributes> = ({
 
   useInput(
     async (input, key) => {
-      await fs.writeFile(
-        "samples/musicBrainzRecording.json",
-        JSON.stringify(musicBrainzRecording, null, 2)
-      );
       if (key.return) {
         if (OPEN_IN_PICARD_ENABLED) {
           if (mbPicardReleaseLink) await open(mbPicardReleaseLink);
@@ -84,7 +80,7 @@ export const MbCell: ColumnComponent<DownloadTaskAttributes> = ({
         }
       }
     },
-    { isActive }
+    { isActive: isSelected }
   );
 
   return (

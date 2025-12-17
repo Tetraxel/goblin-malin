@@ -69,7 +69,6 @@ export const LogPanel: React.FC = () => {
       borderColor="cyan"
       borderTop={false}
       borderBottom={false}
-      flexGrow={1}
       height={height}
     >
       {logs.slice(-height).map((log, index) => (

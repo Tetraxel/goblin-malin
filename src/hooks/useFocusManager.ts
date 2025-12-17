@@ -5,7 +5,7 @@ import { useScreenSize } from './useScreenSize';
 const TOOLBAR_HEIGHT = 1
 const TASK_LIST_HEIGHT = 20
 const FOOTER_HEIGHT = 2
-const SEPARATOR_HEIGHT = 2
+const SEPARATOR_HEIGHT = 4
 
 export type FocusableWindow = 'toolbar' | 'taskList' | 'logPanel' | 'footer';
 
@@ -98,12 +98,17 @@ export const useFocusManager = ({
     // Navigation within toolbar
     const moveToolbarSelection = useCallback((direction: 'left' | 'right' | 'down') => {
         setFocusState(prev => {
-            if (direction === 'down')
+            if (direction === 'down') {
+                // If not tasks, do nothing
+                if (taskCount === 0)
+                    return prev
+                // Else move focus to the first task of the list
                 return {
                     ...prev,
                     activeWindow: 'taskList',
                     taskList: { ...prev.taskList, selectedTaskIndex: 0, selectedColumnIndex: 0 }
                 };
+            }
             const newIndex = direction === 'left'
                 ? Math.max(0, prev.toolbar.selectedButtonIndex - 1)
                 : Math.min(toolbarButtonCount - 1, prev.toolbar.selectedButtonIndex + 1);
@@ -112,7 +117,7 @@ export const useFocusManager = ({
                 toolbar: { ...prev.toolbar, selectedButtonIndex: newIndex }
             };
         });
-    }, [toolbarButtonCount]);
+    }, [taskCount, toolbarButtonCount]);
 
     // Navigation within task list
     const moveTaskSelection = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {

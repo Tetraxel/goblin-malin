@@ -4,6 +4,7 @@ import { TaskRow } from "./TaskRow";
 import { Task, TaskSnapshot } from "../base/task/task";
 import { useFocusContext } from "../contexts/FocusContext";
 import { FlowBase } from "../base/flow/flow-base";
+import { globalLogger } from "../base/logger/logger";
 
 export type ColumnComponent<TAttributes> = ({
   task,
@@ -100,7 +101,8 @@ export const TaskListPanel: React.FC<{
 }> = ({ columns, tasks, width, flow }) => {
   const { focusState, ...focusManager } = useFocusContext();
   const isActive = focusState.activeWindow === "taskList";
-  const height = focusState.taskList.height;
+  const fullHeight = focusState.taskList.height;
+  const height = fullHeight - 1; // substract the header height
 
   useInput(
     (input, key) => {
@@ -120,6 +122,16 @@ export const TaskListPanel: React.FC<{
 
   const calculatedColumns = calculateColumnWidths(columns, width);
 
+  // Calculate scroll offset so the selected task stays visible (center when possible)
+  const selectedIndex = focusState.taskList.selectedTaskIndex;
+  const taskCount = tasks.length;
+  const maxOffset = Math.max(0, taskCount - height);
+
+  // Center using (height - 1)/2 to avoid off-by-one shifts for even heights,
+  // then clamp to [0, maxOffset].
+  const desiredCenterOffset = selectedIndex - Math.floor((height - 1) / 2);
+  const offset = Math.max(0, Math.min(desiredCenterOffset, maxOffset));
+
   return (
     <Box
       borderStyle="single"
@@ -128,11 +140,10 @@ export const TaskListPanel: React.FC<{
       overflow="hidden"
       borderTop={false}
       borderBottom={false}
+      height={fullHeight}
     >
-      <Box paddingX={1}>
-        <Box width={2}>
-          <Text color="cyan"> </Text>
-        </Box>
+      <Box paddingX={1} height={1} overflow="hidden">
+        <Box width={2} height={1} />
         {calculatedColumns.map((column, index) => (
           <Box
             key={`header-${column.label}-${index}`}
@@ -152,13 +163,15 @@ export const TaskListPanel: React.FC<{
 
       {/* Task Rows */}
       <Box flexDirection="column" height={height} overflow="hidden">
-        {tasks.slice(0, height).map((task, index) => {
+        {tasks.slice(offset, offset + height).map((task, index) => {
+          const visibleIndex = index + offset;
           return (
             <TaskRow
               key={task.getId()}
               taskReference={task}
               isActive={
-                isActive && focusState.taskList.selectedTaskIndex === index
+                isActive &&
+                focusState.taskList.selectedTaskIndex === visibleIndex
               }
               columns={calculatedColumns}
               flow={flow}

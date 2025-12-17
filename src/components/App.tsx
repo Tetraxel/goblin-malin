@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import React, { useEffect, useReducer, useState } from "react";
-import { Box, useInput } from "ink";
+import { Box, useInput, useStdin } from "ink";
 import { LogPanel } from "./LogPanel";
 import { Footer } from "./Footer";
 import { Separator } from "./Separator";
@@ -16,6 +16,10 @@ import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
 import { Task, TaskAttributes } from "../base/task/task";
 
 export const App: React.FC = () => {
+  // Fix: each useInput in the application can trigger a MaxListenersExceededWarning
+  const { internal_eventEmitter } = useStdin();
+  internal_eventEmitter.setMaxListeners(20);
+
   const [tasks, setTasks] = useState<Task<TaskAttributes>[]>([]);
   const { height: terminalHeight, width: terminalWidth } = useScreenSize();
   const [activeFlowId, setActiveFlowId] = useState<string | undefined>();

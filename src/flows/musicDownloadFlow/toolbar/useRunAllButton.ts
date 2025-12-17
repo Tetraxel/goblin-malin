@@ -25,8 +25,6 @@ export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({ isSelected, flow,
         { isActive: isSelected }
     );
 
-    globalLogger.info(flow.id)
-
     // Subscribe to orchestrator data changes (tasks)
     useEffect(() => {
         const unsubscribe = orchestrator.subscribe((orchestrator) => {

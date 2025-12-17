@@ -10,6 +10,7 @@ import { ServiceBase } from '../base/service-base';
 import { Task } from '../base/task/task';
 import { StatusType } from '../base/task/task-status';
 import { Logger } from '../base/logger/logger';
+import { Cached } from '../utils/cache';
 
 
 export class YoutubeService extends ServiceBase {
@@ -35,6 +36,7 @@ export class YoutubeService extends ServiceBase {
      * @param query - Search query string
      * @returns Array of detailed song results
      */
+    @Cached()
     public async searchTracks(query: string): Promise<SongDetailed[]> {
         try {
             this.logger.info(`Searching YouTube Music for songs: "${query}"...`);
@@ -69,6 +71,7 @@ export class YoutubeService extends ServiceBase {
      * @param videoId - YouTube video ID
      * @returns Full song data including formats
      */
+    @Cached()
     public async getSong(videoId: string): Promise<SongFull> {
         try {
             this.logger.info(`Getting song data for video ID: "${videoId}"...`);
@@ -101,6 +104,7 @@ export class YoutubeService extends ServiceBase {
      * @param videoId - YouTube video ID
      * @returns Full video data
      */
+    @Cached()
     public async getVideo(videoId: string): Promise<VideoFull> {
         try {
             this.logger.info(`Getting video data for video ID: "${videoId}"...`);
@@ -133,6 +137,7 @@ export class YoutubeService extends ServiceBase {
      * @param artistId - YouTube Music artist ID
      * @returns Full artist data including top songs, albums, etc.
      */
+    @Cached()
     public async getArtist(artistId: string): Promise<ArtistFull> {
         try {
             this.logger.info(`Getting artist data for artist ID: "${artistId}"...`);
@@ -165,6 +170,7 @@ export class YoutubeService extends ServiceBase {
      * @param albumId - YouTube Music album ID
      * @returns Full album data including all songs
      */
+    @Cached()
     public async getAlbum(albumId: string): Promise<AlbumFull> {
         try {
             this.logger.info(`Getting album data for album ID: "${albumId}"...`);
