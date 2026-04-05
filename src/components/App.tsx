@@ -96,7 +96,7 @@ export const App: React.FC = () => {
           />
         )}
         <Separator width={terminalWidth} />
-        <LogPanel />
+        <LogPanel tasks={filteredTasks} />
         <Separator width={terminalWidth} />
         <Footer />
 

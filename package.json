@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/dotenv": "^8.2.3",
     "@types/ink": "^2.0.3",
     "@types/ink-select-input": "^3.0.5",
@@ -26,6 +27,7 @@
   },
   "dependencies": {
     "@spotify/web-api-ts-sdk": "^1.2.0",
+    "adm-zip": "^0.5.16",
     "chalk": "4",
     "dotenv": "^17.2.3",
     "flac-tagger": "^1.0.7",

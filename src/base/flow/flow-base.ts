@@ -2,6 +2,7 @@ import { Logger } from "../logger/logger";
 import { ColumnDefinition } from "../../components/TaskListPanel";
 import { ToolbarButtonHook } from "../../components/Toolbar";
 import { FlowOrchestrator } from "./flow-orchestrator";
+import { Task } from "../task/task";
 
 
 export class FlowBase<TAttributes = any> {
@@ -26,6 +27,10 @@ export class FlowBase<TAttributes = any> {
     }
 
     async importTasks(): Promise<void> {
+        throw Error('Not implemented')
+    }
+
+    async restartTask(task: Task<TAttributes>): Promise<void> {
         throw Error('Not implemented')
     }
 

@@ -1,5 +1,4 @@
-import { useState, useCallback } from 'react';
-import { globalLogger } from '../base/logger/logger';
+import { useState, useCallback, useEffect } from 'react';
 import { useScreenSize } from './useScreenSize';
 
 const TOOLBAR_HEIGHT = 1
@@ -7,10 +6,11 @@ const TASK_LIST_HEIGHT = 20
 const FOOTER_HEIGHT = 2
 const SEPARATOR_HEIGHT = 4
 
-export type FocusableWindow = 'toolbar' | 'taskList' | 'logPanel' | 'footer';
+export type FocusableWindow = 'toolbar' | 'taskList' | 'logPanel' | 'footer' | 'prompt';
 
 export interface FocusState {
     activeWindow: FocusableWindow;
+    previousWindow: FocusableWindow | undefined;
     toolbar: {
         selectedButtonIndex: number;
         height: number;
@@ -19,14 +19,17 @@ export interface FocusState {
         selectedTaskIndex: number;
         selectedColumnIndex: number;
         height: number;
+        width: number;
     };
     logPanel: {
         selectedLogIndex: number;
         height: number;
+        width: number;
     };
     footer: {
         height: number;
     };
+    prompt: {}
 }
 
 function calculateLogPanelHeight(terminalHeight: number, taskListHeight: number, toolbarHeight: number, footerHeight: number) {
@@ -44,9 +47,10 @@ export const useFocusManager = ({
     taskColumnCount: number,
     logCount: number
 }) => {
-    const { height: terminalHeight } = useScreenSize();
+    const { height: terminalHeight, width: terminalWidth } = useScreenSize();
     const [focusState, setFocusState] = useState<FocusState>({
         activeWindow: 'toolbar',
+        previousWindow: undefined,
         toolbar: {
             height: TOOLBAR_HEIGHT,
             selectedButtonIndex: 0,
@@ -54,20 +58,50 @@ export const useFocusManager = ({
         taskList: {
             height: TASK_LIST_HEIGHT,
             selectedTaskIndex: 0,
-            selectedColumnIndex: 0
+            selectedColumnIndex: 0,
+            width: terminalWidth,
         },
         logPanel: {
             height: calculateLogPanelHeight(terminalHeight, TASK_LIST_HEIGHT, TOOLBAR_HEIGHT, FOOTER_HEIGHT),
             // Start from last log
             selectedLogIndex: Math.max(0, logCount - 1),
+            width: terminalWidth,
         },
         footer: {
             height: FOOTER_HEIGHT
-        }
+        },
+        prompt: {},
     });
 
+    // window size change
+    useEffect(() => {
+        setFocusState(prev => ({
+            ...prev,
+            logPanel: {
+                ...prev.logPanel,
+                width: terminalWidth,
+            }
+        }))
+    }, [terminalWidth]);
+
     const switchWindow = useCallback((window: FocusableWindow) => {
-        setFocusState(prev => ({ ...prev, activeWindow: window }));
+        setFocusState(prev => ({
+            ...prev,
+            previousWindow: prev.activeWindow,
+            activeWindow: window,
+        }));
+    }, []);
+
+    const switchBack = useCallback(() => {
+        setFocusState(prev => {
+            if (!prev.previousWindow || prev.previousWindow == 'prompt')
+                return {
+                    ...prev, activeWindow: 'toolbar', toolbar: {
+                        ...prev.toolbar, selectedButtonIndex: 0
+                    }
+                }
+            return { ...prev, activeWindow: prev.previousWindow }
+        });
     }, []);
 
     const handleTabPress = useCallback(() => {
@@ -86,7 +120,6 @@ export const useFocusManager = ({
                 : Math.min(terminalHeight - 10, prev.taskList.height + 2);
             const logPaneHeight = calculateLogPanelHeight(terminalHeight, newHeight, prev.toolbar.height, prev.footer.height)
             const sum = prev.toolbar.height + newHeight + logPaneHeight + prev.footer.height
-            globalLogger.debug(`${sum} = ${prev.toolbar.height} + ${newHeight} + ${logPaneHeight} + ${prev.footer.height}`)
             return {
                 ...prev,
                 taskList: { ...prev.taskList, height: newHeight },
@@ -166,6 +199,7 @@ export const useFocusManager = ({
     return {
         focusState,
         switchWindow,
+        switchBack,
         handleTabPress,
         resizeTaskList,
         moveToolbarSelection,

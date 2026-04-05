@@ -4,6 +4,7 @@ import { Cached } from '../utils/cache';
 import { Task } from "../base/task/task";
 import { Logger } from "../base/logger/logger";
 import { StatusType } from "../base/task/task-status";
+import { StandardTrack } from "../flows/musicDownloadFlow/types";
 
 export type SpotifyTokenResponse = {
     access_token: string;
@@ -79,6 +80,12 @@ export class SpotifyService extends ServiceBase {
         });
     }
 
+    extractTrackIdFromUrl(url: string): string | null {
+        const regex = /(?:https?:\/\/)?(?:open\.)?spotify\.com\/track\/([a-zA-Z0-9]+)(?:\?.*)?$/;
+        const match = url.match(regex);
+        return match ? match[1] : null;
+    }
+
     /**
      * Fetches track details from the Spotify API.
      *
@@ -93,7 +100,7 @@ export class SpotifyService extends ServiceBase {
 
         try {
             this.logger.info(
-                `Get track info: "${trackId}"...`
+                `Get track info: "${trackId}"…`
             );
             this.status.set({
                 type: StatusType.Processing,
@@ -112,7 +119,43 @@ export class SpotifyService extends ServiceBase {
                 type: StatusType.Error,
                 message: "Error fetching Spotify track info",
             });
-            return null;
+            throw error
         }
+    }
+
+    // Converts Spotify Track to Standard Track format
+    convertSpotifyTrack(spotifyTrack: Track, spotifyUrl: string): StandardTrack {
+        return {
+            id: spotifyTrack.id,
+            isrc: spotifyTrack.external_ids?.isrc,
+            trackName: spotifyTrack.name,
+            duration: spotifyTrack.duration_ms,
+            trackNumber: spotifyTrack.track_number,
+            url: spotifyUrl,
+            uri: spotifyTrack.uri,
+            album: {
+                id: spotifyTrack.album.id,
+                albumType: spotifyTrack.album.album_type,
+                albumName: spotifyTrack.album.name,
+                totalTracks: spotifyTrack.album.total_tracks,
+                releaseDate: spotifyTrack.album.release_date,
+                url: spotifyTrack.album.external_urls?.spotify || '',
+                uri: spotifyTrack.album.uri || `spotify:album:${spotifyTrack.album.id}`,
+                artists: spotifyTrack.album.artists.map(artist => ({
+                    id: artist.id,
+                    type: 'artist' as const,
+                    name: artist.name,
+                    url: artist.external_urls?.spotify,
+                    uri: artist.uri || `spotify:artist:${artist.id}`
+                }))
+            },
+            artists: spotifyTrack.artists.map(artist => ({
+                id: artist.id,
+                type: 'artist' as const,
+                name: artist.name,
+                url: artist.external_urls?.spotify,
+                uri: artist.uri || `spotify:artist:${artist.id}`
+            }))
+        };
     }
 }

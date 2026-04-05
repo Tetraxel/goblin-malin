@@ -1,8 +1,12 @@
+import fs from 'fs';
 import chalk from 'chalk'
 import winston from 'winston';
 import { inkTransport } from './ink-transport';
 import { LogMetadata, LogLevel, LogDetails } from './types';
+import { LOGS_PATH } from '../../constants';
 
+// Clear log file
+fs.writeFileSync(LOGS_PATH, '');
 
 function getString(obj: any): string {
     if (typeof obj === 'string') {
@@ -27,6 +31,7 @@ function setLogColor(level: LogLevel, message: string): string {
     }
 }
 
+
 export class Logger {
     private static logger: winston.Logger;
     public metadata: Partial<LogMetadata> = {}
@@ -40,7 +45,17 @@ export class Logger {
     } = {}) {
         if (!Logger.logger) {
             Logger.logger = winston.createLogger({
-                transports: [inkTransport],
+                transports: [
+                    inkTransport,
+                    // Combined log file
+                    new winston.transports.File({
+                        filename: LOGS_PATH,
+                        format: winston.format.combine(
+                            winston.format.timestamp(),
+                            winston.format.json()
+                        ),
+                    }),
+                ],
             });
         }
 

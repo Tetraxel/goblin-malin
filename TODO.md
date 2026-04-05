@@ -2,8 +2,10 @@
 
 ## 🔴 Release Blocker:
 
+- [ ] Set metadata artist/track/MusicBrainzReleaseId
 - [x] Scrolling in tasks
-- [ ] 🚧 Fix Prompt input not handled anymore
+- [x] Fix Prompt input not handled anymore
+- [ ] Fix prompt runExclusive
 - [ ] Handle Spotify albums as input
 - [ ] Handle Spotify playlists as input
 
@@ -15,6 +17,7 @@
 
 ## 🟡 Nice to have
 
+- [ ] Drag and drop the desired folder
 - [ ] Save the tasks into the disk
 - [ ] Handle settings and save into the disk
 - [ ] Copy/Edit cell values

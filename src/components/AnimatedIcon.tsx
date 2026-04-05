@@ -1,6 +1,7 @@
 import React from "react";
 import { Text } from "ink";
 import { useGlobalTicker } from "../hooks/useGlobalTicker";
+import { ANIMATION_ENABLED } from "../constants";
 
 export enum Icon {
   Dots = "dots",
@@ -16,7 +17,7 @@ const ANIMATION_FRAMES = {
   [Icon.RotatingLight]: ["🚨", ""],
   [Icon.RedFlag]: ["🚩", "  "],
   [Icon.Hourglass]: ["⏳", "⌛"],
-  [Icon.Warning]: ["△", " "],
+  [Icon.Warning]: ["▵", " "],
 };
 
 const ICON_COLOR: Record<Icon, string> = {
@@ -44,7 +45,7 @@ export const AnimatedIcon: React.FC<AnimatedIconProps> = ({
   if (!frames || frames.length === 0) return null;
 
   // Use modulo to cycle through frames based on the global infinite counter
-  const frameIndex = globalTick % frames.length;
+  const frameIndex = ANIMATION_ENABLED ? globalTick % frames.length : 0;
   const currentFrame = frames[frameIndex];
 
   const color = ICON_COLOR[icon];

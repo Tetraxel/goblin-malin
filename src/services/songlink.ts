@@ -4,6 +4,7 @@ import { StatusType } from '../base/task/task-status';
 import { Task } from '../base/task/task';
 import { Logger } from '../base/logger/logger';
 import { SonglinkClient, SonglinkResponse } from './apis/songlink-client';
+import { sleep } from '../utils/sleep';
 
 
 export class SonglinkService extends ServiceBase {
@@ -14,7 +15,7 @@ export class SonglinkService extends ServiceBase {
     }
 
     private async getClient(): Promise<SonglinkClient> {
-        return this.runExclusive('init', async () => {
+        return await this.runExclusive('init', async () => {
             if (!SonglinkService.client) {
                 SonglinkService.client = new SonglinkClient();
             }
@@ -55,7 +56,6 @@ export class SonglinkService extends ServiceBase {
             this.logger.info("Successfully fetched Songlink data")
             this.status.update({ progress: 100 });
             return data;
-
         } catch (error) {
             this.logger.error(
                 `Error fetching Songlink track data ${url}`,
@@ -65,7 +65,8 @@ export class SonglinkService extends ServiceBase {
                 type: StatusType.Error,
                 message: "Error fetching Songlink track",
             });
-            return null;
+
+            throw error;
         }
     }
 }

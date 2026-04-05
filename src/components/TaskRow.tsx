@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text, useInput } from "ink";
 import { Task } from "../base/task/task";
 import { useTask } from "../hooks/useTask";
 import { CalculatedColumn } from "./TaskListPanel";
@@ -19,6 +19,13 @@ export const TaskRow = <TAttributes,>({
 }) => {
   const { focusState } = useFocusContext();
   const task = useTask<TAttributes>(taskReference);
+
+  useInput(
+    (input, key) => {
+      if (task && input === "r") flow.restartTask(taskReference);
+    },
+    { isActive }
+  );
 
   return (
     <Box key={task.id} paddingX={1} overflowY="hidden">

@@ -10,7 +10,7 @@ export const useExitButton: ToolbarButtonHook = ({ isSelected }: { isSelected: b
         (input, key) => {
             if (key.return) {
                 process.stdout.write(LEAVE_ALT_SCREEN_COMMAND);
-                console.info("Saving cache before exit...");
+                console.info("Saving cache before exit…");
                 cache.save();
                 process.exit(0);
             }

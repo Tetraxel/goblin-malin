@@ -21,7 +21,7 @@ export class MusicBrainzService extends ServiceBase {
         // Ensure only one initialization at a time
         return this.runExclusive('init', async () => {
             if (!MusicBrainzService.client) {
-                this.logger.info(`Initializing MusicBrainz API client...`);
+                this.logger.info(`Initializing MusicBrainz API client…`);
 
                 MusicBrainzService.client = new MusicBrainzApi({
                     appName: 'tetraxel-app',
@@ -43,7 +43,7 @@ export class MusicBrainzService extends ServiceBase {
         const musicBrainzClient = await this.getClient()
         try {
             this.logger.info(
-                `Searching for release group: "${albumName}" by "${artistName}"...`
+                `Searching for release group: "${albumName}" by "${artistName}"…`
             );
             this.status.set({
                 type: StatusType.Processing,
@@ -75,7 +75,7 @@ export class MusicBrainzService extends ServiceBase {
                 type: StatusType.Error,
                 message: "Error searching release",
             });
-            return [];
+            throw error
         }
     }
 
@@ -85,18 +85,21 @@ export class MusicBrainzService extends ServiceBase {
      * @param trackName The title of the track (e.g., "Smells Like Teen Spirit")
      * @param albumName (Optional) The name of the album/release (e.g., "Nevermind")
      */
-    @Cached()
+    // @Cached()
     async searchTracks(
         artistName: string,
         trackName: string,
-        albumName?: string
+        albumName?: string,
+        trackDuration?: number, // ms
     ): Promise<MusicBrainzRecording[]> {
         const musicBrainzClient = await this.getClient()
 
         try {
             this.logger.info(
-                `\nSearching for track: "${trackName}" by "${artistName}"${albumName ? ` on album "${albumName}"` : ''
-                }...`
+                `\nSearching for track: "${trackName}" by "${artistName}"`
+                + (albumName ? ` on album "${albumName}"` : '')
+                + (trackDuration ? ` (${(trackDuration / 1000)}s)` : '')
+                + '…'
             );
             this.status.set({
                 type: StatusType.Processing,
@@ -109,9 +112,9 @@ export class MusicBrainzService extends ServiceBase {
             const results = await musicBrainzClient.search('recording', {
                 query: {
                     artist: artistName,
-                    recording: "THIS IS…",
-                    // release: trackName,
-                    ...(albumName ? { release: albumName } : {})
+                    recording: trackName,
+                    ...(albumName ? { release: albumName } : {}),
+                    ...(trackDuration ? { dur: trackDuration } : {}),
                     // ...(albumName ? { releasegroup: albumName } : {})
                 }
             });
@@ -125,7 +128,7 @@ export class MusicBrainzService extends ServiceBase {
                 type: StatusType.Error,
                 message: "Error searching for track",
             });
-            return [];
+            throw error;
         }
     }
 }

@@ -7,7 +7,7 @@ export interface StandardTrack {
     id: string;
     isrc?: string;
     trackName: string;
-    duration?: number;
+    duration?: number; // ms
     trackNumber?: number;
     url: string;
     uri?: string;
@@ -35,4 +35,10 @@ export interface StandardAlbum {
     url: string;
     uri: string;
     artists?: StandardArtist[];
+}
+
+export interface Source {
+    platform: Platform;
+    track: StandardTrack;
+    fetchedAt: Date;
 }

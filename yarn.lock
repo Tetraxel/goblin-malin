@@ -505,6 +505,13 @@
   resolved "https://registry.yarnpkg.com/@tsconfig/node16/-/node16-1.0.4.tgz#0b92dcc0cc1c81f6f306a381f28e31b1a56536e9"
   integrity sha512-vxhUy4J8lyeyinH7Azl1pdd43GJhZH/tP2weN8TntQblOY+A0XbT8DJk1/oCPuOOyg/Ja757rG0CgHcWC8OfMA==
 
+"@types/adm-zip@^0.5.7":
+  version "0.5.7"
+  resolved "https://registry.yarnpkg.com/@types/adm-zip/-/adm-zip-0.5.7.tgz#eec10b6f717d3948beb64aca0abebc4b344ac7e9"
+  integrity sha512-DNEs/QvmyRLurdQPChqq0Md4zGvPwHerAJYWk9l2jCbD1VPpnzRJorOdiq4zsw09NFbYnhfsoEhWtxIzXpn2yw==
+  dependencies:
+    "@types/node" "*"
+
 "@types/cli-spinners@<2":
   version "1.3.3"
   resolved "https://registry.yarnpkg.com/@types/cli-spinners/-/cli-spinners-1.3.3.tgz#209e227d4c9e9a6b6d1c2217e1cb5866f4561d26"
@@ -569,9 +576,9 @@
     undici-types "~7.16.0"
 
 "@types/node@^24.9.2":
-  version "24.10.3"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-24.10.3.tgz#e0bde7b6bfa2342e88bf158d177dc110e608520e"
-  integrity sha512-gqkrWUsS8hcm0r44yn7/xZeV1ERva/nLgrLxFRUGb7aoNMIJfZJ3AC261zDQuOAKC7MiXai1WCpYc48jAHoShQ==
+  version "24.10.4"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-24.10.4.tgz#9d27c032a1b2c42a4eab8fb65c5856a8b8e098c4"
+  integrity sha512-vnDVpYPMzs4wunl27jHrfmwojOGKya0xyM3sH+UE5iv5uPS6vX7UIoh6m+vQc5LGBq52HBKPIn/zcSZVzeDEZg==
   dependencies:
     undici-types "~7.16.0"
 
@@ -613,6 +620,11 @@ acorn@^8.11.0, acorn@^8.4.1:
   version "8.15.0"
   resolved "https://registry.yarnpkg.com/acorn/-/acorn-8.15.0.tgz#a360898bc415edaac46c8241f6383975b930b816"
   integrity sha512-NZyJarBfL7nWwIq+FDL6Zp/yHEhePMNnnJ0y3qfieCrmNvYct8uvtiV41UvlSe6apAfk0fY1FbWx+NwfmpvtTg==
+
+adm-zip@^0.5.16:
+  version "0.5.16"
+  resolved "https://registry.yarnpkg.com/adm-zip/-/adm-zip-0.5.16.tgz#0b5e4c779f07dedea5805cdccb1147071d94a909"
+  integrity sha512-TGw5yVi4saajsSEgz25grObGHEUaDrniwvA2qwSC060KfqGPdglhvPMA2lPIoxs3PQIItj2iag35fONcQqgUaQ==
 
 ansi-escapes@^7.0.0, ansi-escapes@^7.2.0:
   version "7.2.0"
@@ -1310,10 +1322,39 @@ ink-text-input@^6.0.0:
     chalk "^5.3.0"
     type-fest "^4.18.2"
 
-ink@*, ink@>=4.4.1, ink@^6.5.1:
+ink@*, ink@>=4.4.1:
   version "6.5.1"
   resolved "https://registry.yarnpkg.com/ink/-/ink-6.5.1.tgz#81f1e825984dc06c18a78c4bb57a77de57316e66"
   integrity sha512-wF3j/DmkM8q5E+OtfdQhCRw8/0ahkc8CUTgEddxZzpEWPslu7YPL3t64MWRoI9m6upVGpfAg4ms2BBvxCdKRLQ==
+  dependencies:
+    "@alcalzone/ansi-tokenize" "^0.2.1"
+    ansi-escapes "^7.2.0"
+    ansi-styles "^6.2.1"
+    auto-bind "^5.0.1"
+    chalk "^5.6.0"
+    cli-boxes "^3.0.0"
+    cli-cursor "^4.0.0"
+    cli-truncate "^5.1.1"
+    code-excerpt "^4.0.0"
+    es-toolkit "^1.39.10"
+    indent-string "^5.0.0"
+    is-in-ci "^2.0.0"
+    patch-console "^2.0.0"
+    react-reconciler "^0.33.0"
+    signal-exit "^3.0.7"
+    slice-ansi "^7.1.0"
+    stack-utils "^2.0.6"
+    string-width "^8.1.0"
+    type-fest "^4.27.0"
+    widest-line "^5.0.0"
+    wrap-ansi "^9.0.0"
+    ws "^8.18.0"
+    yoga-layout "~3.2.1"
+
+ink@^6.5.1:
+  version "6.6.0"
+  resolved "https://registry.yarnpkg.com/ink/-/ink-6.6.0.tgz#a060a4764336106510adb7d64299a53d40d479ca"
+  integrity sha512-QDt6FgJxgmSxAelcOvOHUvFxbIUjVpCH5bx+Slvc5m7IEcpGt3dYwbz/L+oRnqEGeRvwy1tineKK4ect3nW1vQ==
   dependencies:
     "@alcalzone/ansi-tokenize" "^0.2.1"
     ansi-escapes "^7.2.0"

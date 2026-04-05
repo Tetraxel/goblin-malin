@@ -213,7 +213,7 @@ export class SoulseekService extends ServiceBase {
 
                     this.logger.info('sortedResults', { sortedResults })
 
-                    this.logger.info(`Attempting downloads from ${sortedResults.length} results...`);
+                    this.logger.info(`Attempting downloads from ${sortedResults.length} results…`);
                     this.status.update({ progress: 70 });
 
                     // Try downloads sequentially
@@ -242,7 +242,7 @@ export class SoulseekService extends ServiceBase {
                 type: StatusType.Error,
                 message: "Soulseek search error",
             });
-            return null;
+            throw error
         }
     }
 
@@ -277,7 +277,7 @@ export class SoulseekService extends ServiceBase {
                 type: StatusType.Error,
                 message: "Soulseek download error",
             });
-            return null;
+            throw error
         }
     }
 }

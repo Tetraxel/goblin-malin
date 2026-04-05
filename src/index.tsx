@@ -3,9 +3,29 @@ import { type Instance, render } from "ink";
 import process from "node:process";
 import { App } from "./components/App";
 import { FullScreenBox } from "./components/FullScreenBox";
+import { globalLogger } from "./base/logger/logger";
 
 const ENTER_ALT_SCREEN_COMMAND = "\x1b[?1049h";
 const LEAVE_ALT_SCREEN_COMMAND = "\x1b[?1049l";
+
+// Override console.log
+console.log = (...args: any[]) => {
+  globalLogger.info(args.join(" "));
+};
+
+// Optional: Do the same for other console methods
+console.error = (...args: any[]) => {
+  globalLogger.error(args.join(" "));
+};
+
+console.warn = (...args: any[]) => {
+  globalLogger.warn(args.join(" "));
+};
+
+process.on("unhandledRejection", (reason, promise) => {
+  globalLogger.error("Unhandled Rejection", { promise, reason });
+  // Don't exit the process, just log it
+});
 
 async function write(content: string) {
   return new Promise<void>((resolve, reject) => {
@@ -78,7 +98,7 @@ try {
     //     // process.stdout.write(LEAVE_ALT_SCREEN_COMMAND);
     //     // process.stdout.write(ENTER_ALT_SCREEN_COMMAND);
     //     // process.stdout.write(LEAVE_ALT_SCREEN_COMMAND);
-    //     // console.info("Saving cache before exit...");
+    //     // console.info("Saving cache before exit…");
     //     // cache.save();
     //     // process.exit(0);
     //   }

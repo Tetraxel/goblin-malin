@@ -4,6 +4,7 @@ import { inkTransport } from "../base/logger/ink-transport";
 import { LogMetadata } from "../base/logger/types";
 import { inspect } from "util";
 import { useFocusContext } from "../contexts/FocusContext";
+import { Task } from "../base/task/task";
 
 function formatDetails(details?: Record<string, any>): string {
   if (!details || Object.keys(details).length === 0) {
@@ -34,10 +35,18 @@ function getLogString(log: LogMetadata): string {
   return level + flow + service + message + details;
 }
 
-export const LogPanel: React.FC = () => {
+export const LogPanel = ({ tasks }: { tasks: Task[] }) => {
   const { focusState, ...focusManager } = useFocusContext();
   const isActive = focusState.activeWindow === "logPanel";
   const height = focusState.logPanel.height;
+  const width = focusState.logPanel.width;
+
+  const selectedTask =
+    focusState.activeWindow === "taskList"
+      ? tasks?.[focusState.taskList.selectedTaskIndex]
+      : null;
+
+  const [logs, setLogs] = useState<LogMetadata[]>([]);
 
   useInput(
     (input, key) => {
@@ -46,9 +55,6 @@ export const LogPanel: React.FC = () => {
     },
     { isActive }
   );
-
-  const [logs, setLogs] = useState<LogMetadata[]>([]);
-  const [filter, setFilter] = useState("");
 
   useEffect(() => {
     const unsubscribe = inkTransport.subscribe((incomingLogs) => {
@@ -61,6 +67,11 @@ export const LogPanel: React.FC = () => {
     return unsubscribe; // Cleanup on unmount
   }, []);
 
+  const filteredLogs = logs.filter(
+    (log) =>
+      !Boolean(selectedTask) || !Boolean(log.task) || selectedTask === log.task
+  );
+
   return (
     <Box
       flexDirection="column"
@@ -71,8 +82,8 @@ export const LogPanel: React.FC = () => {
       borderBottom={false}
       height={height}
     >
-      {logs.slice(-height).map((log, index) => (
-        <Box key={log.id} paddingX={1} flexDirection="column">
+      {filteredLogs.slice(-height).map((log, index) => (
+        <Box key={log.id} paddingX={1} width={width}>
           <Text>{getLogString(log)}</Text>
         </Box>
       ))}

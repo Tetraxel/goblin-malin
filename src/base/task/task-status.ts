@@ -1,88 +1,92 @@
 
 export enum StatusType {
-  Default = "default",
-  Processing = "processing",
-  Pending = "pending",
-  PendingUserAction = "pendingUserAction",
-  Locked = "locked",
-  Skipped = "skipped",
-  Error = "error",
-  Success = "success",
-  NoStatus = "noStatus"
+    Default = "default",
+    Processing = "processing",
+    Pending = "pending",
+    PendingUserAction = "pendingUserAction",
+    Locked = "locked",
+    Skipped = "skipped",
+    Error = "error",
+    Success = "success",
+    NoStatus = "noStatus"
 }
 
 export interface StatusAttributes {
-  type: StatusType;
-  message: string;
-  timeTracking?: boolean;
-  stepNumber?: number;
-  progress?: number;
-  startTime?: Date | null;
-  metadata?: Record<string, any>;
+    type: StatusType;
+    message: string;
+    timeTracking?: boolean;
+    stepNumber?: number;
+    progress?: number;
+    startTime?: Date | null;
+    metadata?: Record<string, any>;
 }
 
 const DEFAULT_ATTRIBUTES: StatusAttributes = {
-  type: StatusType.NoStatus,
-  message: "No status",
-  timeTracking: false,
+    type: StatusType.NoStatus,
+    message: "No status",
+    timeTracking: false,
+    stepNumber: undefined,
+    progress: undefined,
+    startTime: undefined,
+    metadata: undefined,
 };
 
 export class TaskStatus {
-  private attributes: StatusAttributes = DEFAULT_ATTRIBUTES;
-  private subscribers: Set<(status: StatusAttributes, elapsed?: number) => void> = new Set();
+    private attributes: StatusAttributes = DEFAULT_ATTRIBUTES;
+    private subscribers: Set<(status: StatusAttributes, elapsed?: number) => void> = new Set();
 
-  constructor(initialStatus: StatusAttributes = DEFAULT_ATTRIBUTES) {
-    this.set(initialStatus);
-  }
-
-  get(): StatusAttributes {
-    return { ...this.attributes };
-  }
-
-  // Replace all status attributes
-  set(status: StatusAttributes = DEFAULT_ATTRIBUTES): StatusAttributes {
-    this.attributes = DEFAULT_ATTRIBUTES;
-    return this.update(status);
-  }
-
-  // Update partial status attributes
-  update(partial: Partial<StatusAttributes> = DEFAULT_ATTRIBUTES): StatusAttributes {
-    const wasTracking = this.attributes.timeTracking;
-
-    this.attributes = {
-      ...this.attributes,
-      ...partial,
-    };
-
-    // Start tracking if enabled
-    if (partial.timeTracking && !wasTracking) {
-      this.attributes.startTime = new Date();
+    constructor(initialStatus: StatusAttributes = DEFAULT_ATTRIBUTES) {
+        this.set(initialStatus);
     }
 
-    // Stop tracking if disabled
-    if (partial.timeTracking === false) {
-      this.attributes.startTime = null;
+    get(): StatusAttributes {
+        return { ...this.attributes };
     }
 
-    this.notifySubscribers();
-    return this.attributes;
-  }
+    // Replace all status attributes
+    set(status: StatusAttributes = DEFAULT_ATTRIBUTES): StatusAttributes {
+        this.attributes = DEFAULT_ATTRIBUTES;
+        return this.update(status);
+    }
 
-  // Subscribe to status changes
-  subscribe(callback: (status: StatusAttributes) => void): () => void {
-    this.subscribers.add(callback);
-    // Send current status immediately
-    callback(this.get());
+    // Update partial status attributes
+    update(partial: Partial<StatusAttributes> = DEFAULT_ATTRIBUTES): StatusAttributes {
+        const wasTracking = this.attributes.timeTracking;
 
-    // Return unsubscribe function
-    return () => {
-      this.subscribers.delete(callback);
-    };
-  }
+        this.attributes = {
+            ...this.attributes,
+            ...partial,
+        };
 
-  private notifySubscribers(): void {
-    this.subscribers.forEach(callback =>
-      callback(this.get())
-    );
-  }
+        // Start tracking if enabled
+        if (partial.timeTracking && !wasTracking) {
+            this.attributes.startTime = new Date();
+        }
+
+        // Stop tracking if disabled
+        if (partial.timeTracking === false) {
+            this.attributes.startTime = null;
+        }
+
+        this.notifySubscribers();
+        return this.attributes;
+    }
+
+    // Subscribe to status changes
+    subscribe(callback: (status: StatusAttributes) => void): () => void {
+        this.subscribers.add(callback);
+        // Send current status immediately
+        callback(this.get());
+
+        // Return unsubscribe function
+        return () => {
+            this.subscribers.delete(callback);
+        };
+    }
+
+    private notifySubscribers(): void {
+        this.subscribers.forEach(callback =>
+            callback(this.get())
+        );
+    }
 }

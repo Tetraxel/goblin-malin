@@ -6,6 +6,8 @@ import { Task } from '../base/task/task';
 import { StatusType } from '../base/task/task-status';
 import { Logger } from '../base/logger/logger';
 import { DOWNLOAD_DIR } from '../constants';
+import { ensureYtDlpSetup } from '../utils/ytdlp-setup';
+import { ensureFfmpeg } from '../utils/ffmpeg-setup';
 
 
 export class YtDlpService extends ServiceBase {
@@ -18,7 +20,12 @@ export class YtDlpService extends ServiceBase {
     private async getClient(): Promise<YtDlp> {
         return this.runExclusive('init', async () => {
             if (!YtDlpService.client) {
-                const ytDlpClient = new YtDlp();
+                const ytDlpBinaryPath = await ensureYtDlpSetup()
+                const ffmpefBinaryPath = await ensureFfmpeg()
+                const ytDlpClient = new YtDlp({
+                    binaryPath: ytDlpBinaryPath,
+                    ffmpegPath: ffmpefBinaryPath,
+                });
                 YtDlpService.client = ytDlpClient
             }
             return YtDlpService.client
@@ -29,7 +36,7 @@ export class YtDlpService extends ServiceBase {
         const client = await this.getClient()
         try {
             this.logger.info(
-                `Downloading youtube link: '${url}'...`
+                `Downloading youtube link: '${url}'…`
             );
             this.status.set({
                 type: StatusType.Processing,
@@ -69,6 +76,7 @@ export class YtDlpService extends ServiceBase {
                 type: StatusType.Error,
                 message: "Error downloading youtube link",
             });
+            throw error
         }
     }
 }

@@ -5,6 +5,7 @@ import SelectInput from "ink-select-input";
 import { Task } from "../base/task/task";
 import { PromptType } from "../base/task/task-prompt";
 import { useActivePrompt } from "../hooks/useActivePrompt";
+import { useFocusContext } from "../contexts/FocusContext";
 
 interface PromptModalProps {
   tasks: Task[];
@@ -17,28 +18,42 @@ export const PromptModal: React.FC<PromptModalProps> = ({
   terminalHeight,
   terminalWidth,
 }) => {
+  const { focusState, ...focusManager } = useFocusContext();
   const [inputValue, setInputValue] = useState("");
   const { task, prompt } = useActivePrompt(tasks);
   const currentPrompt = prompt?.getCurrentPrompt();
+  const isActive = !!task && !!prompt && focusState.activeWindow === "prompt";
 
-  useInput((input, key) => {
-    if (!task || !prompt) return;
-
-    // Handle Escape key to cancel
-    if (key.escape) {
-      prompt.cancelPrompt(new Error("User cancelled"));
-      return;
+  useEffect(() => {
+    if (Boolean(prompt)) {
+      focusManager.switchWindow("prompt");
+    } else {
+      focusManager.switchBack();
     }
+    return;
+  }, [prompt]);
 
-    // Handle Confirm prompts (y/n)
-    if (currentPrompt?.type === PromptType.Confirm) {
-      if (input.toLowerCase() === "y") {
-        prompt.resolvePrompt(true);
-      } else if (input.toLowerCase() === "n") {
-        prompt.resolvePrompt(false);
+  useInput(
+    (input, key) => {
+      if (!task || !prompt) return;
+
+      // Handle Escape key to cancel
+      if (key.escape) {
+        prompt.cancelPrompt(new Error("User cancelled"));
+        return;
       }
-    }
-  });
+
+      // Handle Confirm prompts (y/n)
+      if (currentPrompt?.type === PromptType.Confirm) {
+        if (input.toLowerCase() === "y") {
+          prompt.resolvePrompt(true);
+        } else if (input.toLowerCase() === "n") {
+          prompt.resolvePrompt(false);
+        }
+      }
+    },
+    { isActive }
+  );
 
   const handleInputSubmit = (value: string) => {
     if (!task || !prompt) return;
@@ -109,7 +124,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({
                     value={inputValue}
                     onChange={setInputValue}
                     onSubmit={handleInputSubmit}
-                    placeholder={currentPrompt.hint || "Enter value..."}
+                    placeholder={currentPrompt.hint || "Enter value…"}
                   />
                 </Box>
                 <Box marginTop={1}>

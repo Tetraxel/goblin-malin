@@ -39,7 +39,7 @@ export class YoutubeService extends ServiceBase {
     @Cached()
     public async searchTracks(query: string): Promise<SongDetailed[]> {
         try {
-            this.logger.info(`Searching YouTube Music for songs: "${query}"...`);
+            this.logger.info(`Searching YouTube Music for songs: "${query}"…`);
             this.status.set({
                 type: StatusType.Processing,
                 message: "Searching YouTube Music for songs",
@@ -68,13 +68,13 @@ export class YoutubeService extends ServiceBase {
 
     /**
      * Get full information about a specific song
-     * @param videoId - YouTube video ID
+     * @param videoId - YouTube music/video ID
      * @returns Full song data including formats
      */
     @Cached()
     public async getSong(videoId: string): Promise<SongFull> {
         try {
-            this.logger.info(`Getting song data for video ID: "${videoId}"...`);
+            this.logger.info(`Getting song data for video ID: "${videoId}"…`);
             this.status.set({
                 type: StatusType.Processing,
                 message: "Fetching song data",
@@ -107,7 +107,7 @@ export class YoutubeService extends ServiceBase {
     @Cached()
     public async getVideo(videoId: string): Promise<VideoFull> {
         try {
-            this.logger.info(`Getting video data for video ID: "${videoId}"...`);
+            this.logger.info(`Getting video data for video ID: "${videoId}"…`);
             this.status.set({
                 type: StatusType.Processing,
                 message: "Fetching video data",
@@ -140,7 +140,7 @@ export class YoutubeService extends ServiceBase {
     @Cached()
     public async getArtist(artistId: string): Promise<ArtistFull> {
         try {
-            this.logger.info(`Getting artist data for artist ID: "${artistId}"...`);
+            this.logger.info(`Getting artist data for artist ID: "${artistId}"…`);
             this.status.set({
                 type: StatusType.Processing,
                 message: "Fetching artist data",
@@ -173,7 +173,7 @@ export class YoutubeService extends ServiceBase {
     @Cached()
     public async getAlbum(albumId: string): Promise<AlbumFull> {
         try {
-            this.logger.info(`Getting album data for album ID: "${albumId}"...`);
+            this.logger.info(`Getting album data for album ID: "${albumId}"…`);
             this.status.set({
                 type: StatusType.Processing,
                 message: "Fetching album data",

@@ -8,15 +8,18 @@ import { SoulseekService } from "../../../services/soulseek";
 import { YtDlpService } from "../../../services/ytdlp";
 import { YoutubeService } from '../../../services/youtube';
 import { SonglinkService } from "../../../services/songlink";
-import { SonglinkResponse } from '../../../services/apis/songlink-client';
-import { Logger } from "../../../base/logger/logger";
+import { Platform, SonglinkResponse } from '../../../services/apis/songlink-client';
+import { globalLogger, Logger } from "../../../base/logger/logger";
 import { StatusType } from "../../../base/task/task-status";
 import { convertSonglinkToTrack } from './convertSonglinkToTrack';
-import { StandardTrack } from "../types";
+import { Source, StandardTrack } from "../types";
+import { saveJsonFile } from '../../../utils/json';
+import { replaceAll } from '../../../utils/string';
 
 
 export type DownloadTaskAttributes = {
     track?: StandardTrack;
+    sources?: Source[];
 }
 
 export class DownloadTask extends Task<DownloadTaskAttributes> {
@@ -45,10 +48,10 @@ export class DownloadTask extends Task<DownloadTaskAttributes> {
 
             // Step 1: Determine source and fetch metadata
             const track = await this.fetchTrackMetadata();
-            this.logger.info(`Fetched track metadata ${track.artists[0]?.name} - ${track.trackName} (${track?.duration ?? 0 / 1000}s)`);
+
+            this.logger.info(`Fetched track metadata ${track.artists[0]?.name} - ${track.trackName} (${(track?.duration ?? 0) / 1000}s)`);
 
             // Step 2: Download the track
-            // await fs.writeFile('samples/track.json', JSON.stringify(track, null, 2));
             const localTrackPath = await this.downloadTrack(track);
             if (!localTrackPath)
                 throw new Error("No candidate url for download")
@@ -56,12 +59,10 @@ export class DownloadTask extends Task<DownloadTaskAttributes> {
             this.setAttributes({ track });
 
             // Step 3: Musicbrainz
-            const musicBrainzReleases = await this.musicBrainzService.searchTracks(track.artists?.[0].name, track.trackName, track.album?.albumName);
-            await fs.writeFile('samples/musicBrainzReleases.json', JSON.stringify(musicBrainzReleases, null, 2));
-            track.musicBrainzRecording = musicBrainzReleases[0] ?? null;
-            this.setAttributes({ track });
+            await this.fetchMusicBrainz(track)
 
             // Step 4: Mark as complete
+            this.logger.info(`Successfully completed ${this.getInitialInput()}`)
             this.status.set({
                 type: StatusType.Success,
                 message: "Completed",
@@ -86,23 +87,57 @@ export class DownloadTask extends Task<DownloadTaskAttributes> {
             progress: 0,
         });
 
-        try {
-            // Try to get metadata from Songlink first
-            const url = this.getInitialInput()
-            if (!url)
-                throw new Error('No initial input')
+        const url = this.getInitialInput()
+        if (!url)
+            throw new Error('No initial input')
 
-            const songlinkResponse = await this.songlinkService.getSonglinkData(url);
-            if (!songlinkResponse)
-                throw new Error('No response from api')
 
-            const track = await convertSonglinkToTrack(songlinkResponse, this.spotifyService, this.youtubeService);
-            this.setAttributes({ track });
-            return track;
-        } catch (error) {
-            this.logger.error(`Songlink failed for ${this.getInitialInput()}: ${error}`);
-            return { id: crypto.randomUUID(), trackName: 'Unknown', artists: [], url: "Unknown" };
+        const sources: DownloadTaskAttributes['sources'] = []
+
+        // OFTEN DOWN
+        // // Try to get metadata from Songlink first
+        // const songlinkResponse = await this.songlinkService.getSonglinkData(url);
+        // if (songlinkResponse) {
+        //     try {
+        //         const track = await convertSonglinkToTrack(songlinkResponse, this.spotifyService, this.youtubeService);
+        //         sources.push({
+        //             platform: 'songlink',
+        //             track,
+        //             fetchedAt: new Date(),
+        //         });
+        //     } catch (error) {
+        //         // Continue
+        //     }
+        // }
+
+        // If spotify url, try spotify API
+        if (url.includes('.spotify.com/')) {
+            const spotifyTrackId = this.spotifyService.extractTrackIdFromUrl(url);
+
+            if (spotifyTrackId) {
+                try {
+                    const spotifyTrack = await this.spotifyService.getTrackInfo(spotifyTrackId);
+                    if (spotifyTrack) {
+                        const spotifyUrl = `https://open.spotify.com/track/${spotifyTrackId}`;
+                        const track = this.spotifyService.convertSpotifyTrack(spotifyTrack, spotifyUrl);
+                        sources.push({
+                            platform: 'spotify',
+                            track,
+                            fetchedAt: new Date(),
+                        });
+                    }
+                } catch (error) {
+                    // Continue
+                }
+            }
         }
+
+
+        // Select the best source
+        const track = sources[0]?.track
+        if (!track)
+            throw new Error('No track metadata found from the provided URL')
+        this.setAttributes({ track, sources });
     }
 
     // Download the track
@@ -115,6 +150,24 @@ export class DownloadTask extends Task<DownloadTaskAttributes> {
         // Fallback to downloading from youtube
         if (track.linksByPlatform?.["youtube"])
             return await this.ytDlpService.downloadTrack(track.linksByPlatform["youtube"], filename);
+    }
+
+
+    private async fetchMusicBrainz(track: StandardTrack): Promise<void> {
+        const artist = track.artists?.[0]
+        const album = track.album
+        if (!artist)
+            return
+        const MB_CHARS = '()_-'
+        const artistName = replaceAll(artist.name, MB_CHARS, '');
+        const trackName = replaceAll(track.trackName, MB_CHARS, ' ');
+        const albumName = album?.albumName;
+        const trackDuration: number | undefined = track.duration ?? undefined
+
+        const musicBrainzReleases = await this.musicBrainzService.searchTracks(artistName, trackName, albumName, trackDuration);
+        // await saveJsonFile('samples/musicBrainzReleases.json', musicBrainzReleases);
+        track.musicBrainzRecording = musicBrainzReleases[0] ?? null;
+        this.setAttributes({ track });
     }
 
     // // Search on Soulseek

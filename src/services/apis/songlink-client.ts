@@ -137,7 +137,7 @@ export class SonglinkClient {
         if (rateLog.length >= SONGLINK_RATE_LIMIT) {
             const oldest = rateLog[0];
             const waitMs = SONGLINK_RATE_WINDOW_MS - (now - oldest) + 50; // +50ms buffer
-            globalLogger.info(`Rate limit reached for Songlink API. Waiting ${Math.ceil(waitMs / 1000)}s...`);
+            globalLogger.info(`Rate limit reached for Songlink API. Waiting ${Math.ceil(waitMs / 1000)}s…`);
             await sleep(waitMs);
 
             // Re-filter log after waiting

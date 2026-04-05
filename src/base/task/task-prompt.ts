@@ -126,7 +126,7 @@ export class TaskPrompt {
         // Clear pending status
         this.status.update({
             type: StatusType.Processing,
-            message: "Continuing...",
+            message: "Continuing…",
         });
 
         // Resolve the promise last (this will continue task execution)

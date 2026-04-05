@@ -7,6 +7,8 @@ export const Footer: React.FC = () => {
   const isActive = focusState.activeWindow === "footer";
   const height = focusState.footer.height;
 
+  const commands = ["[Shift + ↑/↓] Resize panels", "[R] Run task"];
+
   return (
     <Box
       borderStyle="single"
@@ -16,9 +18,7 @@ export const Footer: React.FC = () => {
       overflow="hidden"
       height={height}
     >
-      <Text color="gray">
-        Shift + ↑/↓ = Resize panels • Ctrl + C = Interrupt
-      </Text>
+      <Text color="gray">{commands.join(" • ")}</Text>
     </Box>
   );
 };

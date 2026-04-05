@@ -1,9 +1,10 @@
 import { SongFull as YoutubeTrack } from 'ytmusic-api';
-import type { Track as SpotifyTrack } from "@spotify/web-api-ts-sdk";
 import { StandardTrack } from '../types';
 import { YoutubeService } from "../../../services/youtube";
 import { SpotifyService } from "../../../services/spotify";
 import type { SonglinkResponse, Entity, APIProvider, Platform } from '../../../services/apis/songlink-client';
+import { globalLogger } from '../../../base/logger/logger';
+import { saveJsonFile } from '../../../utils/json';
 
 
 // Priority order for fallback sources
@@ -30,43 +31,6 @@ function extractYoutubeMusicId(entitiesByUniqueId: Record<string, Entity>): stri
     );
 
     return entity ? entity[1].id : null;
-}
-
-
-// Converts Spotify Track to Standard Track format
-function convertSpotifyTrack(spotifyTrack: SpotifyTrack, spotifyUrl: string): StandardTrack {
-    return {
-        id: spotifyTrack.id,
-        isrc: spotifyTrack.external_ids?.isrc,
-        trackName: spotifyTrack.name,
-        duration: spotifyTrack.duration_ms,
-        trackNumber: spotifyTrack.track_number,
-        url: spotifyUrl,
-        uri: spotifyTrack.uri,
-        album: {
-            id: spotifyTrack.album.id,
-            albumType: spotifyTrack.album.album_type,
-            albumName: spotifyTrack.album.name,
-            totalTracks: spotifyTrack.album.total_tracks,
-            releaseDate: spotifyTrack.album.release_date,
-            url: spotifyTrack.album.external_urls?.spotify || '',
-            uri: spotifyTrack.album.uri || `spotify:album:${spotifyTrack.album.id}`,
-            artists: spotifyTrack.album.artists.map(artist => ({
-                id: artist.id,
-                type: 'artist' as const,
-                name: artist.name,
-                url: artist.external_urls?.spotify,
-                uri: artist.uri || `spotify:artist:${artist.id}`
-            }))
-        },
-        artists: spotifyTrack.artists.map(artist => ({
-            id: artist.id,
-            type: 'artist' as const,
-            name: artist.name,
-            url: artist.external_urls?.spotify,
-            uri: artist.uri || `spotify:artist:${artist.id}`
-        }))
-    };
 }
 
 /**
@@ -135,6 +99,10 @@ export async function getLinksByPlatforms(
             // the solution is to call the youtube music API to find the trackId
             if (platform == 'youtubeMusic') {
                 const trackResults = await youtubeService.searchTracks(`${track.artists[0].name} ${track.trackName}`)
+
+                if (!trackResults || trackResults.length === 0)
+                    return result;
+
                 const trackId = trackResults[0].videoId // TODO: search can be improved with partial matching
                 const trackLink = trackId ? `https://music.youtube.com/watch?v=${trackId}` : undefined
                 result['youtubeMusic'] = trackLink;
@@ -217,7 +185,7 @@ async function convertSonglinkToBestTrack(
             if (spotifyTrack) {
                 const spotifyUrl = response.linksByPlatform.spotify?.url ||
                     `https://open.spotify.com/track/${spotifyId}`;
-                return convertSpotifyTrack(spotifyTrack, spotifyUrl);
+                return spotifyService.convertSpotifyTrack(spotifyTrack, spotifyUrl);
             }
         } catch (error) {
             console.warn('Failed to fetch Spotify track info:', error);

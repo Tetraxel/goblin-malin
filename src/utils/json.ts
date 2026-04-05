@@ -21,6 +21,6 @@ export async function loadJsonFile<T>(filePath: string, defaultValue: T): Promis
 }
 
 export async function saveJsonFile(filePath: string, data: unknown): Promise<void> {
-    await ensureCacheDir();
+    // await ensureCacheDir();
     await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
 }

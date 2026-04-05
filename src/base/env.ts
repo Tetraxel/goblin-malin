@@ -37,7 +37,7 @@ export class Env {
                     title: `Missing environment variable '${key}'`,
                     message: (options?.description ? `${options?.description}\n\n` : "") + "Please provide a value:",
                     defaultValue: options.defaultValue,
-                    hint: options.hint ? options.hint : "Enter value...",
+                    hint: options.hint ? options.hint : "Enter value…",
                 }
             );
 

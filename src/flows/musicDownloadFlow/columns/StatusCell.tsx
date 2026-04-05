@@ -25,7 +25,8 @@ function getStatusIcon(status: StatusType): React.ReactNode {
     case StatusType.Default:
     case StatusType.Processing:
     default:
-      return <Spinner type="dots" />;
+      return <AnimatedIcon icon={Icon.Dots} />;
+    // return <Spinner type="dots" />;
   }
 }
 

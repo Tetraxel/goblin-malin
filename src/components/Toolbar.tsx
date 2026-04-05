@@ -50,10 +50,10 @@ export const Toolbar = ({
       if (key.rightArrow) focusManager.moveToolbarSelection("right");
       if (key.downArrow) focusManager.moveToolbarSelection("down");
     },
-    { isActive }
+    { isActive },
   );
 
-  const name = "😉 " + (width > 90 ? "Goblin Malin" : "");
+  const name = "🏷️+ ⭳✓ ☐ ☒ 😉 " + (width > 90 ? "Goblin Malin" : "");
   const nameWidth = stringWidth(name);
   const splitPositions = [nameWidth + 3]; // left border + padding
 

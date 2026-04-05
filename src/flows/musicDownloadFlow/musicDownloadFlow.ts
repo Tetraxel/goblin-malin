@@ -69,10 +69,12 @@ export class MusicDownloadFlow extends FlowBase<DownloadTaskAttributes> {
         }
     }
 
+    async restartTask(task: Task): Promise<void> {
+        this.orchestrator.processTask(task)
+    }
+
     async runAll(): Promise<void> {
         this.orchestrator.processTasks()
-        // this.tasks.start()
-        // await this.orchestrator.startProcessing();
     }
 
     async stopAll(): Promise<void> {
@@ -103,7 +105,7 @@ export class MusicDownloadFlow extends FlowBase<DownloadTaskAttributes> {
             },
             {
                 label: "MB",
-                weight: 1,
+                weight: 11,
                 flexGrow: 0,
                 component: MbCell,
             },

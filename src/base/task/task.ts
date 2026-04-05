@@ -92,6 +92,10 @@ export class Task<TAttributes = TaskAttributes> {
         return this.prompt;
     }
 
+    public getLogger(): Logger {
+        return this.logger;
+    }
+
     public setInitialInput(initialInput: string): void {
         this.initialInput = initialInput;
         this.notifyTaskSubscribers();

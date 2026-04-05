@@ -10,6 +10,7 @@ import {
 } from "../../../services/musicbrainz";
 import { useFocusContext } from "../../../contexts/FocusContext";
 import { globalLogger } from "../../../base/logger/logger";
+import { StandardTrack } from "../types";
 
 function getBestRelease(
   recording: MusicBrainzRecording
@@ -38,6 +39,31 @@ function getBestRelease(
   return releasesWithPriority[0] || recording.releases[0];
 }
 
+function getSearchTrackLink(
+  track: StandardTrack | undefined
+): string | undefined {
+  if (!track) return undefined;
+
+  const baseUrl = "https://musicbrainz.org/taglookup/index";
+  const params = new URLSearchParams();
+
+  if (track.artists?.[0]?.name) {
+    params.append("tag-lookup.artist", track.artists[0].name);
+  }
+  if (track.album?.albumName) {
+    params.append("tag-lookup.release", track.album.albumName);
+  }
+  if (track.trackName) {
+    params.append("tag-lookup.track", track.trackName);
+  }
+  if (track.duration) {
+    params.append("tag-lookup.duration", track.duration.toString());
+  }
+
+  const queryString = params.toString();
+  return queryString ? `${baseUrl}?${queryString}` : undefined;
+}
+
 export const MbCell: ColumnComponent<DownloadTaskAttributes> = ({
   task,
   width,
@@ -52,7 +78,7 @@ export const MbCell: ColumnComponent<DownloadTaskAttributes> = ({
     : undefined;
 
   const musicBrainzRecordingLink = musicBrainzRecording
-    ? `https://musicbrainz.org/recording/${musicBrainzRecording.id}`
+    ? `https://musicbrainz.org/recording/${musicBrainzRecording.id}?tport=8000`
     : undefined;
   const musicBrainzReleaseLink = musicBrainzRelease
     ? `https://musicbrainz.org/release/${musicBrainzRelease.id}?tport=8000`
@@ -65,6 +91,8 @@ export const MbCell: ColumnComponent<DownloadTaskAttributes> = ({
     ? `http://127.0.0.1:8000/openalbum?id=${musicBrainzRelease.id}`
     : undefined;
 
+  const searchTrackLink = getSearchTrackLink(track);
+
   const OPEN_IN_PICARD_ENABLED = false;
 
   useInput(
@@ -73,10 +101,12 @@ export const MbCell: ColumnComponent<DownloadTaskAttributes> = ({
         if (OPEN_IN_PICARD_ENABLED) {
           if (mbPicardReleaseLink) await open(mbPicardReleaseLink);
           else if (mbPicardRecordingLink) await open(mbPicardRecordingLink);
+          else if (searchTrackLink) await open(searchTrackLink);
         } else {
           if (musicBrainzReleaseLink) await open(musicBrainzReleaseLink);
           else if (musicBrainzRecordingLink)
             await open(musicBrainzRecordingLink);
+          else if (searchTrackLink) await open(searchTrackLink);
         }
       }
     },
@@ -86,20 +116,24 @@ export const MbCell: ColumnComponent<DownloadTaskAttributes> = ({
   return (
     <Text
       color={
-        musicBrainzRecording === undefined
-          ? "white"
-          : musicBrainzRecording === null
+        musicBrainzRecording
+          ? "green"
+          : searchTrackLink
+          ? "yellow"
+          : track
           ? "red"
-          : "green"
+          : "white"
       }
       underline={isSelected}
       wrap="truncate-end"
     >
-      {musicBrainzRecording === undefined
-        ? ""
-        : musicBrainzRecording === null
-        ? "✘"
-        : "✔"}
+      {musicBrainzRecording
+        ? "🡵 Open"
+        : searchTrackLink
+        ? "🔎 Search"
+        : track
+        ? "✘ Not found"
+        : ""}
     </Text>
   );
 };
