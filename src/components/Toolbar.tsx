@@ -7,6 +7,7 @@ import { Separator } from "./Separator";
 import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
 import { ToolbarButtonInvoker } from "./ToolbarButtonInvoker";
 import { FlowBase } from "../base/flow/flow-base";
+import { useWhyDidYouUpdate } from "../utils/useWhyDidYouUpdate";
 
 export type ToolbarButtonHook<TFlow = FlowBase> = ({
   isSelected,
@@ -53,7 +54,7 @@ export const Toolbar = ({
     { isActive },
   );
 
-  const name = "🏷️+ ⭳✓ ☐ ☒ 😉 " + (width > 90 ? "Goblin Malin" : "");
+  const name = "😉 " + (width > 90 ? "Goblin Malin" : "");
   const nameWidth = stringWidth(name);
   const splitPositions = [nameWidth + 3]; // left border + padding
 

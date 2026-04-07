@@ -48,14 +48,6 @@ export const LogPanel = ({ tasks }: { tasks: Task[] }) => {
 
   const [logs, setLogs] = useState<LogMetadata[]>([]);
 
-  useInput(
-    (input, key) => {
-      if (key.upArrow) focusManager.moveLogSelection("up");
-      if (key.downArrow) focusManager.moveLogSelection("down");
-    },
-    { isActive }
-  );
-
   useEffect(() => {
     const unsubscribe = inkTransport.subscribe((incomingLogs) => {
       const normalized = incomingLogs as LogMetadata[];
@@ -69,7 +61,7 @@ export const LogPanel = ({ tasks }: { tasks: Task[] }) => {
 
   const filteredLogs = logs.filter(
     (log) =>
-      !Boolean(selectedTask) || !Boolean(log.task) || selectedTask === log.task
+      !Boolean(selectedTask) || !Boolean(log.task) || selectedTask === log.task,
   );
 
   return (

@@ -3,17 +3,17 @@ import open from "open";
 import fs from "fs/promises";
 import { Text, useInput } from "ink";
 import { ColumnComponent } from "../../../components/TaskListPanel";
-import { DownloadTaskAttributes } from "../utils/downloadTask";
 import {
   MusicBrainzRecording,
   MusicBrainzRelease,
 } from "../../../services/musicbrainz";
 import { useFocusContext } from "../../../contexts/FocusContext";
 import { globalLogger } from "../../../base/logger/logger";
-import { StandardTrack } from "../types";
+import { DownloadTaskAttributes, StandardTrack } from "../types";
+import { useWhyDidYouUpdate } from "../../../utils/useWhyDidYouUpdate";
 
 function getBestRelease(
-  recording: MusicBrainzRecording
+  recording: MusicBrainzRecording,
 ): MusicBrainzRelease | undefined {
   if (!recording.releases || recording.releases.length === 0) {
     return undefined;
@@ -40,7 +40,7 @@ function getBestRelease(
 }
 
 function getSearchTrackLink(
-  track: StandardTrack | undefined
+  track: StandardTrack | undefined,
 ): string | undefined {
   if (!track) return undefined;
 
@@ -69,7 +69,6 @@ export const MbCell: ColumnComponent<DownloadTaskAttributes> = ({
   width,
   isSelected,
 }) => {
-  const { focusState } = useFocusContext();
   const track = task.attributes?.track;
 
   const musicBrainzRecording = track?.musicBrainzRecording;
@@ -95,6 +94,7 @@ export const MbCell: ColumnComponent<DownloadTaskAttributes> = ({
 
   const OPEN_IN_PICARD_ENABLED = false;
 
+  // Hook must be called unconditionally, but disabled when column is hidden
   useInput(
     async (input, key) => {
       if (key.return) {
@@ -110,8 +110,14 @@ export const MbCell: ColumnComponent<DownloadTaskAttributes> = ({
         }
       }
     },
-    { isActive: isSelected }
+    { isActive: isSelected },
   );
+
+  useWhyDidYouUpdate("MbCell", {
+    task,
+    width,
+    isSelected,
+  });
 
   return (
     <Text
@@ -119,10 +125,10 @@ export const MbCell: ColumnComponent<DownloadTaskAttributes> = ({
         musicBrainzRecording
           ? "green"
           : searchTrackLink
-          ? "yellow"
-          : track
-          ? "red"
-          : "white"
+            ? "yellow"
+            : track
+              ? "red"
+              : "white"
       }
       underline={isSelected}
       wrap="truncate-end"
@@ -130,10 +136,10 @@ export const MbCell: ColumnComponent<DownloadTaskAttributes> = ({
       {musicBrainzRecording
         ? "🡵 Open"
         : searchTrackLink
-        ? "🔎 Search"
-        : track
-        ? "✘ Not found"
-        : ""}
+          ? "🔎 Search"
+          : track
+            ? "✘ Not found"
+            : ""}
     </Text>
   );
 };

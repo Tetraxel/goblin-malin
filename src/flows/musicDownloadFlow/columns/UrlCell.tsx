@@ -1,7 +1,8 @@
 import React from "react";
 import { Text } from "ink";
 import { ColumnComponent } from "../../../components/TaskListPanel";
-import { DownloadTaskAttributes } from "../utils/downloadTask";
+import { DownloadTaskAttributes } from "../types";
+import { useWhyDidYouUpdate } from "../../../utils/useWhyDidYouUpdate";
 
 export const UrlCell: ColumnComponent<DownloadTaskAttributes> = ({
   task,
@@ -10,6 +11,12 @@ export const UrlCell: ColumnComponent<DownloadTaskAttributes> = ({
 }) => {
   const track = task.attributes?.track;
   const url = track?.uri ?? track?.url ?? task.initialInput ?? "";
+
+  useWhyDidYouUpdate("UrlCell", {
+    task,
+    width,
+    isSelected,
+  });
 
   return (
     <Text

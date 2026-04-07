@@ -14,6 +14,7 @@ export interface FlowClass {
 type OrchestratorSubscriber = (orchestrator: FlowOrchestrator) => void;
 
 export class FlowOrchestrator {
+    public readonly id = "flow-orchestrator";
     private static instance: FlowOrchestrator;
     private globalMaxConcurrent: number = 3;
     private logger: Logger;

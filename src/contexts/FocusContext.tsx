@@ -15,9 +15,14 @@ export const useFocusContext = () => {
 
 export const FocusProvider: React.FC<{
   children: ReactNode;
-  value: FocusContextValue;
-}> = ({ children, value }) => {
+  toolbarButtonCount: number;
+  taskCount: number;
+  taskColumnCount: number;
+}> = ({ children, ...config }) => {
+  const focusManager = useFocusManager(config); // ← moved here
   return (
-    <FocusContext.Provider value={value}>{children}</FocusContext.Provider>
+    <FocusContext.Provider value={focusManager}>
+      {children}
+    </FocusContext.Provider>
   );
 };

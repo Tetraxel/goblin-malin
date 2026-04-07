@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useScreenSize } from './useScreenSize';
+import { FlowBase } from '../base/flow/flow-base';
 
 const TOOLBAR_HEIGHT = 1
 const TASK_LIST_HEIGHT = 20
@@ -40,12 +41,10 @@ export const useFocusManager = ({
     toolbarButtonCount,
     taskCount,
     taskColumnCount,
-    logCount,
 }: {
     toolbarButtonCount: number,
     taskCount: number,
     taskColumnCount: number,
-    logCount: number
 }) => {
     const { height: terminalHeight, width: terminalWidth } = useScreenSize();
     const [focusState, setFocusState] = useState<FocusState>({
@@ -64,7 +63,7 @@ export const useFocusManager = ({
         logPanel: {
             height: calculateLogPanelHeight(terminalHeight, TASK_LIST_HEIGHT, TOOLBAR_HEIGHT, FOOTER_HEIGHT),
             // Start from last log
-            selectedLogIndex: Math.max(0, logCount - 1),
+            selectedLogIndex: Math.max(0, 10),
             width: terminalWidth,
         },
         footer: {
@@ -113,6 +112,14 @@ export const useFocusManager = ({
         });
     }, []);
 
+    const switchMode = useCallback((flow: FlowBase | undefined, input: string) => {
+        if (!flow || typeof flow.switchMode !== 'function') {
+            return;
+        }
+
+        flow.switchMode(input);
+    }, []);
+
     const resizeTaskList = useCallback((direction: 'up' | 'down') => {
         setFocusState(prev => {
             const newHeight = direction === 'up'
@@ -126,7 +133,7 @@ export const useFocusManager = ({
                 logPanel: { ...prev.logPanel, height: logPaneHeight },
             };
         });
-    }, [logCount]);
+    }, [terminalHeight]);
 
     // Navigation within toolbar
     const moveToolbarSelection = useCallback((direction: 'left' | 'right' | 'down') => {
@@ -183,27 +190,15 @@ export const useFocusManager = ({
         });
     }, [taskCount, taskColumnCount]);
 
-    // Navigation within log panel
-    const moveLogSelection = useCallback((direction: 'up' | 'down') => {
-        setFocusState(prev => {
-            const newIndex = direction === 'up'
-                ? Math.max(0, prev.logPanel.selectedLogIndex - 1)
-                : Math.min(logCount - 1, prev.logPanel.selectedLogIndex + 1);
-            return {
-                ...prev,
-                logPanel: { ...prev.logPanel, selectedLogIndex: newIndex }
-            };
-        });
-    }, [logCount]);
 
     return {
         focusState,
         switchWindow,
         switchBack,
         handleTabPress,
+        switchMode,
         resizeTaskList,
         moveToolbarSelection,
         moveTaskSelection,
-        moveLogSelection,
     };
 };

@@ -1,9 +1,9 @@
 import fs from 'fs/promises';
 import { FlowOrchestrator } from '../../base/flow/flow-orchestrator';
 import { FlowBase } from "../../base/flow/flow-base";
-import { Logger } from "../../base/logger/logger";
+import { globalLogger, Logger } from "../../base/logger/logger";
 import { Task } from '../../base/task/task';
-import { DownloadTask, DownloadTaskAttributes } from './utils/downloadTask';
+import { DownloadTask } from './utils/downloadTask';
 import { InputLoader } from './utils/input-loader';
 import { ToolbarButtonHook } from '../../components/Toolbar';
 import { ColumnDefinition } from '../../components/TaskListPanel';
@@ -15,6 +15,9 @@ import { UrlCell } from './columns/UrlCell';
 import { ArtistCell } from './columns/ArtistCell';
 import { TrackCell } from './columns/TrackCell';
 import { StatusCell } from './columns/StatusCell';
+import { ToTagCell } from './columns/ToTagCell';
+import { ToDownloadCell } from './columns/ToDownloadCell';
+import { DownloadTaskAttributes } from './types';
 
 
 export class MusicDownloadFlow extends FlowBase<DownloadTaskAttributes> {
@@ -22,9 +25,31 @@ export class MusicDownloadFlow extends FlowBase<DownloadTaskAttributes> {
     public readonly displayName = "Music Downloader";
     public readonly author = "Tetraxel";
     static inputLoader: InputLoader = InputLoader.getInstance()
-    protected tasks: Task[] = []
+    protected tasks: DownloadTask[] = []
 
     protected maxConcurrentTasks = 2; // Flow-specific limit
+    protected displayMode: "metadata" | "download" = "metadata";
+
+    public getDisplayMode(): "download" | "metadata" {
+        return this.displayMode;
+    }
+
+    public setDisplayMode(mode: "download" | "metadata"): void {
+        this.displayMode = mode;
+        this.notifyTaskSubscribers();
+    }
+
+    public switchMode(input: string): void {
+        if (input === "1") {
+            this.setDisplayMode("metadata");
+            return;
+        }
+
+        if (input === "2") {
+            this.setDisplayMode("download");
+            return;
+        }
+    }
 
     private static instance: MusicDownloadFlow;
 
@@ -96,18 +121,63 @@ export class MusicDownloadFlow extends FlowBase<DownloadTaskAttributes> {
     }
 
     getColumns(): ColumnDefinition<DownloadTaskAttributes>[] {
+        // Always return all columns to maintain consistent hook count
+        // // Column visibility is controlled via weight, not by array length
+        if (this.displayMode === "metadata") {
+            return [
+                {
+                    label: "TAG?",
+                    weight: 1,
+                    flexGrow: 0,
+                    component: ToTagCell,
+                },
+                {
+                    label: "DL?",
+                    weight: 1,
+                    flexGrow: 0,
+                    component: ToDownloadCell,
+                },
+                {
+                    label: "URL",
+                    weight: 45,
+                    flexGrow: 0,
+                    component: UrlCell,
+                },
+                {
+                    label: "ARTIST",
+                    weight: 16,
+                    flexGrow: 0,
+                    component: ArtistCell,
+                },
+                {
+                    label: "TRACK",
+                    weight: 30,
+                    flexGrow: 0,
+                    component: TrackCell,
+                },
+                {
+                    label: "MB",
+                    weight: 12,
+                    minWidth: 0,
+                    flexGrow: 0,
+                    component: MbCell,
+                },
+                {
+                    label: "STATUS",
+                    weight: 28,
+                    minWidth: 20,
+                    flexGrow: 0,
+                    component: StatusCell,
+                },
+            ];
+        }
+
         return [
             {
                 label: "URL",
-                weight: 45,
+                weight: 20,
                 flexGrow: 0,
                 component: UrlCell,
-            },
-            {
-                label: "MB",
-                weight: 11,
-                flexGrow: 0,
-                component: MbCell,
             },
             {
                 label: "ARTIST",
@@ -128,6 +198,6 @@ export class MusicDownloadFlow extends FlowBase<DownloadTaskAttributes> {
                 flexGrow: 0,
                 component: StatusCell,
             },
-        ]
+        ];
     }
 }

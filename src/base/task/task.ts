@@ -9,26 +9,26 @@ export interface DownloadTaskData {
     track?: string;
 }
 
-export type TaskSubscriber<TAttributes> = (task: Task<TAttributes>) => void;
-export type TaskSubscribers<TAttributes> = Set<TaskSubscriber<TAttributes>>;
+export type TaskSubscriber<TTAttributes> = (task: Task<TTAttributes>) => void;
+export type TaskSubscribers<TTAttributes> = Set<TaskSubscriber<TTAttributes>>;
 export type TaskAttributes = Record<string, any>
-export type TaskSnapshot<TAttributes = TaskAttributes> = {
+export type TaskSnapshot<TTAttributes = TaskAttributes> = {
     id: string;
     initialInput: string | undefined;
-    attributes: TAttributes | undefined;
+    attributes: TTAttributes | undefined;
     status: StatusAttributes;
     prompt: UserPrompt | null;
 }
 
-export class Task<TAttributes = TaskAttributes> {
-    protected id: string;
+export class Task<TTaskAttributes = TaskAttributes> {
+    public readonly id: string;
     protected flowId: string;
     protected initialInput?: string;
-    protected attributes?: TAttributes;
+    protected attributes?: TTaskAttributes;
     protected logger: Logger;
     protected status: TaskStatus;
     protected prompt: TaskPrompt;
-    protected subscribers: TaskSubscribers<TAttributes> = new Set();
+    protected subscribers: TaskSubscribers<TTaskAttributes> = new Set();
 
     public enabled: boolean = true
     public running: boolean = false
@@ -38,7 +38,7 @@ export class Task<TAttributes = TaskAttributes> {
     public success: boolean = false
 
     constructor({ id, initialInput, attributes, flowId, logger }: {
-        id: string; initialInput?: string; attributes?: TAttributes, flowId: string, logger: Logger
+        id: string; initialInput?: string; attributes?: TTaskAttributes, flowId: string, logger: Logger
     }) {
         this.id = id;
         this.flowId = flowId
@@ -58,7 +58,7 @@ export class Task<TAttributes = TaskAttributes> {
         });
     }
 
-    public get(): TaskSnapshot<TAttributes> {
+    public get(): TaskSnapshot<TTaskAttributes> {
         return {
             id: this.id,
             initialInput: this.initialInput,
@@ -101,9 +101,13 @@ export class Task<TAttributes = TaskAttributes> {
         this.notifyTaskSubscribers();
     }
 
-    public setAttributes(track: TAttributes): void {
-        this.attributes = track;
+    public setAttributes(attributes: TTaskAttributes): void {
+        this.attributes = attributes;
         this.notifyTaskSubscribers();
+    }
+
+    public updateAttributes(attributes: Partial<TTaskAttributes>): void {
+        this.setAttributes({ ...this.attributes, ...attributes } as TTaskAttributes);
     }
 
     async start(): Promise<void> {
@@ -115,7 +119,7 @@ export class Task<TAttributes = TaskAttributes> {
     }
 
     // Subscribe to any changes in the task (including status changes)
-    public subscribe(callback: TaskSubscriber<TAttributes>): () => void {
+    public subscribe(callback: TaskSubscriber<TTaskAttributes>): () => void {
         this.subscribers.add(callback);
         callback(this); // Send current state immediately
 
@@ -124,7 +128,7 @@ export class Task<TAttributes = TaskAttributes> {
         };
     }
 
-    private notifyTaskSubscribers(): void {
+    protected notifyTaskSubscribers(): void {
         this.subscribers?.forEach(callback => callback(this));
     }
 }

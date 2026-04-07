@@ -42,3 +42,10 @@ export interface Source {
     track: StandardTrack;
     fetchedAt: Date;
 }
+
+export type DownloadTaskAttributes = {
+    toTag?: boolean;
+    toDownload?: boolean;
+    track?: StandardTrack;
+    sources?: Source[];
+}

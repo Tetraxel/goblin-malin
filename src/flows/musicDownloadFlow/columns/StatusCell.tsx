@@ -2,9 +2,10 @@ import React from "react";
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 import { ColumnComponent } from "../../../components/TaskListPanel";
-import { DownloadTaskAttributes } from "../utils/downloadTask";
 import { StatusAttributes, StatusType } from "../../../base/task/task-status";
 import { AnimatedIcon, Icon } from "../../../components/AnimatedIcon";
+import { DownloadTaskAttributes } from "../types";
+import { useWhyDidYouUpdate } from "../../../utils/useWhyDidYouUpdate";
 
 function getStatusIcon(status: StatusType): React.ReactNode {
   switch (status) {
@@ -75,6 +76,12 @@ export const StatusCell: ColumnComponent<DownloadTaskAttributes> = ({
   const statusColor = getStatusColor(task.status.type);
   const statusText = getStatusText(task.status);
   const iconComponent = getStatusIcon(task.status.type);
+
+  useWhyDidYouUpdate("StatusCell", {
+    task,
+    width,
+    isSelected,
+  });
 
   return (
     <Box overflow="hidden">

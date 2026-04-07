@@ -4,8 +4,10 @@ import { ToolbarButtonHook } from "../../components/Toolbar";
 import { FlowOrchestrator } from "./flow-orchestrator";
 import { Task } from "../task/task";
 
+export type FlowSubscriber<TTaskAttributes> = (flow: FlowBase<TTaskAttributes>) => void;
+export type FlowSubscribers<TTaskAttributes> = Set<FlowSubscriber<TTaskAttributes>>;
 
-export class FlowBase<TAttributes = any> {
+export class FlowBase<TaskAttributes = any> {
     public readonly id: string = "";
     public readonly displayName: string = "";
     public readonly author: string = "";
@@ -14,6 +16,8 @@ export class FlowBase<TAttributes = any> {
     protected logger: Logger;
     protected orchestrator: FlowOrchestrator;
     protected maxConcurrentTasks: number = 1;
+    protected displayMode: string = "default";
+    protected subscribers: FlowSubscribers<TaskAttributes> = new Set();
 
     protected constructor(logger: Logger, defaultEnabled: boolean, orchestrator: FlowOrchestrator) {
         this.logger = logger;
@@ -22,35 +26,57 @@ export class FlowBase<TAttributes = any> {
     }
 
     // Default implementations
-    async initialize(): Promise<void> {
+    public async initialize(): Promise<void> {
         throw Error('Not implemented')
     }
 
-    async importTasks(): Promise<void> {
+    public async importTasks(): Promise<void> {
         throw Error('Not implemented')
     }
 
-    async restartTask(task: Task<TAttributes>): Promise<void> {
+    public async restartTask(task: Task<TaskAttributes>): Promise<void> {
         throw Error('Not implemented')
     }
 
-    async runAll(): Promise<void> {
+    public async runAll(): Promise<void> {
         throw Error('Not implemented')
     }
 
-    async stopAll(): Promise<void> {
+    public async stopAll(): Promise<void> {
         throw Error('Not implemented')
     }
 
-    getMaxConcurrentTasks(): number {
+    public getMaxConcurrentTasks(): number {
         return this.maxConcurrentTasks;
     }
 
-    // UI methods
-    getToolbarButtons(): ToolbarButtonHook[] {
+    public getDisplayMode(): string {
+        return this.displayMode;
+    }
+
+    public switchMode(input: string): void {
         throw Error('Not implemented')
     }
-    getColumns(): ColumnDefinition<TAttributes>[] {
+
+    // UI methods
+    public getToolbarButtons(): ToolbarButtonHook[] {
         throw Error('Not implemented')
+    }
+    public getColumns(): ColumnDefinition<TaskAttributes>[] {
+        throw Error('Not implemented')
+    }
+
+    // Subscribe to any changes in the task (including status changes)
+    public subscribe(callback: FlowSubscriber<TaskAttributes>): () => void {
+        this.subscribers.add(callback);
+        callback(this); // Send current state immediately
+
+        return () => {
+            this.subscribers.delete(callback);
+        };
+    }
+
+    protected notifyTaskSubscribers(): void {
+        this.subscribers?.forEach(callback => callback(this));
     }
 }

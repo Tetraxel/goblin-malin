@@ -1,7 +1,8 @@
 import React from "react";
 import { Text } from "ink";
 import { ColumnComponent } from "../../../components/TaskListPanel";
-import { DownloadTaskAttributes } from "../utils/downloadTask";
+import { DownloadTaskAttributes } from "../types";
+import { useWhyDidYouUpdate } from "../../../utils/useWhyDidYouUpdate";
 
 export const TrackCell: ColumnComponent<DownloadTaskAttributes> = ({
   task,
@@ -9,6 +10,12 @@ export const TrackCell: ColumnComponent<DownloadTaskAttributes> = ({
   isSelected,
 }) => {
   const trackName = task.attributes?.track?.trackName || "";
+
+  useWhyDidYouUpdate("TrackCell", {
+    task,
+    width,
+    isSelected,
+  });
 
   return (
     <Text

@@ -12,15 +12,10 @@ import { Platform, SonglinkResponse } from '../../../services/apis/songlink-clie
 import { globalLogger, Logger } from "../../../base/logger/logger";
 import { StatusType } from "../../../base/task/task-status";
 import { convertSonglinkToTrack } from './convertSonglinkToTrack';
-import { Source, StandardTrack } from "../types";
+import { DownloadTaskAttributes, Source, StandardTrack } from "../types";
 import { saveJsonFile } from '../../../utils/json';
 import { replaceAll } from '../../../utils/string';
 
-
-export type DownloadTaskAttributes = {
-    track?: StandardTrack;
-    sources?: Source[];
-}
 
 export class DownloadTask extends Task<DownloadTaskAttributes> {
     private songlinkService: SonglinkService;
