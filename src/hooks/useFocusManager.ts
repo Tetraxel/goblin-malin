@@ -3,7 +3,7 @@ import { useScreenSize } from './useScreenSize';
 import { FlowBase } from '../base/flow/flow-base';
 
 const TOOLBAR_HEIGHT = 1
-const TASK_LIST_HEIGHT = 20
+const TASK_LIST_HEIGHT = 30
 const FOOTER_HEIGHT = 2
 const SEPARATOR_HEIGHT = 4
 
@@ -172,7 +172,10 @@ export const useFocusManager = ({
                     return { ...prev, activeWindow: 'toolbar', toolbar: { ...prev.toolbar, selectedButtonIndex: 0 } };
                 }
 
-                newIndex = Math.min(taskCount - 1, Math.max(0, newIndex));
+                if (newIndex >= taskCount) {
+                    return prev; // Don't go past the last  
+                }
+
                 return {
                     ...prev,
                     taskList: { ...prev.taskList, selectedTaskIndex: newIndex }

@@ -2,75 +2,228 @@ import path from 'path';
 import fs from 'fs/promises';
 import { PROJECT_ROOT } from "../../../constants";
 import { Task } from "../../../base/task/task";
-import { MusicBrainzService } from '../../../services/musicbrainz';
-import { SpotifyService } from "../../../services/spotify";
-import { SoulseekService } from "../../../services/soulseek";
-import { YtDlpService } from "../../../services/ytdlp";
-import { YoutubeService } from '../../../services/youtube';
-import { SonglinkService } from "../../../services/songlink";
-import { Platform, SonglinkResponse } from '../../../services/apis/songlink-client';
+import { MusicBrainzService } from '../services/metadata-providers/musicbrainz';
+import { SpotifyService } from "../services/metadata-providers/spotify";
+import { SoulseekService } from "../services/download-providers/soulseek";
+import { YtDlpService } from "../services/download-providers/ytdlp";
+import { YoutubeService } from '../services/metadata-providers/youtube';
+import { SonglinkService } from "../services/metadata-providers/songlink";
+import { Platform, SonglinkResponse } from '../services/apis/songlink-client';
 import { globalLogger, Logger } from "../../../base/logger/logger";
 import { StatusType } from "../../../base/task/task-status";
 import { convertSonglinkToTrack } from './convertSonglinkToTrack';
-import { DownloadTaskAttributes, Source, StandardTrack } from "../types";
+import { MusicDownloadTaskAttributes, StandardTrack, TrackMetadata, TrackDownloadSource } from "../types";
 import { saveJsonFile } from '../../../utils/json';
 import { replaceAll } from '../../../utils/string';
+import { ServiceBase } from '../../../base/service-base';
+import { MetadataService } from '../metadataService';
+import { DownloadService } from '../downloadService';
+import { ServiceRegistry } from '../../../base/service-registry';
+import { ServiceScope } from '../../../base/service-scope';
 
 
-export class DownloadTask extends Task<DownloadTaskAttributes> {
-    private songlinkService: SonglinkService;
-    private musicBrainzService: MusicBrainzService;
-    private spotifyService: SpotifyService;
-    private soulseekService: SoulseekService;
-    private ytDlpService: YtDlpService;
-    private youtubeService: YoutubeService;
+export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
+    private metadataServices: ServiceScope<DownloadTask, MetadataService>;
+    private downloadServices: ServiceScope<DownloadTask, DownloadService>;
 
-    constructor({ id, initialInput, attributes, flowId, logger }: {
-        id: string; initialInput?: string; attributes?: DownloadTaskAttributes, flowId: string, logger: Logger
-    }) {
+    // private songlinkService: SonglinkService;
+    // private musicBrainzService: MusicBrainzService;
+    // private spotifyService: SpotifyService;
+    // private soulseekService: SoulseekService;
+    // private ytDlpService: YtDlpService;
+    // private youtubeService: YoutubeService;
+
+    constructor(
+        {
+            id,
+            initialInput,
+            attributes,
+            flowId,
+            logger,
+            metadataServiceRegistry,
+            downloadServiceRegistry
+        }: {
+            id: string;
+            initialInput?: string;
+            attributes?: MusicDownloadTaskAttributes,
+            flowId: string,
+            logger: Logger,
+            metadataServiceRegistry: ServiceRegistry<DownloadTask, MetadataService>,
+            downloadServiceRegistry: ServiceRegistry<DownloadTask, DownloadService>,
+        }) {
         super({ id, initialInput, attributes, flowId, logger });
-        this.songlinkService = new SonglinkService(this, this.logger);
-        this.musicBrainzService = new MusicBrainzService(this, this.logger);
-        this.spotifyService = new SpotifyService(this, this.logger);
-        this.soulseekService = new SoulseekService(this, this.logger);
-        this.ytDlpService = new YtDlpService(this, this.logger);
-        this.youtubeService = new YoutubeService(this, this.logger);
+        // this.songlinkService = new SonglinkService(this, this.logger);
+        // this.musicBrainzService = new MusicBrainzService(this, this.logger);
+        // this.spotifyService = new SpotifyService(this, this.logger);
+        // this.soulseekService = new SoulseekService(this, this.logger);
+        // this.ytDlpService = new YtDlpService(this, this.logger);
+        // this.youtubeService = new YoutubeService(this, this.logger);
+
+        this.metadataServices = metadataServiceRegistry.createScope(this, this.logger);
+        this.downloadServices = downloadServiceRegistry.createScope(this, this.logger);
+    }
+
+    private addMetadataSource(metadata: TrackMetadata): void {
+        const currentSources = this.getAttributes()?.metadataSources || [];
+        this.updateAttributes({ metadataSources: [...currentSources, metadata] });
     }
 
     async start(): Promise<void> {
-        try {
-            this.logger.info(`Starting to process ${this.getInitialInput()}`);
+        this.logger.info(`Starting to process ${this.getInitialInput()}`);
 
-            // Step 1: Determine source and fetch metadata
-            const track = await this.fetchTrackMetadata();
+        // If primary metadata is not fetched -> fetch it
+        if (!this.getAttributes()?.metadataSources.find((s) => s.isPrimarySource)) {
+            await this.startPrimaryMetadataFetching();
+        }
 
-            this.logger.info(`Fetched track metadata ${track.artists[0]?.name} - ${track.trackName} (${(track?.duration ?? 0) / 1000}s)`);
+        await this.startMetadataDiscovering();
 
-            // Step 2: Download the track
-            const localTrackPath = await this.downloadTrack(track);
-            if (!localTrackPath)
-                throw new Error("No candidate url for download")
-            track.localRelativePath = path.relative(PROJECT_ROOT, localTrackPath);
-            this.setAttributes({ track });
+        await this.startDownloads();
 
-            // Step 3: Musicbrainz
-            await this.fetchMusicBrainz(track)
+        // Old implementation
 
-            // Step 4: Mark as complete
-            this.logger.info(`Successfully completed ${this.getInitialInput()}`)
-            this.status.set({
-                type: StatusType.Success,
-                message: "Completed",
-                progress: 100,
-            });
-        } catch (error) {
-            throw error;
+        // // Step 1: Determine source and fetch metadata
+        // const track = await this.fetchTrackMetadata();
+
+        // this.logger.info(`Fetched track metadata ${track.artists[0]?.name} - ${track.trackName} (${(track?.duration ?? 0) / 1000}s)`);
+
+        // // Step 2: Download the track
+        // const localTrackPath = await this.downloadTrack(track);
+        // if (!localTrackPath)
+        //     throw new Error("No candidate url for download")
+        // track.localRelativePath = path.relative(PROJECT_ROOT, localTrackPath);
+        // this.setAttributes({ track });
+
+        // // Step 3: Musicbrainz
+        // await this.fetchMusicBrainz(track)
+
+        // // Step 4: Mark as complete
+        // this.logger.info(`Successfully completed ${this.getInitialInput()}`)
+        // this.status.set({
+        //     type: StatusType.Success,
+        //     message: "Completed",
+        //     progress: 100,
+        // });
+    }
+
+    async startPrimaryMetadataFetching(): Promise<TrackMetadata> {
+        const url = this.getAttributes()?.userInput.url;
+
+        if (!url) {
+            throw new Error('No user input URL provided');
+        }
+
+        this.logger.info(`Fetching primary metadata for URL: ${url}`);
+
+        const services = this.metadataServices.getAllServices();
+        for (const service of services) {
+            try {
+                // Check if this service can handle the URL
+                const type = service.getType(url);
+                if (type === 'track') {
+                    this.logger.debug(`Fetching metadata using ${service.constructor.name}`);
+
+                    const metadata = await service.getTrackMetadata(url);
+
+                    metadata.isPrimarySource = true;
+                    this.addMetadataSource(metadata);
+                    this.logger.info(`Successfully fetched primary metadata from ${metadata.apiProvider}`);
+                    return metadata;
+                }
+            } catch (error) {
+                this.logger.warn(`Failed to fetch metadata from ${service.constructor.name}:`, { error });
+            }
+        }
+
+        throw new Error(`No metadata service could handle the URL: ${url}`);
+    }
+
+    async startMetadataDiscovering(): Promise<void> {
+        // Get the primary metadata source to use for searching
+        const primaryMetadata = this.getAttributes()?.metadataSources.find((s) => s.isPrimarySource);
+
+        if (!primaryMetadata) {
+            throw new Error('No primary metadata source available for metadata discovering');
+        }
+
+        this.logger.info(`Discovering metadata from all other sources using primary metadata`);
+
+        const services = this.metadataServices.getAllServices();
+        for (const service of services) {
+            try {
+                // Skip the primary source provider to avoid duplicate metadata
+                if (service.id === primaryMetadata.id) {
+                    this.logger.debug(`Skipping primary source provider: ${service.id}`);
+                    continue;
+                }
+
+                this.logger.debug(`Searching for track using ${service.id}`);
+
+                // Use isrc, track name, artist name, etc to improve search results
+                const metadata = await service.searchTrack(primaryMetadata);
+
+                metadata.isPrimarySource = false;
+                this.addMetadataSource(metadata);
+                this.logger.info(`Successfully discovered metadata from ${metadata.apiProvider}`);
+            } catch (error) {
+                this.logger.warn(`Failed to discover metadata from ${service.constructor.name}:`, { error });
+                // Continue to next service on failure
+            }
         }
     }
 
-    async stop(): Promise<void> {
-        // Not Implemented
+    async startDownloads(): Promise<void> {
+        const metadataSources = this.getAttributes()?.metadataSources;
+
+        if (!metadataSources || metadataSources.length === 0) {
+            this.logger.warn('No metadata sources available for download');
+            throw new Error('No metadata sources available for download');
+        }
+
+        this.logger.info(`Starting downloads with ${metadataSources.length} metadata sources`);
+
+        const downloadServices = this.downloadServices.getAllServices();
+        const downloadSources: TrackDownloadSource[] = [];
+
+        for (const downloadService of downloadServices) {
+            try {
+                // Find the first compatible metadata source for this download service
+                // TODO: trying multiple metadata sources for the same download service to compare audio files
+                const compatibleMetadata = metadataSources.find((metadata) =>
+                    downloadService.canDownload(metadata)
+                );
+
+                if (!compatibleMetadata) {
+                    this.logger.warn(
+                        `No compatible metadata source found for ${downloadService.id}. Compatible providers: ${downloadService.compatibleMetadataProviders.join(', ')}`
+                    );
+                    continue;
+                }
+
+                this.logger.info(`Downloading using ${downloadService.id} from ${compatibleMetadata.apiProvider}`);
+
+                // Download the track
+                const downloadSource = await downloadService.downloadTrack(compatibleMetadata);
+                downloadSources.push(downloadSource);
+
+                this.logger.info(`Successfully downloaded using ${downloadService.id}`);
+            } catch (error) {
+                this.logger.warn(`Failed to download using ${downloadService.id}:`, { error });
+                // Continue to next download service
+            }
+        }
+
+        // Update task attributes with download sources
+        this.updateAttributes({ downloadSources });
+
+        if (downloadSources.length === 0) {
+            this.logger.warn('No successful downloads');
+        } else {
+            this.logger.info(`Completed downloads: ${downloadSources.filter((s) => s.state === 'downloaded').length} successful, ${downloadSources.filter((s) => s.state === 'failed').length} failed`);
+        }
     }
+
+    // ------- OLD IMPLEMENTATION BELOW - TO BE REWORKED -------
 
     // Fetch metadata from appropriate service
     private async fetchTrackMetadata(): Promise<StandardTrack> {
@@ -87,7 +240,7 @@ export class DownloadTask extends Task<DownloadTaskAttributes> {
             throw new Error('No initial input')
 
 
-        const sources: DownloadTaskAttributes['sources'] = []
+        const sources: MusicDownloadTaskAttributes['sources'] = []
 
         // OFTEN DOWN
         // // Try to get metadata from Songlink first

@@ -69,7 +69,7 @@ export class FlowOrchestrator {
         this.notifySubscribers();
     }
 
-    addTasks(tasks: Task[]): void {
+    addTasks(tasks: Task<any>[]): void {
         // check that none of the tasks are already in the queue
         for (const task of tasks) {
             const existingTask = this.tasks.find(existingTask => existingTask.getId() === task.getId());
@@ -97,8 +97,6 @@ export class FlowOrchestrator {
 
     public async processTask(task: Task): Promise<void> {
         // Clean attributes in case the task is restarted
-        task.setAttributes({})
-
         return task.start()
             .then(() => {
                 task.success = true

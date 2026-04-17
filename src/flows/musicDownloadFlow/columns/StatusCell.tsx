@@ -4,7 +4,7 @@ import Spinner from "ink-spinner";
 import { ColumnComponent } from "../../../components/TaskListPanel";
 import { StatusAttributes, StatusType } from "../../../base/task/task-status";
 import { AnimatedIcon, Icon } from "../../../components/AnimatedIcon";
-import { DownloadTaskAttributes } from "../types";
+import { MusicDownloadTaskAttributes } from "../types";
 import { useWhyDidYouUpdate } from "../../../utils/useWhyDidYouUpdate";
 
 function getStatusIcon(status: StatusType): React.ReactNode {
@@ -68,7 +68,7 @@ const getStatusText = (status: StatusAttributes): string => {
   return statusMessage;
 };
 
-export const StatusCell: ColumnComponent<DownloadTaskAttributes> = ({
+export const StatusCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   task,
   width,
   isSelected,

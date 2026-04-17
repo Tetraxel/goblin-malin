@@ -13,12 +13,19 @@ import { FocusProvider } from "../contexts/FocusContext";
 import { MusicDownloadFlow } from "../flows/musicDownloadFlow/musicDownloadFlow";
 import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
 import { Task, TaskAttributes } from "../base/task/task";
-import { DownloadTaskAttributes } from "../flows/musicDownloadFlow/types";
+import { MusicDownloadTaskAttributes } from "../flows/musicDownloadFlow/types";
 import { globalLogger } from "../base/logger/logger";
 import { useWhyDidYouUpdate } from "../utils/useWhyDidYouUpdate";
+import soundPlay from "sound-play";
 
 export const App: React.FC = () => {
   globalLogger.info(`--- App render`);
+  useEffect(() => {
+    soundPlay.play(
+      "C:\\Users\\axel7\\Documents\\Github\\goblin-malin\\init.wav",
+      0.5,
+    );
+  }, []);
 
   // Fix: each useInput in the application can trigger a MaxListenersExceededWarning
   const { internal_eventEmitter } = useStdin();

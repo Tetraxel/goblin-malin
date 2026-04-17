@@ -1,8 +1,8 @@
 import path from 'path';
-import { CACHE_DIR } from '../../constants';
-import { globalLogger } from '../../base/logger/logger';
-import { loadJsonFile, saveJsonFile } from '../../utils/json';
-import { sleep } from '../../utils/sleep';
+import { CACHE_DIR } from '../../../../constants';
+import { globalLogger } from '../../../../base/logger/logger';
+import { loadJsonFile, saveJsonFile } from '../../../../utils/json';
+import { sleep } from '../../../../utils/sleep';
 
 const SONGLINK_API_BASE_URL = "https://api.song.link/v1-alpha.1/links";
 const SONGLINK_RATE_PATH = path.join(CACHE_DIR, 'songlink_rate.json');

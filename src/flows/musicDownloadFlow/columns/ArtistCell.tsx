@@ -1,15 +1,18 @@
 import React from "react";
 import { Text } from "ink";
 import { ColumnComponent } from "../../../components/TaskListPanel";
-import { DownloadTaskAttributes } from "../types";
+import { MusicDownloadTaskAttributes } from "../types";
 import { useWhyDidYouUpdate } from "../../../utils/useWhyDidYouUpdate";
 
-export const ArtistCell: ColumnComponent<DownloadTaskAttributes> = ({
+export const ArtistCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   task,
   width,
   isSelected,
 }) => {
-  const artist = task.attributes?.track?.artists?.[0]?.name || "";
+  const primaryMetadata = task.attributes?.metadataSources?.find(
+    (m) => m.isPrimarySource,
+  );
+  const artist = primaryMetadata?.artists?.[0]?.name || "";
 
   useWhyDidYouUpdate("ArtistCell", {
     task,

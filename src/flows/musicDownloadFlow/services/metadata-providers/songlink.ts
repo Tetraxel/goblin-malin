@@ -1,16 +1,17 @@
-import { Cached } from '../utils/cache';
-import { ServiceBase } from '../base/service-base';
-import { StatusType } from '../base/task/task-status';
-import { Task } from '../base/task/task';
-import { Logger } from '../base/logger/logger';
-import { SonglinkClient, SonglinkResponse } from './apis/songlink-client';
-import { sleep } from '../utils/sleep';
+import { Cached } from '../../../../utils/cache';
+import { MetadataService } from '../../metadataService';
+import { StatusType } from '../../../../base/task/task-status';
+import { Task } from '../../../../base/task/task';
+import { Logger } from '../../../../base/logger/logger';
+import { SonglinkClient, SonglinkResponse } from '../apis/songlink-client';
+import { sleep } from '../../../../utils/sleep';
+import { DownloadTask } from '../../utils/downloadTask';
 
 
-export class SonglinkService extends ServiceBase {
+export class SonglinkService extends MetadataService {
     private static client: SonglinkClient;
 
-    constructor(task: Task, logger: Logger) {
+    constructor(task: DownloadTask, logger: Logger) {
         super('Songlink', task, logger)
     }
 

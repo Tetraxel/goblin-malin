@@ -5,7 +5,7 @@ import { Env } from './env';
 import { StatusType, TaskStatus } from './task/task-status';
 
 export abstract class ServiceBase extends EventEmitter {
-    protected serviceName: string;
+    public id: string;
     protected task: Task;
     protected logger: Logger;
     protected env: Env;
@@ -13,12 +13,12 @@ export abstract class ServiceBase extends EventEmitter {
 
     private static _executionLocks: Map<string, Promise<any>> = new Map();
 
-    constructor(serviceName: string, task: Task, logger: Logger) {
+    constructor(id: string, task: Task<any>, logger: Logger) {
         super();
-        this.serviceName = serviceName;
+        this.id = id;
         this.task = task;
         this.logger = logger.createChild({
-            service: this.serviceName,
+            service: this.id,
             task: this.task,
         });
         this.env = new Env(task, this.logger)
@@ -26,7 +26,7 @@ export abstract class ServiceBase extends EventEmitter {
     }
 
     protected async runExclusive<T>(actionKey: string, operation: () => Promise<T>): Promise<T> {
-        const key = `${this.serviceName}.${actionKey}`;
+        const key = `${this.id}.${actionKey}`;
 
         // Check if this operation is already running
         const existingPromise = ServiceBase._executionLocks.get(key);

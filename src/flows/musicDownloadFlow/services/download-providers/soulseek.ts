@@ -4,12 +4,13 @@ import slsk from 'slsk-client';
 import type { SlskFile, SoulseekClient } from 'slsk-client';
 import fs from 'fs/promises';
 import path from 'path';
-import { Cached } from '../utils/cache';
-import { ServiceBase } from '../base/service-base';
-import { Logger } from '../base/logger/logger';
-import { PROJECT_ROOT } from '../constants';
-import { Task } from '../base/task/task';
-import { StatusType } from '../base/task/task-status';
+import { Cached } from '../../../../utils/cache';
+import { DownloadService } from '../../downloadService';
+import { Logger } from '../../../../base/logger/logger';
+import { PROJECT_ROOT } from '../../../../constants';
+import { Task } from '../../../../base/task/task';
+import { StatusType } from '../../../../base/task/task-status';
+import { DownloadTask } from '../../utils/downloadTask';
 
 const MAX_PREFERRED_SIZE = 50; // Files bigger than 50MB are less interesting
 const DOWNLOAD_DIR = path.join(PROJECT_ROOT, 'soulseek-download');
@@ -90,10 +91,10 @@ type SearchMusicInput = {
     waitTimeMs: number;
 }
 
-export class SoulseekService extends ServiceBase {
+export class SoulseekService extends DownloadService {
     private static client: SoulseekClient;
 
-    public constructor(task: Task, logger: Logger) {
+    public constructor(task: DownloadTask, logger: Logger) {
         super('SoulseekService', task, logger)
     }
 

@@ -1,10 +1,10 @@
 import React from "react";
 import { Text, useInput } from "ink";
 import { ColumnComponent } from "../../../components/TaskListPanel";
-import { DownloadTaskAttributes } from "../types";
+import { MusicDownloadTaskAttributes } from "../types";
 import { useWhyDidYouUpdate } from "../../../utils/useWhyDidYouUpdate";
 
-export const ToDownloadCell: ColumnComponent<DownloadTaskAttributes> = ({
+export const ToDownloadCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   task,
   taskReference,
   width,
@@ -12,12 +12,6 @@ export const ToDownloadCell: ColumnComponent<DownloadTaskAttributes> = ({
 }) => {
   const toDownload = task.attributes?.toDownload ?? false;
   const checkbox = toDownload ? "☒" : "☐";
-
-  useInput((input, key) => {
-    if ((key.return || input === " ") && isSelected) {
-      taskReference.updateAttributes({ toDownload: !toDownload });
-    }
-  });
 
   useWhyDidYouUpdate("ToDownloadCell", {
     task,

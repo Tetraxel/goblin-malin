@@ -39,18 +39,18 @@ export class TaskStatus {
         this.set(initialStatus);
     }
 
-    get(): StatusAttributes {
+    public get(): StatusAttributes {
         return { ...this.attributes };
     }
 
     // Replace all status attributes
-    set(status: StatusAttributes = DEFAULT_ATTRIBUTES): StatusAttributes {
+    public set(status: StatusAttributes = DEFAULT_ATTRIBUTES): StatusAttributes {
         this.attributes = DEFAULT_ATTRIBUTES;
         return this.update(status);
     }
 
     // Update partial status attributes
-    update(partial: Partial<StatusAttributes> = DEFAULT_ATTRIBUTES): StatusAttributes {
+    public update(partial: Partial<StatusAttributes> = DEFAULT_ATTRIBUTES): StatusAttributes {
         const wasTracking = this.attributes.timeTracking;
 
         this.attributes = {
@@ -72,8 +72,13 @@ export class TaskStatus {
         return this.attributes;
     }
 
+    public clear(): void {
+        this.attributes = DEFAULT_ATTRIBUTES;
+        this.notifySubscribers();
+    }
+
     // Subscribe to status changes
-    subscribe(callback: (status: StatusAttributes) => void): () => void {
+    public subscribe(callback: (status: StatusAttributes) => void): () => void {
         this.subscribers.add(callback);
         // Send current status immediately
         callback(this.get());

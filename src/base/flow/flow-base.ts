@@ -1,5 +1,5 @@
 import { Logger } from "../logger/logger";
-import { ColumnDefinition } from "../../components/TaskListPanel";
+import { ColumnDefinition, ContextualActionBar, ContextualActions } from "../../components/TaskListPanel";
 import { ToolbarButtonHook } from "../../components/Toolbar";
 import { FlowOrchestrator } from "./flow-orchestrator";
 import { Task } from "../task/task";
@@ -60,6 +60,9 @@ export class FlowBase<TaskAttributes = any> {
 
     // UI methods
     public getToolbarButtons(): ToolbarButtonHook[] {
+        throw Error('Not implemented')
+    }
+    public getContextualActionBar(task: Task<TaskAttributes>, attributes: object): ContextualActionBar {
         throw Error('Not implemented')
     }
     public getColumns(): ColumnDefinition<TaskAttributes>[] {

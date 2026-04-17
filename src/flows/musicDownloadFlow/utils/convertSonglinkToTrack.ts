@@ -1,8 +1,8 @@
 import { SongFull as YoutubeTrack } from 'ytmusic-api';
 import { StandardTrack } from '../types';
-import { YoutubeService } from "../../../services/youtube";
-import { SpotifyService } from "../../../services/spotify";
-import type { SonglinkResponse, Entity, APIProvider, Platform } from '../../../services/apis/songlink-client';
+import { YoutubeService } from "../services/metadata-providers/youtube";
+import { SpotifyService } from "../services/metadata-providers/spotify";
+import type { SonglinkResponse, Entity, APIProvider, Platform } from '../services/apis/songlink-client';
 import { globalLogger } from '../../../base/logger/logger';
 import { saveJsonFile } from '../../../utils/json';
 

@@ -1,10 +1,10 @@
 import React from "react";
 import { Text } from "ink";
 import { ColumnComponent } from "../../../components/TaskListPanel";
-import { DownloadTaskAttributes } from "../types";
+import { MusicDownloadTaskAttributes } from "../types";
 import { useWhyDidYouUpdate } from "../../../utils/useWhyDidYouUpdate";
 
-export const UrlCell: ColumnComponent<DownloadTaskAttributes> = ({
+export const UrlCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   task,
   width,
   isSelected,

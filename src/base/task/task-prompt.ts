@@ -6,12 +6,17 @@ export enum PromptType {
     Input = "input",
 }
 
+export enum PromptDisplayMode {
+    Modal = "modal", // Fullscreen modal, blocking interaction with the rest of the UI
+}
+
 export interface BasePrompt {
     id: string;
     type: PromptType;
     status: string;
     title: string;
     message?: string;
+    displayMode?: PromptDisplayMode;
 }
 
 export interface ConfirmPrompt extends BasePrompt {

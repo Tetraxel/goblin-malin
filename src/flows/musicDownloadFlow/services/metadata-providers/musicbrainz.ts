@@ -1,19 +1,19 @@
 import { MusicBrainzApi, IReleaseGroup, IRecordingMatch, IReleaseGroupMatch, IRelease } from 'musicbrainz-api';
-import { ServiceBase } from '../base/service-base';
-import { Task } from '../base/task/task';
-import { StatusType } from '../base/task/task-status';
-import { Logger } from '../base/logger/logger';
-import { Cached } from '../utils/cache';
+import { MetadataService } from '../../metadataService';
+import { StatusType } from '../../../../base/task/task-status';
+import { Logger } from '../../../../base/logger/logger';
+import { Cached } from '../../../../utils/cache';
+import { DownloadTask } from '../../utils/downloadTask';
 
 export type MusicBrainzReleaseGroup = IReleaseGroupMatch
 export type MusicBrainzRelease = IRelease
 export type MusicBrainzRecording = IRecordingMatch
 
 
-export class MusicBrainzService extends ServiceBase {
+export class MusicBrainzService extends MetadataService {
     private static client: MusicBrainzApi;
 
-    constructor(task: Task, logger: Logger) {
+    constructor(task: DownloadTask, logger: Logger) {
         super('MusicBrainzService', task, logger)
     }
 
