@@ -1,134 +1,74 @@
 # goblin-malin
 
-Manage your music downloads in a minimalist terminal UI
+A keyboard-driven terminal UI for downloading and tagging music tracks with high-quality metadata. Import links from Spotify, SoundCloud, YouTube, YouTube Music, Deezer, Apple Music, or Tidal — the app cross-references metadata across providers, finds the best audio source (via yt-dlp or Soulseek), and saves it to disk with clean tags.
 
-## Next tasks
-
-- [ ] Improve Soulseek download with progress bar
-- [ ] Improve Soulseek to download in background
-- [ ] Have logs per url
-- [ ] Have a decorator `@Retry` if exception is raised that disconnect client
-
-## Goal
-
-The goal of this project is to
-
-### 1. Take as input a list of musics links and query in a file all the name
-
-For example:
-
-```json
-{
-  "title": "Elevator Music", // track title
-  "artist": "Bobbing", // first artist of the music
-  "linksByPlatform": {
-    "appleMusic": {
-      "url": "<https://music.apple.com/us/album/kitchen/1443108737?i=1443109064&uo=4&app=music&ls=1&at=1000lHKX>",
-      "nativeAppUriMobile": "music://music.apple.com/us/album/kitchen/1443108737?i=1443109064&uo=4&app=music&ls=1&at=1000lHKX",
-      "nativeAppUriDesktop": "itms://music.apple.com/us/album/kitchen/1443108737?i=1443109064&uo=4&app=music&ls=1&at=1000lHKX",
-      "entityUniqueId": "ITUNES_SONG::1443109064"
-    },
-    "spotify": {
-      "url": "<https://open.spotify.com/track/0Jcij1eWd5bDMU5iPbxe2i>",
-      "nativeAppUriDesktop": "spotify:track:0Jcij1eWd5bDMU5iPbxe2i",
-      "entityUniqueId": "SPOTIFY_SONG::0Jcij1eWd5bDMU5iPbxe2i"
-    },
-    "youtube": {
-      "url": "<https://www.youtube.com/watch?v=w3LJ2bDvDJs>",
-      "entityUniqueId": "YOUTUBE_VIDEO::w3LJ2bDvDJs"
-    }
-  }
-}
-```
+> **Developers:** see [docs/audit/](docs/audit/%23README.md) for a codebase audit and [docs/projects/](docs/projects/%23README.md) for the roadmap of technical projects.
 
 ## Steps
 
-1. Input in `urls.txt`
-   1. Spotify
-      1. track link: `https://open.spotify.com/intl-fr/track/1eh2EPeKP4jjxvRXUF4nPm?si=9ee2645ec2884278`
-   2. Youtube
-      1. track link: `https://music.youtube.com/watch?v=LxsT5bYUhbM?si=9ee2645ec2884278`
-      2. video link: `https://www.youtube.com/watch?v=LYtFacwL4hg&list=PLKlunKCBbRIKbAPwFD-RG_2VCjIug7y_x&index=4&pp=gAQBiAQB`
-   3. Soundcloud
-      1. track link `https://soundcloud.com/ytsadey/jacqueskickcesoitremix?in=tetraxel/sets/musique/`
-2. Use `https://api.song.link` to retrieve related links _(max 10 requests per minute, so you can cache requests already done)_
-3.
+- Import track URLs from compatible streaming platforms (Spotify, SoundCloud, YouTube, YouTube Music, Deezer, Apple Music, Tidal)
+- System fetches primary metadata from the corresponding URL platform
+- System discovers the same track on other platforms (cross-referencing via ISRC or track/artist name)
+- User filters/orders metadata sources by relevance (or leaves the default ranking chosen by the system)
+- System downloads matching tracks from available download providers (yt-dlp, Soulseek)
+- User selects the best download source and previews the audio
+- User saves the file to the desired folder with embedded tags
 
-Input `inputs.txt`:
+## Import modal
 
-```txt
-https://open.spotify.com/intl-fr/track/2BWIDTVln2LvwGpJ5BYyJD?si=bb321fc5201f45ed
-https://open.spotify.com/playlist/3cveC7IxGMsDwOA8Gi1N7P?si=e4e9f22aefc549a0
-https://soundcloud.com/hbzmusik/cro-traum-hbz-remix Artist name example - Track title example
-https://music.youtube.com/watch?v=Cv1DlkSSjIQ
-https://www.youtube.com/watch?v=OXYj8CtIS0c
-```
+<img src="docs\designs\import-modal.png"/>
 
-Routines for each links from `links.txt`:
+Press `CTRL+V` to paste links from the clipboard. A confirmation modal lists all detected URLs before importing. Press `[ENTER]` to confirm or `[Esc]` to cancel.
 
-1. ✅ SET METADATA TO FILE
-   1. `cleanAndTagFlac`
-2. 🔵 SPOTIFY DOWNLOAD
-   1. SPOTIFY SOULSEEK DOWNLOAD
-      1. Extract `Spotify track URI` from `Spotify track link`
-      2. Get `Spotify album` from `Spotify track URI`
-      3. Download music file with SOULSEEK (`artistName`, `trackTitle`, `albumName`, 'flac')
-      4. Run `SET METADATA TO FILE`
-3. 📥 YTDLP DOWNLOAD
-   1. Download music file with YTDLP
-   2. Run `SET METADATA TO FILE`
-4. MAIN
-   1. URL DOWNLOAD
-      1. Search Songlink track
-         1. GET SongLink (`artistName`, `trackTitle`)
-         2. Get `Spotify track link`
-            1. RUN `1. SPOTIFY SOULSEEK DOWNLOAD`
-            2. Else next
-         3. or Get `Soundcloud track URI`
-            1. RUN `2. YTDLP DOWNLOAD`
-         4. or Get `Youtube Music track URI`
-            1. RUN `2. YTDLP DOWNLOAD`
-         5. or Get `Youtube video URI`
-            1. RUN `2. YTDLP DOWNLOAD`
-         6. Else throw
-   2. Search MUSICBRAINZ album or track to know if can be marked as SUCCESS
+Supported URL formats include `open.spotify.com`, `soundcloud.com`, `music.youtube.com`, and `youtube.com`.
 
-Output for each links in `results.txt`:
+## Settings modal
 
-1. Success
-   ```yaml
-   fileDownload: "SUCCESS: filename.flac - "
-   ```
+<img src="docs\designs\settings-modal.png"/>
 
-convertSpotifyLinkToAlbum
-Input Spotify track URL
+Settings are split into two sections:
 
-1. Get Spotify track
-2. Get Spotify release from the track
-3. Get Songlink Info
-4. Construct Atisket URL and Save
-5. Display Songlink Results
+**Metadata** — configure which providers are queried (Spotify, Deezer, Apple Music, Tidal, YouTube, SoundCloud, MusicBrainz). MusicBrainz-specific options include importing files into Picard on save and including MusicBrainz IDs in the embedded tags by default.
 
-Soulseek
+**Download** — configure download providers (yt-dlp and Soulseek), set the default output directory, toggle auto-save and auto-deletion of temporary downloads after 24 hours, and auto-relocation of missing files.
 
-1. ⚠️ check after that duration match or longer
+Press `[Ctrl+S]` to save and exit the settings.
 
-## Misc
+## Metadata screen
 
-### Documentation for api.song.link
+<img src="docs\designs\metadata-screen.png"/>
 
-https://linktree.notion.site/API-d0ebe08a5e304a55928405eb682f6741
+The metadata screen lets the user select tasks (checkbox "TAG?") to process:
 
-### Downloading Videos with yt-dlp
+1. **Fetch primary metadata** — pulls metadata from the URL's native provider (e.g. Spotify API for a Spotify link)
+2. **Discover other platforms** — cross-references the track on other enabled providers using reliable identifiers like ISRC, or fallback attributes like track title and artist name
 
-```bash
-./bin/yt-dlp_2025.12.08.exe -x -o "downloads/%(uploader|Unknown)s - %(title)s.%(ext)s" --audio-format flac "https://soundcloud.com/ninajirachi/fmc-fc"
-```
+Metadata fields include: Track Title, Artists, Duration, Album Name, Album Artists, Year, Track number, BPM, Key, Genres, and MusicBrainz IDs (track, album, artist, album artist, release group).
 
-```bash
-./bin/yt-dlp_2025.12.08.exe  --ffmpeg-location "./bin/ffmpeg_2025-12-26.exe" --cookies "./bin/cookies.txt" --batch-file "soundcloud.txt" -x -o "downloads/%(uploader|Unknown)s - %(title)s.%(ext)s" --audio-format "flac" -f "bestaudio"
-```
+Once discovery is done, users can:
 
-```bash
-yt-dlp --download-archive archive.txt --batch-file urls.txt -x -o "dl/%(uploader|Unknown)s - %(title)s.%(ext)s" --audio-format flac
-```
+- **Favorite** a source to pin it as the preferred one for a given provider (max one per provider) — `[F]`
+- **Reject** a source if the system matched the wrong track — `[Del]`
+- **Reorder** sources to control which metadata takes priority — `[Shift+↑]` / `[Shift+↓]`
+
+The **Compiled Metadata** row is a virtual aggregate that picks each field from the highest-ranked available source. It is the only editable row — the user can manually correct the track title or artist name if needed.
+
+## Download screen
+
+<img src="docs\designs\download-screen.png"/>
+
+The download screen lets the user select tasks to download (checkbox "DL?"). The system searches each enabled download provider (yt-dlp, Soulseek) and downloads matching tracks to a temporary folder.
+
+The right panel previews the selected file: format (e.g. FLAC), file size, duration with waveform scrubber, and all embedded metadata tags. Press `[Space]` to play a preview.
+
+Once satisfied with the audio and metadata, press `[Enter]` to save the file to disk.
+
+If the track was previously saved, the panel shows the current **file on disk** state:
+
+<img src="docs\designs\downloads-window-file-previously-saved.png"/>
+
+If the user changes the download source or any metadata field, a **diff** is shown side by side — old version on the left, new version on the right — before confirming the update:
+
+<img src="docs\designs\downloads-window-change-download-source.png"/>
+
+Use `[Ctrl+M]` to open the file directly in MusicBrainz Picard, and `[Ctrl+F]` to relocate the file if it was moved on disk.

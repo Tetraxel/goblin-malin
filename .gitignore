@@ -1,6 +1,7 @@
 ### Specific to this project
 cache/
 downloads/
+bin/
 
 ### Node js ptoject .gitignore
 
