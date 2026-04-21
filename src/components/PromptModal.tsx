@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import TextInput from "ink-text-input";
 import SelectInput from "ink-select-input";
 import { Task } from "../base/task/task";
@@ -18,42 +18,18 @@ export const PromptModal: React.FC<PromptModalProps> = ({
   terminalHeight,
   terminalWidth,
 }) => {
-  const { focusState, ...focusManager } = useFocusContext();
+  const { switchWindow, switchBack } = useFocusContext();
   const [inputValue, setInputValue] = useState("");
   const { task, prompt } = useActivePrompt(tasks);
   const currentPrompt = prompt?.getCurrentPrompt();
-  const isActive = !!task && !!prompt && focusState.activeWindow === "prompt";
 
   useEffect(() => {
     if (Boolean(prompt)) {
-      focusManager.switchWindow("prompt");
+      switchWindow("prompt");
     } else {
-      focusManager.switchBack();
+      switchBack();
     }
-    return;
   }, [prompt]);
-
-  useInput(
-    (input, key) => {
-      if (!task || !prompt) return;
-
-      // Handle Escape key to cancel
-      if (key.escape) {
-        prompt.cancelPrompt(new Error("User cancelled"));
-        return;
-      }
-
-      // Handle Confirm prompts (y/n)
-      if (currentPrompt?.type === PromptType.Confirm) {
-        if (input.toLowerCase() === "y") {
-          prompt.resolvePrompt(true);
-        } else if (input.toLowerCase() === "n") {
-          prompt.resolvePrompt(false);
-        }
-      }
-    },
-    { isActive }
-  );
 
   const handleInputSubmit = (value: string) => {
     if (!task || !prompt) return;

@@ -6,7 +6,8 @@ import { Task } from '../../base/task/task';
 import { DownloadTask } from './utils/downloadTask';
 import { InputLoader } from './utils/input-loader';
 import { ToolbarButtonHook } from '../../components/Toolbar';
-import { ColumnDefinition, ContextualActionBar, ContextualActions } from '../../components/TaskListPanel';
+import { ColumnDefinition } from '../../components/TaskListPanel';
+import { ContextualActionBar, ContextualActions } from '../../types/actions';
 import { useExitButton } from './toolbar/useExitButton';
 import { useRunAllButton } from './toolbar/useRunAllButton';
 import { useImportButton } from './toolbar/useImportButton';
@@ -205,7 +206,12 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 shortcuts: [{ input: " " }, { key: "return" }],
                 label: "Toggle",
                 description: "Toggle this option",
+                multiSelectAllowed: true,
                 onClick: () => task.updateAttributes({ toTag: !task.getAttributes()?.toTag }),
+                onClickBatch: (tasks) => {
+                    const newValue = !task.getAttributes()?.toTag;
+                    tasks.forEach(t => (t as Task<MusicDownloadTaskAttributes>).updateAttributes({ toTag: newValue }));
+                },
             }])
         }
 
@@ -214,7 +220,12 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 shortcuts: [{ input: " " }, { key: "return" }],
                 label: "Toggle",
                 description: "Toggle this option",
+                multiSelectAllowed: true,
                 onClick: () => task.updateAttributes({ toDownload: !task.getAttributes()?.toDownload }),
+                onClickBatch: (tasks) => {
+                    const newValue = !task.getAttributes()?.toDownload;
+                    tasks.forEach(t => (t as Task<MusicDownloadTaskAttributes>).updateAttributes({ toDownload: newValue }));
+                },
             }])
         }
 

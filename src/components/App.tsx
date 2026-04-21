@@ -1,22 +1,23 @@
-import fs from "fs/promises";
-import React, { useEffect, useMemo, useReducer, useState } from "react";
-import { Box, useInput, useStdin } from "ink";
+import React, { useEffect, useMemo, useState } from "react";
+import { Box, Text } from "ink";
 import { LogPanel } from "./LogPanel";
 import { Footer } from "./Footer";
 import { Separator } from "./Separator";
 import { PromptModal } from "./PromptModal";
 import { Toolbar, ToolbarButtonHook } from "./Toolbar";
 import { ColumnDefinition, TaskListPanel } from "./TaskListPanel";
+import { ActionBar } from "./ActionBar";
+import { InputRouter } from "./InputRouter";
 import { useScreenSize } from "../hooks/useScreenSize";
-import { useFocusManager } from "../hooks/useFocusManager";
 import { FocusProvider } from "../contexts/FocusContext";
+import { ToolbarActionsProvider } from "../contexts/ToolbarActionsContext";
 import { MusicDownloadFlow } from "../flows/musicDownloadFlow/musicDownloadFlow";
 import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
 import { Task, TaskAttributes } from "../base/task/task";
 import { MusicDownloadTaskAttributes } from "../flows/musicDownloadFlow/types";
 import { globalLogger } from "../base/logger/logger";
-import { useWhyDidYouUpdate } from "../utils/useWhyDidYouUpdate";
 import soundPlay from "sound-play";
+import BigText from "ink-big-text";
 
 export const App: React.FC = () => {
   globalLogger.info(`--- App render`);
@@ -27,16 +28,12 @@ export const App: React.FC = () => {
     );
   }, []);
 
-  // Fix: each useInput in the application can trigger a MaxListenersExceededWarning
-  const { internal_eventEmitter } = useStdin();
-  internal_eventEmitter.setMaxListeners(30);
-
   const [tasks, setTasks] = useState<Task<TaskAttributes>[]>([]);
   const { height: terminalHeight, width: terminalWidth } = useScreenSize();
   const [activeFlowId, setActiveFlowId] = useState<string | undefined>();
   const [toolbarButtons, setToolbarButtons] = useState<ToolbarButtonHook[]>([]);
   const [columns, setColumns] = useState<
-    ColumnDefinition<DownloadTaskAttributes>[]
+    ColumnDefinition<MusicDownloadTaskAttributes>[]
   >([]);
 
   const orchestrator = FlowOrchestrator.getInstance();
@@ -44,7 +41,6 @@ export const App: React.FC = () => {
     ? orchestrator.getFlow(activeFlowId)
     : undefined;
 
-  // Initialize flows on mount
   useEffect(() => {
     orchestrator.registerFlow(MusicDownloadFlow, true);
     setActiveFlowId(orchestrator.getEnabledFlows()?.[0].id);
@@ -60,57 +56,21 @@ export const App: React.FC = () => {
       setToolbarButtons(currentFlow.getToolbarButtons() ?? []);
       setColumns(currentFlow.getColumns() ?? []);
     });
+    return unsubscribe;
+  }, [currentFlow?.id]);
 
-    return unsubscribe; // Cleanup subscription on flow change or unmount
-  }, [currentFlow?.id]); // Re-subscribe if the currentFlow instance changes
-
-  // Subscribe to orchestrator data changes (tasks)
   useEffect(() => {
     const unsubscribe = orchestrator.subscribe((orchestrator) => {
       globalLogger.info(`orchestrator state changed, updating tasks...`);
       setTasks(orchestrator.getTasks());
     });
-
     return unsubscribe;
   }, [orchestrator.id]);
 
-  // Filter tasks by active flow
   const filteredTasks = useMemo(
     () => tasks.filter((task) => task.getFlowId() === activeFlowId),
     [tasks, activeFlowId],
   );
-
-  const focusManager = useFocusManager({
-    toolbarButtonCount: toolbarButtons.length,
-    taskCount: filteredTasks.length,
-    taskColumnCount: columns.length,
-  });
-
-  // Global shortcuts
-  useInput((input, key) => {
-    if (key.tab) {
-      focusManager.handleTabPress();
-      return;
-    }
-
-    if (Number(input) >= 0 && Number(input) <= 9) {
-      if (currentFlow) {
-        focusManager.switchMode(currentFlow, input);
-      }
-      return;
-    }
-  });
-
-  useWhyDidYouUpdate("App", {
-    tasks, // is the tasks array itself changing?
-    activeFlowId,
-    columns,
-    toolbarButtons,
-    currentFlow,
-    // also track internal focusManager state if possible
-    selectedTaskIndex: focusManager.focusState.taskList.selectedTaskIndex,
-    activeWindow: focusManager.focusState.activeWindow,
-  });
 
   return (
     <FocusProvider
@@ -118,37 +78,51 @@ export const App: React.FC = () => {
       taskCount={filteredTasks.length}
       taskColumnCount={columns.length}
     >
-      <Box flexDirection="column" height={terminalHeight}>
-        {currentFlow && (
-          <Toolbar
-            buttons={toolbarButtons}
-            width={terminalWidth}
-            flows={orchestrator.getAllFlows()}
-            onFlowChange={setActiveFlowId}
-            flow={currentFlow}
-            orchestrator={orchestrator}
-          />
-        )}
-        {currentFlow && (
-          <TaskListPanel
-            columns={columns}
-            tasks={filteredTasks}
-            width={terminalWidth}
-            flow={currentFlow}
-          />
-        )}
-        <Separator width={terminalWidth} />
-        <LogPanel tasks={filteredTasks} />
-        <Separator width={terminalWidth} />
-        <Footer />
+      <ToolbarActionsProvider>
+        {/* InputRouter: single root useInput — must be inside FocusProvider */}
+        <InputRouter tasks={filteredTasks} flow={currentFlow} />
 
-        {/* Prompt Modal - renders on top when a prompt is active */}
-        <PromptModal
-          tasks={tasks}
-          terminalHeight={terminalHeight}
-          terminalWidth={terminalWidth}
-        />
-      </Box>
+        {/* <Text color="gray">██</Text>
+      <Text color="cyan">██</Text>
+      <Text color="cyanBright">██</Text>
+      <Text color="red">██</Text>
+      <Text color="redBright">██</Text>
+      <Text color="green">██</Text>
+      <Text color="greenBright">██</Text>
+      <BigText text="Goblin Malin" /> */}
+
+        <Box flexDirection="column" height={terminalHeight}>
+          {currentFlow && (
+            <Toolbar
+              buttons={toolbarButtons}
+              width={terminalWidth}
+              flows={orchestrator.getAllFlows()}
+              onFlowChange={setActiveFlowId}
+              flow={currentFlow}
+              orchestrator={orchestrator}
+            />
+          )}
+          {currentFlow && (
+            <TaskListPanel
+              columns={columns}
+              tasks={filteredTasks}
+              width={terminalWidth}
+              flow={currentFlow}
+            />
+          )}
+          <ActionBar tasks={filteredTasks} flow={currentFlow} />
+          <Separator width={terminalWidth} />
+          <LogPanel tasks={filteredTasks} />
+          <Separator width={terminalWidth} />
+          <Footer />
+
+          <PromptModal
+            tasks={tasks}
+            terminalHeight={terminalHeight}
+            terminalWidth={terminalWidth}
+          />
+        </Box>
+      </ToolbarActionsProvider>
     </FocusProvider>
   );
 };

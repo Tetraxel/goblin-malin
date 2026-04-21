@@ -3,6 +3,7 @@ import React from "react";
 import { ToolbarButtonHook } from "./Toolbar";
 import { FlowBase } from "../base/flow/flow-base";
 import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
+import { useToolbarActionsRef } from "../contexts/ToolbarActionsContext";
 
 export const ToolbarButtonInvoker = ({
   hook,
@@ -17,11 +18,17 @@ export const ToolbarButtonInvoker = ({
   flow: FlowBase;
   orchestrator: FlowOrchestrator;
 }) => {
-  const { enabled, label, icon, color, bold, italic } = hook({
+  const actionsRef = useToolbarActionsRef();
+  const { enabled, label, icon, color, bold, italic, onPress } = hook({
     isSelected,
     flow,
     orchestrator,
   });
+
+  // Register the current onPress for this button index into the shared ref.
+  // Runs on every render so the handler always sees the latest closure.
+  actionsRef.current[index] = onPress;
+
   if (!enabled) return null;
   return (
     <Box

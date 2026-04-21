@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import stringWidth from "string-width";
 import { useFocusContext } from "../contexts/FocusContext";
 import { FlowSelector } from "./FlowSelector";
@@ -7,8 +7,6 @@ import { Separator } from "./Separator";
 import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
 import { ToolbarButtonInvoker } from "./ToolbarButtonInvoker";
 import { FlowBase } from "../base/flow/flow-base";
-import { useWhyDidYouUpdate } from "../utils/useWhyDidYouUpdate";
-
 export type ToolbarButtonHook<TFlow = FlowBase> = ({
   isSelected,
   flow,
@@ -24,6 +22,7 @@ export type ToolbarButtonHook<TFlow = FlowBase> = ({
   color?: React.ComponentProps<typeof Text>["color"];
   bold?: boolean;
   italic?: boolean;
+  onPress?: () => void;
 };
 
 export const Toolbar = ({
@@ -41,18 +40,9 @@ export const Toolbar = ({
   flow: FlowBase;
   orchestrator: FlowOrchestrator;
 }) => {
-  const { focusState, ...focusManager } = useFocusContext();
+  const { focusState } = useFocusContext();
   const isActive = focusState.activeWindow === "toolbar";
   const height = focusState.toolbar.height;
-
-  useInput(
-    (input, key) => {
-      if (key.leftArrow) focusManager.moveToolbarSelection("left");
-      if (key.rightArrow) focusManager.moveToolbarSelection("right");
-      if (key.downArrow) focusManager.moveToolbarSelection("down");
-    },
-    { isActive },
-  );
 
   const name = "😉 " + (width > 90 ? "Goblin Malin" : "");
   const nameWidth = stringWidth(name);

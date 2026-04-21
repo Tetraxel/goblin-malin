@@ -1,5 +1,6 @@
 import { Logger } from "../logger/logger";
-import { ColumnDefinition, ContextualActionBar, ContextualActions } from "../../components/TaskListPanel";
+import { ColumnDefinition } from "../../components/TaskListPanel";
+import { ContextualActionBar } from "../../types/actions";
 import { ToolbarButtonHook } from "../../components/Toolbar";
 import { FlowOrchestrator } from "./flow-orchestrator";
 import { Task } from "../task/task";

@@ -1,5 +1,5 @@
 import React from "react";
-import { Text, useInput } from "ink";
+import { Text } from "ink";
 import { ColumnComponent } from "../../../components/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "../types";
 import { useWhyDidYouUpdate } from "../../../utils/useWhyDidYouUpdate";

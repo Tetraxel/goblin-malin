@@ -6,12 +6,12 @@
 
 There are four `useInput` registrations spread across the component tree:
 
-| Component | Handles |
-|-----------|---------|
-| `App.tsx` | `Tab` (window cycle), digits `1–9` (mode switch) |
-| `Toolbar.tsx` | `←` `→` `↓` (button navigation) |
+| Component           | Handles                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `App.tsx`           | `Tab` (window cycle), digits `1–9` (mode switch)                                     |
+| `Toolbar.tsx`       | `←` `→` `↓` (button navigation)                                                      |
 | `TaskListPanel.tsx` | Arrow keys (row/column navigation), `Shift+↑/↓` (resize), contextual action dispatch |
-| `PromptModal.tsx` | `Esc` (cancel), `y/n` (confirm), text input submit |
+| `PromptModal.tsx`   | `Esc` (cancel), `y/n` (confirm), text input submit                                   |
 
 Each `useInput` adds a listener to the stdin EventEmitter — hence `setMaxListeners(30)` in `App.tsx` (line 36).
 
@@ -37,32 +37,32 @@ A single `useInput` at the root. A single `FocusState` instance. A dispatch tabl
 
 This also means the `useInput` in `App.tsx` can no longer call `focusManager.handleTabPress()` — that wiring is fixed as part of T1.3.
 
-*Depends on: nothing*
+_Depends on: nothing_
 
 ---
 
 ### T1.2 — Extend `FocusState` to cover all target panels
 
-`FocusState` currently knows about: `toolbar`, `taskList`, `logPanel`, `footer`, `prompt`. The target UI adds more focusable windows: `rightPanel` (the metadata/download/logs detail panel), `settingsModal`, and `importModal`.
+`FocusState` currently knows about: `toolbar`, `taskList`, `logPanel`, `footer`, `prompt`. The target UI adds more focusable windows: `secondaryPanel` (the metadata/download/logs detail panel), `settingsModal`, and `importModal`.
 
 Add to `FocusState`:
 
 ```typescript
-rightPanel: {
-  mode: 'metadataSources' | 'download' | 'logs';
+secondaryPanel: {
+  mode: "metadataSources" | "download" | "logs";
   selectedRowIndex: number;
   scrollOffset: number;
-};
+}
 modal: {
-  type: 'settings' | 'import' | null;
-};
+  type: "settings" | "import" | null;
+}
 ```
 
-Add `'rightPanel' | 'settingsModal' | 'importModal'` to the `FocusableWindow` union. Update `handleTabPress()` to cycle `toolbar → taskList → rightPanel` (and skip modal windows, which steal focus programmatically). Initialize all new fields in the initial state object.
+Add `'secondaryPanel' | 'settingsModal' | 'importModal'` to the `FocusableWindow` union. Update `handleTabPress()` to cycle `toolbar → taskList → secondaryPanel` (and skip modal windows, which steal focus programmatically). Initialize all new fields in the initial state object.
 
 Do this before other panels are built so the shape doesn't need restructuring again.
 
-*Depends on: T1.1*
+_Depends on: T1.1_
 
 ---
 
@@ -74,14 +74,17 @@ Replace the four separate `useInput` hooks with a single one in `App.tsx` (or a 
 const handlers: Record<FocusableWindow, KeyHandler> = {
   toolbar: toolbarHandler,
   taskList: taskListHandler,
-  rightPanel: rightPanelHandler,
+  secondaryPanel: rightPanelHandler,
   prompt: promptHandler,
   // ...
 };
 
 useInput((input, key) => {
   // Global shortcuts first (Tab, Esc to close modal, etc.)
-  if (key.tab) { focusManager.handleTabPress(); return; }
+  if (key.tab) {
+    focusManager.handleTabPress();
+    return;
+  }
 
   // Delegate to active window
   handlers[focusState.activeWindow]?.(input, key);
@@ -90,7 +93,7 @@ useInput((input, key) => {
 
 Remove the `useInput` calls from `Toolbar.tsx`, `TaskListPanel.tsx`, and `PromptModal.tsx`. Remove `setMaxListeners(30)`.
 
-*Depends on: T1.1, T1.2*
+_Depends on: T1.1, T1.2_
 
 ---
 
@@ -112,7 +115,7 @@ export function usePromptKeyHandler(): KeyHandler { ... }
 
 The root dispatcher (T1.3) calls these hooks and builds the handler map. This keeps each panel's key logic co-located and independently testable.
 
-*Depends on: T1.3*
+_Depends on: T1.3_
 
 ---
 
@@ -143,26 +146,28 @@ export type Shortcut = {
 
 Update the matcher (currently inside `TaskListPanel.tsx`'s `useInput`, will move to the dispatcher after T1.4) to check all modifier fields before declaring a match.
 
-*Depends on: T1.4*
+_Depends on: T1.4_
 
 ---
 
 ### T1.6 — Migrate `Toolbar` key handling to the centralized dispatcher
 
 `Toolbar.tsx` has a `useInput({ isActive })` that calls:
+
 - `focusManager.moveToolbarSelection('left')` on `←`
 - `focusManager.moveToolbarSelection('right')` on `→`
 - `focusManager.moveToolbarSelection('down')` on `↓`
 
 Move this logic into `useToolbarKeyHandler()` (from T1.4). Remove the `useInput` from `Toolbar.tsx`. `Toolbar` no longer handles any key events directly — it only renders.
 
-*Depends on: T1.4*
+_Depends on: T1.4_
 
 ---
 
 ### T1.7 — Migrate `TaskListPanel` key handling to the centralized dispatcher
 
 `TaskListPanel.tsx` has a `useInput({ isActive })` that handles:
+
 - Arrow keys → `focusManager.moveTaskSelection()`
 - `Shift+↑/↓` → `focusManager.resizeTaskList()`
 - Contextual action dispatch (iterate `contextualActionBar.actions`, find matching shortcut, call `onClick`)
@@ -171,7 +176,7 @@ Move the entire handler body into `useTaskListKeyHandler()` (from T1.4). `TaskLi
 
 The contextual action dispatch logic can stay structurally the same — it just runs inside the handler function rather than a `useInput` callback.
 
-*Depends on: T1.4, T1.5*
+_Depends on: T1.4, T1.5_
 
 ---
 
@@ -179,9 +184,9 @@ The contextual action dispatch logic can stay structurally the same — it just 
 
 `PromptModal.tsx` has a `useInput({ isActive })` for `Esc` and `y/n` confirm. Move this into `usePromptKeyHandler()`. `PromptModal` stops handling key events and only renders.
 
-Note: `PromptModal` also uses `TextInput` from `ink-text-input` (for free-form env var input) and `SelectInput` from `ink-select-input`. Both packages register their own internal `useInput` hooks — this cannot be avoided. The goal is to eliminate the *manually registered* `useInput` from `PromptModal`; the third-party components are acceptable.
+Note: `PromptModal` also uses `TextInput` from `ink-text-input` (for free-form env var input) and `SelectInput` from `ink-select-input`. Both packages register their own internal `useInput` hooks — this cannot be avoided. The goal is to eliminate the _manually registered_ `useInput` from `PromptModal`; the third-party components are acceptable.
 
-*Depends on: T1.4*
+_Depends on: T1.4_
 
 ---
 
@@ -193,7 +198,7 @@ Extract the bar into a standalone `<ActionBar>` component rendered in the root l
 
 The `getContextualActionBar` method on `FlowBase` stays as the data source for taskList actions; the flow just needs to be called from outside TaskListPanel.
 
-*Depends on: T1.2, T1.4*
+_Depends on: T1.2, T1.4_
 
 ---
 
@@ -205,11 +210,11 @@ Users need to select multiple tasks at once to perform batch operations (e.g., "
 
 ```typescript
 taskList: {
-  selectedTaskIndex: number;     // cursor position (unchanged)
-  selectedColumnIndex: number;   // unchanged
-  selectedTaskIds: Set<string>;  // NEW — the multi-select set
+  selectedTaskIndex: number; // cursor position (unchanged)
+  selectedColumnIndex: number; // unchanged
+  selectedTaskIds: Set<string>; // NEW — the multi-select set
   // ...
-};
+}
 ```
 
 `selectedTaskIds` is independent of `selectedTaskIndex`. The cursor can move freely without deselecting. Tasks in `selectedTaskIds` get a distinct visual indicator (e.g., `✓` prefix) different from the cursor indicator (`☛`).
@@ -230,21 +235,36 @@ When `selectedTaskIds.size > 1`, the contextual action bar must only show action
 
 The action dispatcher in `TaskListPanel` (or the root action bar after T1.9) iterates over `selectedTaskIds` when calling `onClick` for batch-capable actions.
 
-*Depends on: T1.2, T1.4, T1.7*
+_Depends on: T1.2, T1.4, T1.7_
+
+---
+
+### T1.11 — Remove `useInput` from toolbar button hooks
+
+Each of the three toolbar button hooks (`useImportButton`, `useRunAllButton`, `useExitButton`) registers its own `useInput({ isActive: isSelected })`, adding listeners outside the central dispatcher.
+
+Add `onPress?: () => void` to the `ToolbarButtonHook` return type. Remove `useInput` from each hook and expose the action as `onPress` instead.
+
+Create a `ToolbarActionsContext` (ref-based, no state — zero extra re-renders) so that `ToolbarButtonInvoker` can write each button's current `onPress` into a shared ref on every render. Extend `useToolbarKeyHandler` to handle `key.return` by reading `actionsRef.current[selectedButtonIndex]?.()`.
+
+Wrap the App layout in `<ToolbarActionsProvider>` (inside `<FocusProvider>`).
+
+_Depends on: T1.6_
 
 ---
 
 ## Summary
 
-| Task | What | Depends on |
-|------|------|-----------|
-| T1.1 | Remove duplicate `useFocusManager` in `App.tsx` | — |
-| T1.2 | Extend `FocusState` for all target panels | T1.1 |
-| T1.3 | Single root `useInput` dispatcher | T1.1, T1.2 |
-| T1.4 | `KeyHandler` type + per-window handler functions | T1.3 |
-| T1.5 | Add `ctrl`/`shift` modifiers to `Shortcut` type | T1.4 |
-| T1.6 | Migrate `Toolbar` key handling | T1.4 |
-| T1.7 | Migrate `TaskListPanel` key handling | T1.4, T1.5 |
-| T1.8 | Migrate `PromptModal` key handling | T1.4 |
-| T1.9 | Move action bar to root layout | T1.2, T1.4 |
-| T1.10 | Multi-select support | T1.2, T1.4, T1.7 |
+| Task  | What                                             | Depends on       |
+| ----- | ------------------------------------------------ | ---------------- |
+| T1.1  | Remove duplicate `useFocusManager` in `App.tsx`  | —                |
+| T1.2  | Extend `FocusState` for all target panels        | T1.1             |
+| T1.3  | Single root `useInput` dispatcher                | T1.1, T1.2       |
+| T1.4  | `KeyHandler` type + per-window handler functions | T1.3             |
+| T1.5  | Add `ctrl`/`shift` modifiers to `Shortcut` type  | T1.4             |
+| T1.6  | Migrate `Toolbar` key handling                   | T1.4             |
+| T1.7  | Migrate `TaskListPanel` key handling             | T1.4, T1.5       |
+| T1.8  | Migrate `PromptModal` key handling               | T1.4             |
+| T1.9  | Move action bar to root layout                   | T1.2, T1.4       |
+| T1.10 | Multi-select support                             | T1.2, T1.4, T1.7 |
+| T1.11 | Remove `useInput` from toolbar button hooks      | T1.6             |

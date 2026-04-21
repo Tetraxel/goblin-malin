@@ -1,11 +1,17 @@
 import React, { useMemo } from "react";
-import { Box, Key, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import { TaskRow } from "./TaskRow";
 import { Task, TaskSnapshot } from "../base/task/task";
 import { useFocusContext } from "../contexts/FocusContext";
 import { FlowBase } from "../base/flow/flow-base";
 import { globalLogger } from "../base/logger/logger";
-import { useWhyDidYouUpdate } from "../utils/useWhyDidYouUpdate";
+import {
+  Shortcut,
+  ContextualActions,
+  ContextualActionBar,
+} from "../types/actions";
+
+export type { Shortcut, ContextualActions, ContextualActionBar };
 
 export type ColumnComponent<TAttributes> = ({
   task,
@@ -30,51 +36,15 @@ export type ColumnDefinition<TAttributes = any> = {
   component: ColumnComponent<TAttributes>;
 };
 
-export type Shortcut = {
-  key?: keyof Key;
-  input?: string;
-};
-
-export type ContextualActions = {
-  shortcuts: Shortcut[];
-  label: string;
-  description?: string;
-  color?: React.ComponentProps<typeof Text>["color"];
-  onClick: () => void;
-};
-
-export type ContextualActionBar = {
-  text?: string;
-  textColor?: React.ComponentProps<typeof Text>["color"];
-  actions: ContextualActions[];
-};
-
 export type CalculatedColumn<TAttributes = any> =
   ColumnDefinition<TAttributes> & {
     width: number;
   };
 
-function getShortcutLiteral(shortcuts: Shortcut[]): string {
-  return shortcuts
-    .map((shortcut) => {
-      const keyName = shortcut.key ? `${shortcut.key.toUpperCase()}` : "";
-      const inputName = shortcut.input
-        ? shortcut.input === " "
-          ? "SPACE"
-          : `${shortcut.input.toUpperCase()}`
-        : "";
-
-      if (keyName && inputName) return `${keyName} + ${inputName}`;
-      return keyName || inputName || "";
-    })
-    .join(" / ");
-}
-
 export function calculateColumnWidths<TAttributes>(
   columns: ColumnDefinition<TAttributes>[],
   totalWidth: number,
 ): CalculatedColumn<TAttributes>[] {
-  // Account for selection indicator and padding
   const reservedWidth = 2; // "☛ " indicator
   const availableWidth = totalWidth - reservedWidth;
 
@@ -136,14 +106,14 @@ export function calculateColumnWidths<TAttributes>(
 
 export const TaskListPanel: React.FC<{
   columns: ColumnDefinition[];
-  tasks: Task[];
+  tasks: Task<any>[];
   width: number;
   flow: FlowBase;
 }> = ({ columns, tasks, width, flow }) => {
-  const { focusState, ...focusManager } = useFocusContext();
+  const { focusState } = useFocusContext();
   const isWindowActive = focusState.activeWindow === "taskList";
   const fullHeight = focusState.taskList.height;
-  const height = fullHeight - 2; // substract the header height + contextual actions row
+  const height = fullHeight - 1; // subtract the header row
 
   // Calculate scroll offset so the selected task stays visible (center when possible)
   const selectedIndex = focusState.taskList.selectedTaskIndex;
@@ -154,82 +124,6 @@ export const TaskListPanel: React.FC<{
   // then clamp to [0, maxOffset].
   const desiredCenterOffset = selectedIndex - Math.floor((height - 1) / 2);
   const offset = Math.max(0, Math.min(desiredCenterOffset, maxOffset));
-
-  const contextualActionBar = useMemo(() => {
-    if (isWindowActive && tasks[selectedIndex]) {
-      return flow.getContextualActionBar(tasks[selectedIndex], {
-        columnIndex: focusState.taskList.selectedColumnIndex,
-      });
-    }
-    return null;
-  }, [
-    isWindowActive,
-    tasks,
-    selectedIndex,
-    flow,
-    focusState.taskList.selectedColumnIndex,
-  ]);
-
-  useInput(
-    (input, key) => {
-      // Handle navigation and resizing shortcuts
-      if (key.upArrow) {
-        if (key.shift) focusManager.resizeTaskList("up");
-        else focusManager.moveTaskSelection("up");
-      }
-      if (key.downArrow) {
-        if (key.shift) focusManager.resizeTaskList("down");
-        else focusManager.moveTaskSelection("down");
-      }
-      if (key.leftArrow) focusManager.moveTaskSelection("left");
-      if (key.rightArrow) focusManager.moveTaskSelection("right");
-
-      // Handle contextual action shortcuts
-      if (contextualActionBar) {
-        const matchingAction = contextualActionBar.actions.find((action) => {
-          // Check if any shortcut in the array matches
-          return action.shortcuts.some((shortcut) => {
-            globalLogger.info(`'${key.ctrl}' '${input}'`);
-            // Check if input matches
-            if (shortcut.input === input) {
-              globalLogger.info(`matched input '${input}'`);
-              return true;
-            }
-            // Check if key matches (need to check if the key property is pressed)
-            if (shortcut.key) {
-              const keyName = shortcut.key;
-              if (
-                (keyName === "upArrow" && key.upArrow) ||
-                (keyName === "downArrow" && key.downArrow) ||
-                (keyName === "leftArrow" && key.leftArrow) ||
-                (keyName === "rightArrow" && key.rightArrow) ||
-                (keyName === "pageDown" && key.pageDown) ||
-                (keyName === "pageUp" && key.pageUp) ||
-                (keyName === "home" && key.home) ||
-                (keyName === "end" && key.end) ||
-                (keyName === "return" && key.return) ||
-                (keyName === "escape" && key.escape) ||
-                (keyName === "ctrl" && key.ctrl) ||
-                (keyName === "shift" && key.shift) ||
-                (keyName === "tab" && key.tab) ||
-                (keyName === "backspace" && key.backspace) ||
-                (keyName === "delete" && key.delete) ||
-                (keyName === "meta" && key.meta)
-              ) {
-                globalLogger.info(`matched key '${keyName}'`);
-                return true;
-              }
-            }
-            return false;
-          });
-        });
-        if (matchingAction) {
-          matchingAction.onClick();
-        }
-      }
-    },
-    { isActive: isWindowActive },
-  );
 
   const calculatedColumns = useMemo(
     () => calculateColumnWidths(columns, width),
@@ -248,29 +142,25 @@ export const TaskListPanel: React.FC<{
       borderBottom={false}
       height={fullHeight}
     >
-      {/* headers */}
+      {/* Column headers */}
       <Box paddingX={1} height={1} overflow="hidden">
         <Box width={2} height={1} />
-        {calculatedColumns.map((column, index) => {
-          return (
-            <Box
-              key={`header-${column.label}-${index}`}
-              width={column.width}
-              height={1}
-              paddingX={1}
-              overflow="hidden"
-              // minWidth={column.minWidth}
-              // flexGrow={column?.flexGrow}
-            >
-              <Text bold color={column.color || "cyan"}>
-                {column.label}
-              </Text>
-            </Box>
-          );
-        })}
+        {calculatedColumns.map((column, index) => (
+          <Box
+            key={`header-${column.label}-${index}`}
+            width={column.width}
+            height={1}
+            paddingX={1}
+            overflow="hidden"
+          >
+            <Text bold color={column.color || "cyan"}>
+              {column.label}
+            </Text>
+          </Box>
+        ))}
       </Box>
 
-      {/* Task Rows */}
+      {/* Task rows */}
       <Box flexDirection="column" height={height} overflow="hidden">
         {tasks.slice(offset, offset + height).map((task, index) => {
           const visibleIndex = index + offset;
@@ -278,46 +168,21 @@ export const TaskListPanel: React.FC<{
           const selectedColumnIndex = isRowActive
             ? focusState.taskList.selectedColumnIndex
             : -1;
+          const isMultiSelected = focusState.taskList.selectedTaskIds.has(
+            task.getId(),
+          );
           return (
             <TaskRow
               key={task.getId()}
               taskReference={task}
-              isActive={isWindowActive && selectedIndex === visibleIndex}
+              isActive={isRowActive}
+              isMultiSelected={isMultiSelected}
               selectedColumnIndex={selectedColumnIndex}
               columns={calculatedColumns}
               flow={flow}
             />
           );
         })}
-      </Box>
-
-      {/* Contextual Actions */}
-      <Box paddingX={1} height={1} overflow="hidden">
-        {contextualActionBar ? (
-          <>
-            {contextualActionBar.text && (
-              <Box marginRight={2}>
-                <Text
-                  color={contextualActionBar.textColor || "white"}
-                  bold={true}
-                >
-                  {contextualActionBar.text}
-                </Text>
-              </Box>
-            )}
-            {contextualActionBar.actions.map((action, index) => (
-              <Box key={`context-${action.label}-${index}`} marginRight={2}>
-                <Text
-                  color={action.color ? action.color : "white"}
-                >{`[${getShortcutLiteral(action.shortcuts)}] ${action.label}`}</Text>
-              </Box>
-            ))}
-          </>
-        ) : (
-          <Text color="gray" italic={true}>
-            No contextual actions available
-          </Text>
-        )}
       </Box>
     </Box>
   );

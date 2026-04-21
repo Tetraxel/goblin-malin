@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import { inkTransport } from "../base/logger/ink-transport";
 import { LogMetadata } from "../base/logger/types";
 import { inspect } from "util";
@@ -75,7 +75,7 @@ export const LogPanel = ({ tasks }: { tasks: Task[] }) => {
       height={height}
     >
       {filteredLogs.slice(-height).map((log, index) => (
-        <Box key={log.id} paddingX={1} width={width}>
+        <Box key={log.id} paddingX={1} width={width} height={1}>
           <Text>{getLogString(log)}</Text>
         </Box>
       ))}
