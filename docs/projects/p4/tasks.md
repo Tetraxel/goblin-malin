@@ -14,12 +14,21 @@ metadataSources: TrackMetadata[];
 
 ```typescript
 type BaseTrackMetadata = {
-  id, isrc, trackName, duration, trackNumber,
-  url, uri, artists, album,
-  platform, apiProvider,
-  isPrimarySource?: boolean,
-  fetchedAt, type: 'track'
-}
+  id;
+  isrc;
+  trackName;
+  duration;
+  trackNumber;
+  url;
+  uri;
+  artists;
+  album;
+  platform;
+  apiProvider;
+  isPrimarySource?: boolean;
+  fetchedAt;
+  type: "track";
+};
 ```
 
 There is **no ranking, favorite, or rejected state** on any source. The array position is the implicit rank. There is **no compiled metadata** concept — no aggregation across sources. `bpm`, `key`, and `genres` fields do not exist in `BaseTrackMetadata` at all.
@@ -48,9 +57,9 @@ P2/T2.9 creates the `SourcesPanel` scaffold with an inner left/right split. P4 f
 type BaseTrackMetadata = {
   // ... existing fields ...
   bpm?: number;
-  key?: string;          // e.g. "Am", "F#"
+  key?: string; // e.g. "Am", "F#"
   genres?: string[];
-}
+};
 ```
 
 These are optional on all platform types. Only services that actually return them (e.g. Spotify returns BPM via the audio features endpoint, Deezer returns genres) will populate them.
@@ -60,9 +69,9 @@ These are optional on all platform types. Only services that actually return the
 ```typescript
 export type MetadataSourceState = {
   metadata: TrackMetadata;
-  rank: number;          // 0 = highest priority; lower = considered first
-  isFavorited: boolean;  // pinned as preferred for this provider (max one per provider)
-  isRejected: boolean;   // user marked as wrong match; excluded from compiled output
+  rank: number; // 0 = highest priority; lower = considered first
+  isFavorited: boolean; // pinned as preferred for this provider (max one per provider)
+  isRejected: boolean; // user marked as wrong match; excluded from compiled output
 };
 ```
 
@@ -85,14 +94,14 @@ export type TrackDownloadTask = {
   toTag?: boolean;
   toDownload?: boolean;
   userInput: UserInput;
-  metadataSources: MetadataSourceState[];   // was TrackMetadata[]
-  metadataOverrides: MetadataOverrides;     // new
+  metadataSources: MetadataSourceState[]; // was TrackMetadata[]
+  metadataOverrides: MetadataOverrides; // new
   downloadSources: TrackDownloadSource[];
   parentAlbumDownloadTask?: AlbumDownloadTask;
 };
 ```
 
-*Depends on: nothing*
+_Depends on: nothing_
 
 ---
 
@@ -133,7 +142,7 @@ After: `task.attributes?.metadataSources.find(s => s.metadata.apiProvider === 's
 
 The action bar reads column IDs that start with `metadataService-` and calls handlers that currently reference task sources — update any such references.
 
-*Depends on: T4.1*
+_Depends on: T4.1_
 
 ---
 
@@ -142,7 +151,7 @@ The action bar reads column IDs that start with `metadataService-` and calls han
 Create `src/flows/musicDownloadFlow/utils/compiledMetadata.ts`.
 
 ```typescript
-export type FieldAttribution = Platform | 'manual' | 'none';
+export type FieldAttribution = Platform | "manual" | "none";
 
 export type CompiledMetadata = {
   trackName: string;
@@ -156,17 +165,27 @@ export type CompiledMetadata = {
   key?: string;
   genres?: string[];
   // which source provided each field (for display in the detail panel)
-  attribution: Partial<Record<
-    'trackName' | 'artists' | 'duration' | 'isrc' | 'album' |
-    'year' | 'trackNumber' | 'bpm' | 'key' | 'genres',
-    FieldAttribution
-  >>;
+  attribution: Partial<
+    Record<
+      | "trackName"
+      | "artists"
+      | "duration"
+      | "isrc"
+      | "album"
+      | "year"
+      | "trackNumber"
+      | "bpm"
+      | "key"
+      | "genres",
+      FieldAttribution
+    >
+  >;
 };
 
 export function computeCompiledMetadata(
   sources: MetadataSourceState[],
   overrides: MetadataOverrides,
-): CompiledMetadata
+): CompiledMetadata;
 ```
 
 **Algorithm:**
@@ -179,7 +198,7 @@ export function computeCompiledMetadata(
 
 This function is **pure** — it is not stored anywhere. Components call it at render time from `task.getAttributes()`. No caching needed at this stage (the source list is small).
 
-*Depends on: T4.1*
+_Depends on: T4.1_
 
 ---
 
@@ -192,8 +211,8 @@ Create `src/components/MetadataSourceList.tsx`.
 ```typescript
 interface MetadataSourceListProps {
   sources: MetadataSourceState[];
-  compiled: CompiledMetadata;       // pre-computed, passed in from SourcesPanel
-  selectedIndex: number;            // -1 = compiled row selected, 0+ = source index
+  compiled: CompiledMetadata; // pre-computed, passed in from SourcesPanel
+  selectedIndex: number; // -1 = compiled row selected, 0+ = source index
   isActive: boolean;
   width: number;
   height: number;
@@ -218,7 +237,7 @@ interface MetadataSourceListProps {
 
 The compiled row is always index `-1` and always at the top. It cannot be reordered, favorited, or rejected.
 
-*Depends on: T4.1, T4.3*
+_Depends on: T4.1, T4.3_
 
 ---
 
@@ -230,10 +249,10 @@ Create `src/components/MetadataSourceDetail.tsx`.
 
 ```typescript
 interface MetadataSourceDetailProps {
-  source: MetadataSourceState | 'compiled';
+  source: MetadataSourceState | "compiled";
   compiled: CompiledMetadata;
   overrides: MetadataOverrides;
-  selectedFieldIndex: number;   // only relevant when source === 'compiled' and detail panel is focused
+  selectedFieldIndex: number; // only relevant when source === 'compiled' and detail panel is focused
   isActive: boolean;
   width: number;
   height: number;
@@ -273,7 +292,7 @@ Each field shows the value plus a dim attribution badge. If the field has a manu
 
 When `isActive` and the detail panel has focus, `↑/↓` navigates between fields. The selected field is highlighted and its shortcut appears in the action bar (`[Enter]` to edit, `[Del]` to clear override).
 
-*Depends on: T4.1, T4.3*
+_Depends on: T4.1, T4.3_
 
 ---
 
@@ -292,7 +311,7 @@ When the detail panel is active, the compiled row is selected in the source list
 
 The field edit state (`editingField: keyof MetadataOverrides | null`) lives as local React state in `MetadataSourceDetail` — it does not need to go into `FocusState`.
 
-*Depends on: T4.5*
+_Depends on: T4.5_
 
 ---
 
@@ -302,12 +321,12 @@ These actions are registered in the centralized dispatcher (P1/T1.4) under a `'m
 
 **Contextual actions when source list is focused:**
 
-| Key | Label | Condition |
-|-----|-------|-----------|
-| `[F]` | Favorite | Selected row is not compiled, not rejected |
-| `[Del]` | Reject / Unreject | Selected row is not compiled |
-| `[Shift+↑]` | Move up | Selected row is not compiled, not at rank 0 |
-| `[Shift+↓]` | Move down | Selected row is not compiled, not at last rank |
+| Key         | Label             | Condition                                      |
+| ----------- | ----------------- | ---------------------------------------------- |
+| `[F]`       | Favorite          | Selected row is not compiled, not rejected     |
+| `[Del]`     | Reject / Unreject | Selected row is not compiled                   |
+| `[Shift+↑]` | Move up           | Selected row is not compiled, not at rank 0    |
+| `[Shift+↓]` | Move down         | Selected row is not compiled, not at last rank |
 
 **Favorite logic:** `isFavorited` is toggled. Max one favorite per `metadata.platform` — when setting a new favorite for a platform, clear `isFavorited` on any existing favorite with the same platform. Favorited sources bubble to rank 0 (or near it) in the compiled metadata field selection.
 
@@ -317,7 +336,7 @@ These actions are registered in the centralized dispatcher (P1/T1.4) under a `'m
 
 All mutations call `task.updateAttributes({ metadataSources: updatedSources })`.
 
-*Depends on: T4.1, T4.4*
+_Depends on: T4.1, T4.4_
 
 ---
 
@@ -337,8 +356,8 @@ const compiled = computeCompiledMetadata(sources, overrides);
   <MetadataSourceList
     sources={sources}
     compiled={compiled}
-    selectedIndex={focusState.rightPanel.sourcesPanel.selectedSourceIndex}
-    isActive={focusState.rightPanel.sourcesPanel.innerFocus === 'list'}
+    selectedIndex={focusState.secondaryPanel.sourcesPanel.selectedSourceIndex}
+    isActive={focusState.secondaryPanel.sourcesPanel.innerFocus === 'list'}
     width={leftWidth}
     height={height}
   />
@@ -346,19 +365,19 @@ const compiled = computeCompiledMetadata(sources, overrides);
     source={selectedIndex === -1 ? 'compiled' : sources[selectedIndex]}
     compiled={compiled}
     overrides={overrides}
-    selectedFieldIndex={focusState.rightPanel.sourcesPanel.selectedFieldIndex ?? 0}
-    isActive={focusState.rightPanel.sourcesPanel.innerFocus === 'detail'}
+    selectedFieldIndex={focusState.secondaryPanel.sourcesPanel.selectedFieldIndex ?? 0}
+    isActive={focusState.secondaryPanel.sourcesPanel.innerFocus === 'detail'}
     width={rightWidth}
     height={height}
   />
 </Box>
 ```
 
-Add `selectedFieldIndex: number` to `focusState.rightPanel.sourcesPanel` (alongside `selectedSourceIndex` and `innerFocus` from P1/T1.2).
+Add `selectedFieldIndex: number` to `focusState.secondaryPanel.sourcesPanel` (alongside `selectedSourceIndex` and `innerFocus` from P1/T1.2).
 
-Register `'metadataSourceList'` and `'metadataSourceDetail'` as focusable sub-windows within the right panel, and add keyboard handlers for `→`/`←` (or `Tab`) to switch `innerFocus` between them.
+Register `'metadataSourceList'` and `'metadataSourceDetail'` as focusable sub-windows within the secondary panel, and add keyboard handlers for `→`/`←` (or `Tab`) to switch `innerFocus` between them.
 
-*Depends on: T4.4, T4.5, T4.6, T4.7, P2/T2.9, P1/T1.2*
+_Depends on: T4.4, T4.5, T4.6, T4.7, P2/T2.9, P1/T1.2_
 
 ---
 
@@ -391,20 +410,20 @@ private upsertMetadataSource(metadata: TrackMetadata): void {
 
 This fills in the currently empty `onClick: () => {}` handler for the `"s" → Search` action in `MusicDownloadFlow.getContextualActionBar()`.
 
-*Depends on: T4.2, T4.7*
+_Depends on: T4.2, T4.7_
 
 ---
 
 ## Summary
 
-| Task | What | Depends on |
-|------|------|-----------|
-| T4.1 | Add `bpm`/`key`/`genres` to `BaseTrackMetadata`; introduce `MetadataSourceState` and `metadataOverrides` | — |
-| T4.2 | Migrate all code from `TrackMetadata[]` to `MetadataSourceState[]` | T4.1 |
-| T4.3 | `computeCompiledMetadata()` — pure aggregation function with attribution | T4.1 |
-| T4.4 | `MetadataSourceList` — scrollable ranked source list with indicators | T4.1, T4.3 |
-| T4.5 | `MetadataSourceDetail` — full field display, attribution badges | T4.1, T4.3 |
-| T4.6 | Inline field editing for compiled metadata overrides | T4.5 |
-| T4.7 | Keyboard actions: `[F]` favorite, `[Del]` reject, `[Shift+↑/↓]` reorder | T4.1, T4.4 |
-| T4.8 | Wire `SourcesPanel` to real components + focus state | T4.4, T4.5, T4.6, T4.7, P2/T2.9, P1/T1.2 |
-| T4.9 | Per-provider re-search from the source list | T4.2, T4.7 |
+| Task | What                                                                                                     | Depends on                               |
+| ---- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| T4.1 | Add `bpm`/`key`/`genres` to `BaseTrackMetadata`; introduce `MetadataSourceState` and `metadataOverrides` | —                                        |
+| T4.2 | Migrate all code from `TrackMetadata[]` to `MetadataSourceState[]`                                       | T4.1                                     |
+| T4.3 | `computeCompiledMetadata()` — pure aggregation function with attribution                                 | T4.1                                     |
+| T4.4 | `MetadataSourceList` — scrollable ranked source list with indicators                                     | T4.1, T4.3                               |
+| T4.5 | `MetadataSourceDetail` — full field display, attribution badges                                          | T4.1, T4.3                               |
+| T4.6 | Inline field editing for compiled metadata overrides                                                     | T4.5                                     |
+| T4.7 | Keyboard actions: `[F]` favorite, `[Del]` reject, `[Shift+↑/↓]` reorder                                  | T4.1, T4.4                               |
+| T4.8 | Wire `SourcesPanel` to real components + focus state                                                     | T4.4, T4.5, T4.6, T4.7, P2/T2.9, P1/T1.2 |
+| T4.9 | Per-provider re-search from the source list                                                              | T4.2, T4.7                               |

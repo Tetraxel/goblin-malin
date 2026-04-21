@@ -192,7 +192,7 @@ _Depends on: T1.4_
 
 ### T1.9 — Move contextual action bar out of `TaskListPanel` into the root layout
 
-The contextual action bar is currently computed inside `TaskListPanel` via `flow.getContextualActionBar(task, { columnIndex })` and rendered at the bottom of the panel. As the right panel (P4, P5) and settings modal (P7) gain their own contextual actions, each panel will need to contribute to the bar.
+The contextual action bar is currently computed inside `TaskListPanel` via `flow.getContextualActionBar(task, { columnIndex })` and rendered at the bottom of the panel. As the secondary panel (P4, P5) and settings modal (P7) gain their own contextual actions, each panel will need to contribute to the bar.
 
 Extract the bar into a standalone `<ActionBar>` component rendered in the root layout (between the pane area and the footer), driven by a `getContextualActions(focusState) → ContextualActionBar` call. Each panel registers its action provider with the router rather than rendering its own bar inline.
 

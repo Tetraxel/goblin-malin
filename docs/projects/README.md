@@ -7,7 +7,7 @@ These are not task lists — each project is a self-contained scope of work. Ind
 | Project | Tasks |
 |---------|-------|
 | P1 — Global Keyboard / Input System | [p1/tasks.md](p1/tasks.md) |
-| P2 — Split-Pane Layout | [p2/tasks.md](p2/tasks.md) |
+| P2 — Two-Panel Layout | [p2/tasks.md](p2/tasks.md) |
 | P3 — Import System | [p3/tasks.md](p3/tasks.md) |
 | P4 — Metadata Source Management Panel | [p4/tasks.md](p4/tasks.md) |
 | P5 — Download Source Selection & Audio Preview | [p5/tasks.md](p5/tasks.md) |
@@ -18,7 +18,7 @@ These are not task lists — each project is a self-contained scope of work. Ind
 
 ## P1 — Global Keyboard / Input System
 
-**The biggest architectural risk.** The target UI has deeply context-sensitive keyboard shortcuts: the same key does a different thing depending on which panel is focused, which row is selected, and which column is active. The current approach — multiple `useInput` hooks scattered across components — already shows strain (`setMaxListeners(30)` in `App.tsx`). It will break down completely once the right panel, metadata source list, and download tree all need their own shortcuts simultaneously.
+**The biggest architectural risk.** The target UI has deeply context-sensitive keyboard shortcuts: the same key does a different thing depending on which panel is focused, which row is selected, and which column is active. The current approach — multiple `useInput` hooks scattered across components — already shows strain (`setMaxListeners(30)` in `App.tsx`). It will break down completely once the secondary panel, metadata source list, and download tree all need their own shortcuts simultaneously.
 
 What's needed is a single centralized input router that:
 - Knows the current "focus context" (active window + selection within it)
@@ -30,19 +30,19 @@ This project touches almost every other project below, so it should be resolved 
 
 ---
 
-## P2 — Split-Pane Layout
+## P2 — Two-Panel Layout
 
-The target layout is fundamentally different from the current one. Today: a task table + a log panel. Target: a **left pane** (task table) and a **right pane** (contextual detail panel), with a two-level tab system and resizable widths (`[Shift+↑/↓]`).
+The target layout is an evolution of the current one — both keep a **vertical stack**, but the log panel is replaced by a richer **secondary panel**. Today: task table + log panel. Target: task table (top) + secondary panel (bottom), with resizable heights and a two-level tab system.
 
-**Primary tabs `[1]`/`[2]`** switch the entire screen mode — `[1] Metadata` shows metadata columns in the task table; `[2] Download` shows download columns.
+**Primary tabs `[1]`/`[2]`** in the toolbar switch the entire screen mode — `[1] Metadata` shows metadata columns in the task table; `[2] Download` shows download columns.
 
-**Right pane sub-tabs `[3]`/`[4]`** switch the right panel's view — `[3]` shows "Metadata Sources" (in metadata mode) or "Download Sources" (in download mode); `[4]` shows Logs. The `[3]` sub-tab is itself a split: a source list on the left and full field detail on the right.
+**Secondary panel sub-tabs `[3]`/`[4]`** switch the secondary panel's view — `[3]` shows "Metadata Sources" (in metadata mode) or "Download Sources" (in download mode); `[4]` shows Logs. The `[3]` sub-tab has an inner horizontal split: a source list on the left and full field detail on the right.
 
-This requires a full restructuring of `App.tsx` and the Ink component tree to support:
-- A horizontal split between the task table and the right panel
-- The right panel as a slot with its own tab bar and an inner split for the sources view
-- Resizable pane proportions stored in state
-- The two-level key system (`[1]`/`[2]` for primary mode, `[3]`/`[4]` for right pane sub-tab)
+This requires restructuring `App.tsx` and the Ink component tree to support:
+- A secondary panel below the task table with its own tab bar
+- The secondary panel's `[3]` tab as an inner horizontal split (source list + source detail)
+- Resizable heights for the task list and secondary panel stored in state
+- The two-level key system (`[1]`/`[2]` for primary mode, `[3]`/`[4]` for secondary panel tab)
 
 The Ink layout model (flexbox over TTY) supports this but requires careful column/row dimension management.
 
@@ -70,7 +70,7 @@ This replaces the `inputs.txt` mechanism entirely and requires:
 
 ## P4 — Metadata Source Management Panel
 
-The right pane in metadata mode shows the full picture for the selected task:
+The secondary panel in metadata mode shows the full picture for the selected task:
 
 - A **ranked list of discovered metadata sources** (Spotify, YouTube, MusicBrainz, Soulseek, etc.) with platform badges, track name, and duration
 - Each source can be **favorited** `[F]`, **rejected** `[Del]`, and **reordered** `[Shift+↑/↓]`
@@ -84,7 +84,7 @@ The current data model (`metadataSources: TrackMetadata[]`) exists but has no ra
 
 ## P5 — Download Source Selection & Audio Preview Panel
 
-The right pane in download mode shows:
+The secondary panel in download mode shows:
 
 - A **download source tree** grouped by provider (YtDlp, Soulseek), then by the metadata source used, then individual downloaded files with filename, size, and state (DOWNLOADED / SAVED / failed)
 - The selected file previewed in the right sub-panel: format, size, duration, all embedded tags
@@ -93,7 +93,7 @@ The right pane in download mode shows:
 - When the on-disk file is missing: a "Lost the link to the file" warning + `[Ctrl+F]` to relocate
 - When changing the download source after a file is already saved: a **side-by-side diff view** (old version left, new version right) before confirming the update
 
-Currently `downloadSources` is populated but there is no selection UI and no right panel for it at all.
+Currently `downloadSources` is populated but there is no selection UI and no secondary panel for it at all.
 
 ---
 
@@ -167,7 +167,7 @@ MusicBrainz has a strict 1 req/sec rate limit — the service already handles th
 | # | Project | Depends on | Blocks |
 |---|---------|-----------|--------|
 | P1 | Global Keyboard / Input System | — | P2, P4, P5 |
-| P2 | Split-Pane Layout | P1 | P4, P5 |
+| P2 | Two-Panel Layout | P1 | P4, P5 |
 | P3 | Import System | P1 | — |
 | P4 | Metadata Source Management Panel | P1, P2 | P6 |
 | P5 | Download Source Selection & Audio Preview | P1, P2 | P6 |
