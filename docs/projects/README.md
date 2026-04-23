@@ -30,21 +30,22 @@ This project touches almost every other project below, so it should be resolved 
 
 ---
 
-## P2 — Two-Panel Layout
+## P2 — Two-Panel Layout ✅ Largely complete
 
-The target layout is an evolution of the current one — both keep a **vertical stack**, but the log panel is replaced by a richer **secondary panel**. Today: task table + log panel. Target: task table (top) + secondary panel (bottom), with resizable heights and a two-level tab system.
+The layout restructuring is done. `LogPanel` is replaced by `SecondaryPanel` in `App.tsx`. The two-level tab system (`[1]`/`[2]` primary mode, `[3]`/`[4]` secondary tab), resizable panel heights (`Shift+↑/↓`), and dynamic layout state are all implemented.
 
-**Primary tabs `[1]`/`[2]`** in the toolbar switch the entire screen mode — `[1] Metadata` shows metadata columns in the task table; `[2] Download` shows download columns.
+**What's in place:**
+- `SecondaryPanel` with a shared `TabBar` component (also used in `Toolbar`)
+- `SourcesPanel` inner split (left source list, right detail box with gray border + centered title)
+- `FocusState.layout` drives all panel heights dynamically; resizes proportionally on terminal resize
+- Keys `[1]`–`[4]` wired in `InputRouter` (single root dispatcher)
+- `LogPanel` always mounted inside `SecondaryPanel` (preserves log history across tab switches)
 
-**Secondary panel sub-tabs `[3]`/`[4]`** switch the secondary panel's view — `[3]` shows "Metadata Sources" (in metadata mode) or "Download Sources" (in download mode); `[4]` shows Logs. The `[3]` sub-tab has an inner horizontal split: a source list on the left and full field detail on the right.
+**Known gaps vs original plan:**
+- `[1]`/`[2]` do not reset the secondary tab to `"sources"` when switching primary mode
+- `soundPlay` startup sound was path-fixed rather than removed (T2.1 partial)
 
-This requires restructuring `App.tsx` and the Ink component tree to support:
-- A secondary panel below the task table with its own tab bar
-- The secondary panel's `[3]` tab as an inner horizontal split (source list + source detail)
-- Resizable heights for the task list and secondary panel stored in state
-- The two-level key system (`[1]`/`[2]` for primary mode, `[3]`/`[4]` for secondary panel tab)
-
-The Ink layout model (flexbox over TTY) supports this but requires careful column/row dimension management.
+See [p2/tasks.md](p2/tasks.md) for full task-by-task status.
 
 ---
 

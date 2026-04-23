@@ -45,7 +45,7 @@ export function calculateColumnWidths<TAttributes>(
   columns: ColumnDefinition<TAttributes>[],
   totalWidth: number,
 ): CalculatedColumn<TAttributes>[] {
-  const reservedWidth = 2; // "☛ " indicator
+  const reservedWidth = 3; // " ☛✓ " indicator
   const availableWidth = totalWidth - reservedWidth;
 
   const columnsWithMin = columns.map((col) => ({
@@ -112,7 +112,7 @@ export const TaskListPanel: React.FC<{
 }> = ({ columns, tasks, width, flow }) => {
   const { focusState } = useFocusContext();
   const isWindowActive = focusState.activeWindow === "taskList";
-  const fullHeight = focusState.taskList.height;
+  const fullHeight = focusState.layout.taskListHeight;
   const height = fullHeight - 1; // subtract the header row
 
   // Calculate scroll offset so the selected task stays visible (center when possible)

@@ -26,7 +26,7 @@ export function useTaskListKeyHandler(tasks: Task[], flow: FlowBase | undefined)
   const {
     focusState,
     moveTaskSelection,
-    resizeTaskList,
+    resizePanels,
     toggleTaskSelection,
     selectAllTasks,
     clearSelection,
@@ -34,11 +34,11 @@ export function useTaskListKeyHandler(tasks: Task[], flow: FlowBase | undefined)
 
   return (input: string, key: Key) => {
     if (key.upArrow) {
-      if (key.shift) resizeTaskList('up');
+      if (key.shift) resizePanels('shrink');
       else moveTaskSelection('up');
     }
     if (key.downArrow) {
-      if (key.shift) resizeTaskList('down');
+      if (key.shift) resizePanels('grow');
       else moveTaskSelection('down');
     }
     if (key.leftArrow) moveTaskSelection('left');

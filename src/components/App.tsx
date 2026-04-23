@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Box, Text } from "ink";
-import { LogPanel } from "./LogPanel";
+import { Box } from "ink";
 import { Footer } from "./Footer";
 import { Separator } from "./Separator";
 import { PromptModal } from "./PromptModal";
 import { Toolbar, ToolbarButtonHook } from "./Toolbar";
 import { ColumnDefinition, TaskListPanel } from "./TaskListPanel";
 import { ActionBar } from "./ActionBar";
+import { SecondaryPanel } from "./SecondaryPanel";
 import { InputRouter } from "./InputRouter";
 import { useScreenSize } from "../hooks/useScreenSize";
 import { FocusProvider } from "../contexts/FocusContext";
@@ -17,15 +17,17 @@ import { Task, TaskAttributes } from "../base/task/task";
 import { MusicDownloadTaskAttributes } from "../flows/musicDownloadFlow/types";
 import { globalLogger } from "../base/logger/logger";
 import soundPlay from "sound-play";
-import BigText from "ink-big-text";
+import { fileURLToPath } from "url";
+import path from "path";
 
 export const App: React.FC = () => {
   globalLogger.info(`--- App render`);
   useEffect(() => {
-    soundPlay.play(
-      "C:\\Users\\axel7\\Documents\\Github\\goblin-malin\\init.wav",
-      0.5,
+    const initWav = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../../init.wav",
     );
+    soundPlay.play(initWav, 0.5);
   }, []);
 
   const [tasks, setTasks] = useState<Task<TaskAttributes>[]>([]);
@@ -82,15 +84,6 @@ export const App: React.FC = () => {
         {/* InputRouter: single root useInput — must be inside FocusProvider */}
         <InputRouter tasks={filteredTasks} flow={currentFlow} />
 
-        {/* <Text color="gray">██</Text>
-      <Text color="cyan">██</Text>
-      <Text color="cyanBright">██</Text>
-      <Text color="red">██</Text>
-      <Text color="redBright">██</Text>
-      <Text color="green">██</Text>
-      <Text color="greenBright">██</Text>
-      <BigText text="Goblin Malin" /> */}
-
         <Box flexDirection="column" height={terminalHeight}>
           {currentFlow && (
             <Toolbar
@@ -111,8 +104,11 @@ export const App: React.FC = () => {
             />
           )}
           <ActionBar tasks={filteredTasks} flow={currentFlow} />
-          <Separator width={terminalWidth} />
-          <LogPanel tasks={filteredTasks} />
+          <SecondaryPanel
+            tasks={filteredTasks}
+            width={terminalWidth}
+            flow={currentFlow}
+          />
           <Separator width={terminalWidth} />
           <Footer />
 

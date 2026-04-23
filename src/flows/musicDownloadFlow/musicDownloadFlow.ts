@@ -203,7 +203,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
 
         if (column.id === "toTag") {
             actions = actions.concat([{
-                shortcuts: [{ input: " " }, { key: "return" }],
+                shortcuts: [{ key: "return" }],
                 label: "Toggle",
                 description: "Toggle this option",
                 multiSelectAllowed: true,
@@ -217,7 +217,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
 
         if (column.id === "toDownload") {
             actions = actions.concat([{
-                shortcuts: [{ input: " " }, { key: "return" }],
+                shortcuts: [{ key: "return" }],
                 label: "Toggle",
                 description: "Toggle this option",
                 multiSelectAllowed: true,

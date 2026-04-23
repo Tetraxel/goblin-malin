@@ -35,11 +35,18 @@ function getLogString(log: LogMetadata): string {
   return level + flow + service + message + details;
 }
 
-export const LogPanel = ({ tasks }: { tasks: Task[] }) => {
-  const { focusState, ...focusManager } = useFocusContext();
-  const isActive = focusState.activeWindow === "logPanel";
-  const height = focusState.logPanel.height;
-  const width = focusState.logPanel.width;
+export const LogPanel = ({
+  tasks,
+  width: widthProp,
+  height: heightProp,
+}: {
+  tasks: Task[];
+  width?: number;
+  height?: number;
+}) => {
+  const { focusState } = useFocusContext();
+  const height = heightProp ?? focusState.layout.secondaryPanelHeight;
+  const width = widthProp ?? focusState.logPanel.width;
 
   const selectedTask =
     focusState.activeWindow === "taskList"

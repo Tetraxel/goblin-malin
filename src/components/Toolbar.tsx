@@ -7,6 +7,7 @@ import { Separator } from "./Separator";
 import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
 import { ToolbarButtonInvoker } from "./ToolbarButtonInvoker";
 import { FlowBase } from "../base/flow/flow-base";
+import { TabBar } from "./TabBar";
 export type ToolbarButtonHook<TFlow = FlowBase> = ({
   isSelected,
   flow,
@@ -132,11 +133,27 @@ export const Toolbar = ({
           </Text> */}
         </Box>
       </Box>
-      <Separator
-        width={width}
-        splitPositions={splitPositions}
-        splitCharacter={"┴"}
-      />
+      <PrimaryModeTabBar width={width} splitPos={splitPositions[0] ?? 0} />
     </>
+  );
+};
+
+const PrimaryModeTabBar: React.FC<{ width: number; splitPos: number }> = ({
+  width,
+  splitPos,
+}) => {
+  const { focusState } = useFocusContext();
+  const { primaryMode } = focusState.secondaryPanel;
+
+  return (
+    <TabBar
+      width={width}
+      tabs={[
+        { key: "1", label: "Metadata view" },
+        { key: "2", label: "Download view" },
+      ]}
+      activeTabKey={primaryMode === "metadata" ? "1" : "2"}
+      splitPos={splitPos}
+    />
   );
 };

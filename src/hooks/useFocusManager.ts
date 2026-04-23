@@ -2,10 +2,24 @@ import { useState, useCallback, useEffect } from 'react';
 import { useScreenSize } from './useScreenSize';
 import { FlowBase } from '../base/flow/flow-base';
 
-const TOOLBAR_HEIGHT = 1;
-const TASK_LIST_HEIGHT = 30;
-const FOOTER_HEIGHT = 2;
-const SEPARATOR_HEIGHT = 4;
+// Fixed rows that never change regardless of terminal size.
+// toolbarRows = top separator + toolbar content + bottom separator.
+// Remaining overhead: 1 actionBar + 1 separator before footer + 2 footer (content + bottom border).
+const LAYOUT = {
+  toolbarRows: 3,
+  overheadRows: 4, // actionBar(1) + separatorBeforeFooter(1) + footer(2)
+} as const;
+
+function computeContentHeight(terminalHeight: number): number {
+  return Math.max(10, terminalHeight - LAYOUT.toolbarRows - LAYOUT.overheadRows);
+}
+
+function initLayout(terminalHeight: number) {
+  const contentHeight = computeContentHeight(terminalHeight);
+  const taskListHeight = Math.floor(contentHeight / 2);
+  const secondaryPanelHeight = contentHeight - taskListHeight;
+  return { taskListHeight, secondaryPanelHeight, contentHeight };
+}
 
 export type FocusableWindow =
   | 'toolbar'
@@ -28,35 +42,34 @@ export interface FocusState {
     selectedTaskIndex: number;
     selectedColumnIndex: number;
     selectedTaskIds: Set<string>;
-    height: number;
     width: number;
   };
   logPanel: {
     selectedLogIndex: number;
-    height: number;
     width: number;
   };
   footer: {
     height: number;
   };
+  layout: {
+    taskListHeight: number;
+    secondaryPanelHeight: number;
+    contentHeight: number;
+  };
   prompt: Record<string, never>;
   secondaryPanel: {
-    mode: 'metadataSources' | 'download' | 'logs';
+    primaryMode: 'metadata' | 'download';
+    subTab: 'sources' | 'logs';
     selectedRowIndex: number;
     scrollOffset: number;
+    sourcesPanel: {
+      selectedSourceIndex: number;
+      innerFocus: 'list' | 'detail';
+    };
   };
   modal: {
     type: 'settings' | 'import' | null;
   };
-}
-
-function calculateLogPanelHeight(
-  terminalHeight: number,
-  taskListHeight: number,
-  toolbarHeight: number,
-  footerHeight: number,
-) {
-  return terminalHeight - taskListHeight - toolbarHeight - footerHeight - SEPARATOR_HEIGHT;
 }
 
 export const useFocusManager = ({
@@ -69,48 +82,59 @@ export const useFocusManager = ({
   taskColumnCount: number;
 }) => {
   const { height: terminalHeight, width: terminalWidth } = useScreenSize();
-  const [focusState, setFocusState] = useState<FocusState>({
+
+  const [focusState, setFocusState] = useState<FocusState>(() => ({
     activeWindow: 'toolbar',
     previousWindow: undefined,
     toolbar: {
-      height: TOOLBAR_HEIGHT,
+      height: 1,
       selectedButtonIndex: 0,
     },
     taskList: {
-      height: TASK_LIST_HEIGHT,
       selectedTaskIndex: 0,
       selectedColumnIndex: 0,
       selectedTaskIds: new Set<string>(),
       width: terminalWidth,
     },
     logPanel: {
-      height: calculateLogPanelHeight(terminalHeight, TASK_LIST_HEIGHT, TOOLBAR_HEIGHT, FOOTER_HEIGHT),
-      selectedLogIndex: Math.max(0, 10),
+      selectedLogIndex: 0,
       width: terminalWidth,
     },
     footer: {
-      height: FOOTER_HEIGHT,
+      height: 2,
     },
+    layout: initLayout(terminalHeight),
     prompt: {},
     secondaryPanel: {
-      mode: 'metadataSources',
+      primaryMode: 'metadata',
+      subTab: 'sources',
       selectedRowIndex: 0,
       scrollOffset: 0,
+      sourcesPanel: {
+        selectedSourceIndex: 0,
+        innerFocus: 'list',
+      },
     },
     modal: {
       type: null,
     },
-  });
+  }));
 
   useEffect(() => {
-    setFocusState((prev) => ({
-      ...prev,
-      logPanel: {
-        ...prev.logPanel,
-        width: terminalWidth,
-      },
-    }));
-  }, [terminalWidth]);
+    setFocusState((prev) => {
+      const contentHeight = computeContentHeight(terminalHeight);
+      const prevContent = prev.layout.contentHeight || contentHeight;
+      const ratio = prev.layout.taskListHeight / prevContent;
+      const taskListHeight = Math.max(5, Math.min(Math.round(contentHeight * ratio), contentHeight - 5));
+      const secondaryPanelHeight = contentHeight - taskListHeight;
+      return {
+        ...prev,
+        taskList: { ...prev.taskList, width: terminalWidth },
+        logPanel: { ...prev.logPanel, width: terminalWidth },
+        layout: { taskListHeight, secondaryPanelHeight, contentHeight },
+      };
+    });
+  }, [terminalHeight, terminalWidth]);
 
   const switchWindow = useCallback((window: FocusableWindow) => {
     setFocusState((prev) => ({
@@ -151,28 +175,46 @@ export const useFocusManager = ({
     flow.switchMode(input);
   }, []);
 
-  const resizeTaskList = useCallback(
-    (direction: 'up' | 'down') => {
-      setFocusState((prev) => {
-        const newHeight =
-          direction === 'up'
-            ? Math.max(5, prev.taskList.height - 2)
-            : Math.min(terminalHeight - 10, prev.taskList.height + 2);
-        const logPaneHeight = calculateLogPanelHeight(
-          terminalHeight,
-          newHeight,
-          prev.toolbar.height,
-          prev.footer.height,
-        );
-        return {
-          ...prev,
-          taskList: { ...prev.taskList, height: newHeight },
-          logPanel: { ...prev.logPanel, height: logPaneHeight },
-        };
-      });
-    },
-    [terminalHeight],
-  );
+  const resizePanels = useCallback((direction: 'grow' | 'shrink') => {
+    setFocusState((prev) => {
+      const delta = direction === 'grow' ? 2 : -2;
+      const newTaskListHeight = Math.max(
+        5,
+        Math.min(
+          prev.layout.taskListHeight + delta,
+          prev.layout.contentHeight - 5,
+        ),
+      );
+      return {
+        ...prev,
+        layout: {
+          ...prev.layout,
+          taskListHeight: newTaskListHeight,
+          secondaryPanelHeight: prev.layout.contentHeight - newTaskListHeight,
+        },
+      };
+    });
+  }, []);
+
+  const setPrimaryMode = useCallback((mode: 'metadata' | 'download') => {
+    setFocusState((prev) => ({
+      ...prev,
+      secondaryPanel: {
+        ...prev.secondaryPanel,
+        primaryMode: mode,
+      },
+    }));
+  }, []);
+
+  const setSecondaryTab = useCallback((tab: 'sources' | 'logs') => {
+    setFocusState((prev) => ({
+      ...prev,
+      secondaryPanel: {
+        ...prev.secondaryPanel,
+        subTab: tab,
+      },
+    }));
+  }, []);
 
   const moveToolbarSelection = useCallback(
     (direction: 'left' | 'right' | 'down') => {
@@ -272,7 +314,9 @@ export const useFocusManager = ({
     switchBack,
     handleTabPress,
     switchMode,
-    resizeTaskList,
+    resizePanels,
+    setPrimaryMode,
+    setSecondaryTab,
     moveToolbarSelection,
     moveTaskSelection,
     toggleTaskSelection,

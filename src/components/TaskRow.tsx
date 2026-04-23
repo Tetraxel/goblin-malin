@@ -27,7 +27,12 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
   const indicator = isActiveIndicator + (isMultiSelected ? "✓" : " ");
 
   return (
-    <Box key={task.id} paddingX={1} overflowY="hidden">
+    <Box
+      key={task.id}
+      paddingX={1}
+      overflowY="hidden"
+      backgroundColor={isActive ? "#111111" : undefined}
+    >
       <Box width={2}>
         <Text color={isActive ? "white" : isMultiSelected ? "cyan" : "white"}>
           {indicator}
