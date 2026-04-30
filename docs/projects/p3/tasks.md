@@ -2,92 +2,79 @@
 
 ## Context
 
+**Previous import flow (replaced):**
+
+1. User selected the "Import" toolbar button and pressed `Enter`
+2. `MusicDownloadFlow.importTasks()` read `inputs.txt` from the project root
+3. Each non-empty, non-comment line became a `DownloadTask` with ID `item-0`, `item-1`, ...
+4. `orchestrator.addTasks()` threw if any task ID already existed
+
+**Problems (now fixed):**
+
+- Sequential IDs (`item-0`, `item-1`) broke on re-import — collided with existing tasks
+- `orchestrator.addTasks()` threw on duplicate instead of skipping
+- `inputs.txt` was a dev artifact with a hardcoded file path — no user-facing flow
+- `useImportButton` registered its own `useInput` hook (extra `setMaxListeners`)
+
 **Current import flow:**
 
-1. User selects the "Import" toolbar button and presses `Enter`
-2. `MusicDownloadFlow.importTasks()` reads `inputs.txt` from the project root
-3. Each non-empty, non-comment line becomes a `DownloadTask` with ID `item-0`, `item-1`, ...
-4. `orchestrator.addTasks()` is called — it **throws** if any task ID already exists
-
-**Problems with the current approach:**
-
-- Sequential IDs (`item-0`, `item-1`) break on re-import — a second import would create IDs that collide with the first
-- `orchestrator.addTasks()` throws on duplicate, so re-importing crashes instead of skipping
-- `inputs.txt` is a dev artifact with a hardcoded file path — it has no user-facing flow
-- `useImportButton` registers its own `useInput` hook (another `setMaxListeners` contributor)
-
-**Target import flow:**
-
-1. `Ctrl+V` anywhere on the main screen (no modal open) reads the clipboard
-2. App parses all valid URLs from the pasted text and identifies their platform
-3. A confirmation modal appears listing the detected URLs with platform badges
-4. Modal footer has two checkboxes: **Fetch Metadata?** and **Download?**
-5. `[Enter]` confirms: tasks are created with `toTag`/`toDownload` set from the checkboxes
-6. URLs already in the queue are silently skipped (logged)
-7. `[Esc]` dismisses the modal with no changes
-
-The Import toolbar button triggers the same clipboard-driven flow.
+1. `Ctrl+V` anywhere on the main screen, or the Import toolbar button, triggers the flow
+2. On most terminals: the keystroke is intercepted and clipboard is read via `readClipboard()`
+3. On Windows Terminal (and others that intercept `Ctrl+V`): the pasted text arrives directly
+   as a raw multi-char stdin chunk — detected by `input.length > 8 && /https?:\/\//i` and
+   routed without a clipboard read
+4. `detectUrls()` extracts and classifies all supported platform URLs from the text
+5. A confirmation modal lists the detected URLs with platform badges
+6. A 3-option radio selector lets the user choose the import action
+7. `[Enter]` confirms; `[↑↓]` or `[Tab]` navigates; `[Esc]` cancels
+8. Additional pastes while the modal is open append new URLs to the existing list
+9. On confirm: `createTasksFromUrls()` builds typed `Task[]`, then `importTasks()` deduplicates and adds them
 
 ---
 
 ## Tasks
 
-### T3.1 — Switch task IDs from sequential integers to URL-based hashes
+### T3.1 — Switch task IDs from sequential integers to URL-based hashes ✅
 
-**Current:** `DownloadTask` is constructed with `id: \`item-${index}\`` (line 122 in `musicDownloadFlow.ts`). This makes duplicate detection impossible — the same URL imported twice gets a different ID each time.
-
-**Target:** Use a stable identifier derived from the URL itself:
+**Implemented:** `src/flows/musicDownloadFlow/utils/taskId.ts`
 
 ```typescript
 import { createHash } from 'crypto';
 
-function taskIdFromUrl(url: string): string {
+export function taskIdFromUrl(url: string): string {
   return 'task:' + createHash('sha1').update(url).digest('hex').slice(0, 12);
 }
 ```
 
-Update `MusicDownloadFlow.importTasks()` (and the new clipboard import path in T3.5) to use `taskIdFromUrl(url)` instead of the positional index. Since `createHash` is Node built-in, no new dependency is needed.
-
-This is a prerequisite for T3.4 (duplicate skipping) — the ID must be stable across re-imports for the collision check to work.
+Used in `MusicDownloadFlow.createTasksFromUrls()`. Same URL always produces the same ID,
+enabling reliable duplicate detection across re-imports.
 
 *Depends on: nothing*
 
 ---
 
-### T3.2 — Clipboard read utility
+### T3.2 — Clipboard read utility ✅
 
-Ink has no native clipboard API. Create `src/utils/clipboard.ts` with a single export:
+**Implemented:** `src/utils/clipboard.ts`
 
 ```typescript
 export async function readClipboard(): Promise<string>
 ```
 
-Implementation using `child_process` with platform detection (no extra dependency):
+Platform-aware (`win32` → `powershell Get-Clipboard`, `darwin` → `pbpaste`,
+Linux → `xclip`). Catches all errors and returns `''`.
 
-```typescript
-import { execSync } from 'child_process';
-
-export async function readClipboard(): Promise<string> {
-  switch (process.platform) {
-    case 'win32':
-      return execSync('powershell -command "Get-Clipboard"').toString().trim();
-    case 'darwin':
-      return execSync('pbpaste').toString();
-    default:
-      return execSync('xclip -selection clipboard -o').toString();
-  }
-}
-```
-
-If the command fails (e.g., `xclip` not installed), catch and return `''` — the URL detector will produce an empty list, which the caller handles gracefully.
+**Note:** In practice, Windows Terminal intercepts `Ctrl+V` and delivers clipboard
+text as raw stdin before the keystroke ever reaches the app. `readClipboard()` is
+the fallback for terminals that do forward the keystroke.
 
 *Depends on: nothing*
 
 ---
 
-### T3.3 — URL detection and platform parsing utility
+### T3.3 — URL detection and platform parsing utility ✅
 
-Create `src/utils/detectUrls.ts`. Given a string of arbitrary text (clipboard contents), extract all URLs that match a supported platform and identify each one:
+**Implemented:** `src/utils/detectUrls.ts`
 
 ```typescript
 export type SupportedPlatform =
@@ -95,7 +82,7 @@ export type SupportedPlatform =
   | 'soundcloud' | 'deezer' | 'appleMusic' | 'tidal';
 
 export type DetectedUrl = {
-  raw: string;       // the original URL as pasted
+  raw: string;
   platform: SupportedPlatform;
   type: 'track' | 'album' | 'playlist' | 'unknown';
 };
@@ -103,165 +90,145 @@ export type DetectedUrl = {
 export function detectUrls(text: string): DetectedUrl[]
 ```
 
-Matching rules (expand as more platforms are enabled):
-
-| Platform | URL pattern |
-|----------|------------|
-| `spotify` | `open.spotify.com/track/` → `type: 'track'`, `open.spotify.com/album/` → `'album'` |
-| `youtube` | `youtube.com/watch` or `youtu.be/` → `'track'` |
-| `youtubeMusic` | `music.youtube.com/watch` → `'track'` |
-| `soundcloud` | `soundcloud.com/` (not homepage) → `'track'` |
-| `deezer` | `deezer.com/track/` → `'track'` |
-| `appleMusic` | `music.apple.com/` → `'track'` |
-| `tidal` | `tidal.com/track/` → `'track'` |
-
-Use a single URL extraction regex (`/https?:\/\/[^\s"'<>]+/gi`) to pull all URLs from the text first, then classify each. Unknown URLs (not matching any pattern) are excluded from the result.
+Extracts all URLs with `/https?:\/\/[^\s"'<>]+/gi`, then classifies each via `classify()`.
+Unknown URLs (no matching platform) are excluded. Spotify album/playlist paths are
+classified accordingly; SoundCloud homepage is excluded.
 
 *Depends on: nothing*
 
 ---
 
-### T3.4 — Import state management and duplicate filtering
+### T3.4 — Import state management and duplicate filtering ✅
 
-**Import state** needs to live somewhere accessible to both the `Ctrl+V` handler and the modal. Add it to `App.tsx` as local state (not `FocusState` — it is transient UI state, not navigation state):
+**Deviation from plan:** Import state was originally planned for `App.tsx`. It now lives in
+`src/hooks/useImportFlow.ts`, which owns state and all three import callbacks
+(`openImportFlow`, `handleImportConfirm`, `handleImportCancel`). `App.tsx` and `AppInner.tsx`
+are not aware of `PendingImport`.
 
+**`PendingImport` type** (in `src/components/ImportModal.tsx`):
 ```typescript
 type PendingImport = {
   urls: DetectedUrl[];
-  fetchMetadata: boolean;   // checkbox state — default: true
-  download: boolean;        // checkbox state — default: false
-} | null;
-
-const [pendingImport, setPendingImport] = useState<PendingImport>(null);
+  fetchMetadata: boolean;
+  download: boolean;
+};
 ```
 
-Pass `pendingImport` and `setPendingImport` to the `<ImportModal>` component (T3.5).
+**Duplicate filtering** moved to `FlowBase.importTasks()` (see T3.8 deviation). Deduplication
+checks both the orchestrator's existing task IDs and a within-batch `seen` set.
 
-**Duplicate filtering** in `MusicDownloadFlow`: before calling `orchestrator.addTasks()`, check the existing task list for URL collisions. Since task IDs are now URL-derived (T3.1), the check is simply:
-
-```typescript
-const existingIds = new Set(this.orchestrator.getTasks().map(t => t.getId()));
-const newTasks = tasks.filter(t => !existingIds.has(t.getId()));
-const skippedCount = tasks.length - newTasks.length;
-
-if (skippedCount > 0) {
-  this.logger.info(`Skipped ${skippedCount} URL(s) already in queue`);
-}
-if (newTasks.length > 0) {
-  this.orchestrator.addTasks(newTasks);
-}
-```
-
-Move this logic into a new `MusicDownloadFlow.addUrlsAsTask(urls: string[], opts: { toTag: boolean; toDownload: boolean })` method that both the old `importTasks()` path and the new clipboard path call. This avoids duplicating the task construction code.
+**Continuous link handling (post-P3 addition):** When the modal is already open, additional
+pastes merge new URLs into the existing list instead of being dropped. Deduplication is by
+raw URL string. The stdin paste check in `InputRouter` runs *before* the modal guard so it
+fires even when the modal has focus.
 
 *Depends on: T3.1, T3.3*
 
 ---
 
-### T3.5 — ImportModal component
+### T3.5 — ImportModal component ✅
 
-Create `src/components/ImportModal.tsx`. It renders as a centered overlay (same approach as `PromptModal`) when `pendingImport !== null`.
+**Implemented:** `src/components/ImportModal.tsx`
 
-**Layout:**
+**Deviation from plan:** The two checkboxes (Fetch Metadata? / Download?) were replaced with
+a 3-option radio selector navigated by `[↑↓]` / `[Tab]`:
 
 ```
-╭─── Import 3 tracks ────────────────────────────────╮
-│                                                      │
-│  open.spotify.com/track/4uLU6hM…  [SPOTIFY]  track  │
-│  music.youtube.com/watch?v=dQw4…  [YT MUSIC] track  │
-│  youtube.com/watch?v=oHg5SJYRHA  [YOUTUBE]  track   │
-│                                                      │
-│  [✓] Fetch Metadata?   [ ] Download?                 │
-│                                                      │
-│  [ENTER] Confirm · [TAB] Toggle checkbox · [ESC] Cancel │
-╰──────────────────────────────────────────────────────╯
+  ☛ Fetch Metadata & Download
+    Fetch Metadata
+    Do nothing
 ```
 
-**Props:**
+`[Enter]` confirms the selected option. `[Esc]` cancels. The selected option maps to
+`{ fetchMetadata, download }` passed to `onConfirm`.
 
-```typescript
-interface ImportModalProps {
-  pendingImport: PendingImport;
-  onConfirm: (opts: { fetchMetadata: boolean; download: boolean }) => void;
-  onCancel: () => void;
-}
-```
+**URL list limits (post-P3 addition):**
+- Maximum 32 URLs displayed; excess shown as `and N other URLs...`
+- If the list would overflow the terminal height, it is trimmed earlier (before the 32nd),
+  always reserving one row for the overflow line
 
-**Keyboard handling** (handled by the centralized dispatcher via the `'importModal'` focus window from P1/T1.2; until P1 is done, use a local `useInput`):
-
-- `Tab` → cycle checkbox focus between "Fetch Metadata?" and "Download?"
-- `Space` → toggle the focused checkbox
-- `Enter` → call `onConfirm({ fetchMetadata, download })`
-- `Esc` → call `onCancel()`
-
-The modal uses `useFocusContext()` to check `focusState.activeWindow === 'importModal'` — it renders but is inactive when another modal is on top. When it mounts, call `focusManager.switchWindow('importModal')`. When it unmounts or `onCancel()` is called, call `focusManager.switchBack()`.
-
-URL lines: truncate long URLs to fit the modal width. Display platform badge as a colored label (reuse `SERVICE_DISPLAY_MAPPING` acronym/color from `musicDownloadFlow.ts` where available, fall back to the platform key uppercased). If the terminal supports OSC 8 hyperlinks (detectable via `process.env.TERM_PROGRAM`), wrap URLs in the escape sequence so they are clickable — otherwise render as plain text.
+**Focus management:** `switchWindow('importModal')` on mount, `switchBack()` on unmount,
+via `useFocusContext()`. `useInput` is gated with `{ isActive }`.
 
 *Depends on: T3.3, T3.4, P1/T1.2*
 
 ---
 
-### T3.6 — Wire `Ctrl+V` as a global import shortcut
+### T3.6 — Wire `Ctrl+V` as a global import shortcut ✅
 
-Add `Ctrl+V` handling to the global key dispatcher (P1/T1.3). Until P1 is done, add it to `App.tsx`'s existing `useInput`:
+**Implemented:** `src/components/InputRouter.tsx` + `src/hooks/useImportFlow.ts`
 
-```typescript
-if (key.ctrl && input === 'v') {
-  // Do not open a second import modal if one is already pending
-  if (pendingImport !== null) return;
-  // Do not interrupt a task prompt
-  if (focusState.activeWindow === 'prompt') return;
+Two detection paths in `InputRouter.useInput`:
 
-  readClipboard()
-    .then(text => {
-      const urls = detectUrls(text);
-      if (urls.length === 0) {
-        globalLogger.info('Ctrl+V: no supported URLs found in clipboard');
-        return;
-      }
-      setPendingImport({ urls, fetchMetadata: true, download: false });
-      focusManager.switchWindow('importModal');
-    })
-    .catch(err => globalLogger.error('Clipboard read failed', { err }));
-}
-```
+1. **stdin paste** (checked first, before the modal guard so it works while modal is open):
+   ```typescript
+   if (input.length > 8 && /https?:\/\//i.test(input)) {
+     openImportFlow(input);
+     return;
+   }
+   ```
 
-The `onConfirm` callback passed to `<ImportModal>`:
+2. **Ctrl+V keystroke** (fallback, blocked by modal guard):
+   ```typescript
+   if ((key.ctrl && (input === 'v' || input === 'V')) || input === '\x16') {
+     openImportFlow();
+     return;
+   }
+   ```
 
-```typescript
-const handleImportConfirm = ({ fetchMetadata, download }) => {
-  const urls = pendingImport!.urls.map(d => d.raw);
-  currentFlow.addUrlsAsTask(urls, { toTag: fetchMetadata, toDownload: download });
-  setPendingImport(null);
-  focusManager.switchBack();
-};
-```
+`openImportFlow(text?)` in `useImportFlow`: if `text` is provided, skips clipboard read;
+otherwise calls `readClipboard()`. Guards: no-op if `focusState.activeWindow === 'prompt'`.
 
 *Depends on: T3.2, T3.3, T3.4, T3.5*
 
 ---
 
-### T3.7 — Redirect the Import toolbar button to the clipboard flow
+### T3.7 — Redirect the Import toolbar button to the clipboard flow ✅
 
-`useImportButton` currently calls `flow.importTasks()` on `Enter`. After this change, pressing the Import toolbar button should trigger the same clipboard-driven flow as `Ctrl+V`.
+**Implemented:** `src/flows/musicDownloadFlow/toolbar/useImportButton.ts` +
+`src/contexts/ImportActionsContext.tsx`
 
-Move the clipboard read + modal open logic into a shared function (e.g., `openImportFlow()`) defined in `App.tsx` and passed to both the `Ctrl+V` handler and `useImportButton`. Update `useImportButton` to accept and call this function instead of `flow.importTasks()`.
+`useImportButton` no longer calls `flow.importTasks()` directly. It reads `openImportFlow`
+from `ImportActionsContext`:
 
-`useImportButton` also currently registers its own `useInput` hook — remove it as part of P1/T1.6 (toolbar key migration). For now, the `isSelected + Enter` pattern can stay as-is.
+```typescript
+export const useImportButton: ToolbarButtonHook<FlowBase> = () => {
+    const { openImportFlow } = useImportActions();
+    return { label: "Import", icon: "⮯", ..., onPress: () => openImportFlow() };
+};
+```
+
+`ImportActionsProvider` wraps `AppInner` and passes `openImportFlow` down via context,
+avoiding prop-drilling through the toolbar stack.
 
 *Depends on: T3.6*
 
 ---
 
-### T3.8 — Remove the `inputs.txt` import mechanism
+### T3.8 — Remove the `inputs.txt` import mechanism ✅
 
-After T3.7 is complete and the clipboard flow is the only import path:
+**Implemented as planned**, with one architectural deviation:
 
-- Delete `MusicDownloadFlow.importTasks()` (the `fs.readFile('inputs.txt')` implementation)
-- Rename `addUrlsAsTask()` (introduced in T3.4) to `importTasks()` to preserve the `FlowBase` interface, or update `FlowBase.importTasks()` signature to accept `(urls: string[], opts)`.
-- Remove `inputs.txt` from the repo root (add to `.gitignore` if keeping it as a local dev tool)
-- Remove the `InputLoader` import and `static inputLoader` field from `MusicDownloadFlow` if they are only used by the old `importTasks()` path
+**Deviation:** The plan said to keep `FlowBase.importTasks(urls, opts)` and rename
+`addUrlsAsTask()` to `importTasks()`. Instead, the interface was split into two methods:
+
+- `FlowBase.createTasksFromUrls(urls, opts): Task<TaskAttributes>[]` — flow-specific factory;
+  `MusicDownloadFlow` implements this to build `DownloadTask[]` with `toTag`, `toDownload`,
+  and `userInput` already set
+- `FlowBase.importTasks(tasks: Task<TaskAttributes>[])` — generic base implementation;
+  handles deduplication and `orchestrator.addTasks()`. No override needed in `MusicDownloadFlow`
+
+`useImportFlow.handleImportConfirm` calls both in sequence:
+```typescript
+const tasks = currentFlow.createTasksFromUrls(urls, { toTag: fetchMetadata, toDownload: download });
+currentFlow.importTasks(tasks);
+```
+
+**Also removed:**
+- `src/flows/musicDownloadFlow/utils/input-loader.ts` — deleted
+- `InputLoader` import and `static inputLoader` field from `MusicDownloadFlow`
+
+`inputs.txt` is kept in the repo root as a local dev reference but is no longer read by the app.
 
 *Depends on: T3.7*
 
@@ -269,13 +236,15 @@ After T3.7 is complete and the clipboard flow is the only import path:
 
 ## Summary
 
-| Task | What | Depends on |
-|------|------|-----------|
-| T3.1 | URL-based task IDs (replace `item-0`, `item-1`) | — |
-| T3.2 | `readClipboard()` utility | — |
-| T3.3 | `detectUrls()` utility with platform classification | — |
-| T3.4 | Import state in `App.tsx` + duplicate filtering in flow | T3.1, T3.3 |
-| T3.5 | `ImportModal` component with checkboxes | T3.3, T3.4, P1/T1.2 |
-| T3.6 | `Ctrl+V` global shortcut wiring | T3.2, T3.3, T3.4, T3.5 |
-| T3.7 | Redirect Import toolbar button to clipboard flow | T3.6 |
-| T3.8 | Remove `inputs.txt` mechanism | T3.7 |
+| Task | What | Status |
+|------|------|--------|
+| T3.1 | URL-based task IDs (`task:<sha1[:12]>`) | ✅ Done |
+| T3.2 | `readClipboard()` utility | ✅ Done |
+| T3.3 | `detectUrls()` with platform classification | ✅ Done |
+| T3.4 | Import state in `useImportFlow` hook + dedup | ✅ Done |
+| T3.5 | `ImportModal` with 3-option radio selector | ✅ Done |
+| T3.6 | `Ctrl+V` + stdin paste detection in `InputRouter` | ✅ Done |
+| T3.7 | Import toolbar button via `ImportActionsContext` | ✅ Done |
+| T3.8 | Removed `inputs.txt` path; split `FlowBase` import API | ✅ Done |
+| —    | Continuous link handling (append to open modal) | ✅ Done |
+| —    | URL list display limit (32 + overflow line) | ✅ Done |

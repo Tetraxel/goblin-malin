@@ -207,6 +207,7 @@ export type TrackDownloadSource = {
 //----------------------//
 
 export type TrackDownloadTask = {
+    state: 'pending' | 'running' | 'finished' | 'failed';
     toTag?: boolean;
     toDownload?: boolean;
     userInput: UserInput;

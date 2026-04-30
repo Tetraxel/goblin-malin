@@ -9,7 +9,9 @@ export const UrlCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   width,
   isSelected,
 }) => {
-  const track = task.attributes?.track;
+  const track = task.attributes?.metadataSources.find(
+    (source) => source.isPrimarySource && (source.url || source.uri),
+  );
   const url = track?.uri ?? track?.url ?? task.initialInput ?? "";
 
   useWhyDidYouUpdate("UrlCell", {

@@ -69,16 +69,32 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
     }
 
     async start(): Promise<void> {
-        this.logger.info(`Starting to process ${this.getInitialInput()}`);
+        try {
+            if (this.getAttributes()?.state !== 'pending') {
+                this.logger.info(`Skipping because task already processed ${this.getInitialInput()}`);
+                return;
+            }
 
-        // If primary metadata is not fetched -> fetch it
-        if (!this.getAttributes()?.metadataSources.find((s) => s.isPrimarySource)) {
-            await this.startPrimaryMetadataFetching();
+            this.logger.info(`Starting to process ${this.getInitialInput()}`);
+            this.updateAttributes({ state: 'running' });
+
+            if (this.getAttributes()?.toTag) {
+                // If primary metadata is not fetched -> fetch it
+                if (!this.getAttributes()?.metadataSources.find((s) => s.isPrimarySource)) {
+                    await this.startPrimaryMetadataFetching();
+                }
+
+                await this.startMetadataDiscovering();
+            }
+
+            if (this.getAttributes()?.toDownload) {
+                await this.startDownloads();
+            }
+            this.updateAttributes({ state: 'finished' });
+        } catch (error) {
+            this.updateAttributes({ state: 'failed' });
+            throw error;
         }
-
-        await this.startMetadataDiscovering();
-
-        await this.startDownloads();
 
         // Old implementation
 

@@ -162,27 +162,36 @@ export const TaskListPanel: React.FC<{
 
       {/* Task rows */}
       <Box flexDirection="column" height={height} overflow="hidden">
-        {tasks.slice(offset, offset + height).map((task, index) => {
-          const visibleIndex = index + offset;
-          const isRowActive = isWindowActive && selectedIndex === visibleIndex;
-          const selectedColumnIndex = isRowActive
-            ? focusState.taskList.selectedColumnIndex
-            : -1;
-          const isMultiSelected = focusState.taskList.selectedTaskIds.has(
-            task.getId(),
-          );
-          return (
-            <TaskRow
-              key={task.getId()}
-              taskReference={task}
-              isActive={isRowActive}
-              isMultiSelected={isMultiSelected}
-              selectedColumnIndex={selectedColumnIndex}
-              columns={calculatedColumns}
-              flow={flow}
-            />
-          );
-        })}
+        {tasks.length === 0 ? (
+          <Box paddingX={4} overflow="hidden">
+            <Text italic color={"gray"}>
+              Press Ctrl+V to import music URLs
+            </Text>
+          </Box>
+        ) : (
+          tasks.slice(offset, offset + height).map((task, index) => {
+            const visibleIndex = index + offset;
+            const isRowActive =
+              isWindowActive && selectedIndex === visibleIndex;
+            const selectedColumnIndex = isRowActive
+              ? focusState.taskList.selectedColumnIndex
+              : -1;
+            const isMultiSelected = focusState.taskList.selectedTaskIds.has(
+              task.getId(),
+            );
+            return (
+              <TaskRow
+                key={task.getId()}
+                taskReference={task}
+                isActive={isRowActive}
+                isMultiSelected={isMultiSelected}
+                selectedColumnIndex={selectedColumnIndex}
+                columns={calculatedColumns}
+                flow={flow}
+              />
+            );
+          })
+        )}
       </Box>
     </Box>
   );

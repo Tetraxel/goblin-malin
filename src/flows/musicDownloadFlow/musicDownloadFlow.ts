@@ -1,10 +1,9 @@
-import fs from 'fs/promises';
 import { FlowOrchestrator } from '../../base/flow/flow-orchestrator';
 import { FlowBase } from "../../base/flow/flow-base";
 import { globalLogger, Logger } from "../../base/logger/logger";
 import { Task } from '../../base/task/task';
 import { DownloadTask } from './utils/downloadTask';
-import { InputLoader } from './utils/input-loader';
+import { taskIdFromUrl } from './utils/taskId';
 import { ToolbarButtonHook } from '../../components/Toolbar';
 import { ColumnDefinition } from '../../components/TaskListPanel';
 import { ContextualActionBar, ContextualActions } from '../../types/actions';
@@ -56,7 +55,6 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
     public readonly id = "music-downloader";
     public readonly displayName = "Music Downloader";
     public readonly author = "Tetraxel";
-    static inputLoader: InputLoader = InputLoader.getInstance()
     protected tasks: DownloadTask[] = []
     protected maxConcurrentTasks = 2; // Flow-specific limit
     protected displayMode: "metadata" | "download" = "metadata";
@@ -109,47 +107,31 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         }
     }
 
-    async importTasks(): Promise<void> {
-        const filePath = "inputs.txt"
-        try {
-            const content = await fs.readFile(filePath, 'utf-8');
-            const lines = content
-                .split('\n')
-                .map(line => line.trim())
-                // Filter empty lines and comments
-                .filter(line => line.length > 0 && !line.startsWith('#'));
-
-            const tasks: DownloadTask[] = lines.map(
-                (url, index) => {
-                    return new DownloadTask({
-                        id: `item-${index}`,
-                        initialInput: url,
-                        attributes: {
-                            userInput: { type: 'url', url },
-                            metadataSources: [],
-                            downloadSources: [],
-                        },
-                        flowId: this.id,
-                        logger: this.logger,
-                        metadataServiceRegistry: this.metadataServiceRegistry,
-                        downloadServiceRegistry: this.downloadServiceRegistry,
-                    })
-                }
-            );
-            this.orchestrator.addTasks(tasks)
-            this.logger.info(`Loaded ${tasks.length} items from ${filePath}`);
-        } catch (error) {
-            if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-                this.logger.error(`File not found: ${filePath}`);
-                throw new Error(`Input file '${filePath}' does not exist`);
-            }
-
-            this.logger.error(`Failed to read ${filePath}`, { error });
-            throw error;
-        }
+    public createTasksFromUrls(
+        urls: string[],
+        opts: { toTag?: boolean; toDownload?: boolean } = {},
+    ): DownloadTask[] {
+        const { toTag = true, toDownload = false } = opts;
+        return urls.map((url) => new DownloadTask({
+            id: taskIdFromUrl(url),
+            initialInput: url,
+            attributes: {
+                state: 'pending',
+                userInput: { type: 'url', url },
+                metadataSources: [],
+                downloadSources: [],
+                toTag,
+                toDownload,
+            },
+            flowId: this.id,
+            logger: this.logger,
+            metadataServiceRegistry: this.metadataServiceRegistry,
+            downloadServiceRegistry: this.downloadServiceRegistry,
+        }));
     }
 
     async restartTask(task: Task): Promise<void> {
+        task.updateAttributes({ state: 'pending', metadataSources: [], downloadSources: [] });
         this.orchestrator.processTask(task)
     }
 
@@ -163,7 +145,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
 
     public getToolbarButtons(): ToolbarButtonHook[] {
         return [
-            useImportButton,
+            // useImportButton,
             useRunAllButton,
             () => ({
                 label: "Settings",

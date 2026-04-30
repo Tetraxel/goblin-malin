@@ -31,8 +31,28 @@ export class FlowBase<TaskAttributes = any> {
         throw Error('Not implemented')
     }
 
-    public async importTasks(): Promise<void> {
+    public createTasksFromUrls(_urls: string[], _opts: Record<string, unknown>): Task<TaskAttributes>[] {
         throw Error('Not implemented')
+    }
+
+    public async importTasks(tasks: Task<TaskAttributes>[]): Promise<void> {
+        const existingIds = new Set(this.orchestrator.getTasks().map(t => t.getId()));
+        const seen = new Set<string>();
+        const newTasks: Task<TaskAttributes>[] = [];
+        let skippedCount = 0;
+
+        for (const task of tasks) {
+            const id = task.getId();
+            if (existingIds.has(id) || seen.has(id)) { skippedCount++; continue; }
+            seen.add(id);
+            newTasks.push(task);
+        }
+
+        if (skippedCount > 0) this.logger.info(`Skipped ${skippedCount} task(s) already in queue`);
+        if (newTasks.length > 0) {
+            this.orchestrator.addTasks(newTasks);
+            this.logger.info(`Imported ${newTasks.length} new task(s)`);
+        }
     }
 
     public async restartTask(task: Task<TaskAttributes>): Promise<void> {

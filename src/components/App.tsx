@@ -1,13 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Box } from "ink";
-import { Footer } from "./Footer";
-import { Separator } from "./Separator";
-import { PromptModal } from "./PromptModal";
-import { Toolbar, ToolbarButtonHook } from "./Toolbar";
-import { ColumnDefinition, TaskListPanel } from "./TaskListPanel";
-import { ActionBar } from "./ActionBar";
-import { SecondaryPanel } from "./SecondaryPanel";
-import { InputRouter } from "./InputRouter";
+import { ToolbarButtonHook } from "./Toolbar";
+import { ColumnDefinition } from "./TaskListPanel";
 import { useScreenSize } from "../hooks/useScreenSize";
 import { FocusProvider } from "../contexts/FocusContext";
 import { ToolbarActionsProvider } from "../contexts/ToolbarActionsContext";
@@ -19,6 +12,7 @@ import { globalLogger } from "../base/logger/logger";
 import soundPlay from "sound-play";
 import { fileURLToPath } from "url";
 import path from "path";
+import { AppInner } from "./AppInner";
 
 export const App: React.FC = () => {
   globalLogger.info(`--- App render`);
@@ -37,7 +31,6 @@ export const App: React.FC = () => {
   const [columns, setColumns] = useState<
     ColumnDefinition<MusicDownloadTaskAttributes>[]
   >([]);
-
   const orchestrator = FlowOrchestrator.getInstance();
   const currentFlow = activeFlowId
     ? orchestrator.getFlow(activeFlowId)
@@ -81,43 +74,17 @@ export const App: React.FC = () => {
       taskColumnCount={columns.length}
     >
       <ToolbarActionsProvider>
-        {/* InputRouter: single root useInput — must be inside FocusProvider */}
-        <InputRouter tasks={filteredTasks} flow={currentFlow} />
-
-        <Box flexDirection="column" height={terminalHeight}>
-          {currentFlow && (
-            <Toolbar
-              buttons={toolbarButtons}
-              width={terminalWidth}
-              flows={orchestrator.getAllFlows()}
-              onFlowChange={setActiveFlowId}
-              flow={currentFlow}
-              orchestrator={orchestrator}
-            />
-          )}
-          {currentFlow && (
-            <TaskListPanel
-              columns={columns}
-              tasks={filteredTasks}
-              width={terminalWidth}
-              flow={currentFlow}
-            />
-          )}
-          <ActionBar tasks={filteredTasks} flow={currentFlow} />
-          <SecondaryPanel
-            tasks={filteredTasks}
-            width={terminalWidth}
-            flow={currentFlow}
-          />
-          <Separator width={terminalWidth} />
-          <Footer />
-
-          <PromptModal
-            tasks={tasks}
-            terminalHeight={terminalHeight}
-            terminalWidth={terminalWidth}
-          />
-        </Box>
+        <AppInner
+          tasks={tasks}
+          filteredTasks={filteredTasks}
+          toolbarButtons={toolbarButtons}
+          columns={columns}
+          currentFlow={currentFlow}
+          orchestrator={orchestrator}
+          setActiveFlowId={setActiveFlowId}
+          terminalHeight={terminalHeight}
+          terminalWidth={terminalWidth}
+        />
       </ToolbarActionsProvider>
     </FocusProvider>
   );
