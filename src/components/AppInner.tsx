@@ -7,7 +7,7 @@ import { ImportModal } from "./ImportModal";
 import { Toolbar, ToolbarButtonHook } from "./Toolbar";
 import { ColumnDefinition, TaskListPanel } from "./TaskListPanel";
 import { ActionBar } from "./ActionBar";
-import { SecondaryPanel } from "./SecondaryPanel";
+import { SecondaryPanel } from "./SecondaryPanel/SecondaryPanel";
 import { InputRouter } from "./InputRouter";
 import { ImportActionsProvider } from "../contexts/ImportActionsContext";
 import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
@@ -37,8 +37,12 @@ export const AppInner: React.FC<{
   terminalHeight,
   terminalWidth,
 }) => {
-  const { pendingImport, openImportFlow, handleImportConfirm, handleImportCancel } =
-    useImportFlow(currentFlow);
+  const {
+    pendingImport,
+    openImportFlow,
+    handleImportConfirm,
+    handleImportCancel,
+  } = useImportFlow(currentFlow);
 
   return (
     <ImportActionsProvider openImportFlow={openImportFlow}>

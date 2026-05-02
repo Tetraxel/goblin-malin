@@ -4,23 +4,25 @@ High-level technical projects needed to reach the target product described in th
 
 These are not task lists — each project is a self-contained scope of work. Individual tasks are broken out in each project's subfolder.
 
-| Project | Tasks |
-|---------|-------|
-| P1 — Global Keyboard / Input System | [p1/tasks.md](p1/tasks.md) |
-| P2 — Two-Panel Layout | [p2/tasks.md](p2/tasks.md) |
-| P3 — Import System | [p3/tasks.md](p3/tasks.md) |
-| P4 — Metadata Source Management Panel | [p4/tasks.md](p4/tasks.md) |
+| Project                                        | Tasks                      |
+| ---------------------------------------------- | -------------------------- |
+| P1 — Global Keyboard / Input System            | [p1/tasks.md](p1/tasks.md) |
+| P2 — Two-Panel Layout                          | [p2/tasks.md](p2/tasks.md) |
+| P3 — Import System                             | [p3/tasks.md](p3/tasks.md) |
+| P4 — Metadata Source Management Panel          | [p4/tasks.md](p4/tasks.md) |
 | P5 — Download Source Selection & Audio Preview | [p5/tasks.md](p5/tasks.md) |
-| P6 — Save Flow (Tag & Export) | [p6/tasks.md](p6/tasks.md) |
-| P7 — Settings System | [p7/tasks.md](p7/tasks.md) |
+| P6 — Save Flow (Tag & Export)                  | [p6/tasks.md](p6/tasks.md) |
+| P7 — Settings System                           | [p7/tasks.md](p7/tasks.md) |
+| P8 — Color Theme Unification                   | NOT WRITTEN                |
 
 ---
 
-## P1 — Global Keyboard / Input System
+## P1 — Global Keyboard / Input System ✅ Complete
 
 **The biggest architectural risk.** The target UI has deeply context-sensitive keyboard shortcuts: the same key does a different thing depending on which panel is focused, which row is selected, and which column is active. The current approach — multiple `useInput` hooks scattered across components — already shows strain (`setMaxListeners(30)` in `App.tsx`). It will break down completely once the secondary panel, metadata source list, and download tree all need their own shortcuts simultaneously.
 
 What's needed is a single centralized input router that:
+
 - Knows the current "focus context" (active window + selection within it)
 - Dispatches key events to the right handler without components fighting over them
 - Renders the correct contextual action bar at the bottom from that context
@@ -30,11 +32,12 @@ This project touches almost every other project below, so it should be resolved 
 
 ---
 
-## P2 — Two-Panel Layout ✅ Largely complete
+## P2 — Two-Panel Layout ✅ Complete
 
 The layout restructuring is done. `LogPanel` is replaced by `SecondaryPanel` in `App.tsx`. The two-level tab system (`[1]`/`[2]` primary mode, `[3]`/`[4]` secondary tab), resizable panel heights (`Shift+↑/↓`), and dynamic layout state are all implemented.
 
 **What's in place:**
+
 - `SecondaryPanel` with a shared `TabBar` component (also used in `Toolbar`)
 - `SourcesPanel` inner split (left source list, right detail box with gray border + centered title)
 - `FocusState.layout` drives all panel heights dynamically; resizes proportionally on terminal resize
@@ -42,6 +45,7 @@ The layout restructuring is done. `LogPanel` is replaced by `SecondaryPanel` in 
 - `LogPanel` always mounted inside `SecondaryPanel` (preserves log history across tab switches)
 
 **Known gaps vs original plan:**
+
 - `[1]`/`[2]` do not reset the secondary tab to `"sources"` when switching primary mode
 - `soundPlay` startup sound was path-fixed rather than removed (T2.1 partial)
 
@@ -49,7 +53,7 @@ See [p2/tasks.md](p2/tasks.md) for full task-by-task status.
 
 ---
 
-## P3 — Import System
+## P3 — Import System ✅ Complete
 
 The current import reads `inputs.txt` from disk on button press. The target is clipboard-driven:
 
@@ -62,6 +66,7 @@ The current import reads `inputs.txt` from disk on button press. The target is c
 - Confirmed URLs are added as tasks with the selected flags
 
 This replaces the `inputs.txt` mechanism entirely and requires:
+
 - A clipboard read API (Node's `child_process` or a package, since Ink has no native clipboard access)
 - A URL detection/parsing step that identifies supported platforms
 - A new confirmation modal component with keyboard-navigable checkboxes
@@ -69,17 +74,28 @@ This replaces the `inputs.txt` mechanism entirely and requires:
 
 ---
 
-## P4 — Metadata Source Management Panel
+## P4 — Metadata Source Management Panel ✅ Complete
 
-The secondary panel in metadata mode shows the full picture for the selected task:
+All tasks (T4.1–T4.13) are implemented. The metadata sources panel is fully functional.
 
-- A **ranked list of discovered metadata sources** (Spotify, YouTube, MusicBrainz, Soulseek, etc.) with platform badges, track name, and duration
-- Each source can be **favorited** `[F]`, **rejected** `[Del]`, and **reordered** `[Shift+↑/↓]`
-- A **"Compiled Metadata" row** at the top — a virtual aggregate that picks each field from the highest-ranked non-rejected source
-- The compiled row is the only editable one — the user can override individual fields
-- A full metadata field display: Title, Artists, Duration, ISRC, Album, Year, Track#, BPM, Key, Genres, MusicBrainz IDs
+**What's in place:**
 
-The current data model (`metadataSources: TrackMetadata[]`) exists but has no ranking, favorite, or rejected state. That needs to be added to `MusicDownloadTaskAttributes`. The compiled metadata concept is new — it needs to be computed (not stored) from the ranked, non-rejected sources, with manual overrides layered on top.
+- `MetadataSourceState` wrapper with `rank`, `isFavorited`, `isRejected`, `confidence` fields; `MetadataOverrides` type; `bpm`/`key`/`genres` added to `BaseTrackMetadata`
+- `computeCompiledMetadata()` — pure aggregation with per-field `attribution` map and manual override support
+- `computeConfidenceScore()` — 0–100 match score per source vs. primary; stored on upsert in `addMetadataSource` / `upsertMetadataSource`
+- `MetadataSourceList` — scrollable ranked list with trophy compiled row, confidence badges (`[NNN%]` color-coded), status icons (`★`/`✘`/`?`)
+- `MetadataDetailPanel` — full field view with attribution badges; inline `TextInput` editing for compiled overrides; `FieldRow`, `MetadataCompiledRow`, `MetadataSourceRow` sub-components
+- `SourcesHintBar` — two-row contextual shortcuts bar: source context path on row 1, position counter + list actions on row 2
+- `SourcesPanel` subscribes to task changes via `task.subscribe()` to re-render on mutations
+- `[F]` favorite, `[Del]` reject, `[Shift+↑/↓]` reorder, `[S]` re-search single provider via `startSingleProviderSearch()` — all working
+- `useSourceListInput` hook encapsulates all source-list keyboard handling
+- `metadataFields.ts` defines all editable field definitions (label, getter, parser, formatter)
+
+**Component locations** (all under `src/components/SecondaryPanel/MetadataPanel/`):
+
+`MetadataSourceList.tsx`, `MetadataDetailPanel.tsx`, `FieldRow.tsx`, `MetadataCompiledRow.tsx`, `MetadataSourceRow.tsx`, `SourcesHintBar.tsx`, `SourcesPanel.tsx`
+
+See [p4/tasks.md](p4/tasks.md) for full task-by-task detail.
 
 ---
 
@@ -103,6 +119,7 @@ Currently `downloadSources` is populated but there is no selection UI and no sec
 The end of the user journey: take the compiled metadata + selected download file → write tags to the file → move it to the output directory.
 
 This requires wiring together pieces that exist in isolation:
+
 - `src/utils/metadata.ts` has FLAC tagging logic (using `flac-tagger` + `node-id3`)
 - The compiled metadata from P4 needs to drive the tags written
 - The user's chosen output directory (from settings, P7) determines where the file lands
@@ -118,9 +135,11 @@ The **diff view** (P5) is part of this flow — shown when updating an already-s
 A full settings modal (opened from the toolbar) with keyboard navigation and persistence to disk:
 
 **General:**
+
 - Re-open last session on start-up
 
 **Metadata:**
+
 - Auto-fetch primary metadata on import
 - Auto-choose best metadata source
 - Toggle visible columns (URL, Artist, Track title)
@@ -128,6 +147,7 @@ A full settings modal (opened from the toolbar) with keyboard navigation and per
 - MusicBrainz extras: Import file in Picard on save, Include MB metadata in tags by default, Use MB links during discovering
 
 **Download:**
+
 - Auto-choose best download source
 - Auto-save to output directory
 - Auto-delete temporary downloads after 24h
@@ -165,14 +185,14 @@ MusicBrainz has a strict 1 req/sec rate limit — the service already handles th
 
 ## Summary Table
 
-| # | Project | Depends on | Blocks |
-|---|---------|-----------|--------|
-| P1 | Global Keyboard / Input System | — | P2, P4, P5 |
-| P2 | Two-Panel Layout | P1 | P4, P5 |
-| P3 | Import System | P1 | — |
-| P4 | Metadata Source Management Panel | P1, P2 | P6 |
-| P5 | Download Source Selection & Audio Preview | P1, P2 | P6 |
-| P6 | Save Flow (Tag & Export) | P4, P5 | P8 |
-| P7 | Settings System | P1, P2 | P9 |
-| P8 | Session Persistence | P6, P7 | — |
-| P9 | MusicBrainz Integration | P7 | — |
+| #   | Project                                   | Depends on | Blocks     |
+| --- | ----------------------------------------- | ---------- | ---------- |
+| P1  | Global Keyboard / Input System            | —          | P2, P4, P5 |
+| P2  | Two-Panel Layout                          | P1         | P4, P5     |
+| P3  | Import System                             | P1         | —          |
+| P4  | Metadata Source Management Panel          | P1, P2     | P6         |
+| P5  | Download Source Selection & Audio Preview | P1, P2     | P6         |
+| P6  | Save Flow (Tag & Export)                  | P4, P5     | P8         |
+| P7  | Settings System                           | P1, P2     | P9         |
+| P8  | Session Persistence                       | P6, P7     | —          |
+| P9  | MusicBrainz Integration                   | P7         | —          |

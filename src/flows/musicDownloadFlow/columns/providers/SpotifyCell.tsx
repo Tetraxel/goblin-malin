@@ -9,8 +9,8 @@ export const SpotifyCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   isSelected,
 }) => {
   const metadata = task.attributes?.metadataSources.find(
-    (m) => m.apiProvider === "spotify",
-  );
+    (source) => source.metadata.apiProvider === "spotify",
+  )?.metadata;
   const fullUri = metadata?.uri;
   const uri = fullUri?.split("::").pop();
 

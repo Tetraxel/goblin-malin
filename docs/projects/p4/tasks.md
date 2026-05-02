@@ -49,7 +49,7 @@ P2/T2.9 creates the `SourcesPanel` scaffold with an inner left/right split. P4 f
 
 ## Tasks
 
-### T4.1 — Extend `BaseTrackMetadata` with missing fields and wrap sources in `MetadataSourceState`
+### T4.1 ✅ — Extend `BaseTrackMetadata` with missing fields and wrap sources in `MetadataSourceState`
 
 **Part A — Add missing fields to `BaseTrackMetadata` in `types.ts`:**
 
@@ -72,10 +72,11 @@ export type MetadataSourceState = {
   rank: number; // 0 = highest priority; lower = considered first
   isFavorited: boolean; // pinned as preferred for this provider (max one per provider)
   isRejected: boolean; // user marked as wrong match; excluded from compiled output
+  confidence?: number; // 0–100 match score vs. primary; added in T4.13
 };
 ```
 
-**Part C — Add `metadataOverrides` to `TrackDownloadTask`:**
+**Part C — Add `metadataOverride` to `TrackDownloadTask`:**
 
 ```typescript
 export type MetadataOverrides = Partial<{
@@ -95,7 +96,7 @@ export type TrackDownloadTask = {
   toDownload?: boolean;
   userInput: UserInput;
   metadataSources: MetadataSourceState[]; // was TrackMetadata[]
-  metadataOverrides: MetadataOverrides; // new
+  metadataOverride: MetadataOverrides; // new
   downloadSources: TrackDownloadSource[];
   parentAlbumDownloadTask?: AlbumDownloadTask;
 };
@@ -105,7 +106,7 @@ _Depends on: nothing_
 
 ---
 
-### T4.2 — Migrate all existing code from `TrackMetadata[]` to `MetadataSourceState[]`
+### T4.2 ✅ — Migrate all existing code from `TrackMetadata[]` to `MetadataSourceState[]`
 
 Several places read or write `metadataSources` directly and need updating after T4.1:
 
@@ -146,7 +147,7 @@ _Depends on: T4.1_
 
 ---
 
-### T4.3 — Implement `computeCompiledMetadata(sources, overrides)`
+### T4.3 ✅ — Implement `computeCompiledMetadata(sources, overrides)`
 
 Create `src/flows/musicDownloadFlow/utils/compiledMetadata.ts`.
 
@@ -202,9 +203,9 @@ _Depends on: T4.1_
 
 ---
 
-### T4.4 — Build `MetadataSourceList` component (left side of SourcesPanel)
+### T4.4 ✅ — Build `MetadataSourceList` component (left side of SourcesPanel)
 
-Create `src/components/MetadataSourceList.tsx`.
+Create `src/components/SecondaryPanel/MetadataPanel/MetadataSourceList.tsx`.
 
 **Props:**
 
@@ -241,14 +242,16 @@ _Depends on: T4.1, T4.3_
 
 ---
 
-### T4.5 — Build `MetadataSourceDetail` component (right side of SourcesPanel)
+### T4.5 ✅ — Build `MetadataDetailPanel` component (right side of SourcesPanel)
 
-Create `src/components/MetadataSourceDetail.tsx`.
+Create `src/components/SecondaryPanel/MetadataPanel/MetadataDetailPanel.tsx`.
+
+> **Note:** Implemented as `MetadataDetailPanel` (not `MetadataSourceDetail`). Composed of sub-components `FieldRow.tsx`, `MetadataCompiledRow.tsx`, and `MetadataSourceRow.tsx` in the same folder.
 
 **Props:**
 
 ```typescript
-interface MetadataSourceDetailProps {
+interface MetadataDetailPanelProps {
   source: MetadataSourceState | "compiled";
   compiled: CompiledMetadata;
   overrides: MetadataOverrides;
@@ -296,14 +299,14 @@ _Depends on: T4.1, T4.3_
 
 ---
 
-### T4.6 — Inline field editing for compiled metadata
+### T4.6 ✅ — Inline field editing for compiled metadata
 
 When the detail panel is active, the compiled row is selected in the source list, and the user presses `Enter` on a field:
 
 1. The field enters edit mode — renders `<TextInput>` (from `ink-text-input`) pre-filled with the current value
-2. On submit: call `task.updateAttributes({ metadataOverrides: { ...current, [field]: newValue } })`
+2. On submit: call `task.updateAttributes({ metadataOverride: { ...current, [field]: newValue } })`
 3. On `Esc`: cancel without saving, return to field navigation
-4. Pressing `Del` on a field that has an existing override: remove that key from `metadataOverrides` (revert to source-computed value)
+4. Pressing `Del` on a field that has an existing override: remove that key from `metadataOverride` (revert to source-computed value)
 
 **Artists field** is a comma-separated string in the edit input, parsed back to `StandardArtist[]` on submit (split by `,`, trim, wrap as `{ type: 'artist', name }`).
 
@@ -315,9 +318,9 @@ _Depends on: T4.5_
 
 ---
 
-### T4.7 — Source list keyboard actions: favorite, reject, reorder
+### T4.7 ✅ — Source list keyboard actions: favorite, reject, reorder
 
-These actions are registered in the centralized dispatcher (P1/T1.4) under a `'metadataSourceList'` focus window, or until P1 is done, handled by `useInput({ isActive })` inside `MetadataSourceList`.
+These actions are handled by the `useSourceListInput` hook (`src/hooks/useSourceListInput.ts`), called from `MetadataSourceList`. The hook also handles `[Enter]` to open the source URL in the desktop app and `[Ctrl+C]` to copy the URL.
 
 **Contextual actions when source list is focused:**
 
@@ -340,16 +343,16 @@ _Depends on: T4.1, T4.4_
 
 ---
 
-### T4.8 — Wire `SourcesPanel` to real components and focus state
+### T4.8 ✅ — Wire `SourcesPanel` to real components and focus state
 
-Connect the placeholder `SourcesPanel` (P2/T2.9) to the real `MetadataSourceList` and `MetadataSourceDetail` components when `mode === 'metadata'`.
+Connect the placeholder `SourcesPanel` (P2/T2.9) to the real `MetadataSourceList` and `MetadataDetailPanel` components when `mode === 'metadata'`. Implemented at `src/components/SecondaryPanel/MetadataPanel/SourcesPanel.tsx`.
 
 **Changes to `SourcesPanel`:**
 
 ```typescript
 // inside SourcesPanel when mode === 'metadata':
 const sources = selectedTask?.getAttributes()?.metadataSources ?? [];
-const overrides = selectedTask?.getAttributes()?.metadataOverrides ?? {};
+const overrides = selectedTask?.getAttributes()?.metadataOverride ?? {};
 const compiled = computeCompiledMetadata(sources, overrides);
 
 <Box flexDirection="row">
@@ -381,7 +384,7 @@ _Depends on: T4.4, T4.5, T4.6, T4.7, P2/T2.9, P1/T1.2_
 
 ---
 
-### T4.9 — Trigger per-provider re-search from the source list
+### T4.9 ✅ — Trigger per-provider re-search from the source list
 
 Currently metadata discovery only runs automatically in `DownloadTask.start()`. Users should be able to re-trigger a search from the panel.
 
@@ -414,16 +417,114 @@ _Depends on: T4.2, T4.7_
 
 ---
 
+---
+
+### T4.10 ✅ — Fix `SourcesPanel` state re-render after mutations
+
+**Problem:** `SourcesPanel` read task attributes directly via `getAttributes()` without subscribing to task changes. Mutations (favorite, reject, reorder) called `task.updateAttributes()` which notified task subscribers — but `SourcesPanel` had no subscriber, so React never re-rendered until cursor movement triggered an unrelated state change.
+
+**Fix:** Use a `useEffect`-based subscription (`task.subscribe()`) inside `SourcesPanel` to update a local `snapshot` state whenever the task changes. All `sources` and `overrides` are derived from `snapshot` instead of from `getAttributes()` directly.
+
+_Depends on: T4.8_
+
+---
+
+### T4.11 ✅ — Fix `Shift+↑/↓` key detection in `MetadataSourceList`
+
+**Problem:** `key.shift && key.upArrow` (evaluated simultaneously) did not match Ink's key delivery reliably. The reorder shortcuts silently did nothing.
+
+**Fix:** Restructure input handling to check the arrow key first, then check `key.shift` inside — the same pattern used in `src/hooks/useKeyHandlers.ts:36-43`:
+
+```typescript
+if (key.upArrow) {
+  if (key.shift) {
+    /* reorder up */ return;
+  }
+  /* normal navigation up */
+}
+```
+
+_Depends on: T4.7_
+
+---
+
+### T4.12 ✅ — Add `SourcesHintBar` (two-row contextual hints)
+
+Create `src/components/SecondaryPanel/MetadataPanel/SourcesHintBar.tsx`. Rendered inside `SourcesPanel` below the list/detail split (height = 2 rows). `SourcesPanel` reduces the height passed to `MetadataSourceList` and `MetadataDetailPanel` by `HINT_BAR_HEIGHT = 2`.
+
+**Row 1 — source context path:**
+
+```
+Youtube > Track > Rfh_t-P-hh4 >>>   [Enter] Open link   [Ctrl+C] Copy link   [D] Download
+```
+
+When compiled row is selected: shows `"Compiled"` with no source-specific actions.
+
+**Row 2 — list position + list actions:**
+
+```
+Source 3/12 >>>   [F] Favorite   [Del] Reject source   [Shift+↑] Move up   [Shift+↓] Move down
+```
+
+When compiled row is selected: shows `"Compiled >>>"` with `[Enter] Edit field` hint only.
+
+Hints are dimmed when the secondary panel is not active.
+
+_Depends on: T4.7, T4.8_
+
+---
+
+### T4.13 ✅ — Redesign `MetadataSourceList` layout + add confidence scoring
+
+**Part A — Add `confidence?: number` to `MetadataSourceState`** (`src/flows/musicDownloadFlow/types.ts`):
+Field holds a 0–100 match score vs the primary source; `undefined` when not computed.
+
+**Part B — `src/flows/musicDownloadFlow/utils/confidence.ts`** (new pure utility):
+`computeConfidenceScore(source, primary)` scores field matches:
+
+- ISRC exact → 100 immediately
+- Track name normalized exact: 40 pts (substring: 25 pts)
+- First artist name: 30 pts (substring: 15 pts)
+- Duration within 2%: 20 pts (within 5%: 10 pts)
+- Release year: 10 pts
+
+**Part C — Compute confidence on upsert** (`src/flows/musicDownloadFlow/utils/downloadTask.ts`):
+`addMetadataSource` and `upsertMetadataSource` compute `confidence` via `computeConfidenceScore` and store it in `MetadataSourceState`. Primary source always gets `confidence = 100`.
+
+**Part D — Redesign `MetadataSourceList` layout:**
+
+```
+Top-ranked favorite sources are more likely to be used for downloading
+🏆  Artist – Title (N unsaved edits)                                    >>>
+☛ ★ [100%] Spotify > Track > 3Rlc… > Artist – Title (3:40)
+  ? [ 91%] Youtube > Track > Rfh_… > Artist – Title (3:32)
+  ✘ [ 30%] Youtube > Track > WxX…  > David Guetta – … (6:07)
+```
+
+- Fixed header description line (gray italic)
+- Compiled row: trophy icon + compiled artist–title + unsaved edits count + right-aligned `>>>`
+- Status icon: `★` favorited · `✘` rejected · `?` default
+- Confidence badge `[NNN%]` color-coded: ≥90 green · ≥70 yellow · ≥50 gray · <50 red
+- Row path: `Platform > Type > ID > Artist – Title (duration)` as a single truncated string
+
+_Depends on: T4.1, T4.4, T4.7_
+
+---
+
 ## Summary
 
-| Task | What                                                                                                     | Depends on                               |
-| ---- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| T4.1 | Add `bpm`/`key`/`genres` to `BaseTrackMetadata`; introduce `MetadataSourceState` and `metadataOverrides` | —                                        |
-| T4.2 | Migrate all code from `TrackMetadata[]` to `MetadataSourceState[]`                                       | T4.1                                     |
-| T4.3 | `computeCompiledMetadata()` — pure aggregation function with attribution                                 | T4.1                                     |
-| T4.4 | `MetadataSourceList` — scrollable ranked source list with indicators                                     | T4.1, T4.3                               |
-| T4.5 | `MetadataSourceDetail` — full field display, attribution badges                                          | T4.1, T4.3                               |
-| T4.6 | Inline field editing for compiled metadata overrides                                                     | T4.5                                     |
-| T4.7 | Keyboard actions: `[F]` favorite, `[Del]` reject, `[Shift+↑/↓]` reorder                                  | T4.1, T4.4                               |
-| T4.8 | Wire `SourcesPanel` to real components + focus state                                                     | T4.4, T4.5, T4.6, T4.7, P2/T2.9, P1/T1.2 |
-| T4.9 | Per-provider re-search from the source list                                                              | T4.2, T4.7                               |
+| Task     | What                                                                                                    | Depends on                               |
+| -------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| T4.1 ✅  | Add `bpm`/`key`/`genres` to `BaseTrackMetadata`; introduce `MetadataSourceState` and `metadataOverride` | —                                        |
+| T4.2 ✅  | Migrate all code from `TrackMetadata[]` to `MetadataSourceState[]`                                      | T4.1                                     |
+| T4.3 ✅  | `computeCompiledMetadata()` — pure aggregation function with attribution                                | T4.1                                     |
+| T4.4 ✅  | `MetadataSourceList` — scrollable ranked source list with indicators                                    | T4.1, T4.3                               |
+| T4.5 ✅  | `MetadataDetailPanel` — full field display, attribution badges (renamed from MetadataSourceDetail)      | T4.1, T4.3                               |
+| T4.6 ✅  | Inline field editing for compiled metadata overrides                                                    | T4.5                                     |
+| T4.7 ✅  | Keyboard actions: `[F]` favorite, `[Del]` reject, `[Shift+↑/↓]` reorder (`useSourceListInput` hook)     | T4.1, T4.4                               |
+| T4.8 ✅  | Wire `SourcesPanel` to real components + focus state                                                    | T4.4, T4.5, T4.6, T4.7, P2/T2.9, P1/T1.2 |
+| T4.9 ✅  | Per-provider re-search from the source list                                                             | T4.2, T4.7                               |
+| T4.10 ✅ | Fix `SourcesPanel` re-render after mutations (task subscription)                                        | T4.8                                     |
+| T4.11 ✅ | Fix `Shift+↑/↓` key detection in `MetadataSourceList`                                                   | T4.7                                     |
+| T4.12 ✅ | `SourcesHintBar` — two-row contextual shortcuts bar below the sources panel                             | T4.7, T4.8                               |
+| T4.13 ✅ | Redesign `MetadataSourceList` layout + confidence scoring                                               | T4.1, T4.4, T4.7                         |

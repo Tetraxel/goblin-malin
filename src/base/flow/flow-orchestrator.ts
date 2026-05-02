@@ -95,7 +95,7 @@ export class FlowOrchestrator {
         return this.tasks.filter((task) => task.running)
     }
 
-    public async processTask(task: Task): Promise<void> {
+    public async processTask(task: Task<any>): Promise<void> {
         // Clean attributes in case the task is restarted
         return task.start()
             .then(() => {

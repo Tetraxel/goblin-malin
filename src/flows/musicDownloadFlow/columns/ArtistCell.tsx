@@ -10,8 +10,8 @@ export const ArtistCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   isSelected,
 }) => {
   const primaryMetadata = task.attributes?.metadataSources?.find(
-    (m) => m.isPrimarySource,
-  );
+    (source) => source.metadata.isPrimarySource,
+  )?.metadata;
   const artist = primaryMetadata?.artists?.[0]?.name || "";
 
   useWhyDidYouUpdate("ArtistCell", {

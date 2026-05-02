@@ -65,11 +65,13 @@ export interface FocusState {
     sourcesPanel: {
       selectedSourceIndex: number;
       innerFocus: 'list' | 'detail';
+      selectedFieldIndex: number;
     };
   };
   modal: {
     type: 'settings' | 'import' | null;
   };
+  isEditingField: boolean;
 }
 
 export const useFocusManager = ({
@@ -111,13 +113,15 @@ export const useFocusManager = ({
       selectedRowIndex: 0,
       scrollOffset: 0,
       sourcesPanel: {
-        selectedSourceIndex: 0,
+        selectedSourceIndex: -1,
         innerFocus: 'list',
+        selectedFieldIndex: 0,
       },
     },
     modal: {
       type: null,
     },
+    isEditingField: false,
   }));
 
   useEffect(() => {
@@ -308,6 +312,40 @@ export const useFocusManager = ({
     }));
   }, []);
 
+  const setSelectedSourceIndex = useCallback((index: number) => {
+    setFocusState((prev) => ({
+      ...prev,
+      secondaryPanel: {
+        ...prev.secondaryPanel,
+        sourcesPanel: { ...prev.secondaryPanel.sourcesPanel, selectedSourceIndex: index },
+      },
+    }));
+  }, []);
+
+  const setSourcesInnerFocus = useCallback((focus: 'list' | 'detail') => {
+    setFocusState((prev) => ({
+      ...prev,
+      secondaryPanel: {
+        ...prev.secondaryPanel,
+        sourcesPanel: { ...prev.secondaryPanel.sourcesPanel, innerFocus: focus },
+      },
+    }));
+  }, []);
+
+  const setSourceDetailFieldIndex = useCallback((index: number) => {
+    setFocusState((prev) => ({
+      ...prev,
+      secondaryPanel: {
+        ...prev.secondaryPanel,
+        sourcesPanel: { ...prev.secondaryPanel.sourcesPanel, selectedFieldIndex: index },
+      },
+    }));
+  }, []);
+
+  const setIsEditingField = useCallback((editing: boolean) => {
+    setFocusState((prev) => ({ ...prev, isEditingField: editing }));
+  }, []);
+
   return {
     focusState,
     switchWindow,
@@ -322,5 +360,9 @@ export const useFocusManager = ({
     toggleTaskSelection,
     selectAllTasks,
     clearSelection,
+    setSelectedSourceIndex,
+    setSourcesInnerFocus,
+    setDetailFieldIndex: setSourceDetailFieldIndex,
+    setIsEditingField,
   };
 };

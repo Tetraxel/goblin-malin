@@ -1,11 +1,11 @@
 import React from "react";
 import { Box } from "ink";
-import { useFocusContext } from "../contexts/FocusContext";
+import { useFocusContext } from "../../contexts/FocusContext";
 import { LogPanel } from "./LogPanel";
-import { SourcesPanel } from "./SourcesPanel";
-import { TabBar } from "./TabBar";
-import { Task } from "../base/task/task";
-import { FlowBase } from "../base/flow/flow-base";
+import { SourcesPanel } from "./MetadataPanel/SourcesPanel";
+import { TabBar } from "../TabBar";
+import { Task } from "../../base/task/task";
+import { FlowBase } from "../../base/flow/flow-base";
 
 interface SecondaryPanelProps {
   tasks: Task[];

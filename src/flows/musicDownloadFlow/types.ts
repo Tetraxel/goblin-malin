@@ -125,6 +125,9 @@ export type BaseTrackMetadata = {
     isPrimarySource?: boolean; // metadata from the primary source (e.g. the URL provided by the user)
     fetchedAt: Date;
     type: 'track';
+    bpm?: number;
+    key?: string;
+    genres?: string[];
 }
 
 export type MusicBrainzTrackMetadata = BaseTrackMetadata & {
@@ -177,6 +180,27 @@ export type TidalTrackMetadata = BaseTrackMetadata & {
 
 export type TrackMetadata = MusicBrainzTrackMetadata | SpotifyTrackMetadata | DeezerTrackMetadata | AppleMusicTrackMetadata | YoutubeTrackMetadata | YoutubeMusicTrackMetadata | SoundcloudTrackMetadata | TidalTrackMetadata;
 
+export type MetadataSourceState = {
+    metadata: TrackMetadata;
+    rank: number; // 0 = highest priority; lower = considered first
+    isFavorited: boolean; // pinned as preferred for this provider (max one per provider)
+    isRejected: boolean; // user marked as wrong match; excluded from compiled output
+    confidence?: number; // 0–100, field-match score vs the primary source; undefined if not computed
+};
+
+export type MetadataOverrides = Partial<{
+    trackName: string;
+    artists: StandardArtist[];
+    duration: number;
+    isrc: string;
+    album: StandardAlbum;
+    year: number;
+    trackNumber: number;
+    bpm: number;
+    key: string;
+    genres: string[];
+}>;
+
 
 //----------------------//
 //       DOWNLOAD       //
@@ -208,10 +232,12 @@ export type TrackDownloadSource = {
 
 export type TrackDownloadTask = {
     state: 'pending' | 'running' | 'finished' | 'failed';
+    metadataDiscovering?: boolean;
     toTag?: boolean;
     toDownload?: boolean;
     userInput: UserInput;
-    metadataSources: TrackMetadata[];
+    metadataSources: MetadataSourceState[];
+    metadataOverride: MetadataOverrides;
     downloadSources: TrackDownloadSource[];
     parentAlbumDownloadTask?: AlbumDownloadTask;
 }
@@ -221,7 +247,8 @@ export type TracksDownloadTask = {
     toTag?: boolean;
     toDownload?: boolean;
     userInput: UserInput;
-    metadataSources: TrackMetadata[];
+    metadataSources: MetadataSourceState[];
+    metadataOverride: MetadataOverrides;
     downloadSources: TrackDownloadSource[];
     tracks: TrackDownloadTask[];
 }

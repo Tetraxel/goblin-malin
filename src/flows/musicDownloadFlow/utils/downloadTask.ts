@@ -12,7 +12,7 @@ import { Platform, SonglinkResponse } from '../services/apis/songlink-client';
 import { globalLogger, Logger } from "../../../base/logger/logger";
 import { StatusType } from "../../../base/task/task-status";
 import { convertSonglinkToTrack } from './convertSonglinkToTrack';
-import { MusicDownloadTaskAttributes, StandardTrack, TrackMetadata, TrackDownloadSource } from "../types";
+import { MusicDownloadTaskAttributes, StandardTrack, TrackMetadata, TrackDownloadSource, MetadataSourceState } from "../types";
 import { saveJsonFile } from '../../../utils/json';
 import { replaceAll } from '../../../utils/string';
 import { ServiceBase } from '../../../base/service-base';
@@ -20,6 +20,7 @@ import { MetadataService } from '../metadataService';
 import { DownloadService } from '../downloadService';
 import { ServiceRegistry } from '../../../base/service-registry';
 import { ServiceScope } from '../../../base/service-scope';
+import { computeConfidenceScore } from './confidence';
 
 
 export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
@@ -63,9 +64,40 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         this.downloadServices = downloadServiceRegistry.createScope(this, this.logger);
     }
 
+    private getPrimaryMetadata(): TrackMetadata | undefined {
+        return this.getAttributes()?.metadataSources.find(s => s.metadata.isPrimarySource)?.metadata;
+    }
+
     private addMetadataSource(metadata: TrackMetadata): void {
-        const currentSources = this.getAttributes()?.metadataSources || [];
-        this.updateAttributes({ metadataSources: [...currentSources, metadata] });
+        const current = this.getAttributes()?.metadataSources ?? [];
+        const primary = this.getPrimaryMetadata();
+        const confidence = metadata.isPrimarySource || !primary
+            ? 100
+            : computeConfidenceScore(metadata, primary);
+        const state: MetadataSourceState = {
+            metadata,
+            rank: current.length,
+            isFavorited: false,
+            isRejected: false,
+            confidence,
+        };
+        this.updateAttributes({ metadataSources: [...current, state] });
+    }
+
+    private upsertMetadataSource(metadata: TrackMetadata): void {
+        const current = this.getAttributes()?.metadataSources ?? [];
+        const existingIndex = current.findIndex(source => source.metadata.platform === metadata.platform);
+        const primary = this.getPrimaryMetadata();
+        const confidence = metadata.isPrimarySource || !primary
+            ? undefined
+            : computeConfidenceScore(metadata, primary);
+        if (existingIndex >= 0) {
+            const updated = [...current];
+            updated[existingIndex] = { ...updated[existingIndex], metadata, confidence };
+            this.updateAttributes({ metadataSources: updated });
+        } else {
+            this.addMetadataSource(metadata);
+        }
     }
 
     async start(): Promise<void> {
@@ -80,7 +112,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
 
             if (this.getAttributes()?.toTag) {
                 // If primary metadata is not fetched -> fetch it
-                if (!this.getAttributes()?.metadataSources.find((s) => s.isPrimarySource)) {
+                if (!this.getPrimaryMetadata()) {
                     await this.startPrimaryMetadataFetching();
                 }
 
@@ -154,39 +186,65 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         throw new Error(`No metadata service could handle the URL: ${url}`);
     }
 
+    // Search metadata from all other providers using the primary metadata as source of truth
+    // (e.g. using track name, artist name, isrc, etc) to find the best matching metadata
     async startMetadataDiscovering(): Promise<void> {
         // Get the primary metadata source to use for searching
-        const primaryMetadata = this.getAttributes()?.metadataSources.find((s) => s.isPrimarySource);
+        const primaryMetadata = this.getPrimaryMetadata();
 
         if (!primaryMetadata) {
             throw new Error('No primary metadata source available for metadata discovering');
         }
 
         this.logger.info(`Discovering metadata from all other sources using primary metadata`);
+        this.updateAttributes({ metadataDiscovering: true });
 
-        const services = this.metadataServices.getAllServices();
-        for (const service of services) {
-            try {
-                // Skip the primary source provider to avoid duplicate metadata
-                if (service.id === primaryMetadata.id) {
-                    this.logger.debug(`Skipping primary source provider: ${service.id}`);
-                    continue;
+        try {
+            const services = this.metadataServices.getAllServices();
+            for (const service of services) {
+                try {
+                    // Skip the primary source provider to avoid duplicate metadata
+                    if (service.id === primaryMetadata.id) {
+                        this.logger.debug(`Skipping primary source provider: ${service.id}`);
+                        continue;
+                    }
+
+                    this.logger.debug(`Searching for track using ${service.id}`);
+
+                    // Use isrc, track name, artist name, etc to improve search results
+                    const metadata = await service.searchTrack(primaryMetadata);
+
+                    metadata.isPrimarySource = false;
+                    this.upsertMetadataSource(metadata);
+                    this.logger.info(`Successfully discovered metadata from ${metadata.apiProvider}`);
+                } catch (error) {
+                    this.logger.warn(`Failed to discover metadata from ${service.constructor.name}:`, { error });
+                    // Continue to next service on failure
                 }
-
-                this.logger.debug(`Searching for track using ${service.id}`);
-
-                // Use isrc, track name, artist name, etc to improve search results
-                const metadata = await service.searchTrack(primaryMetadata);
-
-                metadata.isPrimarySource = false;
-                this.addMetadataSource(metadata);
-                this.logger.info(`Successfully discovered metadata from ${metadata.apiProvider}`);
-            } catch (error) {
-                this.logger.warn(`Failed to discover metadata from ${service.constructor.name}:`, { error });
-                // Continue to next service on failure
             }
+        } finally {
+            this.updateAttributes({ metadataDiscovering: false });
         }
     }
+
+    // Allow re-searching metadata from a specific provider (e.g. after user has marked a metadata source as rejected or not favorited)
+    async startSingleProviderSearch(serviceKey: string): Promise<void> {
+        const primaryMetadata = this.getPrimaryMetadata();
+        if (!primaryMetadata) {
+            this.logger.warn('No primary metadata available for re-search');
+            return;
+        }
+        try {
+            const service = this.metadataServices.get(serviceKey);
+            const metadata = await service.searchTrack(primaryMetadata);
+            metadata.isPrimarySource = false;
+            this.upsertMetadataSource(metadata);
+            this.logger.info(`Re-search completed for ${serviceKey}`);
+        } catch (error) {
+            this.logger.warn(`Failed to re-search ${serviceKey}:`, { error });
+        }
+    }
+
 
     async startDownloads(): Promise<void> {
         const metadataSources = this.getAttributes()?.metadataSources;
@@ -205,17 +263,18 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             try {
                 // Find the first compatible metadata source for this download service
                 // TODO: trying multiple metadata sources for the same download service to compare audio files
-                const compatibleMetadata = metadataSources.find((metadata) =>
-                    downloadService.canDownload(metadata)
+                const compatibleSource = metadataSources.find((source) =>
+                    downloadService.canDownload(source.metadata)
                 );
 
-                if (!compatibleMetadata) {
+                if (!compatibleSource) {
                     this.logger.warn(
                         `No compatible metadata source found for ${downloadService.id}. Compatible providers: ${downloadService.compatibleMetadataProviders.join(', ')}`
                     );
                     continue;
                 }
 
+                const compatibleMetadata = compatibleSource.metadata;
                 this.logger.info(`Downloading using ${downloadService.id} from ${compatibleMetadata.apiProvider}`);
 
                 // Download the track
@@ -241,98 +300,98 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
 
     // ------- OLD IMPLEMENTATION BELOW - TO BE REWORKED -------
 
-    // Fetch metadata from appropriate service
-    private async fetchTrackMetadata(): Promise<StandardTrack> {
-        this.logger.info(`fetchMetadata`);
-        this.status.set({
-            type: StatusType.Processing,
-            message: "Fetch metadata",
-            timeTracking: true,
-            progress: 0,
-        });
+    // // Fetch metadata from appropriate service
+    // private async fetchTrackMetadata(): Promise<StandardTrack> {
+    //     this.logger.info(`fetchMetadata`);
+    //     this.status.set({
+    //         type: StatusType.Processing,
+    //         message: "Fetch metadata",
+    //         timeTracking: true,
+    //         progress: 0,
+    //     });
 
-        const url = this.getInitialInput()
-        if (!url)
-            throw new Error('No initial input')
-
-
-        const sources: MusicDownloadTaskAttributes['sources'] = []
-
-        // OFTEN DOWN
-        // // Try to get metadata from Songlink first
-        // const songlinkResponse = await this.songlinkService.getSonglinkData(url);
-        // if (songlinkResponse) {
-        //     try {
-        //         const track = await convertSonglinkToTrack(songlinkResponse, this.spotifyService, this.youtubeService);
-        //         sources.push({
-        //             platform: 'songlink',
-        //             track,
-        //             fetchedAt: new Date(),
-        //         });
-        //     } catch (error) {
-        //         // Continue
-        //     }
-        // }
-
-        // If spotify url, try spotify API
-        if (url.includes('.spotify.com/')) {
-            const spotifyTrackId = this.spotifyService.extractTrackIdFromUrl(url);
-
-            if (spotifyTrackId) {
-                try {
-                    const spotifyTrack = await this.spotifyService.getTrackInfo(spotifyTrackId);
-                    if (spotifyTrack) {
-                        const spotifyUrl = `https://open.spotify.com/track/${spotifyTrackId}`;
-                        const track = this.spotifyService.convertSpotifyTrack(spotifyTrack, spotifyUrl);
-                        sources.push({
-                            platform: 'spotify',
-                            track,
-                            fetchedAt: new Date(),
-                        });
-                    }
-                } catch (error) {
-                    // Continue
-                }
-            }
-        }
+    //     const url = this.getInitialInput()
+    //     if (!url)
+    //         throw new Error('No initial input')
 
 
-        // Select the best source
-        const track = sources[0]?.track
-        if (!track)
-            throw new Error('No track metadata found from the provided URL')
-        this.setAttributes({ track, sources });
-    }
+    //     const sources: MusicDownloadTaskAttributes['sources'] = []
 
-    // Download the track
-    private async downloadTrack(track: StandardTrack): Promise<string | undefined> {
-        const filename = `${track.artists[0].name} - ${track.trackName}`
+    //     // OFTEN DOWN
+    //     // // Try to get metadata from Songlink first
+    //     // const songlinkResponse = await this.songlinkService.getSonglinkData(url);
+    //     // if (songlinkResponse) {
+    //     //     try {
+    //     //         const track = await convertSonglinkToTrack(songlinkResponse, this.spotifyService, this.youtubeService);
+    //     //         sources.push({
+    //     //             platform: 'songlink',
+    //     //             track,
+    //     //             fetchedAt: new Date(),
+    //     //         });
+    //     //     } catch (error) {
+    //     //         // Continue
+    //     //     }
+    //     // }
 
-        if (track.linksByPlatform?.["youtubeMusic"])
-            return await this.ytDlpService.downloadTrack(track.linksByPlatform["youtubeMusic"], filename);
+    //     // If spotify url, try spotify API
+    //     if (url.includes('.spotify.com/')) {
+    //         const spotifyTrackId = this.spotifyService.extractTrackIdFromUrl(url);
 
-        // Fallback to downloading from youtube
-        if (track.linksByPlatform?.["youtube"])
-            return await this.ytDlpService.downloadTrack(track.linksByPlatform["youtube"], filename);
-    }
+    //         if (spotifyTrackId) {
+    //             try {
+    //                 const spotifyTrack = await this.spotifyService.getTrackInfo(spotifyTrackId);
+    //                 if (spotifyTrack) {
+    //                     const spotifyUrl = `https://open.spotify.com/track/${spotifyTrackId}`;
+    //                     const track = this.spotifyService.convertSpotifyTrack(spotifyTrack, spotifyUrl);
+    //                     sources.push({
+    //                         platform: 'spotify',
+    //                         track,
+    //                         fetchedAt: new Date(),
+    //                     });
+    //                 }
+    //             } catch (error) {
+    //                 // Continue
+    //             }
+    //         }
+    //     }
 
 
-    private async fetchMusicBrainz(track: StandardTrack): Promise<void> {
-        const artist = track.artists?.[0]
-        const album = track.album
-        if (!artist)
-            return
-        const MB_CHARS = '()_-'
-        const artistName = replaceAll(artist.name, MB_CHARS, '');
-        const trackName = replaceAll(track.trackName, MB_CHARS, ' ');
-        const albumName = album?.albumName;
-        const trackDuration: number | undefined = track.duration ?? undefined
+    //     // Select the best source
+    //     const track = sources[0]?.track
+    //     if (!track)
+    //         throw new Error('No track metadata found from the provided URL')
+    //     this.setAttributes({ track, sources });
+    // }
 
-        const musicBrainzReleases = await this.musicBrainzService.searchTracks(artistName, trackName, albumName, trackDuration);
-        // await saveJsonFile('samples/musicBrainzReleases.json', musicBrainzReleases);
-        track.musicBrainzRecording = musicBrainzReleases[0] ?? null;
-        this.setAttributes({ track });
-    }
+    // // Download the track
+    // private async downloadTrack(track: StandardTrack): Promise<string | undefined> {
+    //     const filename = `${track.artists[0].name} - ${track.trackName}`
+
+    //     if (track.linksByPlatform?.["youtubeMusic"])
+    //         return await this.ytDlpService.downloadTrack(track.linksByPlatform["youtubeMusic"], filename);
+
+    //     // Fallback to downloading from youtube
+    //     if (track.linksByPlatform?.["youtube"])
+    //         return await this.ytDlpService.downloadTrack(track.linksByPlatform["youtube"], filename);
+    // }
+
+
+    // private async fetchMusicBrainz(track: StandardTrack): Promise<void> {
+    //     const artist = track.artists?.[0]
+    //     const album = track.album
+    //     if (!artist)
+    //         return
+    //     const MB_CHARS = '()_-'
+    //     const artistName = replaceAll(artist.name, MB_CHARS, '');
+    //     const trackName = replaceAll(track.trackName, MB_CHARS, ' ');
+    //     const albumName = album?.albumName;
+    //     const trackDuration: number | undefined = track.duration ?? undefined
+
+    //     const musicBrainzReleases = await this.musicBrainzService.searchTracks(artistName, trackName, albumName, trackDuration);
+    //     // await saveJsonFile('samples/musicBrainzReleases.json', musicBrainzReleases);
+    //     track.musicBrainzRecording = musicBrainzReleases[0] ?? null;
+    //     this.setAttributes({ track });
+    // }
 
     // // Search on Soulseek
     // private async searchSoulseek(metadata: SongMetadata): Promise<any> {

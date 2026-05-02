@@ -50,6 +50,7 @@ export const SERVICE_DISPLAY_MAPPING: Record<string, ServiceDisplayInfo> = {
     // 'songlink': { acronym: 'SL', color: 'cyan', component: MbCell },
 };
 
+const DEFAULT_TEST_URL = "https://open.spotify.com/track/4v7kKFlEDmpVToHOICsXaM";
 
 export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
     public readonly id = "music-downloader";
@@ -83,7 +84,12 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
 
         this.downloadServiceRegistry = new ServiceRegistry<DownloadTask, DownloadService>()
             // .register('soulseek', (t, l) => new SoulseekService(t, l))
-            .register('ytdlp', (task, logger) => new YtDlpService(task, logger))
+            .register('ytdlp', (task, logger) => new YtDlpService(task, logger));
+
+        // Temporary url by default
+        const defaultTasks = this.createTasksFromUrls([DEFAULT_TEST_URL], { toTag: true, toDownload: false });
+        this.orchestrator.addTasks(defaultTasks);
+        this.logger.info(`Imported default test URL: ${DEFAULT_TEST_URL}`);
     }
 
     public getDisplayMode(): "download" | "metadata" {
@@ -119,6 +125,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 state: 'pending',
                 userInput: { type: 'url', url },
                 metadataSources: [],
+                metadataOverride: {},
                 downloadSources: [],
                 toTag,
                 toDownload,
@@ -130,9 +137,9 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         }));
     }
 
-    async restartTask(task: Task): Promise<void> {
-        task.updateAttributes({ state: 'pending', metadataSources: [], downloadSources: [] });
-        this.orchestrator.processTask(task)
+    async restartTask(task: DownloadTask): Promise<void> {
+        task.updateAttributes({ state: 'pending', metadataSources: [], metadataOverride: {}, downloadSources: [] });
+        this.orchestrator.processTask(task);
     }
 
     async runAll(): Promise<void> {
@@ -157,7 +164,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         ];
     }
 
-    public getContextualActionBar(task: Task<MusicDownloadTaskAttributes>, attributes: { columnIndex: number }): ContextualActionBar {
+    public getContextualActionBar(task: DownloadTask, attributes: { columnIndex: number }): ContextualActionBar {
         const columns = this.getColumns()
         const column = columns[attributes.columnIndex]
         let actionBartext = ""
@@ -192,7 +199,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 onClick: () => task.updateAttributes({ toTag: !task.getAttributes()?.toTag }),
                 onClickBatch: (tasks) => {
                     const newValue = !task.getAttributes()?.toTag;
-                    tasks.forEach(t => (t as Task<MusicDownloadTaskAttributes>).updateAttributes({ toTag: newValue }));
+                    tasks.forEach(task => task.updateAttributes({ toTag: newValue }));
                 },
             }])
         }
@@ -206,7 +213,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 onClick: () => task.updateAttributes({ toDownload: !task.getAttributes()?.toDownload }),
                 onClickBatch: (tasks) => {
                     const newValue = !task.getAttributes()?.toDownload;
-                    tasks.forEach(t => (t as Task<MusicDownloadTaskAttributes>).updateAttributes({ toDownload: newValue }));
+                    tasks.forEach(task => task.updateAttributes({ toDownload: newValue }));
                 },
             }])
         }
@@ -227,7 +234,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 shortcuts: [{ input: "s" }],
                 label: "Search",
                 description: "Search for metadata matching this track on this service",
-                onClick: () => { },
+                onClick: () => { task.startSingleProviderSearch(serviceKey); },
             }])
         }
 

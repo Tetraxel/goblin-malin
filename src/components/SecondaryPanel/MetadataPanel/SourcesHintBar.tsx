@@ -1,0 +1,174 @@
+import React from "react";
+import { Box, Text } from "ink";
+import { MetadataSourceState } from "../../../flows/musicDownloadFlow/types";
+import { SERVICE_DISPLAY_MAPPING } from "../../../flows/musicDownloadFlow/musicDownloadFlow";
+
+interface SourcesHintBarProps {
+  sources: MetadataSourceState[];
+  selectedIndex: number; // -1 = compiled row
+  innerFocus: "list" | "detail";
+  isActive: boolean;
+  width: number;
+}
+
+const PLATFORM_DISPLAY: Record<string, { label: string; color: string }> = {
+  spotify: { label: "Spotify", color: "green" },
+  youtube: { label: "Youtube", color: "red" },
+  youtubeMusic: { label: "YT Music", color: "red" },
+  musicBrainz: { label: "MusicBrainz", color: "magenta" },
+  deezer: { label: "Deezer", color: "cyan" },
+  appleMusic: { label: "Apple Music", color: "white" },
+  tidal: { label: "Tidal", color: "blue" },
+  soundcloud: { label: "SoundCloud", color: "yellow" },
+  itunes: { label: "iTunes", color: "white" },
+  bandcamp: { label: "Bandcamp", color: "cyan" },
+};
+
+function getDisplay(apiProvider: string): { label: string; color: string } {
+  const fromService = SERVICE_DISPLAY_MAPPING[apiProvider];
+  if (fromService)
+    return { label: fromService.acronym, color: fromService.color as string };
+  return (
+    PLATFORM_DISPLAY[apiProvider] ?? { label: apiProvider, color: "white" }
+  );
+}
+
+function truncate(s: string, maxLen: number): string {
+  return s.length > maxLen ? s.slice(0, maxLen - 1) + "…" : s;
+}
+
+function Hint({
+  label,
+  shortcut,
+  dim,
+}: {
+  label: string;
+  shortcut: string;
+  dim: boolean;
+}) {
+  return (
+    <Box marginRight={2}>
+      <Text color="white" dimColor={dim} bold>
+        [{shortcut}]
+      </Text>
+      <Text color="gray" dimColor={dim}>
+        {" "}
+        {label}
+      </Text>
+    </Box>
+  );
+}
+
+export const SourcesHintBar: React.FC<SourcesHintBarProps> = ({
+  sources,
+  selectedIndex,
+  innerFocus,
+  isActive,
+  width,
+}) => {
+  const dim = !isActive || innerFocus !== "list";
+  const isCompiled = selectedIndex === -1;
+  const selectedSource = isCompiled ? null : (sources[selectedIndex] ?? null);
+
+  // ── Row 1: colored context path (platform > type > id >>>)
+  let row1Parts: { label: string; color: string }[] = [];
+  if (isCompiled) {
+    row1Parts = [];
+  } else if (selectedSource) {
+    const m = selectedSource.metadata;
+    const display = getDisplay(m.apiProvider);
+    const type = m.type
+      ? m.type.charAt(0).toUpperCase() + m.type.slice(1)
+      : "Track";
+    const id = m.id ? truncate(m.id, 14) : "";
+    row1Parts = [display.label, type, id]
+      .filter(Boolean)
+      .map((label) => ({ label, color: display.color }));
+  }
+
+  // ── Row 2: source position counter + list actions
+  const sortedSources = [...sources].sort((a, b) => a.rank - b.rank);
+  let row2Left = "";
+  if (isCompiled) {
+    row2Left = "Compiled Metadata";
+  } else if (selectedSource) {
+    const pos = sortedSources.indexOf(selectedSource) + 1;
+    row2Left = `Source ${pos}/${sources.length}`;
+  }
+
+  const showSourceActions = !isCompiled && !!selectedSource;
+  const isRejected = selectedSource?.isRejected ?? false;
+
+  return (
+    <Box
+      flexDirection="column"
+      width={width}
+      // height={2}
+      minHeight={1}
+      overflow="hidden"
+      marginLeft={1}
+      alignItems="flex-end"
+      justifyContent="flex-end"
+    >
+      {/* Row 1: context path */}
+      <Box flexDirection="row" width={width} overflow="hidden">
+        <Box marginRight={1} flexDirection="row">
+          {row1Parts.map((part, i) => (
+            <React.Fragment key={i}>
+              {i > 0 && (
+                <Text color="white" dimColor={dim}>
+                  {" > "}
+                </Text>
+              )}
+              <Text color={part.color as any} dimColor={dim}>
+                {part.label}
+              </Text>
+            </React.Fragment>
+          ))}
+        </Box>
+        {!isCompiled && row1Parts.length > 0 && (
+          <>
+            <Box marginRight={2}>
+              <Text color="white" dimColor={dim}>
+                {">>>"}
+              </Text>
+            </Box>
+            <Hint label="Open link" shortcut="Enter" dim={dim} />
+            <Hint label="Copy link" shortcut="Ctrl+C" dim={dim} />
+            <Hint label="Download" shortcut="D" dim={dim} />
+          </>
+        )}
+      </Box>
+
+      {/* Row 2: position + list actions */}
+      <Box flexDirection="row" width={width} overflow="hidden">
+        <Box marginRight={1}>
+          <Text color="white" dimColor={dim} bold>
+            {row2Left}
+          </Text>
+        </Box>
+        {showSourceActions && (
+          <>
+            <Box marginRight={2}>
+              <Text color="white" dimColor={dim}>
+                {">>>"}
+              </Text>
+            </Box>
+            <Hint
+              label={selectedSource?.isFavorited ? "Unfavorite" : "Favorite"}
+              shortcut="F"
+              dim={dim}
+            />
+            <Hint
+              label={isRejected ? "Unreject" : "Reject source"}
+              shortcut="Del"
+              dim={dim}
+            />
+            <Hint label="Move up" shortcut="Shift+↑" dim={dim} />
+            <Hint label="Move down" shortcut="Shift+↓" dim={dim} />
+          </>
+        )}
+      </Box>
+    </Box>
+  );
+};

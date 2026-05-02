@@ -9,8 +9,8 @@ export const YoutubeCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   isSelected,
 }) => {
   const metadata = task.attributes?.metadataSources.find(
-    (m) => m.apiProvider === "youtube",
-  );
+    (source) => source.metadata.apiProvider === "youtube",
+  )?.metadata;
   const fullUri = metadata?.uri;
   const uri = fullUri?.split("::").pop();
 

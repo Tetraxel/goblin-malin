@@ -50,11 +50,20 @@ export const InputRouter: React.FC<{
       return;
     }
 
+    // While a field is being edited in the detail panel, suppress all global
+    // shortcuts so typed characters don't trigger mode switches or other actions.
+    if (focusState.isEditingField) return;
+
     // Ctrl+V: open the clipboard import flow from anywhere on the main screen.
     // On most terminals ink reports key.ctrl + input='v'. On some Windows
     // terminals the keystroke arrives as the raw SYN byte (\x16) without
     // key.ctrl set, so handle both.
-    if ((key.ctrl && (input === "v" || input === "V")) || input === "\x16") {
+    // Skip when the secondary panel detail is focused — it handles its own Ctrl+V for field paste.
+    const isDetailFocused =
+      focusState.activeWindow === "secondaryPanel" &&
+      focusState.secondaryPanel.subTab === "sources" &&
+      focusState.secondaryPanel.sourcesPanel.innerFocus === "detail";
+    if (!isDetailFocused && ((key.ctrl && (input === "v" || input === "V")) || input === "\x16")) {
       openImportFlow();
       return;
     }
