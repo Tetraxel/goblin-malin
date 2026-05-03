@@ -2,46 +2,45 @@ import { LogEntry } from "winston";
 import Transport from 'winston-transport'
 
 export class InkTransport extends Transport {
-    private logs: LogEntry[] = [];
+    private history: LogEntry[] = [];
+    private pending: LogEntry[] = [];
     private subscribers: Set<(logs: LogEntry[]) => void> = new Set();
 
     constructor(opts: any) {
         super(opts)
     }
 
-    // log(entry: LogEntry): void {
     log(info: LogEntry, callback: () => void): void {
         setImmediate(() => {
             this.emit('logged', info);
         });
-        this.logs.push(info);
-
-        // Notify all subscribers (React components)
+        this.history.push(info);
+        this.pending.push(info);
         this.notifySubscribers();
         callback();
     }
 
     subscribe(callback: (logs: LogEntry[]) => void): () => void {
         this.subscribers.add(callback);
-        callback(this.logs); // Send current logs immediately
+        callback([...this.history]); // Send full history immediately on subscribe
 
-        // Return unsubscribe function
         return () => {
             this.subscribers.delete(callback);
         };
     }
 
     private notifySubscribers(): void {
-        this.subscribers.forEach(callback => callback([...this.logs]));
-        this.logs = []
+        const batch = [...this.pending];
+        this.pending = [];
+        this.subscribers.forEach(callback => callback(batch));
     }
 
     getLogs(): LogEntry[] {
-        return [...this.logs];
+        return [...this.history];
     }
 
     filterLogs(predicate: (entry: LogEntry) => boolean): LogEntry[] {
-        return this.logs.filter(predicate);
+        return this.history.filter(predicate);
     }
 }
 

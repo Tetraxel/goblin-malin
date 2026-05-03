@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Box, Text } from "ink";
+import { Box, Text, useInput } from "ink";
 import { inkTransport } from "../../base/logger/ink-transport";
 import { LogMetadata } from "../../base/logger/types";
 import { inspect } from "util";
@@ -54,38 +54,82 @@ export const LogPanel = ({
       : null;
 
   const [logs, setLogs] = useState<LogMetadata[]>([]);
+  const [scrollOffset, setScrollOffset] = useState(0);
 
   useEffect(() => {
     const unsubscribe = inkTransport.subscribe((incomingLogs) => {
       const normalized = incomingLogs as LogMetadata[];
-      setLogs((prevLogs) => [
-        ...prevLogs, // Spread the previous (existing) logs
-        ...normalized, // Spread the new incoming logs
-      ]);
+      setLogs((prevLogs) => [...prevLogs, ...normalized]);
     });
-    return unsubscribe; // Cleanup on unmount
+    return unsubscribe;
   }, []);
+
+  const isActive =
+    focusState.activeWindow === "secondaryPanel" &&
+    focusState.secondaryPanel.subTab === "logs";
+
+  // Reset scroll when task filter changes or when panel loses focus
+  useEffect(() => {
+    setScrollOffset(0);
+  }, [selectedTask]);
+
+  useEffect(() => {
+    if (!isActive) setScrollOffset(0);
+  }, [isActive]);
 
   const filteredLogs = logs.filter(
     (log) =>
       !Boolean(selectedTask) || !Boolean(log.task) || selectedTask === log.task,
   );
 
+  // When scrolled (indicator row visible), only height-1 rows are available for logs
+  const maxOffset = Math.max(0, filteredLogs.length - (height - 1));
+
+  useInput(
+    (_input, key) => {
+      if (key.upArrow) {
+        setScrollOffset((prev) => Math.min(prev + 1, maxOffset));
+      }
+      if (key.downArrow) {
+        setScrollOffset((prev) => Math.max(0, prev - 1));
+      }
+    },
+    { isActive },
+  );
+
+  const clampedOffset = Math.min(scrollOffset, maxOffset);
+  const showIndicator = clampedOffset > 0;
+  // Reserve one row for the indicator when it's visible
+  const logRows = showIndicator ? height - 1 : height;
+  const visibleEnd = showIndicator ? filteredLogs.length - clampedOffset : undefined;
+  const visibleStart = Math.max(0, (visibleEnd ?? filteredLogs.length) - logRows);
+  const visibleLogs = filteredLogs.slice(visibleStart, visibleEnd);
+
   return (
     <Box
-      flexDirection="column"
+      flexDirection="row"
       overflow="hidden"
       borderStyle="single"
       borderColor="cyan"
       borderTop={false}
       borderBottom={false}
       height={height}
+      flexGrow={1}
     >
-      {filteredLogs.slice(-height).map((log, index) => (
-        <Box key={log.id} paddingX={1} width={width} height={1}>
-          <Text>{getLogString(log)}</Text>
-        </Box>
-      ))}
+      <Box flexDirection="column" overflow="hidden" flexGrow={1}>
+        {visibleLogs.map((log) => (
+          <Box key={log.id} paddingX={1} width={width} height={1}>
+            <Text>{getLogString(log)}</Text>
+          </Box>
+        ))}
+        {showIndicator && (
+          <Box paddingX={1}>
+            <Text color="cyan" dimColor>
+              ↓ {clampedOffset} more below
+            </Text>
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 };

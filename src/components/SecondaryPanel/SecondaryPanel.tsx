@@ -52,13 +52,9 @@ export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({
       )}
 
       {/* Always mounted so log history is preserved when switching tabs */}
-      <Box
-        height={subTab === "logs" ? contentHeight : 0}
-        width={subTab === "logs" ? contentHeight : 0}
-        overflow="hidden"
-      >
+      {subTab === "logs" && (
         <LogPanel tasks={tasks} width={width} height={contentHeight} />
-      </Box>
+      )}
     </Box>
   );
 };
