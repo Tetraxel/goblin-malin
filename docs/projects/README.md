@@ -14,6 +14,7 @@ These are not task lists — each project is a self-contained scope of work. Ind
 | P6 — Save Flow (Tag & Export)                  | [p6/tasks.md](p6/tasks.md) |
 | P7 — Settings System                           | [p7/tasks.md](p7/tasks.md) |
 | P8 — Color Theme Unification                   | NOT WRITTEN                |
+| P8 — Session management                        | NOT WRITTEN                |
 
 ---
 
@@ -99,18 +100,27 @@ See [p4/tasks.md](p4/tasks.md) for full task-by-task detail.
 
 ---
 
-## P5 — Download Source Selection & Audio Preview Panel
+## P5 — Download Source Selection & Audio Preview Panel ✅ Complete
 
-The secondary panel in download mode shows:
+All core tasks are implemented. The download panel is fully functional.
 
-- A **download source tree** grouped by provider (YtDlp, Soulseek), then by the metadata source used, then individual downloaded files with filename, size, and state (DOWNLOADED / SAVED / failed)
-- The selected file previewed in the right sub-panel: format, size, duration, all embedded tags
-- An **audio scrubber** with `[Space]` to play/pause (the `sound-play` dependency is already there but unused beyond the startup sound)
-- A `[Enter]` / `Update` action to save/tag the selected file
-- When the on-disk file is missing: a "Lost the link to the file" warning + `[Ctrl+F]` to relocate
-- When changing the download source after a file is already saved: a **side-by-side diff view** (old version left, new version right) before confirming the update
+**What's in place:**
 
-Currently `downloadSources` is populated but there is no selection UI and no secondary panel for it at all.
+- `DownloadPanel` mounts in `SecondaryPanel` when `primaryMode === "download"` (tab `[3]`)
+- `DownloadSourceTree` — left pane, groups sources by provider header → metadata-source header → file row; `↑/↓` navigates selectable rows; `[Enter]` requests selection, `[Del]` toggles reject, `[Space]` plays the file directly from the list
+- `DownloadSourceDetail` — right pane, shows format / size / duration / all embedded tags (priority tags first, then others); `[Space]` play/pause, `[Shift+←/→]` seek ±5 s; "File not found" warning with `[Ctrl+F]` relocate flow (prompts for new absolute path via `askInput`)
+- `PlaybackBar` — progress bar with ▶/⏸ icon, filled/unfilled block characters, position/duration timestamps; driven by `MpvPlayer` `progress` and `stateChange` events
+- `StateBadge` — per-row state indicator (DOWNLOADED / SAVED / failed)
+- `DiffView` — side-by-side old vs. new panel shown when switching the selected source after a file is already saved; `[Enter]` confirms the switch, `[Esc]` cancels
+- `Shift+←/→` resizes the left/right split ratio (only when list pane is focused; detail pane owns those keys for seek)
+- `readFileInfo.ts` — reads `fs.stat` + `flac-tagger` tags on download completion and populates `FileInfo` on the source
+
+**Audio backend** (`src/utils/mpvPlayer.ts`, `src/utils/mpv-setup.ts`):
+
+- Custom direct-IPC `MpvPlayer` class (no `node-mpv` dependency) — see [p5/play-music-audit.md](p5/play-music-audit.md#what-was-actually-built)
+- On Windows: mpv binary is auto-downloaded from shinchiro/mpv-winbuild-cmake; on macOS/Linux: uses system `mpv` from PATH
+
+See [p5/tasks.md](p5/tasks.md) for full task-by-task detail.
 
 ---
 

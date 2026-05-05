@@ -5,7 +5,6 @@ import { ColumnComponent } from "../../../components/TaskListPanel";
 import { StatusAttributes, StatusType } from "../../../base/task/task-status";
 import { AnimatedIcon, Icon } from "../../../components/AnimatedIcon";
 import { MusicDownloadTaskAttributes } from "../types";
-import { useWhyDidYouUpdate } from "../../../utils/useWhyDidYouUpdate";
 
 function getStatusIcon(status: StatusType): React.ReactNode {
   switch (status) {
@@ -76,12 +75,6 @@ export const StatusCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   const statusColor = getStatusColor(task.status.type);
   const statusText = getStatusText(task.status);
   const iconComponent = getStatusIcon(task.status.type);
-
-  useWhyDidYouUpdate("StatusCell", {
-    task,
-    width,
-    isSelected,
-  });
 
   return (
     <Box overflow="hidden">

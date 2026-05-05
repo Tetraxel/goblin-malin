@@ -246,6 +246,43 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
     }
 
 
+    selectDownloadSource(index: number): void {
+        const sources = this.getAttributes()?.downloadSources ?? [];
+        this.updateAttributes({
+            downloadSources: sources.map((s, i) => ({ ...s, selected: i === index })),
+        });
+    }
+
+    rejectDownloadSource(index: number, rejected: boolean): void {
+        const sources = this.getAttributes()?.downloadSources ?? [];
+        if (!sources[index]) return;
+        this.updateAttributes({
+            downloadSources: sources.map((s, i) =>
+                i === index
+                    ? { ...s, isRejected: rejected, selected: rejected ? false : s.selected }
+                    : s
+            ),
+        });
+    }
+
+    updateLocalFile(sourceIndex: number, newPath: string): void {
+        const sources = this.getAttributes()?.downloadSources ?? [];
+        if (!sources[sourceIndex]) return;
+        const updated = sources.map((s, i) => {
+            if (i !== sourceIndex) return s;
+            return {
+                ...s,
+                localFile: {
+                    ...s.localFile!,
+                    path: newPath,
+                    state: 'found' as const,
+                    name: newPath.split(/[\\/]/).pop()?.replace(/\.[^/.]+$/, '') ?? s.localFile?.name ?? '',
+                },
+            };
+        });
+        this.updateAttributes({ downloadSources: updated });
+    }
+
     async startDownloads(): Promise<void> {
         const metadataSources = this.getAttributes()?.metadataSources;
 
@@ -288,8 +325,14 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             }
         }
 
-        // Update task attributes with download sources
-        this.updateAttributes({ downloadSources });
+        // Only the first successfully downloaded source is auto-selected
+        const firstDownloadedIdx = downloadSources.findIndex(s => s.state === 'downloaded');
+        const sourcesWithSelection = downloadSources.map((s, i) => ({
+            ...s,
+            selected: i === firstDownloadedIdx,
+        }));
+
+        this.updateAttributes({ downloadSources: sourcesWithSelection });
 
         if (downloadSources.length === 0) {
             this.logger.warn('No successful downloads');

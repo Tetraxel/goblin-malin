@@ -16,8 +16,13 @@ export const InputRouter: React.FC<{
   flow: FlowBase | undefined;
   openImportFlow: (text?: string) => void;
 }> = ({ tasks, flow, openImportFlow }) => {
-  const { focusState, handleTabPress, switchMode, setPrimaryMode, setSecondaryTab } =
-    useFocusContext();
+  const {
+    focusState,
+    handleTabPress,
+    switchMode,
+    setPrimaryMode,
+    setSecondaryTab,
+  } = useFocusContext();
 
   const toolbarHandler = useToolbarKeyHandler();
   const taskListHandler = useTaskListKeyHandler(tasks, flow);
@@ -63,7 +68,10 @@ export const InputRouter: React.FC<{
       focusState.activeWindow === "secondaryPanel" &&
       focusState.secondaryPanel.subTab === "sources" &&
       focusState.secondaryPanel.sourcesPanel.innerFocus === "detail";
-    if (!isDetailFocused && ((key.ctrl && (input === "v" || input === "V")) || input === "\x16")) {
+    if (
+      !isDetailFocused &&
+      ((key.ctrl && (input === "v" || input === "V")) || input === "\x16")
+    ) {
       openImportFlow();
       return;
     }
@@ -94,8 +102,8 @@ export const InputRouter: React.FC<{
       return;
     }
 
-    // [4] Secondary panel: logs tab
-    if (input === "4") {
+    // [5] Secondary panel: logs tab
+    if (input === "5") {
       setSecondaryTab("logs");
       return;
     }

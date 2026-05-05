@@ -130,8 +130,6 @@ export const TaskListPanel: React.FC<{
     [columns, width],
   );
 
-  globalLogger.info("--- TaskListPanel Render ---");
-
   return (
     <Box
       borderStyle="single"

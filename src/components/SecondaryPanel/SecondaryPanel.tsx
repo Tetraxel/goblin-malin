@@ -2,7 +2,8 @@ import React from "react";
 import { Box } from "ink";
 import { useFocusContext } from "../../contexts/FocusContext";
 import { LogPanel } from "./LogPanel";
-import { SourcesPanel } from "./MetadataPanel/SourcesPanel";
+import { MetadataPanel } from "./MetadataPanel/MetadataPanel";
+import { DownloadPanel } from "./DownloadPanel/DownloadPanel";
 import { TabBar } from "../TabBar";
 import { Task } from "../../base/task/task";
 import { FlowBase } from "../../base/flow/flow-base";
@@ -21,7 +22,7 @@ export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({
   const { focusState } = useFocusContext();
   const { primaryMode, subTab } = focusState.secondaryPanel;
   const height = focusState.layout.secondaryPanelHeight;
-  const contentHeight = Math.max(1, height - 1); // subtract tab bar row
+  const contentHeight = Math.max(1, height - 1);
 
   const selectedTask = tasks[focusState.taskList.selectedTaskIndex] ?? null;
 
@@ -37,21 +38,27 @@ export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({
                 ? "Metadata Sources"
                 : "Download Sources",
           },
-          { key: "4", label: "Logs" },
+          { key: "5", label: "Logs" },
         ]}
-        activeTabKey={subTab === "sources" ? "3" : "4"}
+        activeTabKey={subTab === "sources" ? "3" : "5"}
       />
 
-      {subTab === "sources" && (
-        <SourcesPanel
-          mode={primaryMode}
+      {subTab === "sources" && primaryMode === "metadata" && (
+        <MetadataPanel
           selectedTask={selectedTask}
           width={width}
           height={contentHeight}
         />
       )}
 
-      {/* Always mounted so log history is preserved when switching tabs */}
+      {subTab === "sources" && primaryMode === "download" && (
+        <DownloadPanel
+          selectedTask={selectedTask}
+          width={width}
+          height={contentHeight}
+        />
+      )}
+
       {subTab === "logs" && (
         <LogPanel tasks={tasks} width={width} height={contentHeight} />
       )}

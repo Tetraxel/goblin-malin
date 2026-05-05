@@ -1,7 +1,8 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { MetadataSourceState } from "../../../flows/musicDownloadFlow/types";
-import { SERVICE_DISPLAY_MAPPING } from "../../../flows/musicDownloadFlow/musicDownloadFlow";
+import { MetadataSourceState } from "../../flows/musicDownloadFlow/types";
+import { SERVICE_DISPLAY_MAPPING } from "../../flows/musicDownloadFlow/musicDownloadFlow";
+import { Hint } from "../Hint";
 
 interface SourcesHintBarProps {
   sources: MetadataSourceState[];
@@ -37,28 +38,6 @@ function truncate(s: string, maxLen: number): string {
   return s.length > maxLen ? s.slice(0, maxLen - 1) + "…" : s;
 }
 
-function Hint({
-  label,
-  shortcut,
-  dim,
-}: {
-  label: string;
-  shortcut: string;
-  dim: boolean;
-}) {
-  return (
-    <Box marginRight={2}>
-      <Text color="white" dimColor={dim} bold>
-        [{shortcut}]
-      </Text>
-      <Text color="gray" dimColor={dim}>
-        {" "}
-        {label}
-      </Text>
-    </Box>
-  );
-}
-
 export const SourcesHintBar: React.FC<SourcesHintBarProps> = ({
   sources,
   selectedIndex,
@@ -70,11 +49,8 @@ export const SourcesHintBar: React.FC<SourcesHintBarProps> = ({
   const isCompiled = selectedIndex === -1;
   const selectedSource = isCompiled ? null : (sources[selectedIndex] ?? null);
 
-  // ── Row 1: colored context path (platform > type > id >>>)
   let row1Parts: { label: string; color: string }[] = [];
-  if (isCompiled) {
-    row1Parts = [];
-  } else if (selectedSource) {
+  if (!isCompiled && selectedSource) {
     const m = selectedSource.metadata;
     const display = getDisplay(m.apiProvider);
     const type = m.type
@@ -86,7 +62,6 @@ export const SourcesHintBar: React.FC<SourcesHintBarProps> = ({
       .map((label) => ({ label, color: display.color }));
   }
 
-  // ── Row 2: source position counter + list actions
   const sortedSources = [...sources].sort((a, b) => a.rank - b.rank);
   let row2Left = "";
   if (isCompiled) {
@@ -103,14 +78,12 @@ export const SourcesHintBar: React.FC<SourcesHintBarProps> = ({
     <Box
       flexDirection="column"
       width={width}
-      // height={2}
       minHeight={1}
       overflow="hidden"
       marginLeft={1}
       alignItems="flex-end"
       justifyContent="flex-end"
     >
-      {/* Row 1: context path */}
       <Box flexDirection="row" width={width} overflow="hidden">
         <Box marginRight={1} flexDirection="row">
           {row1Parts.map((part, i) => (
@@ -140,7 +113,6 @@ export const SourcesHintBar: React.FC<SourcesHintBarProps> = ({
         )}
       </Box>
 
-      {/* Row 2: position + list actions */}
       <Box flexDirection="row" width={width} overflow="hidden">
         <Box marginRight={1}>
           <Text color="white" dimColor={dim} bold>

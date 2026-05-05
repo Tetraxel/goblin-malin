@@ -9,19 +9,20 @@ import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
 import { Task, TaskAttributes } from "../base/task/task";
 import { MusicDownloadTaskAttributes } from "../flows/musicDownloadFlow/types";
 import { globalLogger } from "../base/logger/logger";
-import soundPlay from "sound-play";
+import { getInstance } from "../utils/mpvPlayer";
 import { fileURLToPath } from "url";
 import path from "path";
 import { AppInner } from "./AppInner";
 
 export const App: React.FC = () => {
-  globalLogger.info(`--- App render`);
   useEffect(() => {
     const initWav = path.resolve(
       path.dirname(fileURLToPath(import.meta.url)),
       "../../init.wav",
     );
-    soundPlay.play(initWav, 0.5);
+    getInstance()
+      .play(initWav)
+      .catch(() => {});
   }, []);
 
   const [tasks, setTasks] = useState<Task<TaskAttributes>[]>([]);
@@ -56,7 +57,6 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const unsubscribe = orchestrator.subscribe((orchestrator) => {
-      globalLogger.info(`orchestrator state changed, updating tasks...`);
       setTasks(orchestrator.getTasks());
     });
     return unsubscribe;

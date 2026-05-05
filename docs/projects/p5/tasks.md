@@ -1,5 +1,7 @@
 # P5 — Download Source Selection & Audio Preview Panel: Tasks
 
+**Status: All tasks complete (T5.1–T5.9)**
+
 ## Context
 
 **Current state of download data:**
@@ -35,7 +37,7 @@ P2/T2.9 creates the `SourcesPanel` scaffold with an inner left/right split. P4/T
 
 ## Tasks
 
-### T5.1 — Extend `TrackDownloadSource` with `fileInfo` and `savedFile`
+### T5.1 ✅ — Extend `TrackDownloadSource` with `fileInfo` and `savedFile`
 
 Two new optional fields in `types.ts`:
 
@@ -63,189 +65,57 @@ type TrackDownloadSource = {
 
 `savedFile` is written by the save flow (P6) — P5 only reads it.
 
+Also added: `isRejected?: boolean` on `TrackDownloadSource` (used by T5.6).
+
 _Depends on: nothing_
 
 ---
 
-### T5.2 — Read `fileInfo` from the FLAC file after download
+### T5.2 ✅ — Read `fileInfo` from the FLAC file after download
 
-In `YtDlpService.downloadTrack()`, after the file is confirmed on disk (both the download case and the already-exists case), read file info and attach it to the returned `TrackDownloadSource`:
+Extracted as a standalone utility at `src/flows/musicDownloadFlow/utils/readFileInfo.ts` (called from `YtDlpService.downloadTrack()`). Uses `fs/promises.stat` + `flac-tagger.readFlacTags()` as planned.
 
-```typescript
-import { stat } from "fs/promises";
-import { readFlacTags } from "flac-tagger";
-
-async function readFileInfo(filePath: string): Promise<FileInfo> {
-  const [stats, flacData] = await Promise.all([
-    stat(filePath),
-    readFlacTags(filePath),
-  ]);
-  const durationMs = /* from flacData.streamInfo.totalSamples / sampleRate * 1000 */ 0;
-  return {
-    format: "flac",
-    sizeBytes: stats.size,
-    durationMs,
-    embeddedTags: flacData.tagMap ?? {},
-  };
-}
-```
-
-`flac-tagger`'s `readFlacTags()` returns a `FlacTags` object with `tagMap` (the Vorbis Comments) and `streamInfo` (sample rate, channels, total samples). Duration = `streamInfo.totalSamples / streamInfo.sampleRate * 1000`.
-
-Call `readFileInfo()` right before returning from `downloadTrack()` and set `downloadSource.fileInfo`. Wrap in try/catch — if reading fails, log a warning and leave `fileInfo` undefined (the UI degrades gracefully to showing `—` for those fields).
+**Deviation:** `flac-tagger` does not expose `streamInfo` reliably, so `durationMs` is not computed from `totalSamples / sampleRate`. Instead, `readFileInfo` takes a `fallbackDurationMs: number` parameter (the track's `duration` field from metadata) and stores that. The `PlaybackBar` falls back to mpv's live `duration` property-change event once playback starts, so the displayed duration is still accurate.
 
 _Depends on: T5.1_
 
 ---
 
-### T5.3 — Build `DownloadSourceTree` component (left side of SourcesPanel in download mode)
+### T5.3 ✅ — Build `DownloadSourceTree` component (left side of SourcesPanel in download mode)
 
-Create `src/components/DownloadSourceTree.tsx`.
+Implemented at `src/components/SecondaryPanel/DownloadPanel/DownloadSourceTree/` (split into `index.tsx`, `ProviderHeader.tsx`, `MetadataHeader.tsx`, `SourceFileRow.tsx` sub-components).
 
-**Props:**
+Tree structure, state badges, `↑/↓` navigation skipping non-selectable rows, and provider colors via `SERVICE_DISPLAY_MAPPING` all match the spec.
 
-```typescript
-interface DownloadSourceTreeProps {
-  sources: TrackDownloadSource[];
-  selectedSourceIndex: number | null;
-  isActive: boolean;
-  width: number;
-  height: number;
-}
-```
-
-**Tree structure** — grouped by `provider`, then by `source.track.platform` within each provider:
-
-```
-  [YTDLP]
-    YouTube Music · Petit Biscuit – Sunset Lover
-  ☛   Petit_Biscuit_-_Sunset_Lover.flac   4.2 MB  ● SAVED
-  [SOULSEEK]
-    Spotify · Petit Biscuit – Sunset Lover
-      Petit_Biscuit_Sunset_Lover.flac      8.1 MB    DOWNLOADED
-```
-
-- Provider rows (e.g. `[YTDLP]`) are section headers — not selectable, rendered bold with the `SERVICE_DISPLAY_MAPPING` color
-- Metadata-source sub-headers show the platform badge and `track.trackName` — also not selectable
-- File rows are selectable. Show: filename, file size (formatted as MB), state badge
-- State badges: `DOWNLOADING` (yellow), `DOWNLOADED` (green), `● SAVED` (cyan with dot), `FAILED` (red)
-- The currently selected source is indicated with `☛`; `↑/↓` navigation skips non-selectable rows
-
-If a source has no `localFile` (state is `pending`, `searching`, or `failed`), show the state instead of a filename.
+**Addition:** `[Space]` in the tree also plays/pauses the selected file directly (not only from the detail pane), using the `MpvPlayer` singleton.
 
 _Depends on: T5.1_
 
 ---
 
-### T5.4 — Build `DownloadSourceDetail` component (right side of SourcesPanel in download mode)
+### T5.4 ✅ — Build `DownloadSourceDetail` component (right side of SourcesPanel in download mode)
 
-Create `src/components/DownloadSourceDetail.tsx`.
-
-**Props:**
-
-```typescript
-interface DownloadSourceDetailProps {
-  source: TrackDownloadSource | null;
-  isDiffMode: boolean;
-  previousSource: TrackDownloadSource | null; // only used in diff mode
-  isActive: boolean;
-  width: number;
-  height: number;
-}
-```
-
-**Normal mode** (when `isDiffMode === false`):
-
-```
-  File        Petit_Biscuit_-_Sunset_Lover.flac
-  Format      FLAC
-  Size        4.2 MB
-  Duration    3:44
-
-  ── Embedded Tags ──────────────────────────
-  TITLE       Sunset Lover
-  ARTIST      Petit Biscuit
-  ALBUM       Presence
-  DATE        2017
-  TRACKNUMBER 1
-  ...
-
-  ── Saved ──────────────────────────────────
-  Path        ~/Music/Petit Biscuit - Sunset Lover.flac
-  Saved       2026-04-21 14:32
-```
-
-If `source.localFile?.state === 'not_found'`:
-
-```
-  ⚠ File not found
-  Last known path: /tmp/downloads/Petit_Biscuit_-_Sunset_Lover.flac
-
-  [Ctrl+F] Relocate file
-```
-
-If `source` is null (nothing selected): render a dim placeholder.
-
-**Diff mode** — see T5.7.
+Implemented at `src/components/SecondaryPanel/DownloadPanel/DownloadSourceDetail/` (`DownloadSourceDetail.tsx`, `DetailRow.tsx`, `DiffRow.tsx`, `DiffView.tsx`). Layout, tag sections, file-not-found state, and the "Saved" section all match the spec.
 
 _Depends on: T5.1_
 
 ---
 
-### T5.5 — Audio playback with `[Space]`
+### T5.5 ✅ — Audio playback with `[Space]`
 
-When the source list is focused and the selected source has a `localFile.state === 'found'`:
+`sound-play` was not used. Playback is handled by `MpvPlayer` (see [play-music-audit.md](play-music-audit.md#what-was-actually-built)) — a custom direct-IPC mpv client that provides real pause/resume and seek, not just play/stop.
 
-- **`[Space]`** → start playing / stop playing
-- While playing: show a progress bar (elapsed / total duration) updated every second via `setInterval`
+**Controls (in `DownloadSourceDetail` when detail pane is active):**
+- `[Space]` — play if stopped, toggle pause/resume if already playing
+- `[Shift+←]` / `[Shift+→]` — seek −5 s / +5 s (added beyond original spec)
 
-**Playback implementation** using `sound-play`:
-
-```typescript
-import soundPlay from "sound-play";
-
-// playing state (local to DownloadSourceDetail or a parent hook)
-let stopPlayback: (() => void) | null = null;
-
-function play(filePath: string, durationMs: number) {
-  const startTime = Date.now();
-  const promise = soundPlay.play(filePath, 1.0);
-  // timer for progress
-  const interval = setInterval(() => {
-    setElapsedMs(Date.now() - startTime);
-  }, 500);
-  promise.finally(() => {
-    clearInterval(interval);
-    setElapsedMs(0);
-    setIsPlaying(false);
-  });
-  stopPlayback = () => {
-    clearInterval(interval);
-    // sound-play has no stop API — kill the process on the platform level
-    // On Windows: taskkill /F /IM powershell.exe (too broad)
-    // Practical approach: just let it finish; mark as stopped in state
-    setIsPlaying(false);
-    stopPlayback = null;
-  };
-  setIsPlaying(true);
-}
-```
-
-Note the limitation: `sound-play` spawns an OS process and does not expose a handle to kill it. Pressing `[Space]` again marks the UI as stopped but audio may continue briefly in the background. Document this as a known limitation — a future swap to a library with a proper stop API (e.g., `node-mpv`, `@discordjs/voice`, or a native addon) will fix it.
-
-Progress bar in `DownloadSourceDetail`:
-
-```
-  ▶  ████████░░░░░░░░░░░░  1:23 / 3:44
-```
-
-Rendered as a `<Text>` using block characters. Width calculated from `fileInfo.durationMs` and `elapsedMs`.
+`DownloadSourceDetail` subscribes to `MpvPlayer` `progress` and `stateChange` events via `useEffect` (not `setInterval`) and passes live `positionMs`/`durationMs` to `PlaybackBar`. The `▶`/`⏸` icon, block-character fill, and `position / duration` timestamps all work as specced.
 
 _Depends on: T5.1, T5.4_
 
 ---
 
-### T5.6 — Exclusive source selection
+### T5.6 ✅ — Exclusive source selection
 
 Currently every `TrackDownloadSource` is created with `selected: true`, and no code enforces at-most-one. The UI for P5 requires exactly one selected source at a time (the one that will be saved).
 
@@ -264,11 +134,13 @@ In `DownloadSourceTree`, pressing `[Enter]` on a file row calls `task.selectDown
 
 On task creation (in `startDownloads()`), only the first successfully downloaded source should be auto-selected; subsequent ones start with `selected: false`.
 
+Also added on `DownloadTask`: `rejectDownloadSource(index, rejected)` (toggles `isRejected`, clears `selected` when rejecting) and `updateLocalFile(sourceIndex, newPath)` (used by T5.8).
+
 _Depends on: T5.1, T5.3_
 
 ---
 
-### T5.7 — Diff view when changing an already-saved source
+### T5.7 ✅ — Diff view when changing an already-saved source
 
 When a task has at least one source with `savedFile` set and the user selects a **different** source (via `[Enter]` in the source tree), instead of immediately calling `selectDownloadSource()`, enter diff mode in the detail panel.
 
@@ -298,7 +170,7 @@ _Depends on: T5.4, T5.6_
 
 ---
 
-### T5.8 — `[Ctrl+F]` file relocation
+### T5.8 ✅ — `[Ctrl+F]` file relocation
 
 When `source.localFile?.state === 'not_found'` and the user presses `[Ctrl+F]` (while the detail panel is active):
 
@@ -311,41 +183,17 @@ The `TaskPrompt` mechanism already exists (`PromptModal` renders it). This just 
 
 Register `Ctrl+F` in the key handler for `'downloadSourceDetail'` (via P1/T1.5 modifier support). Until P1 is done, use a local `useInput`.
 
+Uses `typedTask.getPrompt().askInput()` for the path input. Path validation (`fs.existsSync`) and the `updateLocalFile()` call on `DownloadTask` match the spec.
+
 _Depends on: T5.1, T5.4, P1/T1.5_
 
 ---
 
-### T5.9 — Wire `SourcesPanel` to download components
+### T5.9 ✅ — Wire `SourcesPanel` to download components
 
-Connect the `SourcesPanel` scaffold (P2/T2.9) to `DownloadSourceTree` + `DownloadSourceDetail` when `mode === 'download'` (parallel to P4/T4.8 which does the same for metadata mode):
+Implemented as a dedicated `DownloadPanel` component (`src/components/SecondaryPanel/DownloadPanel/DownloadPanel.tsx`) rather than extending `SourcesPanel`. `SecondaryPanel` mounts it when `primaryMode === 'download'` alongside the existing `MetadataPanel` for `primaryMode === 'metadata'`. Focus management and `innerFocus` switching (`→`/`←` between list and detail) use `useFocusContext` as planned.
 
-```typescript
-// inside SourcesPanel when mode === 'download':
-const sources = selectedTask?.getAttributes()?.downloadSources ?? [];
-const selected = sources.find(s => s.selected) ?? null;
-
-<Box flexDirection="row">
-  <DownloadSourceTree
-    sources={sources}
-    selectedSourceIndex={focusState.secondaryPanel.sourcesPanel.selectedSourceIndex}
-    isActive={focusState.secondaryPanel.sourcesPanel.innerFocus === 'list'}
-    width={leftWidth}
-    height={height}
-  />
-  <DownloadSourceDetail
-    source={selected}
-    isDiffMode={isDiffMode}
-    previousSource={previousSource}
-    isActive={focusState.secondaryPanel.sourcesPanel.innerFocus === 'detail'}
-    width={rightWidth}
-    height={height}
-  />
-</Box>
-```
-
-Register `'downloadSourceTree'` and `'downloadSourceDetail'` as the active focus sub-windows when the secondary panel is in download mode. `Tab` (or `→`/`←`) switches `innerFocus` between them.
-
-Add the contextual action bar entries for download mode: `[Space] Play`, `[Enter] Select`, `[Ctrl+F] Relocate` (the last one only when file is missing).
+`Shift+←/→` resizes the left/right split ratio (only when the list pane is focused; the detail pane uses those keys for seek).
 
 _Depends on: T5.3, T5.4, T5.5, T5.6, T5.7, T5.8, P2/T2.9, P1/T1.2_
 
@@ -353,14 +201,14 @@ _Depends on: T5.3, T5.4, T5.5, T5.6, T5.7, T5.8, P2/T2.9, P1/T1.2_
 
 ## Summary
 
-| Task | What                                                                    | Depends on                  |
-| ---- | ----------------------------------------------------------------------- | --------------------------- |
-| T5.1 | Add `fileInfo` and `savedFile` to `TrackDownloadSource`                 | —                           |
-| T5.2 | Populate `fileInfo` from FLAC file after download in `YtDlpService`     | T5.1                        |
-| T5.3 | `DownloadSourceTree` — grouped tree with state badges                   | T5.1                        |
-| T5.4 | `DownloadSourceDetail` — file info, embedded tags, saved/missing states | T5.1                        |
-| T5.5 | Audio playback with `[Space]`, timer-based progress bar                 | T5.1, T5.4                  |
-| T5.6 | Exclusive source selection via `[Enter]` in the tree                    | T5.1, T5.3                  |
-| T5.7 | Diff view when switching source after a file is already saved           | T5.4, T5.6                  |
-| T5.8 | `[Ctrl+F]` file relocation via `TaskPrompt`                             | T5.1, T5.4, P1/T1.5         |
-| T5.9 | Wire `SourcesPanel` to download components + focus state                | T5.3–T5.8, P2/T2.9, P1/T1.2 |
+| Task | What                                                                    | Depends on                   | Status |
+| ---- | ----------------------------------------------------------------------- | ---------------------------- | ------ |
+| T5.1 | Add `fileInfo` and `savedFile` to `TrackDownloadSource`                 | —                            | ✅     |
+| T5.2 | Populate `fileInfo` from FLAC file after download in `YtDlpService`     | T5.1                         | ✅     |
+| T5.3 | `DownloadSourceTree` — grouped tree with state badges                   | T5.1                         | ✅     |
+| T5.4 | `DownloadSourceDetail` — file info, embedded tags, saved/missing states | T5.1                         | ✅     |
+| T5.5 | Audio playback with `[Space]`, seek `[Shift+←/→]`, live progress bar   | T5.1, T5.4                   | ✅     |
+| T5.6 | Exclusive source selection via `[Enter]` in the tree                    | T5.1, T5.3                   | ✅     |
+| T5.7 | Diff view when switching source after a file is already saved           | T5.4, T5.6                   | ✅     |
+| T5.8 | `[Ctrl+F]` file relocation via `TaskPrompt`                             | T5.1, T5.4, P1/T1.5          | ✅     |
+| T5.9 | Wire `DownloadPanel` into `SecondaryPanel` + focus state                | T5.3–T5.8, P2/T2.9, P1/T1.2 | ✅     |

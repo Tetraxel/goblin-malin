@@ -8,8 +8,9 @@ import { Logger } from '../../../../base/logger/logger';
 import { BIN_DIR, DOWNLOAD_DIR, PROJECT_ROOT } from '../../../../constants';
 import { ensureYtDlpSetup } from '../../../../utils/ytdlp-setup';
 import { ensureFfmpeg } from '../../../../utils/ffmpeg-setup';
-import { APIProvider, TrackMetadata, TrackDownloadSource, LocalFile } from '../../types';
+import { APIProvider, TrackMetadata, TrackDownloadSource, LocalFile, FileInfo } from '../../types';
 import { DownloadTask } from '../../utils/downloadTask';
+import { readFileInfo } from '../../utils/readFileInfo';
 
 
 export class YtDlpService extends DownloadService {
@@ -115,7 +116,13 @@ export class YtDlpService extends DownloadService {
 
             this.status.clear();
 
-            // Create and return TrackDownloadSource
+            let fileInfo: FileInfo | undefined;
+            try {
+                fileInfo = await readFileInfo(fullPath, trackMetadata.duration ?? 0);
+            } catch (err) {
+                this.logger.warn(`Failed to read file info for ${filename}`, { error: err });
+            }
+
             const downloadSource: TrackDownloadSource = {
                 state: 'downloaded',
                 provider: 'ytdlp',
@@ -123,6 +130,7 @@ export class YtDlpService extends DownloadService {
                 localFile,
                 downloadedAt: new Date(),
                 selected: true,
+                fileInfo,
             };
             return downloadSource;
         } catch (error) {

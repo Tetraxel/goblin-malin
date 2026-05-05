@@ -10,7 +10,6 @@ import {
 import { useFocusContext } from "../../../../contexts/FocusContext";
 import { globalLogger } from "../../../../base/logger/logger";
 import { MusicDownloadTaskAttributes, StandardTrack } from "../../types";
-import { useWhyDidYouUpdate } from "../../../../utils/useWhyDidYouUpdate";
 
 function getBestRelease(
   recording: MusicBrainzRecording,
@@ -112,12 +111,6 @@ export const MbCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
     },
     { isActive: isSelected },
   );
-
-  useWhyDidYouUpdate("MbCell", {
-    task,
-    width,
-    isSelected,
-  });
 
   return (
     <Text

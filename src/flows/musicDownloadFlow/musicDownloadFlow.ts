@@ -87,7 +87,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             .register('ytdlp', (task, logger) => new YtDlpService(task, logger));
 
         // Temporary url by default
-        const defaultTasks = this.createTasksFromUrls([DEFAULT_TEST_URL], { toTag: true, toDownload: false });
+        const defaultTasks = this.createTasksFromUrls([DEFAULT_TEST_URL], { toTag: true, toDownload: true });
         this.orchestrator.addTasks(defaultTasks);
         this.logger.info(`Imported default test URL: ${DEFAULT_TEST_URL}`);
     }
@@ -327,7 +327,6 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                     component: serviceAttributes.component,
                 };
             });
-            globalLogger.debug(`Download service columns ${downloadServiceColumns.length}`)
             columns = columns.concat(downloadServiceColumns)
         }
 

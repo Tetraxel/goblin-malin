@@ -195,12 +195,15 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
       );
 
   return (
-    <Box flexDirection="column" width={width} flexGrow={1} overflow="hidden">
-      <Box flexDirection="row">
-        <Text color="gray">{borderLeft}</Text>
-        <Text color={platformColor}>{headerLabel}</Text>
-        <Text color="gray">{borderRight}</Text>
+    <Box flexDirection="column" width={width} height={height} overflow="hidden">
+      <Box flexDirection="column" height={1} flexShrink={0} overflow="hidden">
+        <Box flexDirection="row">
+          <Text color="gray">{borderLeft}</Text>
+          <Text color={platformColor}>{headerLabel}</Text>
+          <Text color="gray">{borderRight}</Text>
+        </Box>
       </Box>
+
       <Box
         flexDirection="column"
         flexGrow={1}
@@ -210,46 +213,43 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
         borderTop={false}
       >
         <Box flexDirection="column" flexGrow={1} overflow="hidden">
-          {FIELDS.map((field) => {
-            const isFocused =
-              isActive && navigableFields[clampedFieldIdx]?.key === field.key;
-            const value = isCompiled
-              ? field.getCompiledValue(compiled)
-              : field.getSourceValue(source as MetadataSourceState);
-            const attr = isCompiled
-              ? compiled.attribution[field.key]
-              : undefined;
-            const isEditing = editingField === field.key;
-            const hasOverride =
-              isCompiled &&
-              overrides[field.key as keyof MetadataOverrides] !== undefined;
-            return (
-              <FieldRow
-                key={field.key}
-                field={field}
-                isFocused={isFocused}
-                isCompiled={isCompiled}
-                isEditing={isEditing}
-                value={value}
-                attribution={attr}
-                hasOverride={hasOverride}
-                editValue={editValue}
-                editError={editError}
-                onEditValueChange={setEditValue}
-                onEditSubmit={handleEditSubmit}
-              />
-            );
-          })}
+          <Box flexDirection="column" flexShrink={0}>
+            {FIELDS.map((field) => {
+              const isFocused =
+                isActive && navigableFields[clampedFieldIdx]?.key === field.key;
+              const value = isCompiled
+                ? field.getCompiledValue(compiled)
+                : field.getSourceValue(source as MetadataSourceState);
+              const attr = isCompiled
+                ? compiled.attribution[field.key]
+                : undefined;
+              const isEditing = editingField === field.key;
+              const hasOverride =
+                isCompiled &&
+                overrides[field.key as keyof MetadataOverrides] !== undefined;
+              return (
+                <FieldRow
+                  key={field.key}
+                  field={field}
+                  isFocused={isFocused}
+                  isCompiled={isCompiled}
+                  isEditing={isEditing}
+                  value={value}
+                  attribution={attr}
+                  hasOverride={hasOverride}
+                  editValue={editValue}
+                  editError={editError}
+                  onEditValueChange={setEditValue}
+                  onEditSubmit={handleEditSubmit}
+                />
+              );
+            })}
+          </Box>
         </Box>
 
-        <Box flexDirection="column" flexShrink={0} overflow="hidden">
-          <Box
-            flexGrow={1}
-            flexDirection="row"
-            height={HINT_BAR_HEIGHT}
-            overflow="hidden"
-            paddingLeft={1}
-          >
+        {/* Keyboard shortcuts */}
+        <Box flexDirection="column" height={1} minHeight={1} overflow="hidden">
+          <Box flexDirection="row" paddingX={1} overflow="hidden" flexGrow={1}>
             {editingField !== null ? (
               <>
                 <Hint label="Confirm" shortcut="Enter" />

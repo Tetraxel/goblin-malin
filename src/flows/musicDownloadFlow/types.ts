@@ -216,14 +216,29 @@ export type LocalFile = {
     sourceUrl?: string;
 }
 
+export type FileInfo = {
+    format: 'flac' | 'mp3' | 'ogg';
+    sizeBytes: number;
+    durationMs: number;
+    embeddedTags: Record<string, string | string[]>;
+};
+
+export type SavedFile = {
+    path: string;
+    savedAt: Date;
+};
+
 export type TrackDownloadSource = {
     state: 'pending' | 'searching' | 'downloading' | 'downloaded' | 'failed';
     provider: DownloadProvider;
     track: TrackMetadata;
-    localFile?: LocalFile
+    localFile?: LocalFile;
     downloadedAt: Date;
     selected: boolean;
-}
+    isRejected?: boolean;
+    fileInfo?: FileInfo;
+    savedFile?: SavedFile;
+};
 
 
 //----------------------//

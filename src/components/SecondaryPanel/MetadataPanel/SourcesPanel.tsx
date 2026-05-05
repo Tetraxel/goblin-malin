@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from "react";
-import { Box, useInput } from "ink";
+import { Box, Text, useInput } from "ink";
+import fs from "fs";
 import { Task, TaskSnapshot } from "../../../base/task/task";
 import { useFocusContext } from "../../../contexts/FocusContext";
 import {
   MusicDownloadTaskAttributes,
   MetadataSourceState,
   MetadataOverrides,
+  TrackDownloadSource,
 } from "../../../flows/musicDownloadFlow/types";
+import { DownloadTask } from "../../../flows/musicDownloadFlow/utils/downloadTask";
 import { computeCompiledMetadata } from "../../../flows/musicDownloadFlow/utils/compiledMetadata";
 import { navigableFields } from "../../../flows/musicDownloadFlow/utils/metadataFields";
 import { MetadataSourceList } from "./MetadataSourceList";
 import { MetadataDetailPanel } from "./MetadataDetailPanel";
-import { SourcesHintBar } from "./SourcesHintBar";
+import { SourcesHintBar } from "../SourcesHintBar";
+import { DownloadSourceTree } from "../DownloadPanel/DownloadSourceTree/DownloadSourceTree";
+import { DownloadSourceDetail } from "../DownloadPanel/DownloadSourceDetail/DownloadSourceDetail";
 
 const HINT_BAR_HEIGHT = 2;
 
@@ -78,20 +83,20 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   useInput(
     (_, key) => {
       if (!isPanelActive || focusState.isEditingField) return;
-      if (key.leftArrow && key.shift) {
-        // Shift+→ : grow detail (shrink list)
+      // Shift+arrows resize the split (metadata mode or list focused); plain arrows switch focus
+      const seekOwnedByDetail = mode === "download" && innerFocus === "detail";
+      if (key.shift && key.leftArrow && !seekOwnedByDetail) {
         setSplitRatio((prev) => Math.max(0.2, prev - 0.04));
         return;
       }
-      if (key.rightArrow && key.shift) {
-        // Shift+← : grow list (shrink detail)
+      if (key.shift && key.rightArrow && !seekOwnedByDetail) {
         setSplitRatio((prev) => Math.min(0.75, prev + 0.04));
         return;
       }
-      if (key.rightArrow && innerFocus === "list") {
+      if (!key.shift && key.rightArrow && innerFocus === "list") {
         setSourcesInnerFocus("detail");
       }
-      if (key.leftArrow && innerFocus === "detail") {
+      if (!key.shift && key.leftArrow && innerFocus === "detail") {
         setSourcesInnerFocus("list");
       }
     },
@@ -125,18 +130,197 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
     },
   );
 
+  // ── Download mode ───────────────────────────────────────────────────
+
+  const downloadSources: TrackDownloadSource[] =
+    snapshot?.attributes?.downloadSources ?? [];
+
+  // Clamp navigation cursor to valid range for download mode
+  const downloadNavIndex =
+    downloadSources.length === 0
+      ? -1
+      : Math.max(
+          0,
+          Math.min(
+            selectedSourceIndex < 0 ? 0 : selectedSourceIndex,
+            downloadSources.length - 1,
+          ),
+        );
+
+  const [isDiffMode, setIsDiffMode] = useState(false);
+  const [pendingSourceIndex, setPendingSourceIndex] = useState<number | null>(
+    null,
+  );
+
+  function handleRequestSelect(idx: number) {
+    // If any source is already saved, enter diff mode before committing
+    const hasSaved = downloadSources.some((s) => s.savedFile != null);
+    const isAlreadySelected = downloadSources[idx]?.selected;
+    if (hasSaved && !isAlreadySelected) {
+      setPendingSourceIndex(idx);
+      setIsDiffMode(true);
+    } else {
+      (typedTask as unknown as DownloadTask)?.selectDownloadSource(idx);
+    }
+  }
+
+  function handleRejectSource(idx: number) {
+    const source = downloadSources[idx];
+    if (!source) return;
+    (typedTask as unknown as DownloadTask)?.rejectDownloadSource(
+      idx,
+      !source.isRejected,
+    );
+  }
+
+  function handleConfirmDiff() {
+    if (pendingSourceIndex !== null) {
+      (typedTask as unknown as DownloadTask)?.selectDownloadSource(
+        pendingSourceIndex,
+      );
+    }
+    setIsDiffMode(false);
+    setPendingSourceIndex(null);
+  }
+
+  function handleCancelDiff() {
+    setIsDiffMode(false);
+    setPendingSourceIndex(null);
+  }
+
+  async function handleRelocateFile() {
+    if (!typedTask) return;
+    const attrs = typedTask.getAttributes();
+    if (!attrs) return;
+    const sourceIdx = downloadNavIndex >= 0 ? downloadNavIndex : 0;
+    const source = attrs.downloadSources[sourceIdx];
+    if (!source) return;
+
+    const filename = source.localFile?.name ?? "file";
+    try {
+      const newPath = await typedTask.getPrompt().askInput({
+        status: "Relocating file",
+        title: "Relocate File",
+        message: `Enter new file path for: ${filename}`,
+        hint: "Absolute path to the FLAC file",
+      });
+      if (!newPath.trim()) return;
+      if (!fs.existsSync(newPath)) return;
+      (typedTask as unknown as DownloadTask)?.updateLocalFile(
+        sourceIdx,
+        newPath,
+      );
+    } catch {
+      // user cancelled
+    }
+  }
+
   if (mode === "download") {
+    const pendingSource =
+      pendingSourceIndex !== null
+        ? (downloadSources[pendingSourceIndex] ?? null)
+        : null;
+    const selectedSource =
+      downloadNavIndex >= 0
+        ? (downloadSources[downloadNavIndex] ?? null)
+        : null;
+
+    const listSelectedSource =
+      downloadNavIndex >= 0
+        ? (downloadSources[downloadNavIndex] ?? null)
+        : null;
+    const canPlaySelected = listSelectedSource?.localFile?.state === "found";
+    const dimHints = !isPanelActive || innerFocus !== "list";
+
     return (
       <Box
-        flexDirection="row"
+        flexDirection="column"
         height={height}
         overflow="hidden"
         borderStyle="single"
         borderColor="cyan"
         borderTop={false}
         borderBottom={false}
+        paddingRight={1}
       >
-        <Box paddingX={1}>{/* Download Sources panel implemented in P5 */}</Box>
+        <Box flexDirection="row" flexGrow={1} overflow="hidden">
+          <DownloadSourceTree
+            sources={downloadSources}
+            selectedSourceIndex={downloadNavIndex}
+            isActive={isPanelActive && innerFocus === "list"}
+            width={leftWidth}
+            height={listHeight}
+            onSelectSource={setSelectedSourceIndex}
+            onRequestSelect={handleRequestSelect}
+            onRejectSource={handleRejectSource}
+            onInnerFocusSwitch={() => setSourcesInnerFocus("detail")}
+          />
+          <DownloadSourceDetail
+            source={selectedSource}
+            isDiffMode={isDiffMode}
+            pendingSource={pendingSource}
+            isActive={isPanelActive && innerFocus === "detail"}
+            width={rightWidth}
+            height={listHeight}
+            onInnerFocusSwitch={() => setSourcesInnerFocus("list")}
+            onConfirmDiff={handleConfirmDiff}
+            onCancelDiff={handleCancelDiff}
+            onRelocateFile={handleRelocateFile}
+          />
+        </Box>
+        <Box
+          flexDirection="column"
+          width={width - 2}
+          overflow="hidden"
+          marginLeft={1}
+          alignItems="flex-end"
+          justifyContent="flex-end"
+        >
+          <Box flexDirection="row" width={width - 2} overflow="hidden">
+            {listSelectedSource && (
+              <Box marginRight={1}>
+                <Text color="white" dimColor={dimHints} bold>
+                  Source {downloadNavIndex + 1}/{downloadSources.length}
+                </Text>
+              </Box>
+            )}
+            {listSelectedSource && (
+              <Box marginRight={2}>
+                <Text color="white" dimColor={dimHints}>
+                  {">>>"}
+                </Text>
+              </Box>
+            )}
+            <Box marginRight={2}>
+              <Text color="white" dimColor={dimHints} bold>
+                [Enter]
+              </Text>
+              <Text color="gray" dimColor={dimHints}>
+                {" "}
+                Select
+              </Text>
+            </Box>
+            <Box marginRight={2}>
+              <Text color="white" dimColor={dimHints} bold>
+                [Del]
+              </Text>
+              <Text color="gray" dimColor={dimHints}>
+                {listSelectedSource?.isRejected ? " Unreject" : " Reject"}
+              </Text>
+            </Box>
+            {canPlaySelected && (
+              <Box marginRight={2}>
+                <Text color="white" dimColor={dimHints} bold>
+                  [Space]
+                </Text>
+                <Text color="gray" dimColor={dimHints}>
+                  {" "}
+                  Play/Pause
+                </Text>
+              </Box>
+            )}
+          </Box>
+        </Box>
       </Box>
     );
   }

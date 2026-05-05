@@ -1,7 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
 import TextInput from "ink-text-input";
-import { MetadataOverrides } from "../../../flows/musicDownloadFlow/types";
 import { FieldAttribution } from "../../../flows/musicDownloadFlow/utils/compiledMetadata";
 import { FieldDef } from "../../../flows/musicDownloadFlow/utils/metadataFields";
 
@@ -31,7 +30,10 @@ function attributionBadge(attr: FieldAttribution | undefined): {
   if (attr === "manual")
     return { text: "EDITED", color: "yellow", italic: true };
   if (attr === "none") return { text: "—", color: "gray" };
-  return { text: `${attr.toUpperCase().slice(0, 8)}`, color: getPlatformColor(attr) };
+  return {
+    text: `${attr.toUpperCase().slice(0, 8)}`,
+    color: getPlatformColor(attr),
+  };
 }
 
 const LABEL_W = 10;
@@ -66,57 +68,51 @@ export const FieldRow: React.FC<FieldRowProps> = ({
   const badge = attributionBadge(attribution);
 
   return (
-    <Box flexDirection="column" overflow="hidden" paddingX={1}>
-      <Box flexDirection="row" flexGrow={1} overflow="hidden">
-        <Box width={2} minWidth={2} height={1} flexShrink={0}>
-          {isFocused && <Text color="white">{"☛"}</Text>}
+    <Box
+      flexDirection="row"
+      paddingX={1}
+      flexShrink={0}
+      backgroundColor={"blue"}
+      flexGrow={1}
+    >
+      <Box width={2} minWidth={2} flexShrink={0}>
+        {isFocused && <Text color="white">{"☛"}</Text>}
+      </Box>
+      <Box width={LABEL_W} flexShrink={0}>
+        <Text color={isFocused ? "green" : "cyan"} bold>
+          {field.label.toUpperCase().padEnd(LABEL_W)}
+        </Text>
+      </Box>
+
+      {isEditing ? (
+        <Box flexWrap="wrap" flexDirection="row" flexGrow={1}>
+          <TextInput
+            value={editValue}
+            onChange={onEditValueChange}
+            onSubmit={onEditSubmit}
+          />
+          {editError && <Text color="red"> ✗ invalid</Text>}
         </Box>
-        <Box width={LABEL_W} flexShrink={0} height={1}>
-          <Text color={isFocused ? "green" : "cyan"} bold>
-            {field.label.toUpperCase().padEnd(LABEL_W)}
+      ) : (
+        <Box flexGrow={1}>
+          <Text
+            color={value === "—" ? "gray" : hasOverride ? "yellow" : "white"}
+            underline={isFocused}
+            dimColor={value === "—"}
+            wrap="truncate-end"
+          >
+            {value}
           </Text>
         </Box>
+      )}
 
-        {isEditing ? (
-          <Box
-            flexWrap="wrap"
-            flexDirection="row"
-            flexGrow={1}
-            overflow="hidden"
-          >
-            <TextInput
-              value={editValue}
-              onChange={onEditValueChange}
-              onSubmit={onEditSubmit}
-            />
-            {editError && <Text color="red"> ✗ invalid</Text>}
-          </Box>
-        ) : (
-          <Box flexDirection="row" flexGrow={1} overflow="hidden" height={1}>
-            <Text
-              color={value === "—" ? "gray" : hasOverride ? "yellow" : "white"}
-              underline={isFocused}
-              dimColor={value === "—"}
-              wrap="truncate-end"
-            >
-              {value}
-            </Text>
-          </Box>
-        )}
-
-        {isCompiled && !isEditing && !editError && (
-          <Box
-            minWidth={badge.text.length + 1}
-            paddingLeft={1}
-            height={1}
-            flexShrink={0}
-          >
-            <Text color={badge.color as any} dimColor italic={badge.italic}>
-              {badge.text}
-            </Text>
-          </Box>
-        )}
-      </Box>
+      {isCompiled && !isEditing && !editError && (
+        <Box minWidth={badge.text.length + 1} paddingLeft={1} flexShrink={0}>
+          <Text color={badge.color as any} dimColor italic={badge.italic}>
+            {badge.text}
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 };
