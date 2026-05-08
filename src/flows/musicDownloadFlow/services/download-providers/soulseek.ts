@@ -1,6 +1,4 @@
 import slsk from 'slsk-client';
-// const slsk = require('slsk-client');
-// import slsk from "./apis/soulseek-client/index";
 import type { SlskFile, SoulseekClient } from 'slsk-client';
 import fs from 'fs/promises';
 import path from 'path';

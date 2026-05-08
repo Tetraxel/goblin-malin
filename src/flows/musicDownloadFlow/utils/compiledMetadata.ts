@@ -14,6 +14,13 @@ export type CompiledMetadataField =
     | 'key'
     | 'genres';
 
+export type MusicBrainzIds = {
+    recording?: string;
+    release?: string;
+    artist?: string;
+    releaseGroup?: string;
+};
+
 export type CompiledMetadata = {
     trackName: string;
     artists: StandardArtist[];
@@ -25,6 +32,7 @@ export type CompiledMetadata = {
     bpm?: number;
     key?: string;
     genres?: string[];
+    musicBrainzIds?: MusicBrainzIds;
     attribution: Partial<Record<CompiledMetadataField, FieldAttribution>>;
 };
 

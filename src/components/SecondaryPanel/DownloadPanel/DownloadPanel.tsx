@@ -8,9 +8,17 @@ import {
   TrackDownloadSource,
 } from "../../../flows/musicDownloadFlow/types";
 import { DownloadTask } from "../../../flows/musicDownloadFlow/utils/downloadTask";
+import { StatusType } from "../../../base/task/task-status";
 import { DownloadSourceTree } from "./DownloadSourceTree/DownloadSourceTree";
 import { DownloadSourceDetail } from "./DownloadSourceDetail/DownloadSourceDetail";
 import { Hint } from "../../Hint";
+import {
+  computeCompiledMetadata,
+  CompiledMetadata,
+} from "../../../flows/musicDownloadFlow/utils/compiledMetadata";
+import { getSaveSettings } from "../../../flows/musicDownloadFlow/saveSettings";
+import { computeOutputFilename } from "../../../flows/musicDownloadFlow/utils/computeOutputPath";
+import path from "path";
 
 const HINT_BAR_HEIGHT = 2;
 
@@ -57,6 +65,18 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({
   const downloadSources: TrackDownloadSource[] =
     snapshot?.attributes?.downloadSources ?? [];
 
+  const savedSource: TrackDownloadSource | null =
+    downloadSources.find((s) => s.savedFile != null) ?? null;
+
+  const compiled: CompiledMetadata | null = snapshot?.attributes
+    ? computeCompiledMetadata(
+        snapshot.attributes.metadataSources,
+        snapshot.attributes.metadataOverride,
+      )
+    : null;
+
+  const { outputDir } = getSaveSettings();
+
   const downloadNavIndex =
     downloadSources.length === 0
       ? -1
@@ -78,6 +98,28 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({
     null,
   );
 
+  // Auto-detect when compiled metadata would produce a different filename than what's on disk
+  const previewFilename = compiled ? computeOutputFilename(compiled) : null;
+  const savedFilename = savedSource?.savedFile
+    ? path.basename(savedSource.savedFile.path)
+    : null;
+  const hasMetadataChange =
+    previewFilename != null &&
+    savedFilename != null &&
+    previewFilename !== savedFilename;
+
+  // Combined diff flag: manually triggered source-switch OR auto-detected metadata change
+  const showDiff = isDiffMode || hasMetadataChange;
+
+  // For metadata-only change the "pending" source is the currently selected (saved) source
+  const effectivePendingSource = isDiffMode
+    ? pendingSourceIndex !== null
+      ? (downloadSources[pendingSourceIndex] ?? null)
+      : null
+    : hasMetadataChange
+      ? (downloadSources.find((s) => s.selected) ?? savedSource)
+      : null;
+
   // Shift+arrows resize the split only when list is focused (detail owns shift+arrows for seek)
   useInput(
     (_, key) => {
@@ -98,6 +140,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({
     if (hasSaved && !isAlreadySelected) {
       setPendingSourceIndex(idx);
       setIsDiffMode(true);
+      setSourcesInnerFocus("detail");
     } else {
       (typedTask as unknown as DownloadTask)?.selectDownloadSource(idx);
     }
@@ -113,18 +156,37 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({
   }
 
   function handleConfirmDiff() {
-    if (pendingSourceIndex !== null) {
-      (typedTask as unknown as DownloadTask)?.selectDownloadSource(
-        pendingSourceIndex,
-      );
+    if (isDiffMode) {
+      // Source-switch diff: confirm the new source selection
+      if (pendingSourceIndex !== null) {
+        (typedTask as unknown as DownloadTask)?.selectDownloadSource(
+          pendingSourceIndex,
+        );
+      }
+      setIsDiffMode(false);
+      setPendingSourceIndex(null);
+      setSourcesInnerFocus("list");
+    } else if (hasMetadataChange) {
+      // Metadata-only diff: save directly (re-tag + rename the existing file)
+      handleSave();
     }
-    setIsDiffMode(false);
-    setPendingSourceIndex(null);
   }
 
   function handleCancelDiff() {
     setIsDiffMode(false);
     setPendingSourceIndex(null);
+    setSourcesInnerFocus("list");
+  }
+
+  const isSaving = snapshot?.status?.type === StatusType.Processing;
+
+  async function handleSave() {
+    if (!typedTask) return;
+    try {
+      await (typedTask as unknown as DownloadTask).saveTrack();
+    } catch {
+      // status already set to Error inside saveTrack()
+    }
   }
 
   async function handleRelocateFile() {
@@ -154,10 +216,6 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({
     }
   }
 
-  const pendingSource =
-    pendingSourceIndex !== null
-      ? (downloadSources[pendingSourceIndex] ?? null)
-      : null;
   const selectedSource =
     downloadNavIndex >= 0 ? (downloadSources[downloadNavIndex] ?? null) : null;
   const canPlaySelected = selectedSource?.localFile?.state === "found";
@@ -188,15 +246,21 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({
         />
         <DownloadSourceDetail
           source={selectedSource}
-          isDiffMode={isDiffMode}
-          pendingSource={pendingSource}
+          savedSource={savedSource}
+          compiled={compiled}
+          outputDir={outputDir}
+          isDiffMode={showDiff}
+          diffKind={isDiffMode ? "source-switch" : "metadata-change"}
+          pendingSource={effectivePendingSource}
           isActive={isPanelActive && innerFocus === "detail"}
+          isSaving={isSaving}
           width={rightWidth}
           height={listHeight}
           onInnerFocusSwitch={() => setSourcesInnerFocus("list")}
           onConfirmDiff={handleConfirmDiff}
           onCancelDiff={handleCancelDiff}
           onRelocateFile={handleRelocateFile}
+          onSave={handleSave}
         />
       </Box>
       <Box

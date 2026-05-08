@@ -21,6 +21,11 @@ import { DownloadService } from '../downloadService';
 import { ServiceRegistry } from '../../../base/service-registry';
 import { ServiceScope } from '../../../base/service-scope';
 import { computeConfidenceScore } from './confidence';
+import { computeCompiledMetadata } from './compiledMetadata';
+import { compiledMetadataToTags } from './compiledMetadataToTags';
+import { computeOutputPath } from './computeOutputPath';
+import { cleanAndTagFlac } from '../../../utils/metadata';
+import { getSaveSettings } from '../saveSettings';
 
 
 export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
@@ -281,6 +286,72 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             };
         });
         this.updateAttributes({ downloadSources: updated });
+    }
+
+    async saveTrack(): Promise<void> {
+        const attrs = this.getAttributes();
+        const sources = attrs?.downloadSources ?? [];
+        const selectedSource = sources.find(s => s.selected);
+
+        if (!selectedSource) throw new Error('No download source selected');
+        if (selectedSource.localFile?.state !== 'found') throw new Error('Local file not found');
+
+        const settings = getSaveSettings();
+        globalLogger.info('Saving track with settings:', { settings });
+
+        const compiled = computeCompiledMetadata(
+            attrs!.metadataSources,
+            attrs!.metadataOverride,
+        );
+        const tags = compiledMetadataToTags(compiled, {
+            includeMusicBrainzTags: settings.includeMusicBrainzTags,
+        });
+        const outputPath = computeOutputPath(compiled, settings.outputDir);
+
+        this.status.update({ type: StatusType.Processing, message: 'Saving…' });
+
+        const existingSavedPath = selectedSource.savedFile?.path ?? null;
+        let outputCreated = false;
+
+        try {
+            // Delete saved files from other sources (they're being replaced)
+            for (const src of sources) {
+                if (src !== selectedSource && src.savedFile) {
+                    try { await fs.unlink(src.savedFile.path); } catch (e: any) { if (e.code !== 'ENOENT') throw e; }
+                }
+            }
+
+            if (existingSavedPath) {
+                // Re-saving same source: rename to new path if it changed, otherwise just re-tag
+                if (existingSavedPath !== outputPath) {
+                    const { moveFile } = await import('../../../utils/metadata');
+                    await moveFile(existingSavedPath, outputPath);
+                }
+                outputCreated = true;
+            } else {
+                // New source: copy temp file to output dir
+                await fs.copyFile(selectedSource.localFile!.path, outputPath);
+                outputCreated = true;
+            }
+
+            await cleanAndTagFlac(outputPath, tags);
+
+            this.updateAttributes({
+                downloadSources: sources.map(s =>
+                    s === selectedSource
+                        ? { ...s, savedFile: { path: outputPath, savedAt: new Date() } }
+                        : { ...s, savedFile: undefined }
+                ),
+            });
+
+            this.status.set({ type: StatusType.Success, message: 'Saved' });
+        } catch (err) {
+            if (outputCreated) {
+                await fs.unlink(outputPath).catch(() => { });
+            }
+            this.status.set({ type: StatusType.Error, message: 'Save failed' });
+            throw err;
+        }
     }
 
     async startDownloads(): Promise<void> {

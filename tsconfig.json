@@ -12,10 +12,6 @@
         "strict": true, // Enable all strict type-checking
         "esModuleInterop": true, // Helps with importing older modules
         "skipLibCheck": true, // Skip type checking of declaration files
-        "typeRoots": [
-            "./node_modules/@types",
-            "./@types"
-        ],
         "types": ["node"]
     },
     "include": ["src/**/*"], // Only compile files inside the 'src' folder

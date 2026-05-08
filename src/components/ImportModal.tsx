@@ -34,13 +34,16 @@ const PLATFORM_DISPLAY: Record<
   SupportedPlatform,
   { label: string; color: string }
 > = {
-  spotify: { label: "SPOTIFY", color: "green" },
-  youtube: { label: "YT", color: "red" },
-  youtubeMusic: { label: "YT MUSIC", color: "red" },
-  soundcloud: { label: "SOUNDCLOUD", color: "blue" },
-  deezer: { label: "DEEZER", color: "magenta" },
-  appleMusic: { label: "APPLE", color: "white" },
-  tidal: { label: "TIDAL", color: "cyan" },
+  spotify: { label: "SPOTIFY", color: "#1ed760" },
+  youtube: { label: "YT", color: "#ff0033" },
+  youtubeMusic: { label: "YT MUSIC", color: "#ff0033" },
+  deezer: { label: "DEEZER", color: "#9546f7" },
+  appleMusic: { label: "APPLE", color: "#fb233b" },
+  // itunes: { label: "ITUNES", color: "#fb233b" },
+  tidal: { label: "TIDAL", color: "#ffffff" },
+  soundcloud: { label: "SOUNDCLOUD", color: "#ff5510" },
+  // bandcamp: { label: "BANDCAMP", color: "#ff5510" },
+  // musicbrainz: { label: "MB", color: "#741b81" },
 };
 
 function platformBadge(platform: SupportedPlatform): {

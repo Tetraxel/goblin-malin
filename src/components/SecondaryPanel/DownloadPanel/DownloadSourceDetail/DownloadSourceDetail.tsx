@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
+import * as path from "path";
+import * as fs from "fs";
 import { TrackDownloadSource } from "../../../../flows/musicDownloadFlow/types";
+import { CompiledMetadata } from "../../../../flows/musicDownloadFlow/utils/compiledMetadata";
+import { computeOutputFilename } from "../../../../flows/musicDownloadFlow/utils/computeOutputPath";
 import { getInstance, PlayerStatus } from "../../../../utils/mpvPlayer";
-import {
-  getProviderColor,
-  formatBytes,
-  formatDuration,
-  formatDate,
-  tagValue,
-} from "../utils";
+import { formatBytes, formatDuration, formatDate, tagValue } from "../utils";
 import { PlaybackBar } from "../PlaybackBar";
 import { DiffView } from "./DiffView";
 import { DetailRow } from "./DetailRow";
@@ -16,16 +14,43 @@ import { Hint } from "../../../Hint";
 
 interface DownloadSourceDetailProps {
   source: TrackDownloadSource | null;
+  savedSource: TrackDownloadSource | null;
+  compiled: CompiledMetadata | null;
+  outputDir: string;
   isDiffMode: boolean;
+  diffKind: "source-switch" | "metadata-change";
   pendingSource: TrackDownloadSource | null;
   isActive: boolean;
+  isSaving: boolean;
   width: number;
   height: number;
   onInnerFocusSwitch: () => void;
   onConfirmDiff: () => void;
   onCancelDiff: () => void;
   onRelocateFile: () => void;
+  onSave: () => void;
 }
+
+const DOWNLOAD_PROVIDER_DISPLAY: Record<
+  string,
+  { label: string; color: string }
+> = {
+  ytdlp: { label: "YtDlp", color: "#ff0033" },
+  soulseek: { label: "Soulseek", color: "#2700ff" },
+};
+
+const PLATFORM_DISPLAY: Record<string, { label: string; color: string }> = {
+  spotify: { label: "Spotify", color: "#1ed760" },
+  deezer: { label: "Deezer", color: "#9546f7" },
+  appleMusic: { label: "Apple Music", color: "#fb233b" },
+  itunes: { label: "iTunes", color: "#fb233b" },
+  tidal: { label: "Tidal", color: "#ffffff" },
+  youtube: { label: "Youtube", color: "#ff0033" },
+  youtubeMusic: { label: "YT Music", color: "#ff0033" },
+  soundcloud: { label: "SoundCloud", color: "#ff5510" },
+  bandcamp: { label: "Bandcamp", color: "#3b8db2" },
+  musicBrainz: { label: "MusicBrainz", color: "#741b81" },
+};
 
 const PRIORITY_TAGS = [
   "TITLE",
@@ -43,7 +68,7 @@ function SectionDivider({ label, width }: { label: string; width: number }) {
   const dashes = Math.max(0, innerW - label.length - 3);
   return (
     <Box paddingX={1} height={1} flexDirection="column">
-      <Text color="gray">
+      <Text color={"gray"}>
         {"── "}
         {label}
         {" " + "─".repeat(dashes)}
@@ -54,15 +79,21 @@ function SectionDivider({ label, width }: { label: string; width: number }) {
 
 export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
   source,
+  savedSource,
+  compiled,
+  outputDir,
   isDiffMode,
+  diffKind,
   pendingSource,
   isActive,
+  isSaving,
   width,
   height,
   onInnerFocusSwitch,
   onConfirmDiff,
   onCancelDiff,
   onRelocateFile,
+  onSave,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -184,23 +215,26 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
         if (source?.localFile?.state === "not_found") onRelocateFile();
         return;
       }
+
+      if (key.return) {
+        const canSave = source?.localFile?.state === "found" && !isSaving;
+        if (canSave) onSave();
+        return;
+      }
     },
     { isActive },
   );
 
-  const providerLabel = source ? source.provider.toUpperCase() : "NO SOURCE";
-  const innerW = width - 2;
-  const dashes = Math.max(0, innerW - providerLabel.length - 2);
-  const leftD = Math.floor(dashes / 2);
-  const rightD = dashes - leftD + 1;
-  const borderLeft = `┌${"─".repeat(leftD)} `;
-  const borderRight = ` ${"─".repeat(rightD)}┐`;
-
-  if (isDiffMode && source && pendingSource) {
+  // Diff mode: show OLD (savedSource) vs NEW (pendingSource)
+  if (isDiffMode && savedSource && pendingSource) {
     return (
       <DiffView
-        source={source}
+        savedSource={savedSource}
         pendingSource={pendingSource}
+        compiled={compiled}
+        outputDir={outputDir}
+        diffKind={diffKind}
+        isActive={isActive}
         width={width}
         height={height}
       />
@@ -210,6 +244,25 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
   if (!source) {
     return null;
   }
+
+  const isSaved = !!source.savedFile;
+  const borderColor = isSaved ? "white" : "green";
+
+  const outputFileExists =
+    !isSaved &&
+    compiled !== null &&
+    fs.existsSync(path.join(outputDir, computeOutputFilename(compiled)));
+
+  // Header: "FILE ON DISK" when saved, "NEW FILE" otherwise
+  const headerLabel = isSaved ? "FILE ON DISK" : "NEW FILE";
+  const headerColor = isSaved ? "white" : "green";
+
+  const innerW = width - 2;
+  const dashes = Math.max(0, innerW - headerLabel.length - 2);
+  const leftD = Math.floor(dashes / 2);
+  const rightD = dashes - leftD + 1;
+  const borderLeft = `┌${"─".repeat(leftD)} `;
+  const borderRight = ` ${"─".repeat(rightD)}┐`;
 
   const fileNotFound = source.localFile?.state === "not_found";
   const sourceDurationMs =
@@ -228,15 +281,31 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     .filter((k) => !PRIORITY_TAGS.includes(k));
   const canPlay = source.localFile?.state === "found";
 
+  const dlProvider = DOWNLOAD_PROVIDER_DISPLAY[source.provider] ?? {
+    label: source.provider,
+    color: "white",
+  };
+  const metaPlatform = PLATFORM_DISPLAY[source.track.apiProvider] ?? {
+    label: source.track.apiProvider,
+    color: "white",
+  };
+  const trackType = source.track.type
+    ? source.track.type.charAt(0).toUpperCase() + source.track.type.slice(1)
+    : "Track";
+  const sourceParts = [
+    dlProvider.label,
+    metaPlatform.label,
+    trackType,
+    source.track.id,
+  ].filter(Boolean);
+
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">
       <Box flexDirection="column" height={1} flexShrink={0} overflow="hidden">
         <Box flexDirection="row">
-          <Text color="gray">{borderLeft}</Text>
-          <Text color={getProviderColor(source?.provider ?? "") as any}>
-            {providerLabel}
-          </Text>
-          <Text color="gray">{borderRight}</Text>
+          <Text color={borderColor}>{borderLeft}</Text>
+          <Text color={headerColor as any}>{headerLabel}</Text>
+          <Text color={borderColor}>{borderRight}</Text>
         </Box>
       </Box>
 
@@ -245,10 +314,19 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
         flexGrow={1}
         overflow="hidden"
         borderStyle="single"
-        borderColor="gray"
+        borderColor={borderColor}
         borderTop={false}
       >
         <Box flexDirection="column" flexGrow={1} overflow="hidden">
+          {outputFileExists && (
+            <Box paddingX={1} paddingBottom={1} flexShrink={0}>
+              <Text color="yellow" bold>
+                △ Warning: A file already exists! Please check before
+                overwriting the file.
+              </Text>
+            </Box>
+          )}
+
           {canPlay && (
             <PlaybackBar
               positionMs={positionMs}
@@ -258,6 +336,23 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
               isPaused={isPaused}
             />
           )}
+
+          <Box
+            paddingX={1}
+            paddingBottom={1}
+            height={1}
+            flexShrink={0}
+            flexDirection="row"
+            overflow="hidden"
+          >
+            <Text color="gray">{"SOURCE  "}</Text>
+            {sourceParts.map((part, idx) => (
+              <React.Fragment key={idx}>
+                {idx > 0 && <Text color="gray">{" > "}</Text>}
+                <Text color={dlProvider.color as any}>{part}</Text>
+              </React.Fragment>
+            ))}
+          </Box>
 
           {fileNotFound ? (
             <Box flexDirection="column" paddingX={1} paddingY={1}>
@@ -274,13 +369,35 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
             </Box>
           ) : (
             <Box flexDirection="column" flexShrink={0}>
-              <DetailRow label="1" value={"1"} />
-              <DetailRow label="2" value={"2"} />
-              <DetailRow label="3" value={"3"} />
-              <DetailRow label="4" value={"4"} />
-              <DetailRow label="5" value={"5"} />
-              <DetailRow label="6" value={"6"} />
-              <DetailRow label="7" value={"7"} />
+              {compiled && (
+                <>
+                  <DetailRow label="Title" value={compiled.trackName || "—"} />
+                  <DetailRow
+                    label="Artists"
+                    value={
+                      compiled.artists.map((a) => a.name).join(", ") || "—"
+                    }
+                  />
+                  {compiled.album && (
+                    <DetailRow label="Album" value={compiled.album.albumName} />
+                  )}
+                  {compiled.year != null && (
+                    <DetailRow label="Year" value={String(compiled.year)} />
+                  )}
+                  {compiled.bpm != null && (
+                    <DetailRow label="BPM" value={String(compiled.bpm)} />
+                  )}
+                  {compiled.key && (
+                    <DetailRow label="Key" value={compiled.key} />
+                  )}
+                  {compiled.genres && compiled.genres.length > 0 && (
+                    <DetailRow
+                      label="Genres"
+                      value={compiled.genres.join(", ")}
+                    />
+                  )}
+                </>
+              )}
               <DetailRow label="File" value={filename} />
               <DetailRow label="Format" value={formatLabel} />
               <DetailRow label="Size" value={sizeText} />
@@ -288,6 +405,13 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                 label="Duration"
                 value={formatDuration(sourceDurationMs)}
               />
+              {compiled && (
+                <DetailRow
+                  label="Output"
+                  value={path.join(outputDir, computeOutputFilename(compiled))}
+                  valueColor="gray"
+                />
+              )}
             </Box>
           )}
 
@@ -339,6 +463,13 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
             {isActive && fileNotFound && (
               <Hint label="Relocate" shortcut="Ctrl+F" />
             )}
+            {isActive && canPlay && !isSaving && (
+              <Hint
+                label={source?.savedFile ? "Update" : "Save"}
+                shortcut="Enter"
+              />
+            )}
+            {isActive && isSaving && <Hint label="Saving…" shortcut="" />}
           </Box>
         </Box>
       </Box>

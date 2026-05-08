@@ -42,9 +42,9 @@ export interface ServiceDisplayInfo {
 }
 
 export const SERVICE_DISPLAY_MAPPING: Record<string, ServiceDisplayInfo> = {
-    'youtube': { acronym: 'YT', color: 'red', component: YoutubeCell },
-    'spotify': { acronym: 'SPOTIFY', color: 'green', component: SpotifyCell },
-    'ytdlp': { acronym: 'YTDLP', color: 'red', component: YtDlpCell },
+    'youtube': { acronym: 'YT', color: '#ff0033', component: YoutubeCell },
+    'spotify': { acronym: 'SPOTIFY', color: '#1ed760', component: SpotifyCell },
+    'ytdlp': { acronym: 'YTDLP', color: '#ff0033', component: YtDlpCell },
     // 'soulseek': { acronym: 'SOULSEEK', color: 'blue', component: MbCell },
     // 'musicbrainz': { acronym: 'MB', color: 'purple', component: MbCell },
     // 'songlink': { acronym: 'SL', color: 'cyan', component: MbCell },
