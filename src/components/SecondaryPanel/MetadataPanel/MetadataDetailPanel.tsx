@@ -28,21 +28,10 @@ interface MetadataSourceDetailProps {
   onInnerFocusSwitch: () => void; // called when ← is pressed to move back to list
 }
 
-const PLATFORM_BRIGHT_COLORS: Record<string, string> = {
-  spotify: "#1db954",
-  youtube: "#ff4040",
-  youtubeMusic: "#ff4040",
-  musicBrainz: "#ba47b5",
-  deezer: "#00c7f2",
-  appleMusic: "#cccccc",
-  tidal: "#4080ff",
-  soundcloud: "#ff5500",
-  itunes: "#cccccc",
-  bandcamp: "#1da0c3",
-};
+import { providerDisplayRegistry } from "../../../base/providerDisplay";
 
 function getPlatformBrightColor(apiProvider: string): string {
-  return PLATFORM_BRIGHT_COLORS[apiProvider] ?? "#aaaaaa";
+  return providerDisplayRegistry.get(apiProvider).colorBright;
 }
 
 const HINT_BAR_HEIGHT = 1;

@@ -4,7 +4,7 @@ import {
   TrackDownloadSource,
   DownloadProvider,
 } from "../../../../flows/musicDownloadFlow/types";
-import { SERVICE_DISPLAY_MAPPING } from "../../../../flows/musicDownloadFlow/musicDownloadFlow";
+import { providerDisplayRegistry } from "../../../../base/providerDisplay";
 import { getInstance } from "../../../../utils/mpvPlayer";
 import { ProviderHeader } from "./ProviderHeader";
 import { MetadataHeader } from "./MetadataHeader";
@@ -40,10 +40,8 @@ function getProviderDisplay(provider: string): {
   label: string;
   color: string;
 } {
-  const mapping = SERVICE_DISPLAY_MAPPING[provider];
-  if (mapping)
-    return { label: mapping.acronym, color: mapping.color as string };
-  return { label: provider.toUpperCase(), color: "white" };
+  const display = providerDisplayRegistry.get(provider);
+  return { label: display.acronym, color: display.color };
 }
 
 function buildTreeItems(sources: TrackDownloadSource[]): TreeItem[] {

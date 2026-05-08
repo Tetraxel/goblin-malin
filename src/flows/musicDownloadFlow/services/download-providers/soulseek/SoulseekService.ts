@@ -2,13 +2,13 @@ import slsk from 'slsk-client';
 import type { SlskFile, SoulseekClient } from 'slsk-client';
 import fs from 'fs/promises';
 import path from 'path';
-import { Cached } from '../../../../utils/cache';
-import { DownloadService } from '../../downloadService';
-import { Logger } from '../../../../base/logger/logger';
-import { PROJECT_ROOT } from '../../../../constants';
-import { Task } from '../../../../base/task/task';
-import { StatusType } from '../../../../base/task/task-status';
-import { DownloadTask } from '../../utils/downloadTask';
+import { Cached } from '../../../../../utils/cache';
+import { DownloadService } from '../../../downloadService';
+import { ProviderDisplay } from '../../../../../base/providerDisplay';
+import { Logger } from '../../../../../base/logger/logger';
+import { PROJECT_ROOT } from '../../../../../constants';
+import { StatusType } from '../../../../../base/task/task-status';
+import { DownloadTask } from '../../../utils/downloadTask';
 
 const MAX_PREFERRED_SIZE = 50; // Files bigger than 50MB are less interesting
 const DOWNLOAD_DIR = path.join(PROJECT_ROOT, 'soulseek-download');
@@ -51,13 +51,6 @@ function calculateResultWeight(result: SlskFile, query: { artistName: string, tr
     if (!result.slots) return -1;
     if (contains(fileName, 'remix') !== contains(query.trackTitle, 'remix')) return -1; // only if remix version requested
 
-    // // String similarity matching (0-1 scale, multiplied for significance)
-    // const similarity = stringSimilarity.compareTwoStrings(
-    //     filename.replace(/\.[^/.]+$/, ""), // Remove extension
-    //     query
-    // );
-    // score += similarity * 20; // Make similarity the dominant factor
-
     // File attributes
     const sizeInMB = result.size / (1024 * 1024);
     score += sizeInMB > MAX_PREFERRED_SIZE
@@ -90,6 +83,8 @@ type SearchMusicInput = {
 }
 
 export class SoulseekService extends DownloadService {
+    static readonly display: ProviderDisplay = { label: "Soulseek", acronym: "SOULSEEK", color: "#2700ff", colorSubtle: "#100080", colorBright: "#4040ff" };
+
     private static client: SoulseekClient;
 
     public constructor(task: DownloadTask, logger: Logger) {
@@ -118,25 +113,6 @@ export class SoulseekService extends DownloadService {
             return SoulseekService.client;
         });
     }
-
-    // // Connect to Soulseek network
-    // private async connectToSoulseek(): Promise<SoulseekClient> {
-    //     const username = await this.env.getVariable('SOULSEEK_USERNAME');
-    //     const password = await this.env.getVariable('SOULSEEK_PASSWORD');
-
-    //     return new Promise((resolve, reject) => {
-    //         slsk.connect({
-    //             user: username,
-    //             pass: password,
-    //         }, (err: Error | null, client: any) => {
-    //             if (err) {
-    //                 reject(err);
-    //                 return;
-    //             }
-    //             resolve(client);
-    //         });
-    //     });
-    // }
 
     @Cached()
     async searchMusic({ query, waitTimeMs }: SearchMusicInput): Promise<{ file: SlskFile, path: string | null } | null> {

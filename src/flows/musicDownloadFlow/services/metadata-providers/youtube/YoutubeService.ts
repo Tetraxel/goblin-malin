@@ -6,15 +6,26 @@ import YTMusic, {
     type AlbumFull
 } from 'ytmusic-api';
 import fs from 'fs/promises';
-import { MetadataService } from '../../metadataService';
-import { Task } from '../../../../base/task/task';
-import { StatusType } from '../../../../base/task/task-status';
-import { Logger } from '../../../../base/logger/logger';
-import { Cached } from '../../../../utils/cache';
-import { DownloadTask } from '../../utils/downloadTask';
-import { StandardTrack, TrackMetadata, TrackUri } from '../../types';
+import { MetadataService } from '../../../metadataService';
+import { ProviderDisplay } from '../../../../../base/providerDisplay';
+import { ParsedUrl } from '../../../../../base/urlParser';
+import { StatusType } from '../../../../../base/task/task-status';
+import { Logger } from '../../../../../base/logger/logger';
+import { Cached } from '../../../../../utils/cache';
+import { DownloadTask } from '../../../utils/downloadTask';
+import { StandardTrack, TrackMetadata, TrackUri } from '../../../types';
+import { YoutubeCell } from './YoutubeCell';
 
 export class YoutubeService extends MetadataService {
+    static readonly display: ProviderDisplay = {
+        label: "YouTube",
+        acronym: "YT",
+        color: "#ff0033",
+        colorSubtle: "#7a1500",
+        colorBright: "#ff4040"
+    };
+    static readonly cellComponent = YoutubeCell;
+
     private static client: YTMusic;
 
     constructor(task: DownloadTask, logger: Logger) {
@@ -31,41 +42,6 @@ export class YoutubeService extends MetadataService {
             return YoutubeService.client;
         });
     }
-
-    // /**
-    //  * Search YouTube Music for tracks matching a query
-    //  * @param query - Search query string
-    //  * @returns Array of detailed song results
-    //  */
-    // @Cached()
-    // public async searchTracks(query: string): Promise<SongDetailed[]> {
-    //     try {
-    //         this.logger.info(`Searching YouTube Music for songs: "${query}"…`);
-    //         this.status.set({
-    //             type: StatusType.Processing,
-    //             message: "Searching YouTube Music for songs",
-    //             timeTracking: true,
-    //             progress: 0,
-    //         });
-
-    //         const client = await this.getClient();
-    //         const results = await client.searchSongs(query);
-
-    //         await fs.writeFile('samples/youtubeSearchResults.json', JSON.stringify(results, null, 2));
-
-    //         this.logger.info(`Successfully found ${results.length} tracks`);
-    //         this.status.update({ progress: 100 });
-
-    //         return results;
-    //     } catch (error) {
-    //         this.logger.error('Error searching songs:', { error });
-    //         this.status.set({
-    //             type: StatusType.Error,
-    //             message: "Error searching songs",
-    //         });
-    //         throw new Error(`Song search failed: ${error}`);
-    //     }
-    // }
 
     /**
      * Get full information about a specific song
@@ -199,21 +175,32 @@ export class YoutubeService extends MetadataService {
         }
     }
 
-    public getType(url: string): 'track' | undefined {
-        const videoId = this.extractVideoIdFromUrl(url);
-        return videoId ? 'track' : undefined;
-    }
+    static parseUrl(url: string): ParsedUrl | null {
+        let parsed: URL;
+        try { parsed = new URL(url); } catch { return null; }
+        const host = parsed.hostname.replace(/^www\./, '');
 
-    public extractVideoIdFromUrl(url: string): string | null {
-        // Match YouTube URLs: https://www.youtube.com/watch?v=ID or https://music.youtube.com/watch?v=ID
-        const regex = /(?:https?:\/\/)?(?:www\.)?(?:music\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/;
-        const match = url.match(regex);
-        return match ? match[1] : null;
+        if (host === 'music.youtube.com') {
+            if (!parsed.pathname.startsWith('/watch')) return null;
+            return { platform: 'youtubeMusic', type: 'track', id: parsed.searchParams.get('v') ?? undefined };
+        }
+
+        if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
+            if (parsed.pathname !== '/watch') return null;
+            return { platform: 'youtube', type: 'track', id: parsed.searchParams.get('v') ?? undefined };
+        }
+
+        if (host === 'youtu.be') {
+            const id = parsed.pathname.slice(1) || undefined;
+            return { platform: 'youtube', type: 'track', id };
+        }
+
+        return null;
     }
 
     @Cached()
     async getTrackMetadata(url: string): Promise<TrackMetadata> {
-        const videoId = this.extractVideoIdFromUrl(url);
+        const videoId = YoutubeService.parseUrl(url)?.id;
         if (!videoId) {
             throw new Error(`Invalid YouTube track URL: ${url}`);
         }
@@ -276,7 +263,6 @@ export class YoutubeService extends MetadataService {
             this.logger.debug(`Searching YouTube Music with query: ${query}`);
             const client = await this.getClient();
             const results = await client.searchSongs(query);
-            // const results = await this.searchTracks(query);
 
             if (!results || results.length === 0) {
                 throw new Error(`No YouTube Music results found for: ${query}`);

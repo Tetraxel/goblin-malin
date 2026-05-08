@@ -1,15 +1,11 @@
 import React from "react";
 import open from "open";
-import fs from "fs/promises";
 import { Text, useInput } from "ink";
-import { ColumnComponent } from "../../../../components/TaskListPanel";
-import {
-  MusicBrainzRecording,
-  MusicBrainzRelease,
-} from "../../services/metadata-providers/musicbrainz";
-import { useFocusContext } from "../../../../contexts/FocusContext";
-import { globalLogger } from "../../../../base/logger/logger";
-import { MusicDownloadTaskAttributes, StandardTrack } from "../../types";
+import { ColumnComponent } from "../../../../../components/TaskListPanel";
+import { MusicBrainzRecording, MusicBrainzRelease } from "./MusicBrainzService";
+import { useFocusContext } from "../../../../../contexts/FocusContext";
+import { globalLogger } from "../../../../../base/logger/logger";
+import { MusicDownloadTaskAttributes, StandardTrack } from "../../../types";
 
 function getBestRelease(
   recording: MusicBrainzRecording,
@@ -63,7 +59,7 @@ function getSearchTrackLink(
   return queryString ? `${baseUrl}?${queryString}` : undefined;
 }
 
-export const MbCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
+export const MusicBrainzCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   task,
   width,
   isSelected,

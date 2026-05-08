@@ -2,12 +2,6 @@ import path from 'path';
 import fs from 'fs/promises';
 import { PROJECT_ROOT } from "../../../constants";
 import { Task } from "../../../base/task/task";
-import { MusicBrainzService } from '../services/metadata-providers/musicbrainz';
-import { SpotifyService } from "../services/metadata-providers/spotify";
-import { SoulseekService } from "../services/download-providers/soulseek";
-import { YtDlpService } from "../services/download-providers/ytdlp";
-import { YoutubeService } from '../services/metadata-providers/youtube';
-import { SonglinkService } from "../services/metadata-providers/songlink";
 import { Platform, SonglinkResponse } from '../services/apis/songlink-client';
 import { globalLogger, Logger } from "../../../base/logger/logger";
 import { StatusType } from "../../../base/task/task-status";
@@ -32,13 +26,6 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
     private metadataServices: ServiceScope<DownloadTask, MetadataService>;
     private downloadServices: ServiceScope<DownloadTask, DownloadService>;
 
-    // private songlinkService: SonglinkService;
-    // private musicBrainzService: MusicBrainzService;
-    // private spotifyService: SpotifyService;
-    // private soulseekService: SoulseekService;
-    // private ytDlpService: YtDlpService;
-    // private youtubeService: YoutubeService;
-
     constructor(
         {
             id,
@@ -58,12 +45,6 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             downloadServiceRegistry: ServiceRegistry<DownloadTask, DownloadService>,
         }) {
         super({ id, initialInput, attributes, flowId, logger });
-        // this.songlinkService = new SonglinkService(this, this.logger);
-        // this.musicBrainzService = new MusicBrainzService(this, this.logger);
-        // this.spotifyService = new SpotifyService(this, this.logger);
-        // this.soulseekService = new SoulseekService(this, this.logger);
-        // this.ytDlpService = new YtDlpService(this, this.logger);
-        // this.youtubeService = new YoutubeService(this, this.logger);
 
         this.metadataServices = metadataServiceRegistry.createScope(this, this.logger);
         this.downloadServices = downloadServiceRegistry.createScope(this, this.logger);

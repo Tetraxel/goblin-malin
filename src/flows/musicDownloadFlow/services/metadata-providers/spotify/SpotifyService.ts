@@ -1,11 +1,13 @@
 import { SpotifyApi, Track } from "@spotify/web-api-ts-sdk";
-import { MetadataService } from '../../metadataService';
-import { Cached } from '../../../../utils/cache';
-import { Task } from "../../../../base/task/task";
-import { Logger } from "../../../../base/logger/logger";
-import { StatusType } from "../../../../base/task/task-status";
-import { StandardTrack, TrackMetadata, TrackUri } from "../../types";
-import { DownloadTask } from "../../utils/downloadTask";
+import { MetadataService } from '../../../metadataService';
+import { ProviderDisplay } from '../../../../../base/providerDisplay';
+import { ParsedUrl } from '../../../../../base/urlParser';
+import { Cached } from '../../../../../utils/cache';
+import { Logger } from "../../../../../base/logger/logger";
+import { StatusType } from "../../../../../base/task/task-status";
+import { StandardTrack, TrackMetadata, TrackUri } from "../../../types";
+import { DownloadTask } from "../../../utils/downloadTask";
+import { SpotifyCell } from './SpotifyCell';
 
 export type SpotifyTokenResponse = {
     access_token: string;
@@ -63,6 +65,15 @@ export type SpotifyPlaylistTrackResponse = {
 };
 
 export class SpotifyService extends MetadataService {
+    static readonly display: ProviderDisplay = {
+        label: "Spotify",
+        acronym: "SPOTIFY",
+        color: "#1ed760",
+        colorSubtle: "#156b30",
+        colorBright: "#1db954"
+    };
+    static readonly cellComponent = SpotifyCell;
+
     private static client: SpotifyApi;
 
     constructor(task: DownloadTask, logger: Logger) {
@@ -154,20 +165,24 @@ export class SpotifyService extends MetadataService {
         };
     }
 
-    getType(url: string): 'track' | undefined {
-        const trackId = this.extractTrackIdFromUrl(url);
-        return trackId ? 'track' : undefined;
-    }
-
-    extractTrackIdFromUrl(url: string): string | null {
-        const regex = /(?:https?:\/\/)?(?:open\.)?spotify\.com\/(?:intl-[a-z]{2}\/)?track\/([a-zA-Z0-9]+)(?:\?.*)?$/;
-        const match = url.match(regex);
-        return match ? match[1] : null;
+    static parseUrl(url: string): ParsedUrl | null {
+        let parsed: URL;
+        try { parsed = new URL(url); } catch { return null; }
+        const host = parsed.hostname.replace(/^www\./, '');
+        if (host !== 'open.spotify.com' && !host.endsWith('.spotify.com')) return null;
+        const path = parsed.pathname;
+        const trackMatch = path.match(/\/(?:intl-[a-z]{2}\/)?track\/([a-zA-Z0-9]+)/);
+        if (trackMatch) return { platform: 'spotify', type: 'track', id: trackMatch[1] };
+        const albumMatch = path.match(/\/album\/([a-zA-Z0-9]+)/);
+        if (albumMatch) return { platform: 'spotify', type: 'album', id: albumMatch[1] };
+        const playlistMatch = path.match(/\/playlist\/([a-zA-Z0-9]+)/);
+        if (playlistMatch) return { platform: 'spotify', type: 'playlist', id: playlistMatch[1] };
+        return null;
     }
 
     @Cached()
     async getTrackMetadata(url: string): Promise<TrackMetadata> {
-        const trackId = this.extractTrackIdFromUrl(url);
+        const trackId = SpotifyService.parseUrl(url)?.id;
         if (!trackId) {
             throw new Error(`Invalid Spotify track URL: ${url}`);
         }

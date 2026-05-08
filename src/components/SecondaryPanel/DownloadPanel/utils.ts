@@ -1,7 +1,7 @@
-import { SERVICE_DISPLAY_MAPPING } from "../../../flows/musicDownloadFlow/musicDownloadFlow";
+import { providerDisplayRegistry } from "../../../base/providerDisplay";
 
 export function getProviderColor(provider: string): string {
-  return (SERVICE_DISPLAY_MAPPING[provider]?.color as string) ?? "white";
+  return providerDisplayRegistry.get(provider).color;
 }
 
 export function formatBytes(bytes: number): string {

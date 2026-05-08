@@ -1,14 +1,19 @@
 import { MusicBrainzApi, IReleaseGroup, IRecordingMatch, IReleaseGroupMatch, IRelease } from 'musicbrainz-api';
-import { MetadataService } from '../../metadataService';
-import { StatusType } from '../../../../base/task/task-status';
-import { Logger } from '../../../../base/logger/logger';
-import { Cached } from '../../../../utils/cache';
-import { DownloadTask } from '../../utils/downloadTask';
+import { MetadataService } from '../../../metadataService';
+import { ParsedUrl } from '../../../../../base/urlParser';
+import { StatusType } from '../../../../../base/task/task-status';
+import { Logger } from '../../../../../base/logger/logger';
+import { Cached } from '../../../../../utils/cache';
+import { DownloadTask } from '../../../utils/downloadTask';
 
 export type MusicBrainzReleaseGroup = IReleaseGroupMatch
 export type MusicBrainzRelease = IRelease
 export type MusicBrainzRecording = IRecordingMatch
 
+// TODO: add static cellComponent = MusicBrainzCell once MusicBrainz is activated.
+// Importing MusicBrainzCell here would create a circular dep since MusicBrainzCell
+// imports MusicBrainzRecording/MusicBrainzRelease from this file. Extract those
+// types to a shared types.ts in this folder to resolve it.
 
 export class MusicBrainzService extends MetadataService {
     private static client: MusicBrainzApi;
@@ -16,6 +21,8 @@ export class MusicBrainzService extends MetadataService {
     constructor(task: DownloadTask, logger: Logger) {
         super('MusicBrainzService', task, logger)
     }
+
+    static parseUrl(_url: string): ParsedUrl | null { return null; }
 
     private async getClient(): Promise<MusicBrainzApi> {
         // Ensure only one initialization at a time
@@ -115,7 +122,6 @@ export class MusicBrainzService extends MetadataService {
                     recording: trackName,
                     ...(albumName ? { release: albumName } : {}),
                     ...(trackDuration ? { dur: trackDuration } : {}),
-                    // ...(albumName ? { releasegroup: albumName } : {})
                 }
             });
 

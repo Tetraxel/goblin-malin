@@ -1,7 +1,12 @@
+### Claude Code
+.claude/settings.local.json
+
 ### Specific to this project
 cache/
 downloads/
 bin/
+samples/
+.tmp.*
 
 ### Node js ptoject .gitignore
 
@@ -73,7 +78,7 @@ web_modules/
 .yarn-integrity
 
 # dotenv environment variable files
-.env
+*.env
 .env.*
 !.env.example
 
@@ -141,10 +146,3 @@ dist
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
-
-# Vite files
-vite.config.js.timestamp-*
-vite.config.ts.timestamp-*
-.vite/
-
-.tmp.*

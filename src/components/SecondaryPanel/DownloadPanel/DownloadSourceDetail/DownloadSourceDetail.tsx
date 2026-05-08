@@ -11,6 +11,7 @@ import { PlaybackBar } from "../PlaybackBar";
 import { DiffView } from "./DiffView";
 import { DetailRow } from "./DetailRow";
 import { Hint } from "../../../Hint";
+import { providerDisplayRegistry } from "../../../../base/providerDisplay";
 
 interface DownloadSourceDetailProps {
   source: TrackDownloadSource | null;
@@ -30,27 +31,6 @@ interface DownloadSourceDetailProps {
   onRelocateFile: () => void;
   onSave: () => void;
 }
-
-const DOWNLOAD_PROVIDER_DISPLAY: Record<
-  string,
-  { label: string; color: string }
-> = {
-  ytdlp: { label: "YtDlp", color: "#ff0033" },
-  soulseek: { label: "Soulseek", color: "#2700ff" },
-};
-
-const PLATFORM_DISPLAY: Record<string, { label: string; color: string }> = {
-  spotify: { label: "Spotify", color: "#1ed760" },
-  deezer: { label: "Deezer", color: "#9546f7" },
-  appleMusic: { label: "Apple Music", color: "#fb233b" },
-  itunes: { label: "iTunes", color: "#fb233b" },
-  tidal: { label: "Tidal", color: "#ffffff" },
-  youtube: { label: "Youtube", color: "#ff0033" },
-  youtubeMusic: { label: "YT Music", color: "#ff0033" },
-  soundcloud: { label: "SoundCloud", color: "#ff5510" },
-  bandcamp: { label: "Bandcamp", color: "#3b8db2" },
-  musicBrainz: { label: "MusicBrainz", color: "#741b81" },
-};
 
 const PRIORITY_TAGS = [
   "TITLE",
@@ -281,14 +261,8 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     .filter((k) => !PRIORITY_TAGS.includes(k));
   const canPlay = source.localFile?.state === "found";
 
-  const dlProvider = DOWNLOAD_PROVIDER_DISPLAY[source.provider] ?? {
-    label: source.provider,
-    color: "white",
-  };
-  const metaPlatform = PLATFORM_DISPLAY[source.track.apiProvider] ?? {
-    label: source.track.apiProvider,
-    color: "white",
-  };
+  const dlProvider = providerDisplayRegistry.get(source.provider);
+  const metaPlatform = providerDisplayRegistry.get(source.track.apiProvider);
   const trackType = source.track.type
     ? source.track.type.charAt(0).toUpperCase() + source.track.type.slice(1)
     : "Track";

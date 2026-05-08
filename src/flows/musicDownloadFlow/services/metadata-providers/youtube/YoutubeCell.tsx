@@ -1,15 +1,15 @@
 import React from "react";
 import { Text } from "ink";
-import { ColumnComponent } from "../../../../components/TaskListPanel";
-import { MusicDownloadTaskAttributes } from "../../types";
+import { ColumnComponent } from "../../../../../components/TaskListPanel";
+import { MusicDownloadTaskAttributes } from "../../../types";
 
-export const SpotifyCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
+export const YoutubeCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   task,
   width,
   isSelected,
 }) => {
   const metadata = task.attributes?.metadataSources.find(
-    (source) => source.metadata.apiProvider === "spotify",
+    (source) => source.metadata.apiProvider === "youtube",
   )?.metadata;
   const fullUri = metadata?.uri;
   const uri = fullUri?.split("::").pop();

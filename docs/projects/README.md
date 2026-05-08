@@ -13,8 +13,9 @@ These are not task lists — each project is a self-contained scope of work. Ind
 | P5 — Download Source Selection & Audio Preview | [p5/tasks.md](p5/tasks.md) |
 | P6 — Save Flow (Tag & Export)                  | [p6/tasks.md](p6/tasks.md) |
 | P7 — Settings System                           | [p7/tasks.md](p7/tasks.md) |
-| P8 — Color Theme Unification                   | NOT WRITTEN                |
-| P8 — Session management                        | NOT WRITTEN                |
+| P8 — Provider Display Registry                 | [p8/tasks.md](p8/tasks.md) |
+| P9 — Color Theme Unification                   | NOT WRITTEN                |
+| P10 — Session management                       | NOT WRITTEN                |
 
 ---
 
@@ -171,7 +172,24 @@ Settings need to persist to disk (JSON file) and be read by services at runtime 
 
 ---
 
-## P8 — Session Persistence
+## P8 — Provider Display Registry ✅ Complete
+
+**The extensibility problem.** Provider display metadata (labels, colors, acronyms) was hardcoded across 8 separate files in copy-pasted dictionaries. Adding a new provider required touching all of them.
+
+**What's in place:**
+
+- `src/base/providerDisplay.ts` — `ProviderDisplay` interface (label, acronym, color, colorSubtle, colorBright), `ProviderDisplayRegistry` class with a module-level `providerDisplayRegistry` singleton, `BUILTIN_PROVIDERS` covering all known platforms
+- `ServiceRegistry.register()` accepts a class constructor — reads `static readonly display` off the class and auto-registers it in `providerDisplayRegistry`
+- All 4 active service classes (`SpotifyService`, `YoutubeService`, `YtDlpService`, `SoulseekService`) declare `static readonly display`
+- All 8 previously hardcoded locations now call `providerDisplayRegistry.get(key)` — no local dicts
+
+Adding a new provider now requires only: a service class with `static display` + one `.register(MyService)` line in `MusicDownloadFlow`'s constructor.
+
+See [p8/tasks.md](p8/tasks.md) for full task-by-task detail.
+
+---
+
+## P9 — Session Persistence
 
 "Re-open last session on start-up" (visible in the settings screenshot). The task list, task states, metadata sources, download sources, and on-disk file paths should survive a restart.
 

@@ -1,7 +1,7 @@
-import { MusicBrainzRecording } from './services/metadata-providers/musicbrainz';
+import { MusicBrainzRecording } from './services/metadata-providers/musicbrainz/MusicBrainzService';
 
 //----------------------//
-//      DEPRECATED      //
+//         BASE         //
 //----------------------//
 
 // Standard Track type definition
@@ -39,12 +39,6 @@ export interface StandardAlbum {
     url: string;
     uri: string;
     artists?: StandardArtist[];
-}
-
-export type DownloadTaskAttributes = {
-    toTag?: boolean;
-    toDownload?: boolean;
-    track?: StandardTrack;
 }
 
 //----------------------//

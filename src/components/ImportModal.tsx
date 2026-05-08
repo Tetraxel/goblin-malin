@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { useFocusContext } from "../contexts/FocusContext";
 import { DetectedUrl, SupportedPlatform } from "../utils/detectUrls";
-import { SERVICE_DISPLAY_MAPPING } from "../flows/musicDownloadFlow/musicDownloadFlow";
+import { providerDisplayRegistry } from "../base/providerDisplay";
 
 export type PendingImport = {
   urls: DetectedUrl[];
@@ -30,35 +30,12 @@ const OPTIONS: ActionOption[] = [
   { label: "Do nothing", fetchMetadata: false, download: false },
 ];
 
-const PLATFORM_DISPLAY: Record<
-  SupportedPlatform,
-  { label: string; color: string }
-> = {
-  spotify: { label: "SPOTIFY", color: "#1ed760" },
-  youtube: { label: "YT", color: "#ff0033" },
-  youtubeMusic: { label: "YT MUSIC", color: "#ff0033" },
-  deezer: { label: "DEEZER", color: "#9546f7" },
-  appleMusic: { label: "APPLE", color: "#fb233b" },
-  // itunes: { label: "ITUNES", color: "#fb233b" },
-  tidal: { label: "TIDAL", color: "#ffffff" },
-  soundcloud: { label: "SOUNDCLOUD", color: "#ff5510" },
-  // bandcamp: { label: "BANDCAMP", color: "#ff5510" },
-  // musicbrainz: { label: "MB", color: "#741b81" },
-};
-
 function platformBadge(platform: SupportedPlatform): {
   label: string;
   color: string;
 } {
-  const mapped = SERVICE_DISPLAY_MAPPING[platform];
-  if (mapped)
-    return { label: mapped.acronym, color: String(mapped.color ?? "white") };
-  return (
-    PLATFORM_DISPLAY[platform] ?? {
-      label: platform.toUpperCase(),
-      color: "white",
-    }
-  );
+  const display = providerDisplayRegistry.get(platform);
+  return { label: display.acronym, color: display.color };
 }
 
 function truncateUrl(str: string, max: number): string {

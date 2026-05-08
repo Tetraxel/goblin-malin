@@ -3,22 +3,10 @@ import { Box, Text } from "ink";
 import TextInput from "ink-text-input";
 import { FieldAttribution } from "../../../flows/musicDownloadFlow/utils/compiledMetadata";
 import { FieldDef } from "../../../flows/musicDownloadFlow/utils/metadataFields";
-
-const PLATFORM_SUBTLE_COLORS: Record<string, string> = {
-  spotify: "#156b30",
-  youtube: "#7a1500",
-  youtubeMusic: "#7a1500",
-  musicBrainz: "#6b1060",
-  deezer: "#005570",
-  appleMusic: "#505050",
-  tidal: "#0030a0",
-  soundcloud: "#7a2500",
-  itunes: "#505050",
-  bandcamp: "#0a5060",
-};
+import { providerDisplayRegistry } from "../../../base/providerDisplay";
 
 function getPlatformColor(apiProvider: string): string {
-  return PLATFORM_SUBTLE_COLORS[apiProvider] ?? "#404040";
+  return providerDisplayRegistry.get(apiProvider).colorSubtle;
 }
 
 function attributionBadge(attr: FieldAttribution | undefined): {

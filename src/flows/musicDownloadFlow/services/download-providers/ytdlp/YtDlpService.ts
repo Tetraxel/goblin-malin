@@ -1,19 +1,22 @@
 import fs from 'fs';
 import path from 'path';
 import { FormatOptions, QualityOptions, YtDlp } from 'ytdlp-nodejs';
-import { DownloadService } from '../../downloadService';
-import { Task } from '../../../../base/task/task';
-import { StatusType } from '../../../../base/task/task-status';
-import { Logger } from '../../../../base/logger/logger';
-import { BIN_DIR, DOWNLOAD_DIR, PROJECT_ROOT } from '../../../../constants';
-import { ensureYtDlpSetup } from '../../../../utils/ytdlp-setup';
-import { ensureFfmpeg } from '../../../../utils/ffmpeg-setup';
-import { APIProvider, TrackMetadata, TrackDownloadSource, LocalFile, FileInfo } from '../../types';
-import { DownloadTask } from '../../utils/downloadTask';
-import { readFileInfo } from '../../utils/readFileInfo';
-
+import { DownloadService } from '../../../downloadService';
+import { ProviderDisplay } from '../../../../../base/providerDisplay';
+import { StatusType } from '../../../../../base/task/task-status';
+import { Logger } from '../../../../../base/logger/logger';
+import { BIN_DIR, DOWNLOAD_DIR, PROJECT_ROOT } from '../../../../../constants';
+import { ensureYtDlpSetup } from '../../../../../utils/ytdlp-setup';
+import { ensureFfmpeg } from '../../../../../utils/ffmpeg-setup';
+import { APIProvider, TrackMetadata, TrackDownloadSource, LocalFile, FileInfo } from '../../../types';
+import { DownloadTask } from '../../../utils/downloadTask';
+import { readFileInfo } from '../../../utils/readFileInfo';
+import { YtDlpCell } from './YtDlpCell';
 
 export class YtDlpService extends DownloadService {
+    static readonly display: ProviderDisplay = { label: "YtDlp", acronym: "YTDLP", color: "#ff0033", colorSubtle: "#7a1500", colorBright: "#ff4040" };
+    static readonly cellComponent = YtDlpCell;
+
     public compatibleMetadataProviders: APIProvider[] = ['youtube', 'soundcloud'];
     private static client: YtDlp;
 
@@ -142,54 +145,4 @@ export class YtDlpService extends DownloadService {
             throw error;
         }
     }
-
-    // -------- OLD IMPLEMENTATION TO REWORK WITH NEW TYPE --------
-
-    // public async downloadTrack(url: string, outputName: string) {
-    //     const client = await this.getClient()
-    //     try {
-    //         this.logger.info(
-    //             `Downloading youtube link: '${url}'…`
-    //         );
-    //         this.status.set({
-    //             type: StatusType.Processing,
-    //             message: "Downloading youtube link",
-    //             timeTracking: true,
-    //             progress: 0,
-    //         });
-    //         const format = 'flac'
-    //         const filename = `${outputName}.${format}`
-    //         const fullPath = path.join(DOWNLOAD_DIR, filename)
-
-    //         if (fs.existsSync(fullPath)) {
-    //             this.logger.info(`File already exists, bypassing download: '${filename}'`);
-    //         }
-    //         else {
-    //             await client.downloadAsync(
-    //                 url,
-    //                 {
-    //                     paths: DOWNLOAD_DIR,
-    //                     output: filename,
-    //                     audioFormat: format,
-    //                     extractAudio: true,
-    //                     restrictFilenames: true,
-    //                     onProgress: (progress) => {
-    //                         this.status.update({ progress: progress.percentage });
-    //                         this.logger.info(`${progress.percentage} ${progress.speed_str} (${progress.eta_str})`);
-    //                     },
-    //                 }
-    //             );
-    //             this.logger.info(`Download completed: '${filename}'`);
-    //         }
-    //         this.status.update({ progress: 100 });
-    //         return fullPath
-    //     } catch (error) {
-    //         this.logger.error('Error downloading youtube link:', { error });
-    //         this.status.set({
-    //             type: StatusType.Error,
-    //             message: "Error downloading youtube link",
-    //         });
-    //         throw error
-    //     }
-    // }
 }

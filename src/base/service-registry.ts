@@ -2,25 +2,49 @@ import { Logger } from "./logger/logger";
 import { ServiceBase } from "./service-base";
 import { ServiceScope } from "./service-scope";
 import { Task } from "./task/task";
+import { ProviderDisplay, providerDisplayRegistry } from "./providerDisplay";
+import { ParsedUrl, urlParserRegistry } from "./urlParser";
 
 export type ServiceFactory<TTask extends Task<any>, TService extends ServiceBase> = (task: TTask, logger: Logger) => TService;
+
+type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> = {
+    new(task: TTask, logger: Logger): TService;
+    display?: ProviderDisplay;
+    parseUrl?: (url: string) => ParsedUrl | null;
+};
 
 // Central registry for services, allowing dynamic registration and scoped instantiation
 // For example, user can enable/disable certain services
 export class ServiceRegistry<TTask extends Task<any>, TService extends ServiceBase> {
     private factories = new Map<string, ServiceFactory<TTask, TService>>();
+    private constructors = new Map<string, ServiceConstructor<TTask, TService>>();
 
     public getFactories(): Map<string, ServiceFactory<TTask, TService>> {
         return this.factories;
     }
 
-    public register(name: string, factory: ServiceFactory<TTask, TService>): this {
-        this.factories.set(name, factory);
+    public getConstructor(name: string): ServiceConstructor<TTask, TService> | undefined {
+        return this.constructors.get(name);
+    }
+
+    public register(name: string, ctorOrFactory: ServiceConstructor<TTask, TService> | ServiceFactory<TTask, TService>): this {
+        if (typeof ctorOrFactory === 'function' && ctorOrFactory.prototype instanceof ServiceBase) {
+            // Class constructor path: derive factory, store constructor, auto-register display
+            const ctor = ctorOrFactory as ServiceConstructor<TTask, TService>;
+            this.factories.set(name, (task, logger) => new ctor(task, logger));
+            this.constructors.set(name, ctor);
+            if (ctor.display) providerDisplayRegistry.register(name, ctor.display);
+            if (ctor.parseUrl) urlParserRegistry.register(ctor.parseUrl);
+        } else {
+            // Plain factory function path (escape hatch for custom instantiation)
+            this.factories.set(name, ctorOrFactory as ServiceFactory<TTask, TService>);
+        }
         return this; // fluent chaining
     }
 
     public unregister(name: string): this {
         this.factories.delete(name);
+        this.constructors.delete(name);
         return this;
     }
 

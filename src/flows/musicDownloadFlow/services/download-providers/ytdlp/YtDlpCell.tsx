@@ -1,8 +1,8 @@
 import React from "react";
 import path from "path";
 import { Text } from "ink";
-import { ColumnComponent } from "../../../../components/TaskListPanel";
-import { MusicDownloadTaskAttributes } from "../../types";
+import { ColumnComponent } from "../../../../../components/TaskListPanel";
+import { MusicDownloadTaskAttributes } from "../../../types";
 
 export const YtDlpCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   task,

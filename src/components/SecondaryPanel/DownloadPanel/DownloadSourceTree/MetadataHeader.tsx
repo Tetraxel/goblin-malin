@@ -1,27 +1,14 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { TrackDownloadSource } from "../../../../flows/musicDownloadFlow/types";
-
-const PLATFORM_DISPLAY: Record<string, { label: string; color: string }> = {
-  spotify: { label: "Spotify", color: "#1ed760" },
-  youtube: { label: "Youtube", color: "#ff0033" },
-  youtubeMusic: { label: "YT Music", color: "#ff0033" },
-  musicBrainz: { label: "MusicBrainz", color: "#741b81" },
-  deezer: { label: "Deezer", color: "#9546f7" },
-  appleMusic: { label: "Apple Music", color: "#fb233b" },
-  itunes: { label: "iTunes", color: "#fb233b" },
-  tidal: { label: "Tidal", color: "#ffffff" },
-  soundcloud: { label: "SoundCloud", color: "#ff5510" },
-  bandcamp: { label: "Bandcamp", color: "#3b8db2" },
-};
+import { providerDisplayRegistry } from "../../../../base/providerDisplay";
 
 function getPlatformDisplay(apiProvider: string): {
   label: string;
   color: string;
 } {
-  return (
-    PLATFORM_DISPLAY[apiProvider] ?? { label: apiProvider, color: "white" }
-  );
+  const display = providerDisplayRegistry.get(apiProvider);
+  return { label: display.label, color: display.color };
 }
 
 interface MetadataHeaderProps {

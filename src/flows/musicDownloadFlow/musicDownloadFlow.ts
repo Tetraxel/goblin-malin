@@ -10,45 +10,28 @@ import { ContextualActionBar, ContextualActions } from '../../types/actions';
 import { useExitButton } from './toolbar/useExitButton';
 import { useRunAllButton } from './toolbar/useRunAllButton';
 import { useImportButton } from './toolbar/useImportButton';
-import { MbCell } from './columns/providers/MbCell';
 import { UrlCell } from './columns/UrlCell';
 import { ArtistCell } from './columns/ArtistCell';
 import { TrackCell } from './columns/TrackCell';
 import { StatusCell } from './columns/StatusCell';
 import { ToTagCell } from './columns/ToTagCell';
 import { ToDownloadCell } from './columns/ToDownloadCell';
-import { YoutubeCell } from './columns/providers/YoutubeCell';
-import { SpotifyCell } from './columns/providers/SpotifyCell';
-import { YtDlpCell } from './columns/providers/YtDlpCell';
 import { MusicDownloadTaskAttributes } from './types';
 import { ServiceRegistry } from '../../base/service-registry';
-import { SpotifyService } from './services/metadata-providers/spotify';
-import { YoutubeService } from './services/metadata-providers/youtube';
-import { SoulseekService } from './services/download-providers/soulseek';
-import { YtDlpService } from './services/download-providers/ytdlp';
+import { SpotifyService } from './services/metadata-providers/spotify/SpotifyService';
+import { YoutubeService } from './services/metadata-providers/youtube/YoutubeService';
+import { SoulseekService } from './services/download-providers/soulseek/SoulseekService';
+import { YtDlpService } from './services/download-providers/ytdlp/YtDlpService';
 import { MetadataService } from './metadataService';
 import { DownloadService } from './downloadService';
-import { Text } from 'ink';
+import { providerDisplayRegistry } from '../../base/providerDisplay';
 
 
 type Column = ColumnDefinition<MusicDownloadTaskAttributes> & {
 
 }
 
-export interface ServiceDisplayInfo {
-    acronym: string;
-    color: React.ComponentProps<typeof Text>["color"];
-    component: Column['component'];
-}
-
-export const SERVICE_DISPLAY_MAPPING: Record<string, ServiceDisplayInfo> = {
-    'youtube': { acronym: 'YT', color: '#ff0033', component: YoutubeCell },
-    'spotify': { acronym: 'SPOTIFY', color: '#1ed760', component: SpotifyCell },
-    'ytdlp': { acronym: 'YTDLP', color: '#ff0033', component: YtDlpCell },
-    // 'soulseek': { acronym: 'SOULSEEK', color: 'blue', component: MbCell },
-    // 'musicbrainz': { acronym: 'MB', color: 'purple', component: MbCell },
-    // 'songlink': { acronym: 'SL', color: 'cyan', component: MbCell },
-};
+const GenericProviderCell: Column['component'] = () => null;
 
 const DEFAULT_TEST_URL = "https://open.spotify.com/track/4v7kKFlEDmpVToHOICsXaM";
 
@@ -77,14 +60,14 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         globalLogger.debug("Initializing MusicDownloadFlow");
 
         this.metadataServiceRegistry = new ServiceRegistry<DownloadTask, MetadataService>()
-            // .register('songlink', (t, l) => new SonglinkService(t, l))
-            // .register('musicbrainz', (t, l) => new MusicBrainzService(t, l))
-            .register('spotify', (task, logger) => new SpotifyService(task, logger))
-            .register('youtube', (task, logger) => new YoutubeService(task, logger));
+            // .register('songlink', SonglinkService)
+            // .register('musicbrainz', MusicBrainzService)
+            .register('spotify', SpotifyService)
+            .register('youtube', YoutubeService);
 
         this.downloadServiceRegistry = new ServiceRegistry<DownloadTask, DownloadService>()
-            // .register('soulseek', (t, l) => new SoulseekService(t, l))
-            .register('ytdlp', (task, logger) => new YtDlpService(task, logger));
+            // .register('soulseek', SoulseekService)
+            .register('ytdlp', YtDlpService);
 
         // Temporary url by default
         const defaultTasks = this.createTasksFromUrls([DEFAULT_TEST_URL], { toTag: true, toDownload: true });
@@ -300,31 +283,30 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
 
         if (this.displayMode === "metadata") {
             const metadataServiceColumns: Column[] = Array.from(this.metadataServiceRegistry.getFactories().keys()).map((key) => {
-                const serviceAttributes = SERVICE_DISPLAY_MAPPING[key]
+                const display = providerDisplayRegistry.get(key);
                 return {
                     id: `metadataService-${key}`,
-                    label: serviceAttributes?.acronym || key.toUpperCase(),
-                    color: serviceAttributes?.color,
+                    label: display.acronym,
+                    color: display.color,
                     weight: 20,
                     flexGrow: 0,
-                    component: serviceAttributes.component,
+                    component: (this.metadataServiceRegistry.getConstructor(key) as any)?.cellComponent ?? GenericProviderCell,
                 };
             });
             globalLogger.debug(`Metadata service columns ${metadataServiceColumns.length}`)
             columns = columns.concat(metadataServiceColumns)
         }
 
-
         if (this.displayMode === "download") {
             const downloadServiceColumns: Column[] = Array.from(this.downloadServiceRegistry.getFactories().keys()).map((key) => {
-                const serviceAttributes = SERVICE_DISPLAY_MAPPING[key]
+                const display = providerDisplayRegistry.get(key);
                 return {
                     id: `downloadService-${key}`,
-                    label: serviceAttributes?.acronym || key.toUpperCase(),
-                    color: serviceAttributes?.color,
+                    label: display.acronym,
+                    color: display.color,
                     weight: 32,
                     flexGrow: 0,
-                    component: serviceAttributes.component,
+                    component: (this.downloadServiceRegistry.getConstructor(key) as any)?.cellComponent ?? GenericProviderCell,
                 };
             });
             columns = columns.concat(downloadServiceColumns)
