@@ -3,7 +3,7 @@ import { createWriteStream } from "fs";
 import * as path from "path";
 import * as https from "https";
 import { spawn } from "child_process";
-import { BIN_DIR } from "../constants";
+import { getBinDir } from "./appPaths";
 import { globalLogger } from "../base/logger/logger";
 
 // Windows-only auto-download.
@@ -61,7 +61,7 @@ export async function ensureMpv(): Promise<string> {
 
     const version = release.tag_name; // e.g. "20260421"
     const binaryName = `mpv_${version}.exe`;
-    const binaryPath = path.join(BIN_DIR, binaryName);
+    const binaryPath = path.join(getBinDir(), binaryName);
 
     try {
       await fs.access(binaryPath);
@@ -71,7 +71,7 @@ export async function ensureMpv(): Promise<string> {
       globalLogger.info(`Downloading mpv ${version}...`);
     }
 
-    await fs.mkdir(BIN_DIR, { recursive: true });
+    await fs.mkdir(getBinDir(), { recursive: true });
     await cleanupOldVersions("mpv_", binaryName);
 
     const arch = archName();
@@ -85,20 +85,20 @@ export async function ensureMpv(): Promise<string> {
     );
     if (!asset) throw new Error(`No mpv asset found for arch ${arch}`);
 
-    const archivePath = path.join(BIN_DIR, asset.name);
+    const archivePath = path.join(getBinDir(), asset.name);
     globalLogger.info(`Downloading ${asset.name}...`);
     await downloadFile(asset.browser_download_url, archivePath);
 
     globalLogger.info("Extracting mpv.exe...");
-    await extract7z(archivePath, BIN_DIR, "mpv.exe");
+    await extract7z(archivePath, getBinDir(), "mpv.exe");
 
-    await fs.rename(path.join(BIN_DIR, "mpv.exe"), binaryPath);
+    await fs.rename(path.join(getBinDir(), "mpv.exe"), binaryPath);
     await fs.unlink(archivePath);
 
     globalLogger.info(`mpv ${version} installed at ${binaryPath}`);
     return binaryPath;
   } catch (err) {
-    // Last-resort: if a previous version is sitting in BIN_DIR, use it
+    // Last-resort: if a previous version is sitting in getBinDir(), use it
     const fallback = await findExistingBinary("mpv_", ".exe");
     if (fallback) {
       globalLogger.warn(`mpv setup encountered an error — using ${fallback}`);
@@ -162,13 +162,13 @@ async function findExistingBinary(
   suffix: string,
 ): Promise<string | null> {
   try {
-    const files = await fs.readdir(BIN_DIR);
+    const files = await fs.readdir(getBinDir());
     const matches = files
       .filter((f) => f.startsWith(prefix) && f.endsWith(suffix))
       .sort()
       .reverse();
     if (!matches.length) return null;
-    const p = path.join(BIN_DIR, matches[0]);
+    const p = path.join(getBinDir(), matches[0]);
     await fs.access(p);
     return p;
   } catch {
@@ -181,10 +181,10 @@ async function cleanupOldVersions(
   currentName: string,
 ): Promise<void> {
   try {
-    const files = await fs.readdir(BIN_DIR);
+    const files = await fs.readdir(getBinDir());
     for (const f of files) {
       if (f.startsWith(prefix) && f.endsWith(".exe") && f !== currentName) {
-        await fs.unlink(path.join(BIN_DIR, f));
+        await fs.unlink(path.join(getBinDir(), f));
         globalLogger.info(`Removed old mpv binary: ${f}`);
       }
     }
@@ -213,7 +213,7 @@ async function downloadFile(url: string, destination: string): Promise<void> {
         res.pipe(ws);
         ws.on("finish", () => ws.close(() => resolve()));
         ws.on("error", (e) => {
-          fs.unlink(destination).catch(() => {});
+          fs.unlink(destination).catch(() => { });
           reject(e);
         });
       })

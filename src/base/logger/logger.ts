@@ -1,12 +1,15 @@
 import fs from 'fs';
+import path from 'path';
 import chalk from 'chalk'
 import winston from 'winston';
 import { inkTransport } from './ink-transport';
 import { LogMetadata, LogLevel, LogDetails } from './types';
-import { LOGS_PATH } from '../../constants';
+import { getLogsPath } from '../../utils/appPaths';
 
-// Clear log file
-fs.writeFileSync(LOGS_PATH, '');
+// Capture once at startup; ensure directory exists
+const logsPath = getLogsPath();
+fs.mkdirSync(path.dirname(logsPath), { recursive: true });
+fs.writeFileSync(logsPath, '');
 
 function getString(obj: any): string {
     if (typeof obj === 'string') {
@@ -49,7 +52,7 @@ export class Logger {
                     inkTransport,
                     // Combined log file
                     new winston.transports.File({
-                        filename: LOGS_PATH,
+                        filename: logsPath,
                         format: winston.format.combine(
                             winston.format.timestamp(),
                             winston.format.json()

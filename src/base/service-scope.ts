@@ -5,13 +5,19 @@ import { ServiceBase } from "./service-base";
 
 // A scope ensures each service is instantiated only once per task but with different logger for each task
 export class ServiceScope<TTask extends Task<any>, TService extends ServiceBase> {
-    private instances = new Map<string, any>();
+    private factories: Map<string, ServiceFactory<TTask, TService>>;
+    private instances = new Map<string, TService>();
+    private isEnabled?: (name: string) => boolean;
 
     constructor(
-        private factories: Map<string, ServiceFactory<TTask, TService>>,
+        factories: Map<string, ServiceFactory<TTask, TService>>,
         private task: TTask,
-        private logger: Logger
-    ) { }
+        private logger: Logger,
+        isEnabled?: (name: string) => boolean,
+    ) {
+        this.factories = new Map(factories);
+        this.isEnabled = isEnabled;
+    }
 
     get<T extends TService>(name: string): T {
         if (!this.instances.has(name)) {
@@ -22,10 +28,13 @@ export class ServiceScope<TTask extends Task<any>, TService extends ServiceBase>
         return this.instances.get(name) as T;
     }
 
+    // Re-evaluates isEnabled on every call so settings changes take effect on next task run
     getAllServices(): TService[] {
         const services: TService[] = [];
         for (const name of this.factories.keys()) {
-            services.push(this.get(name));
+            if (!this.isEnabled || this.isEnabled(name)) {
+                services.push(this.get(name));
+            }
         }
         return services;
     }

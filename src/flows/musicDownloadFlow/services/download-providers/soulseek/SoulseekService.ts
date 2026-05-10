@@ -5,6 +5,7 @@ import path from 'path';
 import { Cached } from '../../../../../utils/cache';
 import { DownloadService } from '../../../downloadService';
 import { ProviderDisplay } from '../../../../../base/providerDisplay';
+import { ProviderSettingsSchema } from '../../../../../base/providerSettings';
 import { Logger } from '../../../../../base/logger/logger';
 import { PROJECT_ROOT } from '../../../../../constants';
 import { StatusType } from '../../../../../base/task/task-status';
@@ -84,6 +85,10 @@ type SearchMusicInput = {
 
 export class SoulseekService extends DownloadService {
     static readonly display: ProviderDisplay = { label: "Soulseek", acronym: "SOULSEEK", color: "#2700ff", colorSubtle: "#100080", colorBright: "#4040ff" };
+    static readonly defaultSettings: ProviderSettingsSchema = {
+        enabled: { label: 'Enable', defaultValue: true, kind: 'checkbox' },
+        autoDownloadBinary: { label: 'Auto-download latest binary', defaultValue: true, kind: 'checkbox' },
+    };
 
     private static client: SoulseekClient;
 

@@ -34,7 +34,9 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             flowId,
             logger,
             metadataServiceRegistry,
-            downloadServiceRegistry
+            downloadServiceRegistry,
+            isMetadataEnabled,
+            isDownloadEnabled,
         }: {
             id: string;
             initialInput?: string;
@@ -43,11 +45,13 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             logger: Logger,
             metadataServiceRegistry: ServiceRegistry<DownloadTask, MetadataService>,
             downloadServiceRegistry: ServiceRegistry<DownloadTask, DownloadService>,
+            isMetadataEnabled: (key: string) => boolean,
+            isDownloadEnabled: (key: string) => boolean,
         }) {
         super({ id, initialInput, attributes, flowId, logger });
 
-        this.metadataServices = metadataServiceRegistry.createScope(this, this.logger);
-        this.downloadServices = downloadServiceRegistry.createScope(this, this.logger);
+        this.metadataServices = metadataServiceRegistry.createScope(this, this.logger, isMetadataEnabled);
+        this.downloadServices = downloadServiceRegistry.createScope(this, this.logger, isDownloadEnabled);
     }
 
     private getPrimaryMetadata(): TrackMetadata | undefined {

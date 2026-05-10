@@ -1,5 +1,6 @@
 import { FlowOrchestrator } from '../../base/flow/flow-orchestrator';
 import { FlowBase } from "../../base/flow/flow-base";
+import { FlowSettings } from '../../base/flow/flow-settings';
 import { globalLogger, Logger } from "../../base/logger/logger";
 import { Task } from '../../base/task/task';
 import { DownloadTask } from './utils/downloadTask';
@@ -9,7 +10,7 @@ import { ColumnDefinition } from '../../components/TaskListPanel';
 import { ContextualActionBar, ContextualActions } from '../../types/actions';
 import { useExitButton } from './toolbar/useExitButton';
 import { useRunAllButton } from './toolbar/useRunAllButton';
-import { useImportButton } from './toolbar/useImportButton';
+import { useSettingsButton } from './toolbar/useSettingsButton';
 import { UrlCell } from './columns/UrlCell';
 import { ArtistCell } from './columns/ArtistCell';
 import { TrackCell } from './columns/TrackCell';
@@ -20,16 +21,23 @@ import { MusicDownloadTaskAttributes } from './types';
 import { ServiceRegistry } from '../../base/service-registry';
 import { SpotifyService } from './services/metadata-providers/spotify/SpotifyService';
 import { YoutubeService } from './services/metadata-providers/youtube/YoutubeService';
-import { SoulseekService } from './services/download-providers/soulseek/SoulseekService';
 import { YtDlpService } from './services/download-providers/ytdlp/YtDlpService';
 import { MetadataService } from './metadataService';
 import { DownloadService } from './downloadService';
 import { providerDisplayRegistry } from '../../base/providerDisplay';
+import { ProviderConstructorLike } from '../../base/providerSettings';
+import { SettingsStore } from '../../settings/settingsStore';
+import {
+    MusicDownloadFlowSettings,
+    BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS,
+    extractProviderDefaults,
+} from './settings';
+import { buildFlowSettingsItems, ProviderEntry } from './buildFlowSettingsItems';
+import { DeepPartial } from '../../utils/types';
+import { SettingsItem } from '../../settings/buildSettingsItems';
 
 
-type Column = ColumnDefinition<MusicDownloadTaskAttributes> & {
-
-}
+type Column = ColumnDefinition<MusicDownloadTaskAttributes>;
 
 const GenericProviderCell: Column['component'] = () => null;
 
@@ -40,10 +48,14 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
     public readonly displayName = "Music Downloader";
     public readonly author = "Tetraxel";
     protected tasks: DownloadTask[] = []
-    protected maxConcurrentTasks = 2; // Flow-specific limit
+    protected maxConcurrentTasks = 2;
     protected displayMode: "metadata" | "download" = "metadata";
-    protected metadataServiceRegistry: ServiceRegistry<DownloadTask, MetadataService>;
-    protected downloadServiceRegistry: ServiceRegistry<DownloadTask, DownloadService>;
+    protected metadataServiceRegistry = new ServiceRegistry<DownloadTask, MetadataService>();
+    protected downloadServiceRegistry = new ServiceRegistry<DownloadTask, DownloadService>();
+    protected settings = new FlowSettings<MusicDownloadFlowSettings>(
+        'music-downloader',
+        () => this.computeDefaultSettings(),
+    );
 
     private static instance: MusicDownloadFlow;
 
@@ -54,26 +66,73 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         return MusicDownloadFlow.instance;
     }
 
+    // ── Settings ────────────────────────────────────────────────────────────
+
+    private computeDefaultSettings(): MusicDownloadFlowSettings {
+        return {
+            ...BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS,
+            metadata: {
+                ...BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS.metadata,
+                providers: extractProviderDefaults(this.metadataServiceRegistry),
+            },
+            download: {
+                ...BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS.download,
+                providers: extractProviderDefaults(this.downloadServiceRegistry),
+            },
+        };
+    }
+
+    public getFlowSettings(): Record<string, unknown> {
+        return this.settings.get() as Record<string, unknown>;
+    }
+
+    public getMusicDownloadFlowSettings(): MusicDownloadFlowSettings {
+        return this.settings.get();
+    }
+
+    public buildFlowSettingsItems(
+        flowSettings: Record<string, unknown>,
+        onChange: (patch: Record<string, unknown>) => void,
+    ): SettingsItem[] {
+        const toEntries = (registry: ServiceRegistry<any, any>): ProviderEntry[] =>
+            Array.from(registry.getFactories().keys())
+                .map(key => ({ key, ctor: registry.getConstructor(key) as ProviderConstructorLike }));
+
+        return buildFlowSettingsItems(
+            flowSettings as MusicDownloadFlowSettings,
+            toEntries(this.metadataServiceRegistry),
+            toEntries(this.downloadServiceRegistry),
+            onChange as (patch: DeepPartial<MusicDownloadFlowSettings>) => void,
+        );
+    }
+
+    public saveFlowSettings(settings: Record<string, unknown>): void {
+        this.settings.save(settings);
+    }
+
+    // ── Constructor ──────────────────────────────────────────────────────────
+
     public constructor(logger: Logger, defaultEnabled: boolean, orchestrator: FlowOrchestrator) {
         super(logger, defaultEnabled, orchestrator);
 
         globalLogger.debug("Initializing MusicDownloadFlow");
 
-        this.metadataServiceRegistry = new ServiceRegistry<DownloadTask, MetadataService>()
-            // .register('songlink', SonglinkService)
-            // .register('musicbrainz', MusicBrainzService)
-            .register('spotify', SpotifyService)
-            .register('youtube', YoutubeService);
+        // Register all available providers. Add new providers here.
+        this.metadataServiceRegistry.register('spotify', SpotifyService);
+        this.metadataServiceRegistry.register('youtube', YoutubeService);
+        // this.metadataServiceRegistry.register('musicbrainz', MusicBrainzService);
 
-        this.downloadServiceRegistry = new ServiceRegistry<DownloadTask, DownloadService>()
-            // .register('soulseek', SoulseekService)
-            .register('ytdlp', YtDlpService);
+        this.downloadServiceRegistry.register('ytdlp', YtDlpService);
+        // this.downloadServiceRegistry.register('soulseek', SoulseekService);
 
-        // Temporary url by default
+        SettingsStore.getInstance().onSettingsChanged(() => this.notifyTaskSubscribers());
+
         const defaultTasks = this.createTasksFromUrls([DEFAULT_TEST_URL], { toTag: true, toDownload: true });
         this.orchestrator.addTasks(defaultTasks);
         this.logger.info(`Imported default test URL: ${DEFAULT_TEST_URL}`);
     }
+
+    // ── FlowBase overrides ───────────────────────────────────────────────────
 
     public getDisplayMode(): "download" | "metadata" {
         return this.displayMode;
@@ -85,15 +144,8 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
     }
 
     public switchMode(input: string): void {
-        if (input === "1") {
-            this.setDisplayMode("metadata");
-            return;
-        }
-
-        if (input === "2") {
-            this.setDisplayMode("download");
-            return;
-        }
+        if (input === "1") { this.setDisplayMode("metadata"); return; }
+        if (input === "2") { this.setDisplayMode("download"); return; }
     }
 
     public createTasksFromUrls(
@@ -117,6 +169,8 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             logger: this.logger,
             metadataServiceRegistry: this.metadataServiceRegistry,
             downloadServiceRegistry: this.downloadServiceRegistry,
+            isMetadataEnabled: key => this.settings.get().metadata.providers[key]?.enabled !== false,
+            isDownloadEnabled: key => this.settings.get().download.providers[key]?.enabled !== false,
         }));
     }
 
@@ -125,25 +179,14 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         this.orchestrator.processTask(task);
     }
 
-    async runAll(): Promise<void> {
-        this.orchestrator.processTasks()
-    }
-
-    async stopAll(): Promise<void> {
-
-    }
+    async runAll(): Promise<void> { this.orchestrator.processTasks() }
+    async stopAll(): Promise<void> { }
 
     public getToolbarButtons(): ToolbarButtonHook[] {
         return [
-            // useImportButton,
             useRunAllButton,
-            () => ({
-                label: "Settings",
-                icon: "⛭",
-                color: "gray",
-                enabled: true,
-            }),
-            useExitButton
+            useSettingsButton,
+            useExitButton,
         ];
     }
 
@@ -153,25 +196,15 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         let actionBartext = ""
         let actions: ContextualActions[] = []
 
-        // TODO: show those shortcuts in another place to avoid confusion with the column-specific shortcuts
         actionBartext = "Task Actions"
-        actions = actions.concat(
-            [
-                {
-                    shortcuts: [{ input: "r" }],
-                    label: "Start",
-                    description: "Start this task",
-                    onClick: () => task.start(),
-                },
-                // {
-                //     shortcuts: [{ key: "backspace" }],
-                //     label: "Stop",
-                //     description: "Stop this task",
-                //     color: "red",
-                //     onClick: () => task.stop(),
-                // }
-            ]
-        )
+        actions = actions.concat([
+            {
+                shortcuts: [{ input: "r" }],
+                label: "Start",
+                description: "Start this task",
+                onClick: () => task.start(),
+            },
+        ])
 
         if (column.id === "toTag") {
             actions = actions.concat([{
@@ -201,15 +234,6 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             }])
         }
 
-        // if (this.displayMode === "metadata" && (column.id === "url" || column.id === "artist" || column.id === "track")) {
-        //     actions = actions.concat([{
-        //         shortcuts: [{ key: "ctrl", input: "C" }],
-        //         label: `Copy ${column.id}`,
-        //         description: "Copy the value from this column",
-        //         onClick: () => task.getAttributes()?.metadataSources,
-        //     }])
-        // }
-
         if (column.id.startsWith("metadataService-")) {
             const serviceKey = column.id.replace("metadataService-", "")
             actionBartext = `${serviceKey}`
@@ -221,68 +245,31 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             }])
         }
 
-        return {
-            text: actionBartext,
-            actions,
-        }
+        return { text: actionBartext, actions }
     }
 
     //!\ Always return all columns to maintain consistent hook count !
     public getColumns(): Column[] {
-        const checkboxColumns = [
-            {
-                id: "toTag",
-                label: "TAG?",
-                weight: 1,
-                flexGrow: 0,
-                component: ToTagCell,
-            },
-            {
-                id: "toDownload",
-                label: "DL?",
-                weight: 1,
-                flexGrow: 0,
-                component: ToDownloadCell,
-            },]
-        const trackColumns = [
-            {
-                id: "url",
-                label: "URL",
-                weight: this.displayMode === "metadata" ? 45 : 3,
-                flexGrow: 0,
-                component: UrlCell,
-            },
-            {
-                id: "artist",
-                label: "ARTIST",
-                weight: 16,
-                flexGrow: 0,
-                component: ArtistCell,
-            },
-            {
-                id: "track",
-                label: "TRACK",
-                weight: 30,
-                flexGrow: 0,
-                component: TrackCell,
-            }
-        ]
-        const statusColumns = [{
-            id: "status",
-            label: "STATUS",
-            weight: 28,
-            minWidth: 20,
-            flexGrow: 0,
-            component: StatusCell,
-        }]
+        const checkboxColumns: Column[] = [
+            { id: "toTag", label: "TAG?", weight: 1, flexGrow: 0, component: ToTagCell },
+            { id: "toDownload", label: "DL?", weight: 1, flexGrow: 0, component: ToDownloadCell },
+        ];
+        const trackColumns: Column[] = [
+            { id: "url", label: "URL", weight: this.displayMode === "metadata" ? 45 : 3, flexGrow: 0, component: UrlCell },
+            { id: "artist", label: "ARTIST", weight: 16, flexGrow: 0, component: ArtistCell },
+            { id: "track", label: "TRACK", weight: 30, flexGrow: 0, component: TrackCell },
+        ];
+        const statusColumns: Column[] = [
+            { id: "status", label: "STATUS", weight: 28, minWidth: 20, flexGrow: 0, component: StatusCell },
+        ];
 
-        let columns: Column[] = []
-
-        columns = columns.concat(checkboxColumns)
-        columns = columns.concat(trackColumns);
+        let columns: Column[] = [...checkboxColumns, ...trackColumns];
 
         if (this.displayMode === "metadata") {
-            const metadataServiceColumns: Column[] = Array.from(this.metadataServiceRegistry.getFactories().keys()).map((key) => {
+            const { providers } = this.settings.get().metadata;
+            const metadataServiceColumns: Column[] = Array.from(
+                this.metadataServiceRegistry.getEnabledFactories(key => providers[key]?.enabled !== false).keys()
+            ).map(key => {
                 const display = providerDisplayRegistry.get(key);
                 return {
                     id: `metadataService-${key}`,
@@ -293,12 +280,14 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                     component: (this.metadataServiceRegistry.getConstructor(key) as any)?.cellComponent ?? GenericProviderCell,
                 };
             });
-            globalLogger.debug(`Metadata service columns ${metadataServiceColumns.length}`)
-            columns = columns.concat(metadataServiceColumns)
+            columns = columns.concat(metadataServiceColumns);
         }
 
         if (this.displayMode === "download") {
-            const downloadServiceColumns: Column[] = Array.from(this.downloadServiceRegistry.getFactories().keys()).map((key) => {
+            const { providers } = this.settings.get().download;
+            const downloadServiceColumns: Column[] = Array.from(
+                this.downloadServiceRegistry.getEnabledFactories(key => providers[key]?.enabled !== false).keys()
+            ).map(key => {
                 const display = providerDisplayRegistry.get(key);
                 return {
                     id: `downloadService-${key}`,
@@ -309,11 +298,9 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                     component: (this.downloadServiceRegistry.getConstructor(key) as any)?.cellComponent ?? GenericProviderCell,
                 };
             });
-            columns = columns.concat(downloadServiceColumns)
+            columns = columns.concat(downloadServiceColumns);
         }
 
-        columns = columns.concat(statusColumns);
-
-        return columns;
+        return [...columns, ...statusColumns];
     }
 }

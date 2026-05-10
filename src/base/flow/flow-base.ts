@@ -4,6 +4,7 @@ import { ContextualActionBar } from "../../types/actions";
 import { ToolbarButtonHook } from "../../components/Toolbar";
 import { FlowOrchestrator } from "./flow-orchestrator";
 import { Task } from "../task/task";
+import type { SettingsItem } from "../../settings/buildSettingsItems";
 
 export type FlowSubscriber<TTaskAttributes> = (flow: FlowBase<TTaskAttributes>) => void;
 export type FlowSubscribers<TTaskAttributes> = Set<FlowSubscriber<TTaskAttributes>>;
@@ -89,6 +90,14 @@ export class FlowBase<TaskAttributes = any> {
     public getColumns(): ColumnDefinition<TaskAttributes>[] {
         throw Error('Not implemented')
     }
+
+    // Optional settings interface — flows that support settings implement these
+    public getFlowSettings?(): Record<string, unknown>;
+    public buildFlowSettingsItems?(
+        flowSettings: Record<string, unknown>,
+        onChange: (patch: Record<string, unknown>) => void,
+    ): SettingsItem[];
+    public saveFlowSettings?(settings: Record<string, unknown>): void;
 
     // Subscribe to any changes in the task (including status changes)
     public subscribe(callback: FlowSubscriber<TaskAttributes>): () => void {

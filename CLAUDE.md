@@ -14,6 +14,8 @@
 
 ## Provider extensibility
 
+> **Philosophy**: We don't want to hardcode metadata/download providers! They must be interchangeable and extensible. The app should be able to support any number of metadata and download providers without requiring changes to the core flow logic or UI components.
+
 Adding a new provider should require changes in only two places:
 
 1. A new service class file (the implementation)

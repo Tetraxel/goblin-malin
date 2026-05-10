@@ -23,6 +23,10 @@ export class ServiceRegistry<TTask extends Task<any>, TService extends ServiceBa
         return this.factories;
     }
 
+    public getEnabledFactories(isEnabled: (name: string) => boolean): Map<string, ServiceFactory<TTask, TService>> {
+        return new Map([...this.factories].filter(([k]) => isEnabled(k)));
+    }
+
     public getConstructor(name: string): ServiceConstructor<TTask, TService> | undefined {
         return this.constructors.get(name);
     }
@@ -49,7 +53,7 @@ export class ServiceRegistry<TTask extends Task<any>, TService extends ServiceBa
     }
 
     // Each service will call createScope to get a scope specific to the task, ensuring services are instantiated once per task but with different loggers
-    public createScope(task: TTask, logger: Logger): ServiceScope<TTask, TService> {
-        return new ServiceScope<TTask, TService>(this.factories, task, logger);
+    public createScope(task: TTask, logger: Logger, isEnabled?: (name: string) => boolean): ServiceScope<TTask, TService> {
+        return new ServiceScope<TTask, TService>(this.factories, task, logger, isEnabled);
     }
 }

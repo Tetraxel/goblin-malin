@@ -141,34 +141,37 @@ The **diff view** (P5) is part of this flow — shown when updating an already-s
 
 ---
 
-## P7 — Settings System
+## P7 — Settings System ✅ Complete (T7.10 deferred)
 
-A full settings modal (opened from the toolbar) with keyboard navigation and persistence to disk:
+Settings modal with keyboard navigation, search/filter, and persistence to disk. T7.1–T7.9 are implemented; T7.10 (auto-behavior hooks) is deferred.
 
-**General:**
+**What's in place:**
 
-- Re-open last session on start-up
+- `src/settings/appSettings.ts` — `AppSettings` type (general: reopenLastSession, appDataDir, animationsEnabled) + `DEFAULT_APP_SETTINGS`
+- `src/settings/settingsStore.ts` — `SettingsStore` singleton; atomic write (write-then-rename); app settings and per-flow settings stored together as `{ general: {...}, flows: { [flowId]: {...} } }`; `onSettingsChanged` EventEmitter for live reload
+- `src/settings/buildSettingsItems.ts` — `SettingsItem` discriminated union, `isInteractive()`, `itemRowHeight()`, `filterSettingsItems()` (search filtering with ancestor-header preservation)
+- `src/settings/buildGlobalSettingsItems.ts` — builds the global/app settings item list
+- `src/base/providerSettings.ts` — `ProviderSettingsSchema` + `ProviderConstructorLike`; providers declare `static defaultSettings` for auto-generated settings UI
+- `src/base/flow/flow-settings.ts` — `FlowSettings<T>` typed wrapper around `SettingsStore` for per-flow settings
+- `src/flows/musicDownloadFlow/settings.ts` — `MusicDownloadFlowSettings` type (metadata + download with per-provider blobs); `extractProviderDefaults()` builds defaults from registered providers
+- `src/flows/musicDownloadFlow/buildFlowSettingsItems.ts` — `buildFlowSettingsItems()` driven by registered provider constructors; reads `static defaultSettings` off each to auto-render provider cards
+- `src/components/SettingsModal.tsx` — full-screen overlay; search bar (focused by default) with live `filterSettingsItems()`; scrollable item list with height-aware paging; draft state for app + flow settings; `Ctrl+S` writes both, `Esc` discards
+- `src/components/SettingsItemRow.tsx` — per-kind renderer (sectionHeader, subHeader, providerHeader, checkbox, textInput, action)
+- `src/flows/musicDownloadFlow/toolbar/useSettingsButton.ts` — opens modal via `switchWindow('settingsModal')`
+- `src/flows/musicDownloadFlow/saveSettings.ts` — `getSaveSettings()` now reads from `SettingsStore` (no longer a hardcoded stub)
+- `src/components/AppInner.tsx` — `<SettingsModal>` mounted alongside other modals
+- `.gitignore` — `config/settings.json` excluded
 
-**Metadata:**
+**Architectural divergence from plan:**
 
-- Auto-fetch primary metadata on import
-- Auto-choose best metadata source
-- Toggle visible columns (URL, Artist, Track title)
-- Per-provider cards: Spotify, Deezer, Apple Music, Tidal, YouTube, SoundCloud, MusicBrainz — each with an Enable toggle and provider-specific options
-- MusicBrainz extras: Import file in Picard on save, Include MB metadata in tags by default, Use MB links during discovering
+The original plan had one flat `AppSettings` type covering general + metadata + download. The actual implementation splits into two tiers: a thin `AppSettings` (general only, global across flows) and `MusicDownloadFlowSettings` (metadata/download/providers, flow-scoped). The `ProviderSettingsSchema` mechanism is new — it lets each provider class self-describe its settings so the modal renders them automatically without any hardcoding in the UI.
 
-**Download:**
+**Known gaps vs. original plan:**
 
-- Auto-choose best download source
-- Auto-save to output directory
-- Auto-delete temporary downloads after 24h
-- Auto-relocate missing files
-- Set default output directory (text input)
-- Clear download cache action
-- Toggle visible columns
-- Per-provider cards: YtDlp (enable + auto-download latest binary), Soulseek (enable + auto-download)
+- T7.10 (auto-behavior hooks: auto-fetch, auto-save, auto-delete, auto-relocate) is not implemented
+- Provider enable/disable does not yet rebuild the service registry dynamically — `onSettingsChanged` triggers `notifyTaskSubscribers()` for UI refresh only; the `enabled` flag in provider settings is rendered but not yet acted upon at runtime
 
-Settings need to persist to disk (JSON file) and be read by services at runtime — i.e., the service registries in `MusicDownloadFlow` need to become dynamic based on settings (enabled providers).
+See [p7/tasks.md](p7/tasks.md) for full task-by-task detail.
 
 ---
 

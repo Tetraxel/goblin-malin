@@ -3,9 +3,11 @@ import path from 'path';
 import { FormatOptions, QualityOptions, YtDlp } from 'ytdlp-nodejs';
 import { DownloadService } from '../../../downloadService';
 import { ProviderDisplay } from '../../../../../base/providerDisplay';
+import { ProviderSettingsSchema } from '../../../../../base/providerSettings';
 import { StatusType } from '../../../../../base/task/task-status';
 import { Logger } from '../../../../../base/logger/logger';
-import { BIN_DIR, DOWNLOAD_DIR, PROJECT_ROOT } from '../../../../../constants';
+import { getBinDir } from '../../../../../utils/appPaths';
+import { getDownloadDir } from '../../../saveSettings';
 import { ensureYtDlpSetup } from '../../../../../utils/ytdlp-setup';
 import { ensureFfmpeg } from '../../../../../utils/ffmpeg-setup';
 import { APIProvider, TrackMetadata, TrackDownloadSource, LocalFile, FileInfo } from '../../../types';
@@ -15,6 +17,10 @@ import { YtDlpCell } from './YtDlpCell';
 
 export class YtDlpService extends DownloadService {
     static readonly display: ProviderDisplay = { label: "YtDlp", acronym: "YTDLP", color: "#ff0033", colorSubtle: "#7a1500", colorBright: "#ff4040" };
+    static readonly defaultSettings: ProviderSettingsSchema = {
+        enabled: { label: 'Enable', defaultValue: true, kind: 'checkbox' },
+        autoDownloadBinary: { label: 'Auto-download latest binaries', defaultValue: true, kind: 'checkbox' },
+    };
     static readonly cellComponent = YtDlpCell;
 
     public compatibleMetadataProviders: APIProvider[] = ['youtube', 'soundcloud'];
@@ -61,7 +67,7 @@ export class YtDlpService extends DownloadService {
             const outputName = `${artistName} - ${trackMetadata.trackName}`;
             const format = 'flac';
             const filename = `${outputName}.${format}`;
-            const fullPath = path.join(DOWNLOAD_DIR, filename);
+            const fullPath = path.join(getDownloadDir(), filename);
 
             // Check if file already exists
             let localFile: LocalFile;
@@ -76,14 +82,14 @@ export class YtDlpService extends DownloadService {
                 };
             } else {
                 // Ensure download directory exists
-                if (!fs.existsSync(DOWNLOAD_DIR)) {
-                    fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+                if (!fs.existsSync(getDownloadDir())) {
+                    fs.mkdirSync(getDownloadDir(), { recursive: true });
                 }
 
                 // Load cookies if available
-                const cookiesPath = path.join(BIN_DIR, 'cookies.txt');
+                const cookiesPath = path.join(getBinDir(), 'cookies.txt');
                 let downloadOptions: FormatOptions<keyof QualityOptions> = {
-                    paths: DOWNLOAD_DIR,
+                    paths: getDownloadDir(),
                     output: filename,
                     audioFormat: format,
                     extractAudio: true,

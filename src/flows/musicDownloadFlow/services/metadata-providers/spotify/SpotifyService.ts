@@ -1,6 +1,7 @@
 import { SpotifyApi, Track } from "@spotify/web-api-ts-sdk";
 import { MetadataService } from '../../../metadataService';
 import { ProviderDisplay } from '../../../../../base/providerDisplay';
+import { ProviderSettingsSchema } from '../../../../../base/providerSettings';
 import { ParsedUrl } from '../../../../../base/urlParser';
 import { Cached } from '../../../../../utils/cache';
 import { Logger } from "../../../../../base/logger/logger";
@@ -71,6 +72,9 @@ export class SpotifyService extends MetadataService {
         color: "#1ed760",
         colorSubtle: "#156b30",
         colorBright: "#1db954"
+    };
+    static readonly defaultSettings: ProviderSettingsSchema = {
+        enabled: { label: 'Enable', defaultValue: true, kind: 'checkbox' },
     };
     static readonly cellComponent = SpotifyCell;
 

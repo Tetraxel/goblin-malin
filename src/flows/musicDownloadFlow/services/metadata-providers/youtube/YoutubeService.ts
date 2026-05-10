@@ -8,6 +8,7 @@ import YTMusic, {
 import fs from 'fs/promises';
 import { MetadataService } from '../../../metadataService';
 import { ProviderDisplay } from '../../../../../base/providerDisplay';
+import { ProviderSettingsSchema } from '../../../../../base/providerSettings';
 import { ParsedUrl } from '../../../../../base/urlParser';
 import { StatusType } from '../../../../../base/task/task-status';
 import { Logger } from '../../../../../base/logger/logger';
@@ -23,6 +24,9 @@ export class YoutubeService extends MetadataService {
         color: "#ff0033",
         colorSubtle: "#7a1500",
         colorBright: "#ff4040"
+    };
+    static readonly defaultSettings: ProviderSettingsSchema = {
+        enabled: { label: 'Enable', defaultValue: true, kind: 'checkbox' },
     };
     static readonly cellComponent = YoutubeCell;
 

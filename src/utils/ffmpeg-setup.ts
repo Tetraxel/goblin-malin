@@ -3,7 +3,7 @@ import { createWriteStream } from 'fs';
 import * as path from 'path';
 import * as https from 'https';
 import AdmZip from 'adm-zip';
-import { BIN_DIR } from '../constants';
+import { getBinDir } from './appPaths';
 import { globalLogger } from '../base/logger/logger';
 
 interface GitHubRelease {
@@ -35,7 +35,7 @@ export async function ensureFfmpeg(): Promise<string> {
         // Use published_at date to create a unique version identifier
         const versionDate = new Date(release.published_at).toISOString().split('T')[0];
         const binaryName = `ffmpeg_${versionDate}.exe`;
-        const binaryPath = path.join(BIN_DIR, binaryName);
+        const binaryPath = path.join(getBinDir(), binaryName);
 
         // Check if binary exists
         try {
@@ -47,7 +47,7 @@ export async function ensureFfmpeg(): Promise<string> {
         }
 
         // Create bin directory if it doesn't exist
-        await fs.mkdir(BIN_DIR, { recursive: true });
+        await fs.mkdir(getBinDir(), { recursive: true });
 
         // Clean up old ffmpeg versions (optional)
         await cleanupOldVersions('ffmpeg_', binaryName);
@@ -55,7 +55,7 @@ export async function ensureFfmpeg(): Promise<string> {
         // Download and extract the ZIP file
         const zipName = 'ffmpeg-master-latest-win64-gpl.zip';
         const downloadUrl = `https://github.com/BtbN/FFmpeg-Builds/releases/download/${release.tag_name}/${zipName}`;
-        const zipPath = path.join(BIN_DIR, zipName);
+        const zipPath = path.join(getBinDir(), zipName);
 
         await downloadFile(downloadUrl, zipPath);
 
@@ -74,10 +74,10 @@ export async function ensureFfmpeg(): Promise<string> {
         }
 
         // Extract to the target location
-        zip.extractEntryTo(ffmpegEntry, BIN_DIR, false, true);
+        zip.extractEntryTo(ffmpegEntry, getBinDir(), false, true);
 
         // Rename the extracted file to include version
-        const extractedPath = path.join(BIN_DIR, 'ffmpeg.exe');
+        const extractedPath = path.join(getBinDir(), 'ffmpeg.exe');
         await fs.rename(extractedPath, binaryPath);
 
         // Clean up the zip file
@@ -98,7 +98,7 @@ export async function ensureFfmpeg(): Promise<string> {
 
 async function findExistingBinary(prefix: string, suffix: string): Promise<string | null> {
     try {
-        const files = await fs.readdir(BIN_DIR);
+        const files = await fs.readdir(getBinDir());
         const binaries = files.filter(file =>
             file.startsWith(prefix) && file.endsWith(suffix)
         );
@@ -109,7 +109,7 @@ async function findExistingBinary(prefix: string, suffix: string): Promise<strin
 
         // Sort by name (which includes date) and return the most recent
         binaries.sort().reverse();
-        const binaryPath = path.join(BIN_DIR, binaries[0]);
+        const binaryPath = path.join(getBinDir(), binaries[0]);
 
         // Verify the file is accessible
         await fs.access(binaryPath);
@@ -154,7 +154,7 @@ async function getLatestFfmpegRelease(): Promise<GitHubRelease> {
 // Clean up old versions to avoid accumulating binaries
 async function cleanupOldVersions(prefix: string, currentVersion: string): Promise<void> {
     try {
-        const files = await fs.readdir(BIN_DIR);
+        const files = await fs.readdir(getBinDir());
         const oldVersions = files.filter(file =>
             file.startsWith(prefix) &&
             file.endsWith('.exe') &&
@@ -162,7 +162,7 @@ async function cleanupOldVersions(prefix: string, currentVersion: string): Promi
         );
 
         for (const file of oldVersions) {
-            await fs.unlink(path.join(BIN_DIR, file));
+            await fs.unlink(path.join(getBinDir(), file));
             globalLogger.info(`Cleaned up old version: ${file}`);
         }
     } catch (error) {

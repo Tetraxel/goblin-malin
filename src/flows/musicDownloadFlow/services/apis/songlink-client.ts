@@ -1,11 +1,11 @@
 import path from 'path';
-import { CACHE_DIR } from '../../../../constants';
+import { getCacheDir } from '../../../../utils/appPaths';
 import { globalLogger } from '../../../../base/logger/logger';
 import { loadJsonFile, saveJsonFile } from '../../../../utils/json';
 import { sleep } from '../../../../utils/sleep';
 
 const SONGLINK_API_BASE_URL = "https://api.song.link/v1-alpha.1/links";
-const SONGLINK_RATE_PATH = path.join(CACHE_DIR, 'songlink_rate.json');
+const SONGLINK_RATE_PATH = path.join(getCacheDir(), 'songlink_rate.json');
 const SONGLINK_RATE_LIMIT = 10; // requests
 const SONGLINK_RATE_WINDOW_MS = 60_000; // per 60 seconds
 

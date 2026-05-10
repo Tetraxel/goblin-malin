@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import { createWriteStream } from 'fs';
 import * as path from 'path';
 import * as https from 'https';
-import { BIN_DIR } from '../constants';
+import { getBinDir } from './appPaths';
 import { globalLogger } from '../base/logger/logger';
 
 interface GitHubRelease {
@@ -31,7 +31,7 @@ export async function ensureYtDlpSetup(): Promise<string> {
         }
 
         const binaryName = `yt-dlp_${latestVersion}.exe`;
-        const binaryPath = path.join(BIN_DIR, binaryName);
+        const binaryPath = path.join(getBinDir(), binaryName);
 
         // Check if binary exists
         try {
@@ -43,7 +43,7 @@ export async function ensureYtDlpSetup(): Promise<string> {
         }
 
         // Create bin directory if it doesn't exist
-        await fs.mkdir(BIN_DIR, { recursive: true });
+        await fs.mkdir(getBinDir(), { recursive: true });
 
         // Clean up old yt-dlp versions (optional)
         await cleanupOldVersions('yt-dlp_', binaryName);
@@ -67,7 +67,7 @@ export async function ensureYtDlpSetup(): Promise<string> {
 
 async function findExistingBinary(prefix: string, suffix: string): Promise<string | null> {
     try {
-        const files = await fs.readdir(BIN_DIR);
+        const files = await fs.readdir(getBinDir());
         const binaries = files.filter(file =>
             file.startsWith(prefix) && file.endsWith(suffix)
         );
@@ -78,7 +78,7 @@ async function findExistingBinary(prefix: string, suffix: string): Promise<strin
 
         // Sort by name (which includes version) and return the most recent
         binaries.sort().reverse();
-        const binaryPath = path.join(BIN_DIR, binaries[0]);
+        const binaryPath = path.join(getBinDir(), binaries[0]);
 
         // Verify the file is accessible
         await fs.access(binaryPath);
@@ -123,7 +123,7 @@ async function getLatestYtDlpVersion(): Promise<string> {
 // Clean up old versions to avoid accumulating binaries
 async function cleanupOldVersions(prefix: string, currentVersion: string): Promise<void> {
     try {
-        const files = await fs.readdir(BIN_DIR);
+        const files = await fs.readdir(getBinDir());
         const oldVersions = files.filter(file =>
             file.startsWith(prefix) &&
             file.endsWith('.exe') &&
@@ -131,7 +131,7 @@ async function cleanupOldVersions(prefix: string, currentVersion: string): Promi
         );
 
         for (const file of oldVersions) {
-            await fs.unlink(path.join(BIN_DIR, file));
+            await fs.unlink(path.join(getBinDir(), file));
             globalLogger.info(`Cleaned up old version: ${file}`);
         }
     } catch (error) {

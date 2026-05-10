@@ -1,12 +1,12 @@
 import fs from 'fs/promises';
-import { CACHE_DIR } from '../constants';
+import { getCacheDir } from './appPaths';
 
 
 async function ensureCacheDir() {
     try {
-        await fs.access(CACHE_DIR);
+        await fs.access(getCacheDir());
     } catch {
-        await fs.mkdir(CACHE_DIR, { recursive: true });
+        await fs.mkdir(getCacheDir(), { recursive: true });
     }
 }
 

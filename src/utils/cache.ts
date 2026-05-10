@@ -1,12 +1,14 @@
 import { create } from 'flat-cache';
+import * as fs from 'fs';
 import { globalLogger } from '../base/logger/logger';
-import { CACHE_DIR } from '../constants';
+import { getCacheDir } from './appPaths';
 
-// Global cache instance
+// Global cache instance — path captured once at startup, consistent with clearCache
 const CACHE_ID = 'api-cache'
+const cacheDir = getCacheDir();
 export const cache = create({
     cacheId: CACHE_ID,
-    cacheDir: CACHE_DIR,
+    cacheDir,
 
     // The time to live for the cache in milliseconds. 0 means no expiration
     ttl: 90 * 24 * 60 * 60 * 1000, // 90 days
@@ -17,6 +19,12 @@ export const cache = create({
     // The interval to check for expired items in the cache. 0 means no expiration
     expirationInterval: 10 * 60 * 1000, // 10 minutes
 });
+
+export function clearCache(): void {
+    cache.clear();
+    try { fs.rmSync(cacheDir, { recursive: true, force: true }); } catch { }
+    globalLogger.info('Cache cleared');
+}
 
 interface CacheOptions {
     ttl?: number;

@@ -1,7 +1,7 @@
 import React from "react";
 import { Text } from "ink";
 import { useGlobalTicker } from "../hooks/useGlobalTicker";
-import { ANIMATION_ENABLED } from "../constants";
+import { SettingsStore } from "../settings/settingsStore";
 
 export enum Icon {
   Dots = "dots",
@@ -45,7 +45,9 @@ export const AnimatedIcon: React.FC<AnimatedIconProps> = ({
   if (!frames || frames.length === 0) return null;
 
   // Use modulo to cycle through frames based on the global infinite counter
-  const frameIndex = ANIMATION_ENABLED ? globalTick % frames.length : 0;
+  const animationsEnabled =
+    SettingsStore.getInstance().getAppSettings().general.animationsEnabled;
+  const frameIndex = animationsEnabled ? globalTick % frames.length : 0;
   const currentFrame = frames[frameIndex];
 
   const color = ICON_COLOR[icon];

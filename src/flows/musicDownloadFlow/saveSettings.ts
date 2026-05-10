@@ -1,19 +1,29 @@
-import * as os from 'os';
-import * as path from 'path';
+import { SettingsStore } from '../../settings/settingsStore';
+import {
+  MusicDownloadFlowSettings,
+  BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS,
+} from './settings';
 
 export interface SaveSettings {
-    outputDir: string;
-    includeMusicBrainzTags: boolean;
+  outputDir: string;
+  includeMusicBrainzTags: boolean;
 }
 
-export function getDefaultSaveSettings(): SaveSettings {
-    return {
-        outputDir: process.env.OUTPUT_DIR ?? path.join(os.homedir(), 'Music'),
-        includeMusicBrainzTags: false,
-    };
+function getFlowSettings(): MusicDownloadFlowSettings {
+  return SettingsStore.getInstance().getFlowSettings<MusicDownloadFlowSettings>(
+    'music-downloader',
+    BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS,
+  );
 }
 
-// P7 will replace this with a real reader:
+export function getDownloadDir(): string {
+  return getFlowSettings().download.outputDir;
+}
+
 export function getSaveSettings(): SaveSettings {
-    return getDefaultSaveSettings();
+  const s = getFlowSettings();
+  return {
+    outputDir: s.download.outputDir,
+    includeMusicBrainzTags: false,
+  };
 }

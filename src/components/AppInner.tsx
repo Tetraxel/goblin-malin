@@ -4,6 +4,7 @@ import { Footer } from "./Footer";
 import { Separator } from "./Separator";
 import { PromptModal } from "./PromptModal";
 import { ImportModal } from "./ImportModal";
+import { SettingsModal } from "./SettingsModal";
 import { Toolbar, ToolbarButtonHook } from "./Toolbar";
 import { ColumnDefinition, TaskListPanel } from "./TaskListPanel";
 import { ActionBar } from "./ActionBar";
@@ -95,6 +96,12 @@ export const AppInner: React.FC<{
           terminalWidth={terminalWidth}
           onConfirm={handleImportConfirm}
           onCancel={handleImportCancel}
+        />
+
+        <SettingsModal
+          terminalHeight={terminalHeight}
+          terminalWidth={terminalWidth}
+          currentFlow={currentFlow}
         />
       </Box>
     </ImportActionsProvider>
