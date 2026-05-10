@@ -127,8 +127,8 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
 
         SettingsStore.getInstance().onSettingsChanged(() => this.notifyTaskSubscribers());
 
-        const defaultTasks = this.createTasksFromUrls([DEFAULT_TEST_URL], { toTag: true, toDownload: true });
-        this.orchestrator.addTasks(defaultTasks);
+        // const defaultTasks = this.createTasksFromUrls([DEFAULT_TEST_URL], { toTag: true, toDownload: true });
+        // this.orchestrator.addTasks(defaultTasks);
         this.logger.info(`Imported default test URL: ${DEFAULT_TEST_URL}`);
     }
 

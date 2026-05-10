@@ -95,7 +95,7 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
         <Box paddingLeft={item.indent}>
           <Text color={isSelected ? "cyan" : undefined} bold={isSelected}>
             {cursor}
-            {item.label} {">"}
+            {item.label}
           </Text>
         </Box>
       );

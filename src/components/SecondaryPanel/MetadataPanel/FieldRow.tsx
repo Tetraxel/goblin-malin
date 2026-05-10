@@ -56,13 +56,7 @@ export const FieldRow: React.FC<FieldRowProps> = ({
   const badge = attributionBadge(attribution);
 
   return (
-    <Box
-      flexDirection="row"
-      paddingX={1}
-      flexShrink={0}
-      backgroundColor={"blue"}
-      flexGrow={1}
-    >
+    <Box flexDirection="row" paddingX={1} flexShrink={0} flexGrow={1}>
       <Box width={2} minWidth={2} flexShrink={0}>
         {isFocused && <Text color="white">{"☛"}</Text>}
       </Box>
