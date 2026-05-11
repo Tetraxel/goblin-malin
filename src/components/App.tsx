@@ -20,8 +20,10 @@ export const App: React.FC = () => {
       path.dirname(fileURLToPath(import.meta.url)),
       "../../init.wav",
     );
-    getInstance()
-      .play(initWav)
+    const player = getInstance();
+    player
+      .setVolume(30)
+      .then(() => player.play(initWav))
       .catch(() => {});
   }, []);
 

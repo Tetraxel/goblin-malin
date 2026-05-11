@@ -62,7 +62,13 @@ export function start(): void {
   process.stdout.rows = process.stdout.rows;
   process.stdout.columns = process.stdout.columns;
 
-  render(<App />, { patchConsole: true, maxFps: 60, exitOnCtrlC: false });
+  process.stdout.write("\x1b[?1049h"); // enter alternate screen buffer
+
+  const instance = render(<App />, { patchConsole: true, maxFps: 60, exitOnCtrlC: false });
+
+  instance.waitUntilExit().then(() => {
+    process.stdout.write("\x1b[?1049l"); // restore main screen buffer
+  });
 }
 
 const GoblinMalin = { start };

@@ -40,4 +40,4 @@ GoblinMalin.start();
 - User selects the best download source and previews the audio
 - User saves the file to the desired folder with embedded tags
 
-<img src="docs\screenshots\2026-05-08-download-view.png" width="100%"/>
+<img src="docs/screenshots/2026-05-08-download-view.png" width="100%"/>

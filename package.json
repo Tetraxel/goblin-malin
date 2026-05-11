@@ -16,14 +16,15 @@
   },
   "files": [
     "dist",
-    "README.md",
-    "docs/screenshots"
+    "README.md"
   ],
   "scripts": {
     "dev": "tsx src/cli.ts",
     "start": "ts-node src/index.ts",
     "build": "tsup",
     "type-check": "tsc --noEmit",
+    "prepack": "node scripts/patch-readme.mjs",
+    "postpack": "git checkout -- README.md",
     "prepublishOnly": "tsup"
   },
   "keywords": [
@@ -43,6 +44,10 @@
   ],
   "author": "Tetraxel",
   "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tetraxel/goblin-malin.git"
+  },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",
     "@types/dotenv": "^8.2.3",
