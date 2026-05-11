@@ -3,12 +3,14 @@ import { ToolbarButtonHook } from '../../../components/Toolbar';
 import { FlowBase } from '../../../base/flow/flow-base';
 import { FlowOrchestrator } from '../../../base/flow/flow-orchestrator';
 import { Task } from '../../../base/task/task';
+import { useTheme } from '../../../base/themeContext';
 
 export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({ flow, orchestrator }: {
     isSelected: boolean,
     flow: FlowBase,
     orchestrator: FlowOrchestrator,
 }) => {
+    const theme = useTheme();
     const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
 
@@ -29,7 +31,7 @@ export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({ flow, orchestrato
         return {
             icon: "⯈",
             label: `No task to run`,
-            color: "gray",
+            color: theme.action.neutral,
             italic: true,
             enabled: true,
         };
@@ -40,7 +42,7 @@ export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({ flow, orchestrato
         return {
             icon: "⯀",
             label: `Stop ${taskLabel}`,
-            color: "red",
+            color: theme.action.destructive,
             bold: true,
             enabled: true,
         };
@@ -48,7 +50,7 @@ export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({ flow, orchestrato
     return {
         icon: "⯈",
         label: `Run ${taskLabel}`,
-        color: "green",
+        color: theme.status.success,
         bold: true,
         enabled: true,
         onPress: () => { flow.runAll(); setIsProcessing(true); },

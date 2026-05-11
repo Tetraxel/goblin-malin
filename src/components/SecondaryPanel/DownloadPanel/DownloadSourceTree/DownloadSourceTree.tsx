@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text, useInput } from "ink";
+import { useTheme } from "../../../../base/themeContext";
 import {
   TrackDownloadSource,
   DownloadProvider,
@@ -75,6 +76,7 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
   onRejectSource,
   onInnerFocusSwitch,
 }) => {
+  const theme = useTheme();
   const treeItems = buildTreeItems(sources);
   const selectableIndices = treeItems
     .filter(
@@ -141,7 +143,7 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
         paddingX={1}
         paddingY={1}
       >
-        <Text color="gray" dimColor>
+        <Text color={theme.text.secondary} dimColor>
           No download sources yet
         </Text>
       </Box>

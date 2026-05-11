@@ -1,10 +1,11 @@
 import React from "react";
 import { Box, Text } from "ink";
-import Spinner from "ink-spinner";
 import { ColumnComponent } from "../../../components/TaskListPanel";
 import { StatusAttributes, StatusType } from "../../../base/task/task-status";
 import { AnimatedIcon, Icon } from "../../../components/AnimatedIcon";
 import { MusicDownloadTaskAttributes } from "../types";
+import { useTheme } from "../../../base/themeContext";
+import { Theme } from "../../../base/theme";
 
 function getStatusIcon(status: StatusType): React.ReactNode {
   switch (status) {
@@ -21,35 +22,33 @@ function getStatusIcon(status: StatusType): React.ReactNode {
     case StatusType.Success:
       return <Text>✅</Text>;
     case StatusType.NoStatus:
-      return <Text color="gray">▪</Text>;
+      return <Text>▪</Text>;
     case StatusType.Default:
     case StatusType.Processing:
     default:
       return <AnimatedIcon icon={Icon.Dots} />;
-    // return <Spinner type="dots" />;
   }
 }
 
-function getStatusColor(status: StatusType): string {
+function getStatusColor(status: StatusType, theme: Theme): string {
   switch (status) {
     case StatusType.Default:
-      return "blue";
     case StatusType.Processing:
-      return "blue";
+      return theme.status.processing;
     case StatusType.Pending:
-      return "white";
+      return theme.status.pending;
     case StatusType.PendingUserAction:
-      return "yellow";
+      return theme.status.warning;
     case StatusType.Skipped:
-      return "gray";
+      return theme.status.skipped;
     case StatusType.Locked:
-      return "whiteBright";
+      return theme.status.locked;
     case StatusType.Error:
-      return "red";
+      return theme.status.error;
     case StatusType.Success:
-      return "green";
+      return theme.status.success;
     default:
-      return "gray";
+      return theme.text.secondary;
   }
 }
 
@@ -72,7 +71,8 @@ export const StatusCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   width,
   isSelected,
 }) => {
-  const statusColor = getStatusColor(task.status.type);
+  const theme = useTheme();
+  const statusColor = getStatusColor(task.status.type, theme);
   const statusText = getStatusText(task.status);
   const iconComponent = getStatusIcon(task.status.type);
 

@@ -4,20 +4,25 @@ import TextInput from "ink-text-input";
 import { FieldAttribution } from "../../../flows/musicDownloadFlow/utils/compiledMetadata";
 import { FieldDef } from "../../../flows/musicDownloadFlow/utils/metadataFields";
 import { providerDisplayRegistry } from "../../../base/providerDisplay";
+import { useTheme } from "../../../base/themeContext";
+import { Theme } from "../../../base/theme";
 
 function getPlatformColor(apiProvider: string): string {
   return providerDisplayRegistry.get(apiProvider).colorSubtle;
 }
 
-function attributionBadge(attr: FieldAttribution | undefined): {
+function attributionBadge(
+  attr: FieldAttribution | undefined,
+  theme: Theme,
+): {
   text: string;
   color: string;
   italic?: boolean;
 } {
-  if (!attr) return { text: "", color: "gray" };
+  if (!attr) return { text: "", color: theme.text.secondary };
   if (attr === "manual")
-    return { text: "EDITED", color: "yellow", italic: true };
-  if (attr === "none") return { text: "—", color: "gray" };
+    return { text: "EDITED", color: theme.field.overridden, italic: true };
+  if (attr === "none") return { text: "—", color: theme.text.secondary };
   return {
     text: `${attr.toUpperCase().slice(0, 8)}`,
     color: getPlatformColor(attr),
@@ -53,15 +58,16 @@ export const FieldRow: React.FC<FieldRowProps> = ({
   onEditValueChange,
   onEditSubmit,
 }) => {
-  const badge = attributionBadge(attribution);
+  const theme = useTheme();
+  const badge = attributionBadge(attribution, theme);
 
   return (
     <Box flexDirection="row" paddingX={1} flexShrink={0} flexGrow={1}>
       <Box width={2} minWidth={2} flexShrink={0}>
-        {isFocused && <Text color="white">{"☛"}</Text>}
+        {isFocused && <Text color={theme.text.active}>{"☛"}</Text>}
       </Box>
       <Box width={LABEL_W} flexShrink={0}>
-        <Text color={isFocused ? "green" : "cyan"} bold>
+        <Text color={isFocused ? theme.field.selected : theme.ui.border} bold>
           {field.label.toUpperCase().padEnd(LABEL_W)}
         </Text>
       </Box>
@@ -73,12 +79,18 @@ export const FieldRow: React.FC<FieldRowProps> = ({
             onChange={onEditValueChange}
             onSubmit={onEditSubmit}
           />
-          {editError && <Text color="red"> ✗ invalid</Text>}
+          {editError && <Text color={theme.field.error}> ✗ invalid</Text>}
         </Box>
       ) : (
         <Box flexGrow={1}>
           <Text
-            color={value === "—" ? "gray" : hasOverride ? "yellow" : "white"}
+            color={
+              value === "—"
+                ? theme.field.missing
+                : hasOverride
+                  ? theme.field.overridden
+                  : theme.field.normal
+            }
             underline={isFocused}
             dimColor={value === "—"}
             wrap="truncate-end"

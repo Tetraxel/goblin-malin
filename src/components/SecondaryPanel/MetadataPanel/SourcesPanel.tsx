@@ -17,6 +17,8 @@ import { MetadataDetailPanel } from "./MetadataDetailPanel";
 import { SourcesHintBar } from "../SourcesHintBar";
 import { DownloadSourceTree } from "../DownloadPanel/DownloadSourceTree/DownloadSourceTree";
 import { DownloadSourceDetail } from "../DownloadPanel/DownloadSourceDetail/DownloadSourceDetail";
+import { Hint } from "../../Hint";
+import { useTheme } from "../../../base/themeContext";
 
 const HINT_BAR_HEIGHT = 2;
 
@@ -33,6 +35,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   width,
   height,
 }) => {
+  const theme = useTheme();
   const {
     focusState,
     setSelectedSourceIndex,
@@ -115,14 +118,11 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
   useInput(
     (_, key) => {
       if (!isPanelActive || innerFocus !== "detail") return;
-      if (key.upArrow) {
-        setDetailFieldIndex(Math.max(0, selectedFieldIndex - 1));
-      }
-      if (key.downArrow) {
+      if (key.upArrow) setDetailFieldIndex(Math.max(0, selectedFieldIndex - 1));
+      if (key.downArrow)
         setDetailFieldIndex(
           Math.min(navigableFields.length - 1, selectedFieldIndex + 1),
         );
-      }
     },
     {
       isActive:
@@ -224,12 +224,7 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       downloadNavIndex >= 0
         ? (downloadSources[downloadNavIndex] ?? null)
         : null;
-
-    const listSelectedSource =
-      downloadNavIndex >= 0
-        ? (downloadSources[downloadNavIndex] ?? null)
-        : null;
-    const canPlaySelected = listSelectedSource?.localFile?.state === "found";
+    const canPlaySelected = selectedSource?.localFile?.state === "found";
     const dimHints = !isPanelActive || innerFocus !== "list";
 
     return (
@@ -238,7 +233,8 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
         height={height}
         overflow="hidden"
         borderStyle="single"
-        borderColor="cyan"
+        borderColor={theme.ui.border}
+        borderBackgroundColor={theme.ui.background}
         borderTop={false}
         borderBottom={false}
         paddingRight={1}
@@ -257,15 +253,21 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
           />
           <DownloadSourceDetail
             source={selectedSource}
+            savedSource={null}
+            compiled={compiled}
+            outputDir={""}
             isDiffMode={isDiffMode}
+            diffKind="source-switch"
             pendingSource={pendingSource}
             isActive={isPanelActive && innerFocus === "detail"}
+            isSaving={false}
             width={rightWidth}
             height={listHeight}
             onInnerFocusSwitch={() => setSourcesInnerFocus("list")}
             onConfirmDiff={handleConfirmDiff}
             onCancelDiff={handleCancelDiff}
             onRelocateFile={handleRelocateFile}
+            onSave={() => {}}
           />
         </Box>
         <Box
@@ -277,47 +279,28 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
           justifyContent="flex-end"
         >
           <Box flexDirection="row" width={width - 2} overflow="hidden">
-            {listSelectedSource && (
+            {selectedSource && (
               <Box marginRight={1}>
-                <Text color="white" dimColor={dimHints} bold>
+                <Text color={theme.text.active} dimColor={dimHints} bold>
                   Source {downloadNavIndex + 1}/{downloadSources.length}
                 </Text>
               </Box>
             )}
-            {listSelectedSource && (
+            {selectedSource && (
               <Box marginRight={2}>
-                <Text color="white" dimColor={dimHints}>
+                <Text color={theme.text.active} dimColor={dimHints}>
                   {">>>"}
                 </Text>
               </Box>
             )}
-            <Box marginRight={2}>
-              <Text color="white" dimColor={dimHints} bold>
-                [Enter]
-              </Text>
-              <Text color="gray" dimColor={dimHints}>
-                {" "}
-                Select
-              </Text>
-            </Box>
-            <Box marginRight={2}>
-              <Text color="white" dimColor={dimHints} bold>
-                [Del]
-              </Text>
-              <Text color="gray" dimColor={dimHints}>
-                {listSelectedSource?.isRejected ? " Unreject" : " Reject"}
-              </Text>
-            </Box>
+            <Hint label="Select" shortcut="Enter" dim={dimHints} />
+            <Hint
+              label={selectedSource?.isRejected ? " Unreject" : " Reject"}
+              shortcut="Del"
+              dim={dimHints}
+            />
             {canPlaySelected && (
-              <Box marginRight={2}>
-                <Text color="white" dimColor={dimHints} bold>
-                  [Space]
-                </Text>
-                <Text color="gray" dimColor={dimHints}>
-                  {" "}
-                  Play/Pause
-                </Text>
-              </Box>
+              <Hint label="Play/Pause" shortcut="Space" dim={dimHints} />
             )}
           </Box>
         </Box>
@@ -336,7 +319,8 @@ export const SourcesPanel: React.FC<SourcesPanelProps> = ({
       height={height}
       overflow="hidden"
       borderStyle="single"
-      borderColor="cyan"
+      borderColor={theme.ui.border}
+      borderBackgroundColor={theme.ui.background}
       borderTop={false}
       borderBottom={false}
       paddingRight={1}

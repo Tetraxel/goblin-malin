@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { formatDuration } from "./utils";
+import { useTheme } from "../../../base/themeContext";
 
 interface PlaybackBarProps {
   positionMs: number;
@@ -17,8 +18,9 @@ export function PlaybackBar({
   isPlaying,
   isPaused,
 }: PlaybackBarProps) {
+  const theme = useTheme();
   const active = isPlaying || isPaused;
-  const effectiveWidth = Math.max(0, width - 2); // reserve marginX=1 on both sides
+  const effectiveWidth = Math.max(0, width - 2);
   const timeStr =
     "  " +
     (active ? formatDuration(positionMs) : "0:00") +
@@ -39,16 +41,22 @@ export function PlaybackBar({
       overflow="hidden"
       marginBottom={1}
       marginX={1}
-      backgroundColor={"#131313"}
+      backgroundColor={theme.ui.background}
     >
       <Box flexDirection="row" flexGrow={1} overflow="hidden">
-        <Text color={isPlaying ? "green" : "gray"} dimColor={!active}>
+        <Text
+          color={isPlaying ? theme.ui.progressFill : theme.text.secondary}
+          dimColor={!active}
+        >
           {isPaused ? "⏸  " : "▶  "}
         </Text>
-        <Text color={isPlaying ? "green" : "gray"} dimColor={!active}>
+        <Text
+          color={isPlaying ? theme.ui.progressFill : theme.text.secondary}
+          dimColor={!active}
+        >
           {bar}
         </Text>
-        <Text color="gray" dimColor={!active}>
+        <Text color={theme.text.secondary} dimColor={!active}>
           {timeStr}
         </Text>
       </Box>

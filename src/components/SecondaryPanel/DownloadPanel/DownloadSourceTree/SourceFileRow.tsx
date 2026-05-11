@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import { TrackDownloadSource } from "../../../../flows/musicDownloadFlow/types";
 import { formatBytes } from "../utils";
 import { StateBadge } from "../StateBadge";
+import { useTheme } from "../../../../base/themeContext";
 
 interface SourceFileRowProps {
   source: TrackDownloadSource;
@@ -19,12 +20,21 @@ export function SourceFileRow({
   isActive,
   width,
 }: SourceFileRowProps) {
+  const theme = useTheme();
   const bg =
-    isSelected && isActive ? "#2a2a2a" : isSelected ? "#131313" : undefined;
+    isSelected && isActive
+      ? theme.ui.rowActiveBackground
+      : isSelected
+        ? theme.ui.rowBackground
+        : undefined;
 
   const localFile = source.localFile;
-  const filename = localFile ? `${localFile.name}.${localFile.extension}` : null;
-  const sizeText = source.fileInfo ? formatBytes(source.fileInfo.sizeBytes) : "";
+  const filename = localFile
+    ? `${localFile.name}.${localFile.extension}`
+    : null;
+  const sizeText = source.fileInfo
+    ? formatBytes(source.fileInfo.sizeBytes)
+    : "";
 
   return (
     <Box
@@ -37,20 +47,22 @@ export function SourceFileRow({
       paddingLeft={1}
     >
       <Box width={3} minWidth={3} flexShrink={0}>
-        <Text color="cyan">{isSelected && isActive ? "☛ " : "  "}</Text>
+        <Text color={theme.ui.focusIndicator}>
+          {isSelected && isActive ? "☛ " : "  "}
+        </Text>
       </Box>
       <Box width={2} minWidth={2} flexShrink={0}>
         {source.isRejected ? (
-          <Text color="red">✘ </Text>
+          <Text color={theme.status.error}>✘ </Text>
         ) : source.selected ? (
-          <Text color="cyan">✓ </Text>
+          <Text color={theme.ui.selection}>✓ </Text>
         ) : (
           <Text>{"  "}</Text>
         )}
       </Box>
       <Box minWidth={3} flexShrink={0}>
         <Text
-          color="gray"
+          color={theme.text.secondary}
           dimColor={source.isRejected}
           strikethrough={source.isRejected}
         >
@@ -60,7 +72,7 @@ export function SourceFileRow({
       <Box flexGrow={1} overflow="hidden">
         {filename ? (
           <Text
-            color="white"
+            color={theme.text.primary}
             wrap="truncate-end"
             dimColor={source.isRejected}
             strikethrough={source.isRejected}
@@ -73,7 +85,7 @@ export function SourceFileRow({
       </Box>
       {sizeText !== "" && (
         <Box minWidth={sizeText.length + 1} paddingLeft={1} flexShrink={0}>
-          <Text color="gray">{sizeText}</Text>
+          <Text color={theme.text.secondary}>{sizeText}</Text>
         </Box>
       )}
       <Box paddingLeft={1} paddingRight={1} flexShrink={0}>

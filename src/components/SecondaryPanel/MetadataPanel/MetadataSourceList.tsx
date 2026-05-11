@@ -9,6 +9,7 @@ import { CompiledMetadata } from "../../../flows/musicDownloadFlow/utils/compile
 import { useSourceListInput } from "../../../hooks/useSourceListInput";
 import { MetadataSourceRow } from "./MetadataSourceRow";
 import { MetadataCompiledRow } from "./MetadataCompiledRow";
+import { useTheme } from "../../../base/themeContext";
 
 interface MetadataSourceListProps {
   sources: MetadataSourceState[];
@@ -40,6 +41,7 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
   onSourcesChange,
   isDiscovering = false,
 }) => {
+  const theme = useTheme();
   const sortedSources = [...sources].sort((a, b) => a.rank - b.rank);
 
   useSourceListInput({
@@ -89,10 +91,13 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
       </Box>
       {isDiscovering && (
         <Box paddingLeft={3}>
-          <Text color="gray">
+          <Text color={theme.text.secondary}>
             <Spinner type="dots" />
           </Text>
-          <Text color="gray"> Discovering on other platforms…</Text>
+          <Text color={theme.text.secondary}>
+            {" "}
+            Discovering on other platforms…
+          </Text>
         </Box>
       )}
     </Box>

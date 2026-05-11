@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Text } from "ink";
 import { TrackDownloadSource } from "../../../../flows/musicDownloadFlow/types";
 import { providerDisplayRegistry } from "../../../../base/providerDisplay";
+import { useTheme } from "../../../../base/themeContext";
 
 function getPlatformDisplay(apiProvider: string): {
   label: string;
@@ -16,6 +17,7 @@ interface MetadataHeaderProps {
 }
 
 export function MetadataHeader({ source }: MetadataHeaderProps) {
+  const theme = useTheme();
   const m = source.track;
   const { label: platformLabel, color: platformColor } = getPlatformDisplay(
     m.apiProvider,
@@ -30,16 +32,16 @@ export function MetadataHeader({ source }: MetadataHeaderProps) {
 
   return (
     <Box paddingLeft={2} flexDirection="row" overflow="hidden">
-      <Text color="gray">{"└─ used "}</Text>
+      <Text color={theme.text.secondary}>{"└─ used "}</Text>
       {parts.map((part, idx) => (
         <React.Fragment key={idx}>
-          {idx > 0 && <Text color="gray">{" > "}</Text>}
+          {idx > 0 && <Text color={theme.text.secondary}>{" > "}</Text>}
           <Text color={platformColor as any} wrap="truncate-end">
             {part}
           </Text>
         </React.Fragment>
       ))}
-      <Text color="white" wrap="truncate-end">{` (${info})`}</Text>
+      <Text color={theme.text.primary} wrap="truncate-end">{` (${info})`}</Text>
     </Box>
   );
 }

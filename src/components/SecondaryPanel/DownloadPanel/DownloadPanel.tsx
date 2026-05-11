@@ -19,6 +19,7 @@ import {
 import { getSaveSettings } from "../../../flows/musicDownloadFlow/saveSettings";
 import { computeOutputFilename } from "../../../flows/musicDownloadFlow/utils/computeOutputPath";
 import path from "path";
+import { useTheme } from "../../../base/themeContext";
 
 const HINT_BAR_HEIGHT = 2;
 
@@ -33,6 +34,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({
   width,
   height,
 }) => {
+  const theme = useTheme();
   const { focusState, setSelectedSourceIndex, setSourcesInnerFocus } =
     useFocusContext();
 
@@ -227,7 +229,8 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({
       height={height}
       overflow="hidden"
       borderStyle="single"
-      borderColor="cyan"
+      borderColor={theme.ui.border}
+      borderBackgroundColor={theme.ui.background}
       borderTop={false}
       borderBottom={false}
       paddingRight={1}
@@ -274,19 +277,18 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({
         <Box flexDirection="row" width={width - 2} overflow="hidden">
           {selectedSource && (
             <Box marginRight={1}>
-              <Text color="white" dimColor={dimHints} bold>
+              <Text color={theme.text.active} dimColor={dimHints} bold>
                 Source {downloadNavIndex + 1}/{downloadSources.length}
               </Text>
             </Box>
           )}
           {selectedSource && (
             <Box marginRight={2}>
-              <Text color="white" dimColor={dimHints}>
+              <Text color={theme.text.active} dimColor={dimHints}>
                 {">>>"}
               </Text>
             </Box>
           )}
-
           <Hint label="Select" shortcut="Enter" dim={dimHints} />
           <Hint
             label={selectedSource?.isRejected ? " Unreject" : " Reject"}

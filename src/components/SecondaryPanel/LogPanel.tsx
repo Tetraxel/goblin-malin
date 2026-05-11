@@ -5,6 +5,7 @@ import { LogMetadata } from "../../base/logger/types";
 import { inspect } from "util";
 import { useFocusContext } from "../../contexts/FocusContext";
 import { Task } from "../../base/task/task";
+import { useTheme } from "../../base/themeContext";
 
 function formatDetails(details?: Record<string, any>): string {
   if (!details || Object.keys(details).length === 0) {
@@ -44,6 +45,7 @@ export const LogPanel = ({
   width?: number;
   height?: number;
 }) => {
+  const theme = useTheme();
   const { focusState } = useFocusContext();
   const height = heightProp ?? focusState.layout.secondaryPanelHeight;
   const width = widthProp ?? focusState.logPanel.width;
@@ -101,8 +103,13 @@ export const LogPanel = ({
   const showIndicator = clampedOffset > 0;
   // Reserve one row for the indicator when it's visible
   const logRows = showIndicator ? height - 1 : height;
-  const visibleEnd = showIndicator ? filteredLogs.length - clampedOffset : undefined;
-  const visibleStart = Math.max(0, (visibleEnd ?? filteredLogs.length) - logRows);
+  const visibleEnd = showIndicator
+    ? filteredLogs.length - clampedOffset
+    : undefined;
+  const visibleStart = Math.max(
+    0,
+    (visibleEnd ?? filteredLogs.length) - logRows,
+  );
   const visibleLogs = filteredLogs.slice(visibleStart, visibleEnd);
 
   return (
@@ -110,7 +117,8 @@ export const LogPanel = ({
       flexDirection="row"
       overflow="hidden"
       borderStyle="single"
-      borderColor="cyan"
+      borderColor={theme.ui.border}
+      borderBackgroundColor={theme.ui.background}
       borderTop={false}
       borderBottom={false}
       height={height}
@@ -124,7 +132,7 @@ export const LogPanel = ({
         ))}
         {showIndicator && (
           <Box paddingX={1}>
-            <Text color="cyan" dimColor>
+            <Text color={theme.ui.border} dimColor>
               ↓ {clampedOffset} more below
             </Text>
           </Box>

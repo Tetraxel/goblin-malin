@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import TextInput from "ink-text-input";
 import type { SettingsItem } from "../settings/buildSettingsItems";
 import { sanitizeInput } from "../utils/string";
+import { useTheme } from "../base/themeContext";
 
 interface SettingsItemRowProps {
   item: SettingsItem;
@@ -23,13 +24,14 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
   onEditSubmit,
   innerWidth,
 }) => {
+  const theme = useTheme();
   const cursor = isSelected ? "☛ " : "  ";
 
   switch (item.kind) {
     case "sectionHeader":
       return (
         <Box marginTop={1}>
-          <Text bold color="white">
+          <Text bold color={theme.text.heading}>
             {item.label.toUpperCase()}
           </Text>
         </Box>
@@ -61,7 +63,10 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
     case "checkbox":
       return (
         <Box paddingLeft={item.indent}>
-          <Text color={isSelected ? "cyan" : undefined} bold={isSelected}>
+          <Text
+            color={isSelected ? theme.ui.focusIndicator : undefined}
+            bold={isSelected}
+          >
             {cursor}
             {item.get() ? "☑" : "☐"}
             {"  " + item.label}
@@ -73,7 +78,10 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
       const prefix = cursor + item.label + ": ";
       return (
         <Box paddingLeft={item.indent}>
-          <Text color={isSelected ? "cyan" : undefined} bold={isSelected}>
+          <Text
+            color={isSelected ? theme.ui.focusIndicator : undefined}
+            bold={isSelected}
+          >
             {prefix}
           </Text>
           {isEditing ? (
@@ -84,16 +92,33 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
               focus
             />
           ) : (
-            <Text color="gray">[{item.get()}]</Text>
+            <Text color={theme.text.secondary}>[{item.get()}]</Text>
           )}
         </Box>
       );
     }
 
+    case "select":
+      return (
+        <Box paddingLeft={item.indent}>
+          <Text
+            color={isSelected ? theme.ui.focusIndicator : undefined}
+            bold={isSelected}
+          >
+            {cursor}
+            {item.label}:{" "}
+          </Text>
+          <Text color={theme.text.secondary}>[{item.get()} ◀ ▶]</Text>
+        </Box>
+      );
+
     case "action":
       return (
         <Box paddingLeft={item.indent}>
-          <Text color={isSelected ? "cyan" : undefined} bold={isSelected}>
+          <Text
+            color={isSelected ? theme.ui.focusIndicator : undefined}
+            bold={isSelected}
+          >
             {cursor}
             {item.label}
           </Text>

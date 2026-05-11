@@ -1,13 +1,15 @@
 import { ToolbarButtonHook } from '../../../components/Toolbar';
 import { cache } from '../../../utils/cache';
+import { useTheme } from '../../../base/themeContext';
 
 const LEAVE_ALT_SCREEN_COMMAND = "\x1b[?1049l";
 
 export const useExitButton: ToolbarButtonHook = () => {
+    const theme = useTheme();
     return {
         label: "Exit",
         icon: "↳",
-        color: "red",
+        color: theme.action.destructive,
         enabled: true,
         onPress: () => {
             process.stdout.write(LEAVE_ALT_SCREEN_COMMAND);

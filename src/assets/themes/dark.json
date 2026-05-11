@@ -1,0 +1,72 @@
+{
+  "palette": {
+    "blue": "#58a6ff",
+    "cyan": "#39c5cf",
+    "red": "#ff7b72",
+    "green": "#56d364",
+    "yellow": "#e3b341",
+    "orange": "#f0883e",
+    "purple": "#d2a8ff",
+    "pink": "#f778ba",
+    "white": "#e6edf3",
+    "gray": "#8b949e",
+    "grayDark": "#484f58"
+  },
+  "ui": {
+    "background": "#000000",
+    "rowBackground": "#161b22",
+    "rowActiveBackground": "#21262d",
+    "border": "#39c5cf",
+    "separator": "#39c5cf",
+    "selection": "#58a6ff",
+    "tabActive": "#58a6ff",
+    "tabInactive": "#8b949e",
+    "panelTitle": "#e6edf3",
+    "progressFill": "#56d364",
+    "progressEmpty": "#484f58",
+    "modalBorder": "#39c5cf",
+    "focusIndicator": "#58a6ff",
+    "dimText": "#484f58"
+  },
+  "text": {
+    "primary": "#e6edf3",
+    "secondary": "#8b949e",
+    "muted": "#484f58",
+    "hint": "#8b949e",
+    "active": "#e6edf3",
+    "heading": "#e6edf3"
+  },
+  "status": {
+    "processing": "#388bfd",
+    "pending": "#e6edf3",
+    "success": "#56d364",
+    "warning": "#e3b341",
+    "error": "#ff7b72",
+    "skipped": "#8b949e",
+    "locked": "#e6edf3",
+    "downloading": "#e3b341"
+  },
+  "field": {
+    "normal": "#e6edf3",
+    "overridden": "#e3b341",
+    "missing": "#8b949e",
+    "selected": "#56d364",
+    "error": "#ff7b72"
+  },
+  "confidence": {
+    "high": "#56d364",
+    "medium": "#e3b341",
+    "low": "#8b949e",
+    "veryLow": "#ff7b72"
+  },
+  "diff": {
+    "base": "#8b949e",
+    "changed": "#39c5cf",
+    "modified": "#e3b341"
+  },
+  "action": {
+    "primary": "#e3b341",
+    "destructive": "#ff7b72",
+    "neutral": "#8b949e"
+  }
+}

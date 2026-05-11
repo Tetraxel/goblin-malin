@@ -2,6 +2,8 @@ import React from "react";
 import { Box, Text } from "ink";
 import { MetadataSourceState } from "../../../flows/musicDownloadFlow/types";
 import { providerDisplayRegistry } from "../../../base/providerDisplay";
+import { useTheme } from "../../../base/themeContext";
+import { Theme } from "../../../base/theme";
 
 function getDisplay(apiProvider: string): { label: string; color: string } {
   const display = providerDisplayRegistry.get(apiProvider);
@@ -16,16 +18,20 @@ function formatDuration(ms: number | undefined): string {
   return `(${m}:${s.toString().padStart(2, "0")})`;
 }
 
-function confidenceBadge(confidence: number | undefined): {
+function confidenceBadge(
+  confidence: number | undefined,
+  theme: Theme,
+): {
   text: string;
   color: string;
 } {
-  if (confidence === undefined) return { text: "[??%]", color: "gray" };
+  if (confidence === undefined)
+    return { text: "[??%]", color: theme.text.secondary };
   const text = `[${confidence.toString().padStart(3, " ")}%]`;
-  if (confidence >= 90) return { text, color: "green" };
-  if (confidence >= 70) return { text, color: "yellow" };
-  if (confidence >= 50) return { text, color: "gray" };
-  return { text, color: "red" };
+  if (confidence >= 90) return { text, color: theme.confidence.high };
+  if (confidence >= 70) return { text, color: theme.confidence.medium };
+  if (confidence >= 50) return { text, color: theme.confidence.low };
+  return { text, color: theme.confidence.veryLow };
 }
 
 interface SourceRowProps {
@@ -41,14 +47,15 @@ export const MetadataSourceRow: React.FC<SourceRowProps> = ({
   isActive,
   width,
 }) => {
+  const theme = useTheme();
   const statusIcon = source.isRejected ? "✘" : source.isFavorited ? "★" : "?";
   const statusColor = source.isRejected
-    ? "red"
+    ? theme.status.error
     : source.isFavorited
-      ? "yellow"
-      : "gray";
+      ? theme.field.overridden
+      : theme.text.secondary;
   const display = getDisplay(source.metadata.apiProvider);
-  const prefixColor = source.isRejected ? "gray" : display.color;
+  const prefixColor = source.isRejected ? theme.text.secondary : display.color;
   const isDimmed = source.isRejected;
 
   const m = source.metadata;
@@ -62,8 +69,8 @@ export const MetadataSourceRow: React.FC<SourceRowProps> = ({
   const prefixParts = [display.label, type, m.id].filter(Boolean);
   const suffix = ` > ${info}${dur ? ` ${dur}` : ""}`;
 
-  const badge = confidenceBadge(source.confidence);
-  const focusColorBg = isActive ? "#2a2a2a" : "#131313";
+  const badge = confidenceBadge(source.confidence, theme);
+  const focusColorBg = isActive ? theme.ui.rowActiveBackground : theme.ui.rowBackground;
   const bg = isSelected ? focusColorBg : undefined;
 
   return (
@@ -83,17 +90,13 @@ export const MetadataSourceRow: React.FC<SourceRowProps> = ({
         <Text>{isSelected && isActive ? "☛ " : "  "}</Text>
       </Box>
       <Box width={2} minWidth={2}>
-        <Text
-          dimColor={isDimmed}
-          color={statusColor as string}
-          wrap="truncate-end"
-        >
+        <Text dimColor={isDimmed} color={statusColor} wrap="truncate-end">
           {statusIcon}{" "}
         </Text>
       </Box>
       <Box width={badge.text.length + 1} minWidth={badge.text.length + 1}>
         <Text
-          color={badge.color as string}
+          color={badge.color}
           dimColor={isDimmed}
           strikethrough={isDimmed}
           wrap="truncate-end"
@@ -118,7 +121,7 @@ export const MetadataSourceRow: React.FC<SourceRowProps> = ({
           >
             {i > 0 && (
               <Text
-                color="white"
+                color={theme.text.primary}
                 dimColor={isDimmed}
                 strikethrough={isDimmed}
                 wrap="truncate-end"
@@ -137,7 +140,7 @@ export const MetadataSourceRow: React.FC<SourceRowProps> = ({
           </Box>
         ))}
         <Text
-          color="white"
+          color={theme.text.primary}
           dimColor={isDimmed}
           strikethrough={isDimmed}
           wrap="truncate-end"
@@ -154,7 +157,7 @@ export const MetadataSourceRow: React.FC<SourceRowProps> = ({
           paddingLeft={1}
           paddingRight={1}
         >
-          <Text color="gray" dimColor={isDimmed}>
+          <Text color={theme.text.secondary} dimColor={isDimmed}>
             {">>>"}
           </Text>
         </Box>

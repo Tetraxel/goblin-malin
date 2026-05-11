@@ -4,6 +4,7 @@ import { Task } from "../base/task/task";
 import { useTask } from "../hooks/useTask";
 import { CalculatedColumn } from "./TaskListPanel";
 import { FlowBase } from "../base/flow/flow-base";
+import { useTheme } from "../base/themeContext";
 
 export const TaskRow = React.memo(function TaskRow<TAttributes>({
   taskReference,
@@ -20,6 +21,7 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
   columns: CalculatedColumn<TAttributes>[];
   flow: FlowBase;
 }) {
+  const theme = useTheme();
   const task = useTask<TAttributes>(taskReference);
 
   const isActiveIndicator = isActive ? "☛" : " ";
@@ -31,7 +33,7 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
       key={task.id}
       paddingX={1}
       overflowY="hidden"
-      backgroundColor={isActive ? "#111111" : undefined}
+      backgroundColor={isActive ? theme.ui.rowBackground : undefined}
     >
       <Box width={2}>
         <Text color={isActive ? "white" : isMultiSelected ? "cyan" : "white"}>
@@ -49,7 +51,7 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
             flexGrow={column.flexGrow}
             overflow="hidden"
             paddingX={1}
-            backgroundColor={isCellActive ? "gray" : undefined}
+            backgroundColor={isCellActive ? theme.ui.rowActiveBackground : undefined}
           >
             <CellComponent
               task={task}

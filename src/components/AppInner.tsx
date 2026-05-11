@@ -16,6 +16,7 @@ import { Task, TaskAttributes } from "../base/task/task";
 import { MusicDownloadTaskAttributes } from "../flows/musicDownloadFlow/types";
 import { FlowBase } from "../base/flow/flow-base";
 import { useImportFlow } from "../hooks/useImportFlow";
+import { useTheme } from "../base/themeContext";
 
 export const AppInner: React.FC<{
   tasks: Task<TaskAttributes>[];
@@ -38,6 +39,7 @@ export const AppInner: React.FC<{
   terminalHeight,
   terminalWidth,
 }) => {
+  const theme = useTheme();
   const {
     pendingImport,
     openImportFlow,
@@ -54,7 +56,11 @@ export const AppInner: React.FC<{
         openImportFlow={openImportFlow}
       />
 
-      <Box flexDirection="column" height={terminalHeight}>
+      <Box
+        flexDirection="column"
+        height={terminalHeight}
+        backgroundColor={theme.ui.background}
+      >
         {currentFlow && (
           <Toolbar
             buttons={toolbarButtons}

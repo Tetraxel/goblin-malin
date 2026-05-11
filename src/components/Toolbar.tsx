@@ -8,6 +8,8 @@ import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
 import { ToolbarButtonInvoker } from "./ToolbarButtonInvoker";
 import { FlowBase } from "../base/flow/flow-base";
 import { TabBar } from "./TabBar";
+import { useTheme } from "../base/themeContext";
+
 export type ToolbarButtonHook<TFlow = FlowBase> = ({
   isSelected,
   flow,
@@ -41,20 +43,22 @@ export const Toolbar = ({
   flow: FlowBase;
   orchestrator: FlowOrchestrator;
 }) => {
+  const theme = useTheme();
   const { focusState } = useFocusContext();
   const isActive = focusState.activeWindow === "toolbar";
   const height = focusState.toolbar.height;
 
   const name = "😉 " + (width > 90 ? "Goblin Malin" : "");
   const nameWidth = stringWidth(name);
-  const splitPositions = [nameWidth + 3]; // left border + padding
+  const splitPositions = [nameWidth + 3];
 
   return (
     <>
       <Separator width={width} type="top" splitPositions={splitPositions} />
       <Box
         borderStyle="single"
-        borderColor="cyan"
+        borderColor={theme.ui.border}
+        borderBackgroundColor={theme.ui.background}
         borderTop={false}
         borderBottom={false}
         paddingX={1}
@@ -64,7 +68,8 @@ export const Toolbar = ({
       >
         <Box
           borderStyle="single"
-          borderColor="cyan"
+          borderColor={theme.ui.border}
+          borderBackgroundColor={theme.ui.background}
           borderTop={false}
           borderBottom={false}
           borderLeft={false}
@@ -74,7 +79,7 @@ export const Toolbar = ({
           height={height}
           overflow="hidden"
         >
-          <Text color={"yellow"} bold={true}>
+          <Text color={theme.action.primary} bold={true}>
             {name}
           </Text>
         </Box>
@@ -95,26 +100,6 @@ export const Toolbar = ({
           );
         })}
 
-        {/* {buttons.map((hook, index) => {
-          const isSelected =
-            isActive && focusState.toolbar.selectedButtonIndex === index;
-          const { enabled, label, icon, color, bold } = hook({ isSelected });
-
-          if (!enabled) return null;
-
-          return (
-            <Box key={index} marginRight={0}>
-              <Text
-                backgroundColor={isSelected ? color : undefined}
-                color={isSelected ? "white" : color}
-                bold={bold}
-              >
-                {` ${icon} ${label} `}
-              </Text>
-            </Box>
-          );
-        })} */}
-
         <Box
           flexDirection={"row"}
           display={"flex"}
@@ -128,9 +113,6 @@ export const Toolbar = ({
             currentFlow={flow}
             onFlowChange={onFlowChange}
           />
-          {/* <Text color={"gray"} italic={true}>
-            Music Download Flow
-          </Text> */}
         </Box>
       </Box>
       <PrimaryModeTabBar width={width} splitPos={splitPositions[0] ?? 0} />

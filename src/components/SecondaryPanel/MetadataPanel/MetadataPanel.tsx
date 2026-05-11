@@ -12,6 +12,7 @@ import { navigableFields } from "../../../flows/musicDownloadFlow/utils/metadata
 import { MetadataSourceList } from "./MetadataSourceList";
 import { MetadataDetailPanel } from "./MetadataDetailPanel";
 import { SourcesHintBar } from "../SourcesHintBar";
+import { useTheme } from "../../../base/themeContext";
 
 const HINT_BAR_HEIGHT = 2;
 
@@ -26,6 +27,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
   width,
   height,
 }) => {
+  const theme = useTheme();
   const {
     focusState,
     setSelectedSourceIndex,
@@ -128,7 +130,8 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
       height={height}
       overflow="hidden"
       borderStyle="single"
-      borderColor="cyan"
+      borderColor={theme.ui.border}
+      borderBackgroundColor={theme.ui.background}
       borderTop={false}
       borderBottom={false}
       paddingRight={1}

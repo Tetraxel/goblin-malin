@@ -3,6 +3,7 @@ import { Box, Text, useInput } from "ink";
 import { useFocusContext } from "../contexts/FocusContext";
 import { DetectedUrl, SupportedPlatform } from "../utils/detectUrls";
 import { providerDisplayRegistry } from "../base/providerDisplay";
+import { useTheme } from "../base/themeContext";
 
 export type PendingImport = {
   urls: DetectedUrl[];
@@ -51,6 +52,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  const theme = useTheme();
   const { focusState, switchWindow, switchBack } = useFocusContext();
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
 
@@ -142,13 +144,14 @@ export const ImportModal: React.FC<ImportModalProps> = ({
         <Box
           flexDirection="column"
           borderStyle="round"
-          borderColor="cyan"
+          borderColor={theme.ui.modalBorder}
+          borderBackgroundColor={theme.ui.background}
           paddingX={2}
           paddingY={1}
           width={modalWidth}
-          backgroundColor="#1a1a1a"
+          backgroundColor={theme.ui.background}
         >
-          <Text bold color="cyan">
+          <Text bold color={theme.ui.modalBorder}>
             {title}
           </Text>
 
@@ -187,7 +190,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                 <Box key={idx}>
                   <Text
                     bold={isSelected}
-                    color={isSelected ? "cyan" : undefined}
+                    color={isSelected ? theme.ui.focusIndicator : undefined}
                   >
                     {isSelected ? "☛ " : "  "}
                     {opt.label}

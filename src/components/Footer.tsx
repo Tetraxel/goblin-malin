@@ -3,8 +3,10 @@ import { Box, Text } from "ink";
 import { useFocusContext } from "../contexts/FocusContext";
 import { inkTransport } from "../base/logger/ink-transport";
 import { LogMetadata } from "../base/logger/types";
+import { useTheme } from "../base/themeContext";
 
 export const Footer: React.FC = () => {
+  const theme = useTheme();
   const { focusState } = useFocusContext();
   const height = focusState.footer.height;
   const subTab = focusState.secondaryPanel.subTab;
@@ -30,14 +32,17 @@ export const Footer: React.FC = () => {
   return (
     <Box
       borderStyle="single"
-      borderColor="cyan"
+      borderColor={theme.ui.border}
+      borderBackgroundColor={theme.ui.background}
       paddingX={1}
       borderTop={false}
       overflow="hidden"
       height={height}
     >
-      <Text color="gray">
-        {subTab === "logs" && <Text color="cyan">{countSuffix}</Text>}
+      <Text color={theme.text.secondary}>
+        {subTab === "logs" && (
+          <Text color={theme.ui.border}>{countSuffix}</Text>
+        )}
         <Text>{logText}</Text>
       </Text>
     </Box>

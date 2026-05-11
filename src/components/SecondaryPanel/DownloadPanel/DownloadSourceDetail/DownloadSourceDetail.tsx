@@ -12,6 +12,7 @@ import { DiffView } from "./DiffView";
 import { DetailRow } from "./DetailRow";
 import { Hint } from "../../../Hint";
 import { providerDisplayRegistry } from "../../../../base/providerDisplay";
+import { useTheme } from "../../../../base/themeContext";
 
 interface DownloadSourceDetailProps {
   source: TrackDownloadSource | null;
@@ -44,11 +45,12 @@ const PRIORITY_TAGS = [
 ];
 
 function SectionDivider({ label, width }: { label: string; width: number }) {
+  const theme = useTheme();
   const innerW = width - 2;
   const dashes = Math.max(0, innerW - label.length - 3);
   return (
     <Box paddingX={1} height={1} flexDirection="column">
-      <Text color={"gray"}>
+      <Text color={theme.text.secondary}>
         {"── "}
         {label}
         {" " + "─".repeat(dashes)}
@@ -75,6 +77,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
   onRelocateFile,
   onSave,
 }) => {
+  const theme = useTheme();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [positionMs, setPositionMs] = useState(0);
@@ -205,7 +208,6 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     { isActive },
   );
 
-  // Diff mode: show OLD (savedSource) vs NEW (pendingSource)
   if (isDiffMode && savedSource && pendingSource) {
     return (
       <DiffView
@@ -221,22 +223,18 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     );
   }
 
-  if (!source) {
-    return null;
-  }
+  if (!source) return null;
 
   const isSaved = !!source.savedFile;
-  const borderColor = isSaved ? "white" : "green";
+  const borderColor = isSaved ? theme.text.primary : theme.status.success;
+  const headerColor = isSaved ? theme.text.primary : theme.status.success;
 
   const outputFileExists =
     !isSaved &&
     compiled !== null &&
     fs.existsSync(path.join(outputDir, computeOutputFilename(compiled)));
 
-  // Header: "FILE ON DISK" when saved, "NEW FILE" otherwise
   const headerLabel = isSaved ? "FILE ON DISK" : "NEW FILE";
-  const headerColor = isSaved ? "white" : "green";
-
   const innerW = width - 2;
   const dashes = Math.max(0, innerW - headerLabel.length - 2);
   const leftD = Math.floor(dashes / 2);
@@ -278,7 +276,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
       <Box flexDirection="column" height={1} flexShrink={0} overflow="hidden">
         <Box flexDirection="row">
           <Text color={borderColor}>{borderLeft}</Text>
-          <Text color={headerColor as any}>{headerLabel}</Text>
+          <Text color={headerColor}>{headerLabel}</Text>
           <Text color={borderColor}>{borderRight}</Text>
         </Box>
       </Box>
@@ -289,12 +287,13 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
         overflow="hidden"
         borderStyle="single"
         borderColor={borderColor}
+        borderBackgroundColor={theme.ui.background}
         borderTop={false}
       >
         <Box flexDirection="column" flexGrow={1} overflow="hidden">
           {outputFileExists && (
             <Box paddingX={1} paddingBottom={1} flexShrink={0}>
-              <Text color="yellow" bold>
+              <Text color={theme.status.warning} bold>
                 △ Warning: A file already exists! Please check before
                 overwriting the file.
               </Text>
@@ -319,10 +318,10 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
             flexDirection="row"
             overflow="hidden"
           >
-            <Text color="gray">{"SOURCE  "}</Text>
+            <Text color={theme.text.secondary}>{"SOURCE  "}</Text>
             {sourceParts.map((part, idx) => (
               <React.Fragment key={idx}>
-                {idx > 0 && <Text color="gray">{" > "}</Text>}
+                {idx > 0 && <Text color={theme.text.secondary}>{" > "}</Text>}
                 <Text color={dlProvider.color as any}>{part}</Text>
               </React.Fragment>
             ))}
@@ -330,15 +329,15 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
 
           {fileNotFound ? (
             <Box flexDirection="column" paddingX={1} paddingY={1}>
-              <Text color="yellow">⚠ File not found</Text>
-              <Text color="gray" dimColor wrap="truncate-end">
+              <Text color={theme.status.warning}>⚠ File not found</Text>
+              <Text color={theme.text.secondary} dimColor wrap="truncate-end">
                 Last known: {source.localFile?.path ?? "—"}
               </Text>
               <Box marginTop={1}>
-                <Text color="white" bold>
+                <Text color={theme.text.active} bold>
                   [Ctrl+F]
                 </Text>
-                <Text color="gray"> Relocate file</Text>
+                <Text color={theme.text.hint}> Relocate file</Text>
               </Box>
             </Box>
           ) : (
@@ -383,7 +382,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                 <DetailRow
                   label="Output"
                   value={path.join(outputDir, computeOutputFilename(compiled))}
-                  valueColor="gray"
+                  valueColor={theme.text.secondary}
                 />
               )}
             </Box>
@@ -422,7 +421,6 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
           )}
         </Box>
 
-        {/* Keyboard shortcuts */}
         <Box flexDirection="column" height={1} minHeight={1} overflow="hidden">
           <Box flexDirection="row" paddingX={1} overflow="hidden" flexGrow={1}>
             {isActive && canPlay && (

@@ -3,10 +3,11 @@ import { Box, Text } from "ink";
 import { MetadataSourceState } from "../../flows/musicDownloadFlow/types";
 import { providerDisplayRegistry } from "../../base/providerDisplay";
 import { Hint } from "../Hint";
+import { useTheme } from "../../base/themeContext";
 
 interface SourcesHintBarProps {
   sources: MetadataSourceState[];
-  selectedIndex: number; // -1 = compiled row
+  selectedIndex: number;
   innerFocus: "list" | "detail";
   isActive: boolean;
   width: number;
@@ -28,6 +29,7 @@ export const SourcesHintBar: React.FC<SourcesHintBarProps> = ({
   isActive,
   width,
 }) => {
+  const theme = useTheme();
   const dim = !isActive || innerFocus !== "list";
   const isCompiled = selectedIndex === -1;
   const selectedSource = isCompiled ? null : (sources[selectedIndex] ?? null);
@@ -72,7 +74,7 @@ export const SourcesHintBar: React.FC<SourcesHintBarProps> = ({
           {row1Parts.map((part, i) => (
             <React.Fragment key={i}>
               {i > 0 && (
-                <Text color="white" dimColor={dim}>
+                <Text color={theme.text.active} dimColor={dim}>
                   {" > "}
                 </Text>
               )}
@@ -85,7 +87,7 @@ export const SourcesHintBar: React.FC<SourcesHintBarProps> = ({
         {!isCompiled && row1Parts.length > 0 && (
           <>
             <Box marginRight={2}>
-              <Text color="white" dimColor={dim}>
+              <Text color={theme.text.active} dimColor={dim}>
                 {">>>"}
               </Text>
             </Box>
@@ -98,14 +100,14 @@ export const SourcesHintBar: React.FC<SourcesHintBarProps> = ({
 
       <Box flexDirection="row" width={width} overflow="hidden">
         <Box marginRight={1}>
-          <Text color="white" dimColor={dim} bold>
+          <Text color={theme.text.active} dimColor={dim} bold>
             {row2Left}
           </Text>
         </Box>
         {showSourceActions && (
           <>
             <Box marginRight={2}>
-              <Text color="white" dimColor={dim}>
+              <Text color={theme.text.active} dimColor={dim}>
                 {">>>"}
               </Text>
             </Box>

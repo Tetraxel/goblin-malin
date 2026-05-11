@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { CompiledMetadata } from "../../../flows/musicDownloadFlow/utils/compiledMetadata";
+import { useTheme } from "../../../base/themeContext";
 
 const COMPILED_PREFIX = "🏆 Compiled Metadata: ";
 
@@ -19,7 +20,8 @@ export const MetadataCompiledRow: React.FC<CompiledRowProps> = ({
   isActive,
   width,
 }) => {
-  const focusColorBg = isActive ? "#2a2a2a" : "#131313";
+  const theme = useTheme();
+  const focusColorBg = isActive ? theme.ui.rowActiveBackground : theme.ui.rowBackground;
   const bg = isSelected ? focusColorBg : undefined;
   const artist = compiled.artists[0]?.name ?? "";
   const title = compiled.trackName ?? "";
@@ -39,21 +41,25 @@ export const MetadataCompiledRow: React.FC<CompiledRowProps> = ({
       backgroundColor={bg}
     >
       <Box width={3} minWidth={3}>
-        <Text color={isSelected && isActive ? "white" : "gray"}>
+        <Text
+          color={
+            isSelected && isActive ? theme.text.active : theme.text.secondary
+          }
+        >
           {isSelected && isActive ? "☛ " : "  "}
         </Text>
       </Box>
       <Box width={COMPILED_PREFIX.length} minWidth={COMPILED_PREFIX.length}>
-        <Text color="yellow">{COMPILED_PREFIX}</Text>
+        <Text color={theme.action.primary}>{COMPILED_PREFIX}</Text>
       </Box>
       <Box flexGrow={1} flexDirection="row">
-        <Text color="white" wrap="truncate-end">
+        <Text color={theme.text.primary} wrap="truncate-end">
           {trackInfo}
         </Text>
       </Box>
       {overrideCount > 0 && (
         <Box flexShrink={0}>
-          <Text color="gray" italic wrap="truncate-end">
+          <Text color={theme.text.secondary} italic wrap="truncate-end">
             {suffixText}
           </Text>
         </Box>
@@ -67,7 +73,7 @@ export const MetadataCompiledRow: React.FC<CompiledRowProps> = ({
           paddingLeft={1}
           paddingRight={1}
         >
-          <Text color="gray">{">>>"}</Text>
+          <Text color={theme.text.secondary}>{">>>"}</Text>
         </Box>
       )}
     </Box>

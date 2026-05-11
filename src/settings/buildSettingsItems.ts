@@ -4,10 +4,11 @@ export type SettingsItem =
   | { kind: 'providerHeader'; label: string; color: string }
   | { kind: 'checkbox'; label: string; indent: number; get: () => boolean; set: (v: boolean) => void }
   | { kind: 'textInput'; label: string; indent: number; get: () => string; set: (v: string) => void }
+  | { kind: 'select'; label: string; indent: number; options: readonly string[]; get: () => string; set: (v: string) => void }
   | { kind: 'action'; label: string; indent: number; run: () => void };
 
 export function isInteractive(item: SettingsItem): boolean {
-  return item.kind === 'checkbox' || item.kind === 'textInput' || item.kind === 'action';
+  return item.kind === 'checkbox' || item.kind === 'textInput' || item.kind === 'select' || item.kind === 'action';
 }
 
 // sectionHeader uses marginTop={1} and subHeader uses paddingTop={1}, both adding 1 extra visual row

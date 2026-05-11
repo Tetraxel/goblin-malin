@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
+import { useTheme } from "../base/themeContext";
 
 export interface TabDef {
   key: string;
@@ -20,6 +21,7 @@ export const TabBar: React.FC<TabBarProps> = ({
   activeTabKey,
   splitPos,
 }) => {
+  const theme = useTheme();
   const tabsWidth =
     tabs.reduce((sum, tab) => sum + tab.key.length + tab.label.length + 3, 0) +
     Math.max(0, tabs.length - 1) * 2;
@@ -33,21 +35,27 @@ export const TabBar: React.FC<TabBarProps> = ({
 
   return (
     <Box height={1} width={width} overflow="hidden">
-      <Text color="cyan">{lineStr}</Text>
-      <Text color="cyan">{"  "}</Text>
+      <Text color={theme.ui.border}>{lineStr}</Text>
+      <Text color={theme.ui.border}>{"  "}</Text>
       {tabs.map((tab, i) => {
         const isActive = tab.key === activeTabKey;
         return (
           <React.Fragment key={tab.key}>
-            {i > 0 && <Text color="cyan">{"  "}</Text>}
-            <Text color="white" bold={isActive}>{`[${tab.key}] `}</Text>
-            <Text color={isActive ? "yellow" : "gray"} bold={isActive}>
+            {i > 0 && <Text color={theme.ui.border}>{"  "}</Text>}
+            <Text
+              color={theme.text.primary}
+              bold={isActive}
+            >{`[${tab.key}] `}</Text>
+            <Text
+              color={isActive ? theme.action.primary : theme.ui.tabInactive}
+              bold={isActive}
+            >
               {tab.label}
             </Text>
           </React.Fragment>
         );
       })}
-      <Text color="cyan">{" ─┤"}</Text>
+      <Text color={theme.ui.border}>{" ─┤"}</Text>
     </Box>
   );
 };

@@ -16,6 +16,7 @@ import { DeepPartial } from "../utils/types";
 import { FlowBase } from "../base/flow/flow-base";
 import { SettingsItemRow } from "./SettingsItemRow";
 import { Hint } from "./Hint";
+import { useTheme } from "../base/themeContext";
 
 // Rows consumed by modal chrome: borders(2) + paddingY(2) + title(1) + marginTop(1)
 // + search-border(2) + search-row(1) + marginTop(1) + marginTop(1) + footer(1) = 14
@@ -32,6 +33,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   terminalWidth,
   currentFlow,
 }) => {
+  const theme = useTheme();
   const { focusState, switchBack } = useFocusContext();
   const isActive = focusState.activeWindow === "settingsModal";
 
@@ -157,6 +159,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const item = filteredItems[selectedIndex];
       if (!item || !isInteractive(item)) return;
 
+      if ((key.leftArrow || key.rightArrow) && item.kind === "select") {
+        const curr = item.options.indexOf(item.get());
+        const next = key.rightArrow
+          ? (curr + 1) % item.options.length
+          : (curr - 1 + item.options.length) % item.options.length;
+        item.set(item.options[next]);
+        return;
+      }
+
       if (key.return) {
         if (item.kind === "checkbox") {
           item.set(!item.get());
@@ -214,7 +225,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   }
 
   const searchBorderColor =
-    modalFocus === "search" && editingIndex === null ? "yellow" : "gray";
+    modalFocus === "search" && editingIndex === null
+      ? theme.action.primary
+      : theme.text.secondary;
 
   return (
     <Box
@@ -228,19 +241,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       <Box
         flexDirection="column"
         borderStyle="round"
-        borderColor="yellow"
+        borderColor={theme.action.primary}
+        borderBackgroundColor={theme.ui.background}
         paddingX={2}
         paddingY={1}
         marginX={2}
         marginY={3}
         width={modalWidth}
-        backgroundColor="#000000"
+        backgroundColor={theme.ui.background}
         flexGrow={1}
         flexShrink={0}
       >
         {/* Title */}
         <Box justifyContent="space-between">
-          <Text bold color="yellow">
+          <Text bold color={theme.action.primary}>
             SETTINGS
           </Text>
           {searchQuery ? (
@@ -256,12 +270,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           marginTop={1}
           borderStyle="single"
           borderColor={searchBorderColor}
+          borderBackgroundColor={theme.ui.background}
           paddingX={1}
           height={3}
         >
           <Text
             dimColor={modalFocus !== "search"}
-            color={modalFocus === "search" ? "yellow" : undefined}
+            color={modalFocus === "search" ? theme.action.primary : undefined}
           >
             {"🔎 "}
           </Text>

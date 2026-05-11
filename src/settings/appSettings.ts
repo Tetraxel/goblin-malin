@@ -5,6 +5,7 @@ export type AppSettings = {
     reopenLastSession: boolean;
     appDataDir: string;
     animationsEnabled: boolean;
+    theme: string;
   };
 };
 
@@ -13,5 +14,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     reopenLastSession: false,
     appDataDir: PROJECT_ROOT,
     animationsEnabled: false,
+    theme: 'dark',
   },
 };

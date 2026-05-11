@@ -6,6 +6,7 @@ import { Task } from "../base/task/task";
 import { PromptType } from "../base/task/task-prompt";
 import { useActivePrompt } from "../hooks/useActivePrompt";
 import { useFocusContext } from "../contexts/FocusContext";
+import { useTheme } from "../base/themeContext";
 
 interface PromptModalProps {
   tasks: Task[];
@@ -18,6 +19,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({
   terminalHeight,
   terminalWidth,
 }) => {
+  const theme = useTheme();
   const { switchWindow, switchBack } = useFocusContext();
   const [inputValue, setInputValue] = useState("");
   const { task, prompt } = useActivePrompt(tasks);
@@ -47,7 +49,6 @@ export const PromptModal: React.FC<PromptModalProps> = ({
     }
   };
 
-  // Don't render if no prompt is active
   if (!task || !prompt || !currentPrompt) {
     return null;
   }
@@ -62,21 +63,20 @@ export const PromptModal: React.FC<PromptModalProps> = ({
       height={terminalHeight}
       flexDirection="column"
     >
-      {/* Top padding to center vertically */}
       <Box height={Math.max(0, verticalPadding)} />
 
-      {/* Modal container */}
       <Box width="100%" justifyContent="center">
         <Box
           flexDirection="column"
           borderStyle="round"
-          borderColor="cyan"
+          borderColor={theme.ui.modalBorder}
+          borderBackgroundColor={theme.ui.background}
           paddingX={2}
           paddingY={1}
           width={modalWidth}
-          backgroundColor="#1a1a1a"
+          backgroundColor={theme.ui.background}
         >
-          <Text bold color="cyan">
+          <Text bold color={theme.ui.modalBorder}>
             {currentPrompt.title + " - " + task.getId()}
           </Text>
 
@@ -95,7 +95,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({
             {currentPrompt.type === PromptType.Input && (
               <>
                 <Box>
-                  <Text color="green">{">"} </Text>
+                  <Text color={theme.status.success}>{">"} </Text>
                   <TextInput
                     value={inputValue}
                     onChange={setInputValue}
@@ -128,7 +128,6 @@ export const PromptModal: React.FC<PromptModalProps> = ({
         </Box>
       </Box>
 
-      {/* Bottom padding */}
       <Box flexGrow={1} />
     </Box>
   );

@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
+import { useTheme } from "../base/themeContext";
 
 export interface SeparatorProps {
   width: number;
@@ -14,6 +15,7 @@ export const Separator: React.FC<SeparatorProps> = ({
   splitPositions,
   splitCharacter,
 }) => {
+  const theme = useTheme();
   // Sort the positions to process them in order
   const sortedSplits = splitPositions?.sort((a, b) => a - b) ?? [];
 
@@ -61,7 +63,7 @@ export const Separator: React.FC<SeparatorProps> = ({
 
   return (
     <Box flexDirection="row" height={1} width={width} overflow="hidden">
-      <Text color="cyan">{separatorText}</Text>
+      <Text color={theme.ui.border}>{separatorText}</Text>
     </Box>
   );
 };

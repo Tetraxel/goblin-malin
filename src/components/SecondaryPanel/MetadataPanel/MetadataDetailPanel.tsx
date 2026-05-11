@@ -15,6 +15,9 @@ import {
 } from "../../../flows/musicDownloadFlow/utils/metadataFields";
 import { useFocusContext } from "../../../contexts/FocusContext";
 import { FieldRow } from "./FieldRow";
+import { providerDisplayRegistry } from "../../../base/providerDisplay";
+import { useTheme } from "../../../base/themeContext";
+import { Hint } from "../../Hint";
 
 interface MetadataSourceDetailProps {
   source: MetadataSourceState | "compiled";
@@ -25,37 +28,11 @@ interface MetadataSourceDetailProps {
   width: number;
   height: number;
   onOverrideChange: (overrides: MetadataOverrides) => void;
-  onInnerFocusSwitch: () => void; // called when ← is pressed to move back to list
+  onInnerFocusSwitch: () => void;
 }
-
-import { providerDisplayRegistry } from "../../../base/providerDisplay";
 
 function getPlatformBrightColor(apiProvider: string): string {
   return providerDisplayRegistry.get(apiProvider).colorBright;
-}
-
-const HINT_BAR_HEIGHT = 1;
-
-function Hint({
-  label,
-  shortcut,
-  dim,
-}: {
-  label: string;
-  shortcut: string;
-  dim?: boolean;
-}) {
-  return (
-    <Box marginRight={2}>
-      <Text color="white" dimColor={dim} bold>
-        [{shortcut}]
-      </Text>
-      <Text color="gray" dimColor={dim}>
-        {" "}
-        {label}
-      </Text>
-    </Box>
-  );
 }
 
 export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
@@ -69,6 +46,7 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
   onOverrideChange,
   onInnerFocusSwitch,
 }) => {
+  const theme = useTheme();
   const { setIsEditingField } = useFocusContext();
   const [editingField, setEditingField] =
     useState<CompiledMetadataField | null>(null);
@@ -101,13 +79,11 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
         return;
       }
 
-      // Guard: plain ← only (Shift+← is reserved for panel resize)
       if (key.leftArrow && !key.shift) {
         onInnerFocusSwitch();
         return;
       }
 
-      // Enter — start editing (only for compiled row with editable field)
       if (key.return && isCompiled) {
         const field = navigableFields[clampedFieldIdx];
         if (!field) return;
@@ -116,7 +92,6 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
         return;
       }
 
-      // Delete — clear override for current field
       if (key.delete && isCompiled) {
         const field = navigableFields[clampedFieldIdx];
         if (!field) return;
@@ -126,7 +101,6 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
         return;
       }
 
-      // Ctrl+C — copy current field value to clipboard
       if (key.ctrl && input === "c") {
         const field = navigableFields[clampedFieldIdx];
         if (!field) return;
@@ -167,7 +141,6 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
     stopEditing();
   }
 
-  // ── Header
   const titleInner = width - 2;
   const headerLabel = isCompiled
     ? "Compiled Metadata"
@@ -178,7 +151,7 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
   const borderLeft = `┌${"─".repeat(leftD)} `;
   const borderRight = ` ${"─".repeat(rightD)}┐`;
   const platformColor = isCompiled
-    ? "gray"
+    ? theme.text.secondary
     : getPlatformBrightColor(
         (source as MetadataSourceState).metadata.apiProvider,
       );
@@ -187,9 +160,9 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
     <Box flexDirection="column" width={width} height={height} overflow="hidden">
       <Box flexDirection="column" height={1} flexShrink={0} overflow="hidden">
         <Box flexDirection="row">
-          <Text color="gray">{borderLeft}</Text>
+          <Text color={theme.text.secondary}>{borderLeft}</Text>
           <Text color={platformColor}>{headerLabel}</Text>
-          <Text color="gray">{borderRight}</Text>
+          <Text color={theme.text.secondary}>{borderRight}</Text>
         </Box>
       </Box>
 
@@ -198,7 +171,8 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
         flexGrow={1}
         overflow="hidden"
         borderStyle="single"
-        borderColor="gray"
+        borderColor={theme.text.secondary}
+        borderBackgroundColor={theme.ui.background}
         borderTop={false}
       >
         <Box flexDirection="column" flexGrow={1} overflow="hidden">
@@ -236,7 +210,6 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
           </Box>
         </Box>
 
-        {/* Keyboard shortcuts */}
         <Box flexDirection="column" height={1} minHeight={1} overflow="hidden">
           <Box flexDirection="row" paddingX={1} overflow="hidden" flexGrow={1}>
             {editingField !== null ? (

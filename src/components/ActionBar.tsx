@@ -1,16 +1,18 @@
-import React, { useMemo } from 'react';
-import { Box, Text } from 'ink';
-import { useFocusContext } from '../contexts/FocusContext';
-import { FlowBase } from '../base/flow/flow-base';
-import { Task } from '../base/task/task';
-import { getShortcutLiteral } from '../types/actions';
+import React, { useMemo } from "react";
+import { Box, Text } from "ink";
+import { useFocusContext } from "../contexts/FocusContext";
+import { FlowBase } from "../base/flow/flow-base";
+import { Task } from "../base/task/task";
+import { getShortcutLiteral } from "../types/actions";
+import { useTheme } from "../base/themeContext";
 
 export const ActionBar: React.FC<{
   tasks: Task[];
   flow: FlowBase | undefined;
 }> = ({ tasks, flow }) => {
+  const theme = useTheme();
   const { focusState } = useFocusContext();
-  const isTaskListActive = focusState.activeWindow === 'taskList';
+  const isTaskListActive = focusState.activeWindow === "taskList";
   const selectedIndex = focusState.taskList.selectedTaskIndex;
   const multiCount = focusState.taskList.selectedTaskIds.size;
 
@@ -19,7 +21,13 @@ export const ActionBar: React.FC<{
     return flow.getContextualActionBar(tasks[selectedIndex], {
       columnIndex: focusState.taskList.selectedColumnIndex,
     });
-  }, [isTaskListActive, flow, tasks, selectedIndex, focusState.taskList.selectedColumnIndex]);
+  }, [
+    isTaskListActive,
+    flow,
+    tasks,
+    selectedIndex,
+    focusState.taskList.selectedColumnIndex,
+  ]);
 
   const visibleActions = useMemo(() => {
     if (!bar) return [];
@@ -36,7 +44,8 @@ export const ActionBar: React.FC<{
       height={1}
       overflow="hidden"
       borderStyle="single"
-      borderColor="cyan"
+      borderColor={theme.ui.border}
+      borderBackgroundColor={theme.ui.background}
       borderTop={false}
       borderBottom={false}
     >
@@ -44,21 +53,21 @@ export const ActionBar: React.FC<{
         <>
           {bar.text && (
             <Box marginRight={2}>
-              <Text color={bar.textColor ?? 'white'} bold>
+              <Text color={bar.textColor ?? theme.text.primary} bold>
                 {bar.text}
               </Text>
             </Box>
           )}
           {visibleActions.map((action, index) => (
             <Box key={`action-${action.label}-${index}`} marginRight={2}>
-              <Text color={action.color ?? 'white'}>
+              <Text color={action.color ?? theme.text.active}>
                 {`[${getShortcutLiteral(action.shortcuts)}] ${action.label}`}
               </Text>
             </Box>
           ))}
         </>
       ) : (
-        <Text color="gray" italic>
+        <Text color={theme.text.hint} italic>
           No contextual actions available
         </Text>
       )}

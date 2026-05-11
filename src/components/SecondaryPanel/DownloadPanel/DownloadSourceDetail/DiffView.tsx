@@ -11,6 +11,7 @@ import {
 } from "../utils";
 import { DiffRow } from "./DiffRow";
 import { Hint } from "../../../Hint";
+import { useTheme } from "../../../../base/themeContext";
 
 interface DiffViewProps {
   savedSource: TrackDownloadSource;
@@ -39,7 +40,8 @@ export function DiffView({
   width,
   height,
 }: DiffViewProps) {
-  // OLD — what is currently on disk
+  const theme = useTheme();
+
   const oldFilename = path.basename(savedSource.savedFile!.path);
   const oldDir = path.dirname(savedSource.savedFile!.path);
   const oldSize = savedSource.fileInfo
@@ -51,7 +53,6 @@ export function DiffView({
   const oldSavedAt = formatDate(savedSource.savedFile!.savedAt);
   const oldProvider = savedSource.provider.toUpperCase();
 
-  // NEW — what would be written after saving
   const newFilename = compiled ? computePreviewFilename(compiled) : oldFilename;
   const newDir = outputDir;
   const newSize = pendingSource.fileInfo
@@ -62,8 +63,6 @@ export function DiffView({
   );
   const newProvider = pendingSource.provider.toUpperCase();
 
-  // Compiled metadata fields (same for both sides — diff appears if metadata
-  // has changed since the save, which we don't snapshot yet)
   const title = compiled?.trackName || "—";
   const artists = compiled?.artists.map((a) => a.name).join(", ") || "—";
   const album = compiled?.album?.albumName || "—";
@@ -78,13 +77,12 @@ export function DiffView({
 
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">
-      {/* Header */}
       <Box flexDirection="row" paddingX={1} height={1} flexShrink={0}>
-        <Text color="gray">┌── </Text>
+        <Text color={theme.diff.base}>┌── </Text>
         <Text color={oldProviderColor as any}>{oldProvider}</Text>
-        <Text color="gray"> → </Text>
+        <Text color={theme.diff.base}> → </Text>
         <Text color={newProviderColor as any}>{newProvider}</Text>
-        <Text color="gray">
+        <Text color={theme.diff.base}>
           {"─".repeat(
             Math.max(0, innerW - oldProvider.length - newProvider.length - 10),
           )}
@@ -97,12 +95,12 @@ export function DiffView({
         flexGrow={1}
         overflow="hidden"
         borderStyle="single"
-        borderColor="gray"
+        borderColor={theme.diff.base}
+        borderBackgroundColor={theme.ui.background}
         borderTop={false}
       >
-        {/* File section */}
         <Box paddingX={1} height={1} flexShrink={0}>
-          <Text color="gray">
+          <Text color={theme.diff.base}>
             {"── File "}
             {"─".repeat(Math.max(0, innerW - 9))}
           </Text>
@@ -114,10 +112,9 @@ export function DiffView({
         <DiffRow label="Duration" left={oldDuration} right={newDuration} />
         <DiffRow label="Saved" left={oldSavedAt} right="(new)" />
 
-        {/* Metadata section */}
         <Box height={1} flexShrink={0} />
         <Box paddingX={1} height={1} flexShrink={0}>
-          <Text color="gray">
+          <Text color={theme.diff.base}>
             {"── Metadata "}
             {"─".repeat(Math.max(0, innerW - 13))}
           </Text>
@@ -132,7 +129,6 @@ export function DiffView({
 
         <Box flexGrow={1} />
 
-        {/* Hint bar */}
         <Box
           flexDirection="row"
           paddingX={1}

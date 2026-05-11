@@ -10,6 +10,7 @@ import {
   ContextualActions,
   ContextualActionBar,
 } from "../types/actions";
+import { useTheme } from "../base/themeContext";
 
 export type { Shortcut, ContextualActions, ContextualActionBar };
 
@@ -110,6 +111,7 @@ export const TaskListPanel: React.FC<{
   width: number;
   flow: FlowBase;
 }> = ({ columns, tasks, width, flow }) => {
+  const theme = useTheme();
   const { focusState } = useFocusContext();
   const isWindowActive = focusState.activeWindow === "taskList";
   const fullHeight = focusState.layout.taskListHeight;
@@ -133,7 +135,8 @@ export const TaskListPanel: React.FC<{
   return (
     <Box
       borderStyle="single"
-      borderColor="cyan"
+      borderColor={theme.ui.border}
+      borderBackgroundColor={theme.ui.background}
       flexDirection="column"
       overflow="hidden"
       borderTop={false}

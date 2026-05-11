@@ -4,6 +4,7 @@ import { ColumnDefinition } from "./TaskListPanel";
 import { useScreenSize } from "../hooks/useScreenSize";
 import { FocusProvider } from "../contexts/FocusContext";
 import { ToolbarActionsProvider } from "../contexts/ToolbarActionsContext";
+import { ThemeProvider } from "../base/themeContext";
 import { MusicDownloadFlow } from "../flows/musicDownloadFlow/musicDownloadFlow";
 import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
 import { Task, TaskAttributes } from "../base/task/task";
@@ -22,7 +23,7 @@ export const App: React.FC = () => {
     );
     const player = getInstance();
     player
-      .setVolume(30)
+      .setVolume(50)
       .then(() => player.play(initWav))
       .catch(() => {});
   }, []);
@@ -70,24 +71,26 @@ export const App: React.FC = () => {
   );
 
   return (
-    <FocusProvider
-      toolbarButtonCount={toolbarButtons.length}
-      taskCount={filteredTasks.length}
-      taskColumnCount={columns.length}
-    >
-      <ToolbarActionsProvider>
-        <AppInner
-          tasks={tasks}
-          filteredTasks={filteredTasks}
-          toolbarButtons={toolbarButtons}
-          columns={columns}
-          currentFlow={currentFlow}
-          orchestrator={orchestrator}
-          setActiveFlowId={setActiveFlowId}
-          terminalHeight={terminalHeight}
-          terminalWidth={terminalWidth}
-        />
-      </ToolbarActionsProvider>
-    </FocusProvider>
+    <ThemeProvider>
+      <FocusProvider
+        toolbarButtonCount={toolbarButtons.length}
+        taskCount={filteredTasks.length}
+        taskColumnCount={columns.length}
+      >
+        <ToolbarActionsProvider>
+          <AppInner
+            tasks={tasks}
+            filteredTasks={filteredTasks}
+            toolbarButtons={toolbarButtons}
+            columns={columns}
+            currentFlow={currentFlow}
+            orchestrator={orchestrator}
+            setActiveFlowId={setActiveFlowId}
+            terminalHeight={terminalHeight}
+            terminalWidth={terminalWidth}
+          />
+        </ToolbarActionsProvider>
+      </FocusProvider>
+    </ThemeProvider>
   );
 };
