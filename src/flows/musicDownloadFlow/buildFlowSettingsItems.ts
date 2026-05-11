@@ -3,6 +3,7 @@ import { MusicDownloadFlowSettings } from './settings';
 import { DeepPartial } from '../../utils/types';
 import { ProviderConstructorLike, ProviderSettingsSchema } from '../../base/providerSettings';
 import { providerDisplayRegistry } from '../../base/providerDisplay';
+import { clearTempDownloads } from './saveSettings';
 
 export type ProviderEntry = {
   key: string;
@@ -119,6 +120,18 @@ export function buildFlowSettingsItems(
     label: '🗁  Default output directory',
     get: () => flowSettings.download.outputDir,
     set: (v) => onChange({ download: { outputDir: v } }),
+  });
+  items.push({
+    kind: 'textInput',
+    indent: 0,
+    label: '🗁  Temporary download directory',
+    get: () => flowSettings.download.outputTemporaryDir,
+    set: (v) => onChange({ download: { outputTemporaryDir: v } }),
+  });
+  items.push({
+    kind: 'action', indent: 0,
+    label: '⛒  Clear temporary downloads',
+    run: () => clearTempDownloads(),
   });
 
   if (downloadProviders.length > 0) {

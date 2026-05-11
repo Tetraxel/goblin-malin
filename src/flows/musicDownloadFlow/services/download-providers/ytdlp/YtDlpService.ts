@@ -7,7 +7,7 @@ import { ProviderSettingsSchema } from '../../../../../base/providerSettings';
 import { StatusType } from '../../../../../base/task/task-status';
 import { Logger } from '../../../../../base/logger/logger';
 import { getBinDir } from '../../../../../utils/appPaths';
-import { getDownloadDir } from '../../../saveSettings';
+import { getTempDownloadDir } from '../../../saveSettings';
 import { ensureYtDlpSetup } from '../../../../../utils/ytdlp-setup';
 import { ensureFfmpeg } from '../../../../../utils/ffmpeg-setup';
 import { APIProvider, TrackMetadata, TrackDownloadSource, LocalFile, FileInfo } from '../../../types';
@@ -65,9 +65,10 @@ export class YtDlpService extends DownloadService {
             // Generate output filename from track metadata
             const artistName = trackMetadata.artists?.[0]?.name || 'Unknown Artist';
             const outputName = `${artistName} - ${trackMetadata.trackName}`;
+            const uriSlug = trackMetadata.uri?.replace(/::/g, '-').replace(/:/g, '-') ?? '';
             const format = 'flac';
-            const filename = `${outputName}.${format}`;
-            const fullPath = path.join(getDownloadDir(), filename);
+            const filename = uriSlug ? `${outputName} ${uriSlug}.${format}` : `${outputName}.${format}`;
+            const fullPath = path.join(getTempDownloadDir(), filename);
 
             // Check if file already exists
             let localFile: LocalFile;
@@ -82,14 +83,14 @@ export class YtDlpService extends DownloadService {
                 };
             } else {
                 // Ensure download directory exists
-                if (!fs.existsSync(getDownloadDir())) {
-                    fs.mkdirSync(getDownloadDir(), { recursive: true });
+                if (!fs.existsSync(getTempDownloadDir())) {
+                    fs.mkdirSync(getTempDownloadDir(), { recursive: true });
                 }
 
                 // Load cookies if available
                 const cookiesPath = path.join(getBinDir(), 'cookies.txt');
                 let downloadOptions: FormatOptions<keyof QualityOptions> = {
-                    paths: getDownloadDir(),
+                    paths: getTempDownloadDir(),
                     output: filename,
                     audioFormat: format,
                     extractAudio: true,

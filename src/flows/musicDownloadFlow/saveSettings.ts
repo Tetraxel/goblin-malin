@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { SettingsStore } from '../../settings/settingsStore';
 import {
   MusicDownloadFlowSettings,
@@ -18,6 +19,17 @@ function getFlowSettings(): MusicDownloadFlowSettings {
 
 export function getDownloadDir(): string {
   return getFlowSettings().download.outputDir;
+}
+
+export function getTempDownloadDir(): string {
+  return getFlowSettings().download.outputTemporaryDir;
+}
+
+export function clearTempDownloads(): void {
+  const dir = getTempDownloadDir();
+  if (fs.existsSync(dir)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 export function getSaveSettings(): SaveSettings {

@@ -18,6 +18,7 @@ export type MusicDownloadFlowSettings = {
     autoDeleteTempAfter24h: boolean;
     autoRelocateMissingFiles: boolean;
     outputDir: string;
+    outputTemporaryDir: string;
     providers: Record<string, StoredProviderSettings>;
   };
 };
@@ -33,6 +34,8 @@ export function extractProviderDefaults(registry: ServiceRegistry<any, any>): Re
   return result;
 }
 
+const MEDIA_OUTPUT_DIR = path.join(os.homedir(), 'Music', 'GoblinMalin');
+
 /** Flow-level defaults (without provider contributions — those come from registered services). */
 export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSettings = {
   metadata: {
@@ -45,7 +48,8 @@ export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSetting
     autoSaveToOutputDir: true,
     autoDeleteTempAfter24h: false,
     autoRelocateMissingFiles: false,
-    outputDir: path.join(os.homedir(), 'Music'),
+    outputDir: MEDIA_OUTPUT_DIR,
+    outputTemporaryDir: path.join(MEDIA_OUTPUT_DIR, 'tmp'),
     providers: {},
   },
 };
