@@ -7,6 +7,7 @@ import { PromptType } from "../../base/task/task-prompt";
 import { useActivePrompt } from "../../hooks/useActivePrompt";
 import { useFocusContext } from "../../contexts/FocusContext";
 import { useTheme } from "../../base/themeContext";
+import { Hint } from "../Hint";
 
 interface PromptModalProps {
   tasks: Task[];
@@ -77,7 +78,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({
           backgroundColor={theme.ui.background}
         >
           <Text bold color={theme.ui.modalBorder}>
-            {currentPrompt.title + " - " + task.getId()}
+            {currentPrompt.title}
           </Text>
 
           <Box marginTop={1}>
@@ -85,43 +86,49 @@ export const PromptModal: React.FC<PromptModalProps> = ({
           </Box>
 
           <Box marginTop={1} flexDirection="column">
-            {currentPrompt.type === PromptType.Confirm && (
-              <>
-                <Text dimColor>Press Y for Yes, N for No</Text>
-                <Text dimColor>Press ESC to cancel</Text>
-              </>
-            )}
+            {currentPrompt.type === PromptType.Confirm && null}
 
             {currentPrompt.type === PromptType.Input && (
-              <>
-                <Box>
-                  <Text color={theme.status.success}>{">"} </Text>
-                  <TextInput
-                    value={inputValue}
-                    onChange={setInputValue}
-                    onSubmit={handleInputSubmit}
-                    placeholder={currentPrompt.hint || "Enter value…"}
-                  />
-                </Box>
-                <Box marginTop={1}>
-                  <Text dimColor>Press ENTER to submit, ESC to cancel</Text>
-                </Box>
-              </>
+              <Box>
+                <Text color={theme.status.success}>{">"} </Text>
+                <TextInput
+                  value={inputValue}
+                  onChange={setInputValue}
+                  onSubmit={handleInputSubmit}
+                  placeholder={currentPrompt.hint || "Enter value…"}
+                />
+              </Box>
             )}
 
             {currentPrompt.type === PromptType.Select && (
+              <Box marginTop={1}>
+                <SelectInput
+                  items={currentPrompt.options}
+                  onSelect={handleSelectSubmit}
+                />
+              </Box>
+            )}
+          </Box>
+
+          <Box marginTop={1} flexDirection="row">
+            {currentPrompt.type === PromptType.Confirm && (
               <>
-                <Box marginTop={1}>
-                  <SelectInput
-                    items={currentPrompt.options}
-                    onSelect={handleSelectSubmit}
-                  />
-                </Box>
-                <Box marginTop={1}>
-                  <Text dimColor>
-                    Use arrow keys to select, ENTER to confirm, ESC to cancel
-                  </Text>
-                </Box>
+                <Hint label="Yes" shortcut="Y" />
+                <Hint label="No" shortcut="N" />
+                <Hint label="Cancel" shortcut="Esc" />
+              </>
+            )}
+            {currentPrompt.type === PromptType.Input && (
+              <>
+                <Hint label="Submit" shortcut="Enter" />
+                <Hint label="Cancel" shortcut="Esc" />
+              </>
+            )}
+            {currentPrompt.type === PromptType.Select && (
+              <>
+                <Hint label="Navigate" shortcut="↑↓" />
+                <Hint label="Select" shortcut="Enter" />
+                <Hint label="Cancel" shortcut="Esc" />
               </>
             )}
           </Box>

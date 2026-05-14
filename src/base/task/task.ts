@@ -50,7 +50,7 @@ export class Task<TTaskAttributes = TaskAttributes> {
 
         // Initialize status
         this.status = new TaskStatus();
-        this.prompt = new TaskPrompt(this.id, this.status, this.notifyTaskSubscribers);
+        this.prompt = new TaskPrompt(this.id, this.status, () => this.notifyTaskSubscribers());
 
         // Subscribe to status changes to notify task subscribers
         this.status.subscribe(() => {
