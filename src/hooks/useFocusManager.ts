@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useScreenSize } from './useScreenSize';
 import { FlowBase } from '../base/flow/flow-base';
+import { SetupWizardConfig } from '../base/setupWizard';
 
 // Fixed rows that never change regardless of terminal size.
 // toolbarRows = top separator + toolbar content + bottom separator.
@@ -29,11 +30,13 @@ export type FocusableWindow =
   | 'prompt'
   | 'secondaryPanel'
   | 'settingsModal'
-  | 'importModal';
+  | 'importModal'
+  | 'setupWizardModal';
 
 export interface FocusState {
   activeWindow: FocusableWindow;
   previousWindow: FocusableWindow | undefined;
+  returningFromWindow: FocusableWindow | undefined;
   toolbar: {
     selectedButtonIndex: number;
     height: number;
@@ -71,6 +74,8 @@ export interface FocusState {
   modal: {
     type: 'settings' | 'import' | null;
   };
+  wizardConfig: SetupWizardConfig | null;
+  wizardOnDisable: (() => void) | null;
   isEditingField: boolean;
 }
 
@@ -88,6 +93,7 @@ export const useFocusManager = ({
   const [focusState, setFocusState] = useState<FocusState>(() => ({
     activeWindow: 'toolbar',
     previousWindow: undefined,
+    returningFromWindow: undefined,
     toolbar: {
       height: 1,
       selectedButtonIndex: 0,
@@ -121,6 +127,8 @@ export const useFocusManager = ({
     modal: {
       type: null,
     },
+    wizardConfig: null,
+    wizardOnDisable: null,
     isEditingField: false,
   }));
 
@@ -145,21 +153,22 @@ export const useFocusManager = ({
       ...prev,
       previousWindow: prev.activeWindow,
       activeWindow: window,
+      returningFromWindow: undefined,
     }));
   }, []);
 
   const switchBack = useCallback(() => {
     setFocusState((prev) => {
+      const from = prev.activeWindow;
       if (!prev.previousWindow || prev.previousWindow === 'prompt')
         return {
           ...prev,
           activeWindow: 'toolbar',
-          toolbar: {
-            ...prev.toolbar,
-            selectedButtonIndex: 0,
-          },
+          previousWindow: undefined,
+          returningFromWindow: from,
+          toolbar: { ...prev.toolbar, selectedButtonIndex: 0 },
         };
-      return { ...prev, activeWindow: prev.previousWindow };
+      return { ...prev, activeWindow: prev.previousWindow, previousWindow: undefined, returningFromWindow: from };
     });
   }, []);
 
@@ -346,6 +355,17 @@ export const useFocusManager = ({
     setFocusState((prev) => ({ ...prev, isEditingField: editing }));
   }, []);
 
+  const openWizard = useCallback((config: SetupWizardConfig, onDisable?: () => void) => {
+    setFocusState((prev) => ({
+      ...prev,
+      wizardConfig: config,
+      wizardOnDisable: onDisable ?? null,
+      previousWindow: prev.activeWindow,
+      activeWindow: 'setupWizardModal',
+      returningFromWindow: undefined,
+    }));
+  }, []);
+
   return {
     focusState,
     switchWindow,
@@ -364,5 +384,6 @@ export const useFocusManager = ({
     setSourcesInnerFocus,
     setDetailFieldIndex: setSourceDetailFieldIndex,
     setIsEditingField,
+    openWizard,
   };
 };

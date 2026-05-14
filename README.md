@@ -29,8 +29,8 @@ GoblinMalin.start();
 
 ## Steps
 
-- Import track URLs from compatible streaming platforms with `Ctrl+V`:
-  - `Spotify`
+- Import with `Ctrl+V` URLs from compatible streaming platforms :
+  - `Spotify` (requires Spotify Premium Account)
   - `YouTube`
 - System fetches primary metadata from the corresponding URL platform
 - System discovers the same track on other platforms (cross-referencing via ISRC or track/artist name)

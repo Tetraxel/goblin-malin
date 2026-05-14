@@ -46,16 +46,21 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
 
     case "providerHeader": {
       const PROVIDER_INDENT = 2;
+      const WARNING = " ⚠ Missing credentials";
+      const warningLen = item.missingCredentials ? WARNING.length : 0;
       const padLen = Math.max(
         0,
-        innerWidth - item.label.length - PROVIDER_INDENT - 4,
+        innerWidth - item.label.length - PROVIDER_INDENT - 4 - warningLen,
       );
       return (
         <Box paddingLeft={4}>
           <Text color={item.color} bold>
             {item.label}
-            <Text dimColor>{" " + "─".repeat(padLen)}</Text>
           </Text>
+          {item.missingCredentials && (
+            <Text color="yellow">{WARNING}</Text>
+          )}
+          <Text dimColor>{" " + "─".repeat(padLen)}</Text>
         </Box>
       );
     }

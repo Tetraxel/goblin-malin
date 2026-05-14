@@ -2,6 +2,7 @@ import { SpotifyApi, Track } from "@spotify/web-api-ts-sdk";
 import { MetadataService } from '../../../metadataService';
 import { ProviderDisplay } from '../../../../../base/providerDisplay';
 import { ProviderSettingsSchema } from '../../../../../base/providerSettings';
+import { SetupWizardConfig } from '../../../../../base/setupWizard';
 import { ParsedUrl } from '../../../../../base/urlParser';
 import { Cached } from '../../../../../utils/cache';
 import { Logger } from "../../../../../base/logger/logger";
@@ -76,6 +77,33 @@ export class SpotifyService extends MetadataService {
     static readonly defaultSettings: ProviderSettingsSchema = {
         enabled: { label: 'Enable', defaultValue: true, kind: 'checkbox' },
     };
+    static readonly setupWizard: SetupWizardConfig = {
+        title: '⚙  Spotify Setup Wizard',
+        providerKey: 'spotify',
+        envSection: { name: 'SPOTIFY', url: 'https://developer.spotify.com/dashboard' },
+        description: [
+            {
+                type: 'note',
+                text: 'You need a Premium Spotify Account to access the Spotify API.',
+            },
+            {
+                type: 'paragraph',
+                text: 'Steps to setup Spotify API access:',
+            },
+            {
+                type: 'orderedList',
+                items: [
+                    { type: 'link', text: 'Log in to the Spotify Developer Dashboard', url: 'https://developer.spotify.com/dashboard' },
+                    { type: 'text', text: 'Click "Create app"' },
+                    { type: 'text', text: 'Copy the CLIENT_ID and CLIENT_SECRET from the app page' },
+                ],
+            },
+        ],
+        fields: [
+            { envVar: 'SPOTIFY_CLIENT_ID', label: 'CLIENT_ID', hint: 'e.g. b94c59cdcd…' },
+            { envVar: 'SPOTIFY_CLIENT_SECRET', label: 'CLIENT_SECRET', hint: 'e.g. fa5a8a70ab…' },
+        ],
+    };
     static readonly cellComponent = SpotifyCell;
 
     private static client: SpotifyApi;
@@ -85,14 +113,15 @@ export class SpotifyService extends MetadataService {
     }
 
     private async getClient(): Promise<SpotifyApi> {
-        // Ensure only one initialization at a time
         return this.runExclusive('init', async () => {
             if (!SpotifyService.client) {
-                const clientId = await this.env.getVariable('SPOTIFY_CLIENT_ID');
-                const clientSecret = await this.env.getVariable('SPOTIFY_CLIENT_SECRET');
-                SpotifyService.client = SpotifyApi.withClientCredentials(clientId, clientSecret);
+                const vars = await this.env.getVariablesWithWizard(SpotifyService.setupWizard);
+                SpotifyService.client = SpotifyApi.withClientCredentials(
+                    vars['SPOTIFY_CLIENT_ID'],
+                    vars['SPOTIFY_CLIENT_SECRET'],
+                );
             }
-            return SpotifyService.client
+            return SpotifyService.client;
         });
     }
 
@@ -254,7 +283,7 @@ export class SpotifyService extends MetadataService {
                 platform: 'spotify',
                 apiProvider: 'spotify',
                 uri: `SPOTIFY::TRACK::${spotifyTrack.id}` as TrackUri<'spotify'>,
-    
+
                 fetchedAt: new Date(),
                 type: 'track',
             };

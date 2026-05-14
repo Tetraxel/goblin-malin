@@ -101,6 +101,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
     public buildFlowSettingsItems(
         flowSettings: Record<string, unknown>,
         onChange: (patch: Record<string, unknown>) => void,
+        onOpenWizard?: (config: import('../../base/setupWizard').SetupWizardConfig, onDisable?: () => void) => void,
     ): SettingsItem[] {
         const toEntries = (registry: ServiceRegistry<any, any>): ProviderEntry[] =>
             Array.from(registry.getFactories().keys())
@@ -111,6 +112,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             toEntries(this.metadataServiceRegistry),
             toEntries(this.downloadServiceRegistry),
             onChange as (patch: DeepPartial<MusicDownloadFlowSettings>) => void,
+            onOpenWizard,
         );
     }
 

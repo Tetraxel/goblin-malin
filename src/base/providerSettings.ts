@@ -1,3 +1,5 @@
+import { SetupWizardConfig } from './setupWizard';
+
 export type ProviderSettingDef =
   | { label: string; defaultValue: boolean; kind: 'checkbox' }
   | { label: string; defaultValue: string; kind: 'textInput' };
@@ -9,4 +11,5 @@ export interface ProviderConstructorLike {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   new(...args: any[]): any;
   defaultSettings?: ProviderSettingsSchema;
+  setupWizard?: SetupWizardConfig;
 }

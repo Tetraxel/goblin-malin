@@ -1,8 +1,8 @@
 import { Task } from "./task/task";
 import { Logger } from "./logger/logger";
 import { EnvironmentError } from "../exceptions/EnvironmentError";
-import * as fs from "fs/promises";
-import * as path from "path";
+import { SetupWizardConfig } from "./setupWizard";
+import { saveEnvVar, saveEnvVarsGroup } from "../utils/envFile";
 
 export class Env {
     protected task: Task;
@@ -49,29 +49,44 @@ export class Env {
     }
 
 
-    private async saveToEnvFile(key: string, value: string): Promise<void> {
-        const envPath = path.resolve(process.cwd(), ".env");
+    public async getVariablesWithWizard(
+        config: SetupWizardConfig,
+    ): Promise<Record<string, string>> {
+        const missing = config.fields.filter(f => !process.env[f.envVar]);
 
-        try {
-            const envContent = await fs.readFile(envPath, { encoding: "utf-8", flag: "w+" });
-
-            const lines = envContent.split("\n").filter((line) => !line.startsWith("#"));
-            const keyPattern = new RegExp(`^${key}=`, "i");
-            const existingIndex = lines.findIndex(line => keyPattern.test(line.trim()));
-
-            if (existingIndex !== -1) {
-                this.logger.info(`Variable ${key} already exists in .env file, skipping.`);
-                return;
+        if (missing.length > 0) {
+            const values = await this.task.getPrompt().askSetupWizard(config);
+            const nonEmpty = Object.fromEntries(
+                Object.entries(values).filter(([, v]) => v.trim()),
+            );
+            try {
+                if (config.envSection && Object.keys(nonEmpty).length > 0) {
+                    await saveEnvVarsGroup(nonEmpty, config.envSection);
+                } else {
+                    for (const [key, value] of Object.entries(nonEmpty)) {
+                        await saveEnvVar(key, value);
+                    }
+                }
+                this.logger.info(`Saved wizard vars to .env file.`);
+            } catch (error) {
+                this.logger.error(`Failed to save wizard vars to .env file:`, { error });
+                throw new Error(`Could not persist environment variables to .env file`);
             }
+            for (const [key, value] of Object.entries(values)) {
+                process.env[key] = value;
+            }
+            return values;
+        }
 
-            const newEntry = `${key}=${value}`;
-            const updatedContent = envContent.trim()
-                ? `${envContent.trim()}\n${newEntry}\n` // append at the end
-                : `${newEntry}\n`; // no content, set the content to the only variable
+        return Object.fromEntries(
+            config.fields.map(f => [f.envVar, process.env[f.envVar]!]),
+        );
+    }
 
-            await fs.writeFile(envPath, updatedContent, "utf-8");
-            this.logger.info(`Successfully added ${key} to .env file.`);
-
+    private async saveToEnvFile(key: string, value: string): Promise<void> {
+        try {
+            await saveEnvVar(key, value);
+            this.logger.info(`Saved ${key} to .env file.`);
         } catch (error) {
             this.logger.error(`Failed to save ${key} to .env file:`, { error });
             throw new Error(`Could not persist environment variable to .env file`);

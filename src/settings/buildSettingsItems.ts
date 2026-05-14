@@ -1,7 +1,7 @@
 export type SettingsItem =
   | { kind: 'sectionHeader'; label: string }
   | { kind: 'subHeader'; label: string }
-  | { kind: 'providerHeader'; label: string; color: string }
+  | { kind: 'providerHeader'; label: string; color: string; missingCredentials?: boolean }
   | { kind: 'checkbox'; label: string; indent: number; get: () => boolean; set: (v: boolean) => void }
   | { kind: 'textInput'; label: string; indent: number; get: () => string; set: (v: string) => void }
   | { kind: 'select'; label: string; indent: number; options: readonly string[]; get: () => string; set: (v: string) => void }

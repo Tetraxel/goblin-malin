@@ -182,6 +182,8 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             }
 
             if (!this.getPrimaryMetadata()) {
+                this.status.update({ type: StatusType.Error, message: 'Primary metadata unavailable' });
+                this.logger.error(`No metadata service could fetch primary metadata for the URL: ${url}`);
                 throw new Error(`No metadata service could fetch metadata for the URL: ${url}`);
             }
         } finally {

@@ -2,6 +2,7 @@ import { SettingsItem } from '../../settings/buildSettingsItems';
 import { MusicDownloadFlowSettings } from './settings';
 import { DeepPartial } from '../../utils/types';
 import { ProviderConstructorLike, ProviderSettingsSchema } from '../../base/providerSettings';
+import { SetupWizardConfig } from '../../base/setupWizard';
 import { providerDisplayRegistry } from '../../base/providerDisplay';
 import { clearTempDownloads } from './saveSettings';
 
@@ -14,18 +15,38 @@ function schemaOf(ctor: ProviderConstructorLike): ProviderSettingsSchema {
   return (ctor as any).defaultSettings ?? { enabled: { label: 'Enable', defaultValue: true, kind: 'checkbox' } };
 }
 
+function hasMissingCredentials(ctor: ProviderConstructorLike): boolean {
+  if (!ctor.setupWizard) return false;
+  return ctor.setupWizard.fields.some(
+    (f) => f.required !== false && !process.env[f.envVar]?.trim(),
+  );
+}
+
 function providerItems(
   key: string,
   ctor: ProviderConstructorLike,
   stored: Record<string, boolean | string>,
   onChange: (patch: DeepPartial<MusicDownloadFlowSettings>) => void,
   section: 'metadata' | 'download',
+  onOpenWizard: (config: SetupWizardConfig, onDisable?: () => void) => void,
 ): SettingsItem[] {
   const display = providerDisplayRegistry.get(key);
   const schema = schemaOf(ctor);
   const items: SettingsItem[] = [
-    { kind: 'providerHeader', label: display.label, color: display.color },
+    { kind: 'providerHeader', label: display.label, color: display.color, missingCredentials: hasMissingCredentials(ctor) },
   ];
+
+  if (ctor.setupWizard) {
+    const wizard = ctor.setupWizard;
+    items.push({
+      kind: 'action', indent: 4,
+      label: '⚙  Setup Wizard',
+      run: () => onOpenWizard(
+        wizard,
+        () => onChange({ [section]: { providers: { [key]: { enabled: false } } } } as DeepPartial<MusicDownloadFlowSettings>),
+      ),
+    });
+  }
 
   for (const [settingKey, def] of Object.entries(schema)) {
     if (def.kind === 'checkbox') {
@@ -55,6 +76,7 @@ export function buildFlowSettingsItems(
   metadataProviders: ProviderEntry[],
   downloadProviders: ProviderEntry[],
   onChange: (patch: DeepPartial<MusicDownloadFlowSettings>) => void,
+  onOpenWizard: (config: SetupWizardConfig, onDisable?: () => void) => void = () => {},
 ): SettingsItem[] {
   const items: SettingsItem[] = [];
 
@@ -79,7 +101,7 @@ export function buildFlowSettingsItems(
       items.push(...providerItems(
         key, ctor,
         flowSettings.metadata.providers[key] ?? {},
-        onChange, 'metadata',
+        onChange, 'metadata', onOpenWizard,
       ));
     }
   }
@@ -140,7 +162,7 @@ export function buildFlowSettingsItems(
       items.push(...providerItems(
         key, ctor,
         flowSettings.download.providers[key] ?? {},
-        onChange, 'download',
+        onChange, 'download', onOpenWizard,
       ));
     }
   }

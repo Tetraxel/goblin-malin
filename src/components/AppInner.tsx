@@ -5,6 +5,7 @@ import { Separator } from "./Separator";
 import { PromptModal } from "./PromptModal/PromptModal";
 import { ImportModal } from "./ImportModal/ImportModal";
 import { SettingsModal } from "./SettingsModal/SettingsModal";
+import { SetupWizardModal } from "./SetupWizardModal/SetupWizardModal";
 import { Toolbar, ToolbarButtonHook } from "./Toolbar/Toolbar";
 import { ColumnDefinition, TaskListPanel } from "./TaskListPanel/TaskListPanel";
 import { SecondaryPanel } from "./SecondaryPanel/SecondaryPanel";
@@ -106,6 +107,12 @@ export const AppInner: React.FC<{
           terminalHeight={terminalHeight}
           terminalWidth={terminalWidth}
           currentFlow={currentFlow}
+        />
+
+        <SetupWizardModal
+          tasks={tasks}
+          terminalHeight={terminalHeight}
+          terminalWidth={terminalWidth}
         />
       </Box>
     </ImportActionsProvider>

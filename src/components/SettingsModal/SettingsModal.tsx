@@ -34,7 +34,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   currentFlow,
 }) => {
   const theme = useTheme();
-  const { focusState, switchBack } = useFocusContext();
+  const { focusState, switchBack, openWizard } = useFocusContext();
   const isActive = focusState.activeWindow === "settingsModal";
 
   const [appDraft, setAppDraft] = useState<AppSettings>(() =>
@@ -48,9 +48,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [modalFocus, setModalFocus] = useState<"search" | "list">("search");
 
-  // Reset to fresh settings each time the modal opens
+  // Reset to fresh settings when the modal opens, but NOT when returning from the wizard
+  // (wizard's onDisable may have updated flowPatch which we want to preserve)
   useEffect(() => {
     if (!isActive) return;
+    if (focusState.returningFromWindow === "setupWizardModal") return;
     setAppDraft(SettingsStore.getInstance().getAppSettings());
     setFlowPatch({});
     setSelectedIndex(0);
@@ -58,7 +60,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setEditValue("");
     setSearchQuery("");
     setModalFocus("search");
-  }, [isActive]);
+  }, [isActive, focusState.returningFromWindow]);
 
   const allItems = useMemo((): SettingsItem[] => {
     const globalItems = buildGlobalSettingsItems(appDraft, (patch) =>
@@ -70,13 +72,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       flowPatch,
     );
     const flowItems =
-      currentFlow?.buildFlowSettingsItems?.(fullFlowSettings, (patch) =>
-        setFlowPatch(
-          (prev) => deepMerge(prev, patch) as Record<string, unknown>,
-        ),
+      currentFlow?.buildFlowSettingsItems?.(
+        fullFlowSettings,
+        (patch) => setFlowPatch((prev) => deepMerge(prev, patch) as Record<string, unknown>),
+        openWizard,
       ) ?? [];
     return [...globalItems, ...flowItems];
-  }, [appDraft, flowPatch, currentFlow]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appDraft, flowPatch, currentFlow, focusState.returningFromWindow]);
 
   const filteredItems = useMemo(
     () => filterSettingsItems(allItems, searchQuery),

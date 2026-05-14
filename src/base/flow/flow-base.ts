@@ -5,6 +5,7 @@ import { ToolbarButtonHook } from "../../components/Toolbar/Toolbar";
 import { FlowOrchestrator } from "./flow-orchestrator";
 import { Task } from "../task/task";
 import type { SettingsItem } from "../../settings/buildSettingsItems";
+import type { SetupWizardConfig } from "../setupWizard";
 
 export type FlowSubscriber<TTaskAttributes> = (flow: FlowBase<TTaskAttributes>) => void;
 export type FlowSubscribers<TTaskAttributes> = Set<FlowSubscriber<TTaskAttributes>>;
@@ -96,6 +97,7 @@ export class FlowBase<TaskAttributes = any> {
     public buildFlowSettingsItems?(
         flowSettings: Record<string, unknown>,
         onChange: (patch: Record<string, unknown>) => void,
+        onOpenWizard?: (config: SetupWizardConfig, onDisable?: () => void) => void,
     ): SettingsItem[];
     public saveFlowSettings?(settings: Record<string, unknown>): void;
 

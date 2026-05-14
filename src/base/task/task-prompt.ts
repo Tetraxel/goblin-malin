@@ -1,9 +1,11 @@
 import { StatusType, TaskStatus } from "./task-status";
+import { SetupWizardConfig } from "../setupWizard";
 
 export enum PromptType {
     Confirm = "confirm",
     Select = "select",
     Input = "input",
+    SetupWizard = "setupWizard",
 }
 
 export enum PromptDisplayMode {
@@ -38,7 +40,14 @@ export interface InputPrompt extends BasePrompt {
     hint?: string;
 }
 
-export type UserPrompt = ConfirmPrompt | SelectPrompt | InputPrompt;
+export interface SetupWizardPrompt extends BasePrompt {
+    type: PromptType.SetupWizard;
+    config: SetupWizardConfig;
+    resolve: (values: Record<string, string>) => void;
+    reject: (reason?: unknown) => void;
+}
+
+export type UserPrompt = ConfirmPrompt | SelectPrompt | InputPrompt | SetupWizardPrompt;
 
 export interface PendingPrompt<T = any> {
     prompt: UserPrompt;
@@ -92,6 +101,33 @@ export class TaskPrompt {
         };
 
         return this.requestUserInput<string>(prompt);
+    }
+
+    async askSetupWizard(config: SetupWizardConfig): Promise<Record<string, string>> {
+        return new Promise<Record<string, string>>((resolve, reject) => {
+            const prompt: SetupWizardPrompt = {
+                id: `${this.id}-wizard-${Date.now()}`,
+                type: PromptType.SetupWizard,
+                status: `⚙  Setup wizard: ${config.title}`,
+                title: config.title,
+                config,
+                resolve,
+                reject,
+            };
+
+            this.status.update({
+                type: StatusType.PendingUserAction,
+                message: prompt.status,
+            });
+
+            this.current = {
+                prompt,
+                resolve: resolve as (value: any) => void,
+                reject,
+            };
+
+            this.notifySubscribers();
+        });
     }
 
     // Generic method to request user input
