@@ -1,7 +1,7 @@
 import React from "react";
 import open from "open";
 import { Text, useInput } from "ink";
-import { ColumnComponent } from "../../../../../components/TaskListPanel";
+import { ColumnComponent } from "../../../../../components/TaskListPanel/TaskListPanel";
 import { MusicBrainzRecording, MusicBrainzRelease } from "./MusicBrainzService";
 import { useFocusContext } from "../../../../../contexts/FocusContext";
 import { globalLogger } from "../../../../../base/logger/logger";

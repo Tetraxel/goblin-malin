@@ -15,7 +15,8 @@
   "ui": {
     "background": "#ffffff",
     "rowBackground": "#f6f8fa",
-    "rowActiveBackground": "#eaeef2",
+    "rowActiveDimmedBackground": "#d0d7de",
+    "rowActiveBackground": "#b0b0b0",
     "border": "#1b7c83",
     "separator": "#1b7c83",
     "selection": "#0969da",
@@ -54,6 +55,7 @@
     "error": "#cf222e"
   },
   "confidence": {
+    "primary": "#007f81",
     "high": "#1a7f37",
     "medium": "#9a6700",
     "low": "#57606a",

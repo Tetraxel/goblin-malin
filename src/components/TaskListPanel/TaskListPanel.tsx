@@ -1,16 +1,17 @@
 import React, { useMemo } from "react";
 import { Box, Text } from "ink";
 import { TaskRow } from "./TaskRow";
-import { Task, TaskSnapshot } from "../base/task/task";
-import { useFocusContext } from "../contexts/FocusContext";
-import { FlowBase } from "../base/flow/flow-base";
-import { globalLogger } from "../base/logger/logger";
+import { Task, TaskSnapshot } from "../../base/task/task";
+import { useFocusContext } from "../../contexts/FocusContext";
+import { FlowBase } from "../../base/flow/flow-base";
+import { globalLogger } from "../../base/logger/logger";
 import {
   Shortcut,
   ContextualActions,
   ContextualActionBar,
-} from "../types/actions";
-import { useTheme } from "../base/themeContext";
+} from "../../types/actions";
+import { useTheme } from "../../base/themeContext";
+import { ActionBar } from "./ActionBar";
 
 export type { Shortcut, ContextualActions, ContextualActionBar };
 
@@ -115,7 +116,8 @@ export const TaskListPanel: React.FC<{
   const { focusState } = useFocusContext();
   const isWindowActive = focusState.activeWindow === "taskList";
   const fullHeight = focusState.layout.taskListHeight;
-  const height = fullHeight - 1; // subtract the header row
+  const actionBarRows = isWindowActive ? 2 : 0;
+  const height = fullHeight - 1 - actionBarRows; // subtract header and action bar
 
   // Calculate scroll offset so the selected task stays visible (center when possible)
   const selectedIndex = focusState.taskList.selectedTaskIndex;
@@ -142,10 +144,17 @@ export const TaskListPanel: React.FC<{
       borderTop={false}
       borderBottom={false}
       height={fullHeight}
+      flexGrow={1}
     >
       {/* Column headers */}
-      <Box paddingX={1} height={1} overflow="hidden">
-        <Box width={2} height={1} />
+      <Box
+        flexDirection="row"
+        paddingX={1}
+        height={1}
+        overflow="hidden"
+        flexShrink={0}
+      >
+        <Box width={2} height={1} flexShrink={0} />
         {calculatedColumns.map((column, index) => (
           <Box
             key={`header-${column.label}-${index}`}
@@ -153,6 +162,7 @@ export const TaskListPanel: React.FC<{
             height={1}
             paddingX={1}
             overflow="hidden"
+            flexShrink={0}
           >
             <Text bold color={column.color || "cyan"}>
               {column.label}
@@ -162,7 +172,12 @@ export const TaskListPanel: React.FC<{
       </Box>
 
       {/* Task rows */}
-      <Box flexDirection="column" height={height} overflow="hidden">
+      <Box
+        flexDirection="column"
+        height={height}
+        overflow="hidden"
+        flexGrow={1}
+      >
         {tasks.length === 0 ? (
           <Box paddingX={4} overflow="hidden">
             <Text italic color={"gray"}>
@@ -172,6 +187,7 @@ export const TaskListPanel: React.FC<{
         ) : (
           tasks.slice(offset, offset + height).map((task, index) => {
             const visibleIndex = index + offset;
+            const isRowHighlighted = selectedIndex === visibleIndex;
             const isRowActive =
               isWindowActive && selectedIndex === visibleIndex;
             const selectedColumnIndex = isRowActive
@@ -184,6 +200,7 @@ export const TaskListPanel: React.FC<{
               <TaskRow
                 key={task.getId()}
                 taskReference={task}
+                isHighlighted={isRowHighlighted}
                 isActive={isRowActive}
                 isMultiSelected={isMultiSelected}
                 selectedColumnIndex={selectedColumnIndex}
@@ -194,6 +211,9 @@ export const TaskListPanel: React.FC<{
           })
         )}
       </Box>
+
+      {/* Shortcut hints */}
+      <ActionBar tasks={tasks} flow={flow} />
     </Box>
   );
 };

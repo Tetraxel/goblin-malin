@@ -21,10 +21,14 @@ export type ContextualActions = {
   onClickBatch?: (tasks: Task<any>[]) => void;
 };
 
-export type ContextualActionBar = {
+export type ActionBarRow = {
   text?: string;
   textColor?: React.ComponentProps<typeof Text>['color'];
   actions: ContextualActions[];
+};
+
+export type ContextualActionBar = {
+  rows: ActionBarRow[];
 };
 
 export function getShortcutLiteral(shortcuts: Shortcut[]): string {

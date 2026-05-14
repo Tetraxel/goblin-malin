@@ -2,12 +2,11 @@ import React from "react";
 import { Box } from "ink";
 import { Footer } from "./Footer";
 import { Separator } from "./Separator";
-import { PromptModal } from "./PromptModal";
-import { ImportModal } from "./ImportModal";
-import { SettingsModal } from "./SettingsModal";
-import { Toolbar, ToolbarButtonHook } from "./Toolbar";
-import { ColumnDefinition, TaskListPanel } from "./TaskListPanel";
-import { ActionBar } from "./ActionBar";
+import { PromptModal } from "./PromptModal/PromptModal";
+import { ImportModal } from "./ImportModal/ImportModal";
+import { SettingsModal } from "./SettingsModal/SettingsModal";
+import { Toolbar, ToolbarButtonHook } from "./Toolbar/Toolbar";
+import { ColumnDefinition, TaskListPanel } from "./TaskListPanel/TaskListPanel";
 import { SecondaryPanel } from "./SecondaryPanel/SecondaryPanel";
 import { InputRouter } from "./InputRouter";
 import { ImportActionsProvider } from "../contexts/ImportActionsContext";
@@ -79,7 +78,6 @@ export const AppInner: React.FC<{
             flow={currentFlow}
           />
         )}
-        <ActionBar tasks={filteredTasks} flow={currentFlow} />
         <SecondaryPanel
           tasks={filteredTasks}
           width={terminalWidth}

@@ -116,7 +116,6 @@ export type BaseTrackMetadata = {
     album?: StandardAlbum;
     platform: Platform;
     apiProvider: APIProvider;
-    isPrimarySource?: boolean; // metadata from the primary source (e.g. the URL provided by the user)
     fetchedAt: Date;
     type: 'track';
     bpm?: number;
@@ -176,6 +175,7 @@ export type TrackMetadata = MusicBrainzTrackMetadata | SpotifyTrackMetadata | De
 
 export type MetadataSourceState = {
     metadata: TrackMetadata;
+    isPrimarySource: boolean;
     rank: number; // 0 = highest priority; lower = considered first
     isFavorited: boolean; // pinned as preferred for this provider (max one per provider)
     isRejected: boolean; // user marked as wrong match; excluded from compiled output
@@ -241,7 +241,11 @@ export type TrackDownloadSource = {
 
 export type TrackDownloadTask = {
     state: 'pending' | 'running' | 'finished' | 'failed';
-    metadataDiscovering?: boolean;
+    primaryMetadataInProgress?: boolean;
+    metadataDiscoveringInProgress?: boolean;
+    primaryMetadataFetched?: boolean;
+    metadataDiscovered?: boolean;
+    downloadsFetched?: boolean;
     toTag?: boolean;
     toDownload?: boolean;
     userInput: UserInput;

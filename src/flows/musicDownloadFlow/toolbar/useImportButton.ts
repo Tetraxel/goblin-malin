@@ -1,4 +1,4 @@
-import { ToolbarButtonHook } from '../../../components/Toolbar';
+import { ToolbarButtonHook } from '../../../components/Toolbar/Toolbar';
 import { FlowBase } from '../../../base/flow/flow-base';
 import { useImportActions } from '../../../contexts/ImportActionsContext';
 import { useTheme } from '../../../base/themeContext';

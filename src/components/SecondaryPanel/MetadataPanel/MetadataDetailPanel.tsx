@@ -157,7 +157,7 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
       );
 
   return (
-    <Box flexDirection="column" width={width} height={height} overflow="hidden">
+    <Box flexDirection="column" width={width} flexGrow={1} overflow="hidden">
       <Box flexDirection="column" height={1} flexShrink={0} overflow="hidden">
         <Box flexDirection="row">
           <Text color={theme.text.secondary}>{borderLeft}</Text>

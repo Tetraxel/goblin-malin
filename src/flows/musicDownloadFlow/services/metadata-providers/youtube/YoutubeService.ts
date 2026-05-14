@@ -238,7 +238,7 @@ export class YoutubeService extends MetadataService {
             platform: 'youtube',
             apiProvider: 'youtube',
             uri: `YOUTUBE::TRACK::${song.videoId}` as TrackUri<'youtube'>,
-            isPrimarySource: false,
+
             fetchedAt: new Date(),
             type: 'track',
         };
@@ -300,7 +300,7 @@ export class YoutubeService extends MetadataService {
                 platform: 'youtube',
                 apiProvider: 'youtube',
                 uri: `YOUTUBE::TRACK::${song.videoId}` as TrackUri<'youtube'>,
-                isPrimarySource: false,
+    
                 fetchedAt: new Date(),
                 type: 'track',
             };

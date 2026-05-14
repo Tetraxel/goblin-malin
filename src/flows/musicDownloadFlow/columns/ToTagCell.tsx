@@ -1,6 +1,6 @@
 import React from "react";
 import { Text } from "ink";
-import { ColumnComponent } from "../../../components/TaskListPanel";
+import { ColumnComponent } from "../../../components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "../types";
 
 export const ToTagCell: ColumnComponent<MusicDownloadTaskAttributes> = ({

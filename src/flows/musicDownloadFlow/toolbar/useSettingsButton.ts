@@ -1,4 +1,4 @@
-import { ToolbarButtonHook } from '../../../components/Toolbar';
+import { ToolbarButtonHook } from '../../../components/Toolbar/Toolbar';
 import { useFocusContext } from '../../../contexts/FocusContext';
 import { useTheme } from '../../../base/themeContext';
 

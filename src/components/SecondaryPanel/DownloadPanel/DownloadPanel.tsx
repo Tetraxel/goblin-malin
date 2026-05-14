@@ -274,16 +274,21 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({
         alignItems="flex-end"
         justifyContent="flex-end"
       >
-        <Box flexDirection="row" width={width - 2} overflow="hidden">
+        <Box
+          flexDirection="row"
+          width={width - 2}
+          flexShrink={0}
+          overflow="hidden"
+        >
           {selectedSource && (
-            <Box marginRight={1}>
+            <Box marginRight={1} flexShrink={0}>
               <Text color={theme.text.active} dimColor={dimHints} bold>
                 Source {downloadNavIndex + 1}/{downloadSources.length}
               </Text>
             </Box>
           )}
           {selectedSource && (
-            <Box marginRight={2}>
+            <Box marginRight={2} flexShrink={0}>
               <Text color={theme.text.active} dimColor={dimHints}>
                 {">>>"}
               </Text>

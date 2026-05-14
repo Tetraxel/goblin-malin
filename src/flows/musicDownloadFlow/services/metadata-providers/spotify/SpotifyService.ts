@@ -203,7 +203,7 @@ export class SpotifyService extends MetadataService {
             platform: 'spotify',
             apiProvider: 'spotify',
             uri: `SPOTIFY::TRACK::${spotifyTrack.id}` as TrackUri<'spotify'>,
-            isPrimarySource: false,
+
             fetchedAt: new Date(),
             type: 'track',
         };
@@ -254,7 +254,7 @@ export class SpotifyService extends MetadataService {
                 platform: 'spotify',
                 apiProvider: 'spotify',
                 uri: `SPOTIFY::TRACK::${spotifyTrack.id}` as TrackUri<'spotify'>,
-                isPrimarySource: false,
+    
                 fetchedAt: new Date(),
                 type: 'track',
             };

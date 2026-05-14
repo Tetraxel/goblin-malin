@@ -16,6 +16,7 @@
 
 ## 🟡 Nice to have
 
+- [ ] Add provider links to each metadata row: Artist, Album, Track
 - [ ] Handle Spotify albums as input
 - [ ] Handle Spotify playlists as input
 - [ ] Drag and drop tracks

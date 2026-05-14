@@ -1,14 +1,15 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { Task } from "../base/task/task";
-import { useTask } from "../hooks/useTask";
+import { Task } from "../../base/task/task";
+import { useTask } from "../../hooks/useTask";
 import { CalculatedColumn } from "./TaskListPanel";
-import { FlowBase } from "../base/flow/flow-base";
-import { useTheme } from "../base/themeContext";
+import { FlowBase } from "../../base/flow/flow-base";
+import { useTheme } from "../../base/themeContext";
 
 export const TaskRow = React.memo(function TaskRow<TAttributes>({
   taskReference,
   isActive,
+  isHighlighted,
   isMultiSelected,
   selectedColumnIndex,
   columns,
@@ -17,6 +18,7 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
   taskReference: Task<TAttributes>;
   isActive: boolean;
   isMultiSelected: boolean;
+  isHighlighted: boolean;
   selectedColumnIndex: number;
   columns: CalculatedColumn<TAttributes>[];
   flow: FlowBase;
@@ -25,15 +27,19 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
   const task = useTask<TAttributes>(taskReference);
 
   const isActiveIndicator = isActive ? "☛" : " ";
-
   const indicator = isActiveIndicator + (isMultiSelected ? "✓" : " ");
+  const backgroundColor = isActive
+    ? theme.ui.rowActiveDimmedBackground
+    : isHighlighted
+      ? theme.ui.rowBackground
+      : undefined;
 
   return (
     <Box
       key={task.id}
       paddingX={1}
       overflowY="hidden"
-      backgroundColor={isActive ? theme.ui.rowBackground : undefined}
+      backgroundColor={backgroundColor}
     >
       <Box width={2}>
         <Text color={isActive ? "white" : isMultiSelected ? "cyan" : "white"}>
@@ -51,7 +57,9 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
             flexGrow={column.flexGrow}
             overflow="hidden"
             paddingX={1}
-            backgroundColor={isCellActive ? theme.ui.rowActiveBackground : undefined}
+            backgroundColor={
+              isCellActive ? theme.ui.rowActiveBackground : undefined
+            }
           >
             <CellComponent
               task={task}

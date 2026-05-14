@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
-import { FlowBase } from "../base/flow/flow-base";
+import { FlowOrchestrator } from "../../base/flow/flow-orchestrator";
+import { FlowBase } from "../../base/flow/flow-base";
 
 export const FlowSelector: React.FC<{
   flows: ReturnType<FlowOrchestrator["getAllFlows"]>;

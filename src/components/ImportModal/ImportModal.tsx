@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import { useFocusContext } from "../contexts/FocusContext";
-import { DetectedUrl, SupportedPlatform } from "../utils/detectUrls";
-import { providerDisplayRegistry } from "../base/providerDisplay";
-import { useTheme } from "../base/themeContext";
+import { useFocusContext } from "../../contexts/FocusContext";
+import { DetectedUrl, SupportedPlatform } from "../../utils/detectUrls";
+import { providerDisplayRegistry } from "../../base/providerDisplay";
+import { useTheme } from "../../base/themeContext";
 
 export type PendingImport = {
   urls: DetectedUrl[];

@@ -13,7 +13,7 @@ export function Hint({
 }) {
   const theme = useTheme();
   return (
-    <Box marginRight={2}>
+    <Box marginRight={2} flexShrink={0}>
       <Text color={theme.text.active} dimColor={dim} bold>
         [{shortcut}]
       </Text>

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ToolbarButtonHook } from "./Toolbar";
-import { ColumnDefinition } from "./TaskListPanel";
+import { ToolbarButtonHook } from "./Toolbar/Toolbar";
+import { ColumnDefinition } from "./TaskListPanel/TaskListPanel";
 import { useScreenSize } from "../hooks/useScreenSize";
 import { FocusProvider } from "../contexts/FocusContext";
 import { ToolbarActionsProvider } from "../contexts/ToolbarActionsContext";

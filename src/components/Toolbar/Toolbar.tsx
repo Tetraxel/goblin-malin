@@ -1,14 +1,14 @@
 import React from "react";
 import { Box, Text } from "ink";
 import stringWidth from "string-width";
-import { useFocusContext } from "../contexts/FocusContext";
+import { useFocusContext } from "../../contexts/FocusContext";
 import { FlowSelector } from "./FlowSelector";
-import { Separator } from "./Separator";
-import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
+import { Separator } from "../Separator";
+import { FlowOrchestrator } from "../../base/flow/flow-orchestrator";
 import { ToolbarButtonInvoker } from "./ToolbarButtonInvoker";
-import { FlowBase } from "../base/flow/flow-base";
-import { TabBar } from "./TabBar";
-import { useTheme } from "../base/themeContext";
+import { FlowBase } from "../../base/flow/flow-base";
+import { TabBar } from "../TabBar";
+import { useTheme } from "../../base/themeContext";
 
 export type ToolbarButtonHook<TFlow = FlowBase> = ({
   isSelected,

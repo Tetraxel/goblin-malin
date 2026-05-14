@@ -1,4 +1,4 @@
-import { ToolbarButtonHook } from '../../../components/Toolbar';
+import { ToolbarButtonHook } from '../../../components/Toolbar/Toolbar';
 import { cache } from '../../../utils/cache';
 import { useTheme } from '../../../base/themeContext';
 

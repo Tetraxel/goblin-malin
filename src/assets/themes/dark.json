@@ -14,8 +14,9 @@
   },
   "ui": {
     "background": "#000000",
-    "rowBackground": "#161b22",
-    "rowActiveBackground": "#21262d",
+    "rowBackground": "#111111",
+    "rowActiveDimmedBackground": "#1d1d1d",
+    "rowActiveBackground": "#2f2f2f",
     "border": "#39c5cf",
     "separator": "#39c5cf",
     "selection": "#58a6ff",
@@ -54,6 +55,7 @@
     "error": "#ff7b72"
   },
   "confidence": {
+    "primary": "#00fbff",
     "high": "#56d364",
     "medium": "#e3b341",
     "low": "#8b949e",

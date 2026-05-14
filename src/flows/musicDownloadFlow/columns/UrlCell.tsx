@@ -1,6 +1,6 @@
 import React from "react";
 import { Text } from "ink";
-import { ColumnComponent } from "../../../components/TaskListPanel";
+import { ColumnComponent } from "../../../components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "../types";
 
 export const UrlCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
@@ -10,7 +10,7 @@ export const UrlCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
 }) => {
   const primaryMetadata = task.attributes?.metadataSources.find(
     (source) =>
-      source.metadata.isPrimarySource &&
+      source.isPrimarySource &&
       (source.metadata.url || source.metadata.uri),
   )?.metadata;
   const url =

@@ -31,15 +31,17 @@ export function MetadataHeader({ source }: MetadataHeaderProps) {
   const parts = [platformLabel, type, m.id].filter(Boolean);
 
   return (
-    <Box paddingLeft={2} flexDirection="row" overflow="hidden">
-      <Text color={theme.text.secondary}>{"└─ used "}</Text>
+    <Box paddingLeft={2} flexDirection="row" overflow="hidden" flexShrink={0}>
+      <Box paddingRight={1} flexDirection="row" flexShrink={0}>
+        <Text color={theme.text.secondary}>{"└─ used"}</Text>
+      </Box>
       {parts.map((part, idx) => (
-        <React.Fragment key={idx}>
+        <Box key={idx} flexDirection="row" flexShrink={0}>
           {idx > 0 && <Text color={theme.text.secondary}>{" > "}</Text>}
           <Text color={platformColor as any} wrap="truncate-end">
             {part}
           </Text>
-        </React.Fragment>
+        </Box>
       ))}
       <Text color={theme.text.primary} wrap="truncate-end">{` (${info})`}</Text>
     </Box>

@@ -1,9 +1,9 @@
 import { Box, Text } from "ink";
 import React from "react";
 import { ToolbarButtonHook } from "./Toolbar";
-import { FlowBase } from "../base/flow/flow-base";
-import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
-import { useToolbarActionsRef } from "../contexts/ToolbarActionsContext";
+import { FlowBase } from "../../base/flow/flow-base";
+import { FlowOrchestrator } from "../../base/flow/flow-orchestrator";
+import { useToolbarActionsRef } from "../../contexts/ToolbarActionsContext";
 
 export const ToolbarButtonInvoker = ({
   hook,

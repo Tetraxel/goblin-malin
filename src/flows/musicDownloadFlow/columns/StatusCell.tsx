@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { ColumnComponent } from "../../../components/TaskListPanel";
+import { ColumnComponent } from "../../../components/TaskListPanel/TaskListPanel";
 import { StatusAttributes, StatusType } from "../../../base/task/task-status";
 import { AnimatedIcon, Icon } from "../../../components/AnimatedIcon";
 import { MusicDownloadTaskAttributes } from "../types";

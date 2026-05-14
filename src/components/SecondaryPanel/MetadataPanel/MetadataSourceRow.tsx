@@ -19,18 +19,27 @@ function formatDuration(ms: number | undefined): string {
 }
 
 function confidenceBadge(
-  confidence: number | undefined,
+  source: MetadataSourceState,
   theme: Theme,
 ): {
   text: string;
   color: string;
 } {
+  if (source.isPrimarySource) {
+    return { text: "[PRIMARY]", color: theme.confidence.primary };
+  }
+
+  const confidence = source.confidence;
+
   if (confidence === undefined)
     return { text: "[??%]", color: theme.text.secondary };
-  const text = `[${confidence.toString().padStart(3, " ")}%]`;
+
+  const text = `[${confidence.toString()}%]`;
+
   if (confidence >= 90) return { text, color: theme.confidence.high };
   if (confidence >= 70) return { text, color: theme.confidence.medium };
   if (confidence >= 50) return { text, color: theme.confidence.low };
+
   return { text, color: theme.confidence.veryLow };
 }
 
@@ -69,8 +78,10 @@ export const MetadataSourceRow: React.FC<SourceRowProps> = ({
   const prefixParts = [display.label, type, m.id].filter(Boolean);
   const suffix = ` > ${info}${dur ? ` ${dur}` : ""}`;
 
-  const badge = confidenceBadge(source.confidence, theme);
-  const focusColorBg = isActive ? theme.ui.rowActiveBackground : theme.ui.rowBackground;
+  const badge = confidenceBadge(source, theme);
+  const focusColorBg = isActive
+    ? theme.ui.rowActiveBackground
+    : theme.ui.rowBackground;
   const bg = isSelected ? focusColorBg : undefined;
 
   return (
@@ -89,19 +100,24 @@ export const MetadataSourceRow: React.FC<SourceRowProps> = ({
       <Box width={3} minWidth={3}>
         <Text>{isSelected && isActive ? "☛ " : "  "}</Text>
       </Box>
-      <Box width={2} minWidth={2}>
+      <Box width={2} minWidth={2} paddingRight={1} flexShrink={0}>
         <Text dimColor={isDimmed} color={statusColor} wrap="truncate-end">
-          {statusIcon}{" "}
+          {statusIcon}
         </Text>
       </Box>
-      <Box width={badge.text.length + 1} minWidth={badge.text.length + 1}>
+      <Box
+        width={badge.text.length + 1}
+        minWidth={badge.text.length + 1}
+        paddingRight={1}
+        flexShrink={0}
+      >
         <Text
           color={badge.color}
           dimColor={isDimmed}
           strikethrough={isDimmed}
           wrap="truncate-end"
         >
-          {badge.text}{" "}
+          {badge.text}
         </Text>
       </Box>
       <Box
@@ -118,6 +134,7 @@ export const MetadataSourceRow: React.FC<SourceRowProps> = ({
             key={i}
             width={part.length + (i > 0 ? 3 : 0)}
             minWidth={part.length + (i > 0 ? 3 : 0)}
+            flexShrink={0}
           >
             {i > 0 && (
               <Text

@@ -5,9 +5,11 @@ import { globalLogger, Logger } from "../../base/logger/logger";
 import { Task } from '../../base/task/task';
 import { DownloadTask } from './utils/downloadTask';
 import { taskIdFromUrl } from './utils/taskId';
-import { ToolbarButtonHook } from '../../components/Toolbar';
-import { ColumnDefinition } from '../../components/TaskListPanel';
-import { ContextualActionBar, ContextualActions } from '../../types/actions';
+import { ToolbarButtonHook } from '../../components/Toolbar/Toolbar';
+import { ColumnDefinition } from '../../components/TaskListPanel/TaskListPanel';
+import { ActionBarRow, ContextualActionBar, ContextualActions } from '../../types/actions';
+import clipboard from 'clipboardy';
+import open from 'open';
 import { useExitButton } from './toolbar/useExitButton';
 import { useRunAllButton } from './toolbar/useRunAllButton';
 import { useSettingsButton } from './toolbar/useSettingsButton';
@@ -38,6 +40,12 @@ import { SettingsItem } from '../../settings/buildSettingsItems';
 
 
 type Column = ColumnDefinition<MusicDownloadTaskAttributes>;
+
+function toOpenableUri(url: string): string {
+    const m = url.match(/open\.spotify\.com\/(track|album|artist|playlist)\/([A-Za-z0-9]+)/);
+    if (m) return `spotify:${m[1]}:${m[2]}`;
+    return url;
+}
 
 const GenericProviderCell: Column['component'] = () => null;
 
@@ -127,8 +135,8 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
 
         SettingsStore.getInstance().onSettingsChanged(() => this.notifyTaskSubscribers());
 
-        // const defaultTasks = this.createTasksFromUrls([DEFAULT_TEST_URL], { toTag: true, toDownload: true });
-        // this.orchestrator.addTasks(defaultTasks);
+        const defaultTasks = this.createTasksFromUrls([DEFAULT_TEST_URL], { toTag: true, toDownload: true });
+        this.orchestrator.addTasks(defaultTasks);
         this.logger.info(`Imported default test URL: ${DEFAULT_TEST_URL}`);
     }
 
@@ -190,62 +198,138 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         ];
     }
 
-    public getContextualActionBar(task: DownloadTask, attributes: { columnIndex: number }): ContextualActionBar {
-        const columns = this.getColumns()
-        const column = columns[attributes.columnIndex]
-        let actionBartext = ""
-        let actions: ContextualActions[] = []
+    public getContextualActionBar(
+        task: DownloadTask,
+        attributes: { columnIndex: number; taskIndex: number; taskCount: number },
+    ): ContextualActionBar {
+        const columns = this.getColumns();
+        const column = columns[attributes.columnIndex];
+        const attrs = task.getAttributes();
 
-        actionBartext = "Task Actions"
-        actions = actions.concat([
+        // ── Task row (bottom) ─────────────────────────────────────────────────
+        const hasBeenRun = attrs?.state !== 'pending';
+        const taskActions: ContextualActions[] = [
             {
                 shortcuts: [{ input: "r" }],
-                label: "Start",
-                description: "Start this task",
-                onClick: () => task.start(),
+                label: hasBeenRun ? "Restart" : "Start",
+                description: hasBeenRun ? "Restart this task from scratch" : "Start this task",
+                onClick: () => hasBeenRun ? task.restart() : task.start(),
             },
-        ])
+        ];
+        if (attrs?.primaryMetadataFetched) {
+            taskActions.push({
+                shortcuts: [{ input: "f" }],
+                label: "Re-fetch primary metadata",
+                onClick: () => task.startPrimaryMetadataFetching(),
+            });
+        }
+        if (attrs?.metadataDiscovered) {
+            taskActions.push({
+                shortcuts: [{ input: "d" }],
+                label: "Re-discover metadata providers",
+                onClick: () => task.startMetadataDiscovering(),
+            });
+        }
+        if (attrs?.downloadsFetched) {
+            taskActions.push({
+                shortcuts: [{ input: "w" }],
+                label: "Re-download all sources",
+                onClick: () => task.startDownloads(),
+            });
+        }
+
+        // ── Column row (top) ──────────────────────────────────────────────────
+        const columnActions: ContextualActions[] = [];
+        let columnLabel = column.label;
+        let columnColor = column.color;
 
         if (column.id === "toTag") {
-            actions = actions.concat([{
+            columnActions.push({
                 shortcuts: [{ key: "return" }],
-                label: "Toggle",
-                description: "Toggle this option",
+                label: "Toggle tagging",
                 multiSelectAllowed: true,
-                onClick: () => task.updateAttributes({ toTag: !task.getAttributes()?.toTag }),
+                onClick: () => task.updateAttributes({ toTag: !attrs?.toTag }),
                 onClickBatch: (tasks) => {
-                    const newValue = !task.getAttributes()?.toTag;
-                    tasks.forEach(task => task.updateAttributes({ toTag: newValue }));
+                    const newValue = !attrs?.toTag;
+                    tasks.forEach(t => t.updateAttributes({ toTag: newValue }));
                 },
-            }])
+            });
         }
 
         if (column.id === "toDownload") {
-            actions = actions.concat([{
+            columnActions.push({
                 shortcuts: [{ key: "return" }],
-                label: "Toggle",
-                description: "Toggle this option",
+                label: "Toggle downloading",
                 multiSelectAllowed: true,
-                onClick: () => task.updateAttributes({ toDownload: !task.getAttributes()?.toDownload }),
+                onClick: () => task.updateAttributes({ toDownload: !attrs?.toDownload }),
                 onClickBatch: (tasks) => {
-                    const newValue = !task.getAttributes()?.toDownload;
-                    tasks.forEach(task => task.updateAttributes({ toDownload: newValue }));
+                    const newValue = !attrs?.toDownload;
+                    tasks.forEach(t => t.updateAttributes({ toDownload: newValue }));
                 },
-            }])
+            });
+        }
+
+        if (column.id === "url") {
+            const url = attrs?.userInput.url ?? '';
+            columnActions.push({
+                shortcuts: [{ input: "c", ctrl: true }],
+                label: "Copy source URL",
+                onClick: () => clipboard.writeSync(url),
+            });
+        }
+
+        if (column.id === "artist") {
+            const primary = attrs?.metadataSources.find(s => s.isPrimarySource);
+            columnActions.push({
+                shortcuts: [{ input: "c", ctrl: true }],
+                label: "Copy artist",
+                onClick: () => clipboard.writeSync(primary?.metadata.artists[0]?.name ?? ''),
+            });
+        }
+
+        if (column.id === "track") {
+            const primary = attrs?.metadataSources.find(s => s.isPrimarySource);
+            columnActions.push({
+                shortcuts: [{ input: "c", ctrl: true }],
+                label: "Copy track title",
+                onClick: () => clipboard.writeSync(primary?.metadata.trackName ?? ''),
+            });
         }
 
         if (column.id.startsWith("metadataService-")) {
-            const serviceKey = column.id.replace("metadataService-", "")
-            actionBartext = `${serviceKey}`
-            actions = actions.concat([{
+            const serviceKey = column.id.replace("metadataService-", "");
+            const display = providerDisplayRegistry.get(serviceKey);
+            columnLabel = display.label;
+            columnColor = display.color;
+            const source = attrs?.metadataSources.find(
+                s => s.metadata.platform === serviceKey || s.metadata.apiProvider === serviceKey
+            );
+            const url = source?.metadata.url ?? '';
+            if (url) {
+                columnActions.push({
+                    shortcuts: [{ input: "c", ctrl: true }],
+                    label: `Copy ${display.label} URL`,
+                    onClick: () => clipboard.writeSync(url),
+                });
+                columnActions.push({
+                    shortcuts: [{ key: "return" }],
+                    label: `Open in ${display.label}`,
+                    onClick: () => { open(toOpenableUri(url)).catch(() => { }); },
+                });
+            }
+            columnActions.push({
                 shortcuts: [{ input: "s" }],
-                label: "Search",
-                description: "Search for metadata matching this track on this service",
+                label: "Re-search",
                 onClick: () => { task.startSingleProviderSearch(serviceKey); },
-            }])
+            });
         }
 
-        return { text: actionBartext, actions }
+        return {
+            rows: [
+                { text: columnLabel, textColor: columnColor, actions: columnActions },
+                { text: `Task ${attributes.taskIndex + 1}/${attributes.taskCount}`, actions: taskActions },
+            ],
+        };
     }
 
     //!\ Always return all columns to maintain consistent hook count !

@@ -21,6 +21,7 @@ export interface Theme {
   ui: {
     background: string;
     rowBackground: string;
+    rowActiveDimmedBackground: string;
     rowActiveBackground: string;
     border: string;
     separator: string;
@@ -64,6 +65,7 @@ export interface Theme {
   };
 
   confidence: {
+    primary: string;
     high: string;
     medium: string;
     low: string;

@@ -65,7 +65,8 @@ export function useTaskListKeyHandler(tasks: Task[], flow: FlowBase | undefined)
         });
         if (bar) {
           const multiCount = focusState.taskList.selectedTaskIds.size;
-          const matchingAction = bar.actions.find((action) => {
+          const allActions = bar.rows.flatMap((r) => r.actions);
+          const matchingAction = allActions.find((action) => {
             if (multiCount > 1 && !action.multiSelectAllowed) return false;
             if (multiCount <= 1 && action.multiSelectOnly) return false;
             return action.shortcuts.some((s) => matchesShortcut(s, input, key));
@@ -79,6 +80,7 @@ export function useTaskListKeyHandler(tasks: Task[], flow: FlowBase | undefined)
             } else {
               matchingAction.onClick();
             }
+
             return;
           }
         }

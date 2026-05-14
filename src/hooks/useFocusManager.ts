@@ -4,10 +4,10 @@ import { FlowBase } from '../base/flow/flow-base';
 
 // Fixed rows that never change regardless of terminal size.
 // toolbarRows = top separator + toolbar content + bottom separator.
-// Remaining overhead: 1 actionBar + 1 separator before footer + 2 footer (content + bottom border).
+// ActionBar is now rendered inside TaskListPanel (not counted here).
 const LAYOUT = {
   toolbarRows: 3,
-  overheadRows: 4, // actionBar(1) + separatorBeforeFooter(1) + footer(2)
+  overheadRows: 3, // separatorBeforeFooter(1) + footer(2)
 } as const;
 
 function computeContentHeight(terminalHeight: number): number {

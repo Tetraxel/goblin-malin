@@ -1,22 +1,22 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
-import { useFocusContext } from "../contexts/FocusContext";
-import { SettingsStore } from "../settings/settingsStore";
-import { AppSettings } from "../settings/appSettings";
-import { buildGlobalSettingsItems } from "../settings/buildGlobalSettingsItems";
+import { useFocusContext } from "../../contexts/FocusContext";
+import { SettingsStore } from "../../settings/settingsStore";
+import { AppSettings } from "../../settings/appSettings";
+import { buildGlobalSettingsItems } from "../../settings/buildGlobalSettingsItems";
 import {
   filterSettingsItems,
   isInteractive,
   itemRowHeight,
   SettingsItem,
-} from "../settings/buildSettingsItems";
-import { deepMerge } from "../utils/deepMerge";
-import { DeepPartial } from "../utils/types";
-import { FlowBase } from "../base/flow/flow-base";
+} from "../../settings/buildSettingsItems";
+import { deepMerge } from "../../utils/deepMerge";
+import { DeepPartial } from "../../utils/types";
+import { FlowBase } from "../../base/flow/flow-base";
 import { SettingsItemRow } from "./SettingsItemRow";
-import { Hint } from "./Hint";
-import { useTheme } from "../base/themeContext";
+import { Hint } from "../Hint";
+import { useTheme } from "../../base/themeContext";
 
 // Rows consumed by modal chrome: borders(2) + paddingY(2) + title(1) + marginTop(1)
 // + search-border(2) + search-row(1) + marginTop(1) + marginTop(1) + footer(1) = 14
@@ -278,7 +278,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             dimColor={modalFocus !== "search"}
             color={modalFocus === "search" ? theme.action.primary : undefined}
           >
-            {"🔎 "}
+            {"⌕ "}
           </Text>
           <TextInput
             value={searchQuery}

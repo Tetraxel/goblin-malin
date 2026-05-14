@@ -24,8 +24,6 @@ export function computeConfidenceScore(
   source: TrackMetadata,
   primary: TrackMetadata,
 ): number {
-  if (source.isPrimarySource) return 100;
-
   // ISRC exact match is a definitive identifier
   if (source.isrc && primary.isrc && source.isrc === primary.isrc) return 100;
 
@@ -67,5 +65,5 @@ export function computeConfidenceScore(
     score += 10;
   }
 
-  return Math.min(100, score);
+  return Math.min(99, score);
 }

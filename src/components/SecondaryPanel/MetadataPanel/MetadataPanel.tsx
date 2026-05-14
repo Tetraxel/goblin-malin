@@ -148,7 +148,12 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
           onSelectSource={setSelectedSourceIndex}
           onInnerFocusSwitch={() => setSourcesInnerFocus("detail")}
           onSourcesChange={handleSourcesChange}
-          isDiscovering={snapshot?.attributes?.metadataDiscovering ?? false}
+          isFetchingPrimarySource={
+            snapshot?.attributes?.primaryMetadataInProgress ?? false
+          }
+          isDiscovering={
+            snapshot?.attributes?.metadataDiscoveringInProgress ?? false
+          }
         />
         <MetadataDetailPanel
           source={selectedSource}
