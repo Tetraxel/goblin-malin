@@ -31,7 +31,8 @@ export type FocusableWindow =
   | 'secondaryPanel'
   | 'settingsModal'
   | 'importModal'
-  | 'setupWizardModal';
+  | 'setupWizardModal'
+  | 'welcomeModal';
 
 export interface FocusState {
   activeWindow: FocusableWindow;
@@ -72,7 +73,7 @@ export interface FocusState {
     };
   };
   modal: {
-    type: 'settings' | 'import' | null;
+    type: 'settings' | 'import' | 'welcome' | null;
   };
   wizardConfig: SetupWizardConfig | null;
   wizardOnDisable: (() => void) | null;

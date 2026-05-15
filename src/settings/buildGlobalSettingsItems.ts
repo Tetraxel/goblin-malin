@@ -36,6 +36,13 @@ export function buildGlobalSettingsItems(
       set: (v) => onChange({ general: { animationsEnabled: v } }),
     },
     {
+      kind: 'checkbox',
+      indent: 0,
+      label: 'Show welcome tutorial on start-up',
+      get: () => settings.general.showWelcomeTutorial,
+      set: (v) => onChange({ general: { showWelcomeTutorial: v } }),
+    },
+    {
       kind: 'textInput',
       indent: 0,
       label: '🗁  App data directory',

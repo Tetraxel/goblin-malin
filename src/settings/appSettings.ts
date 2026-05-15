@@ -6,6 +6,7 @@ export type AppSettings = {
     appDataDir: string;
     animationsEnabled: boolean;
     theme: string;
+    showWelcomeTutorial: boolean;
   };
 };
 
@@ -15,5 +16,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     appDataDir: PROJECT_ROOT,
     animationsEnabled: false,
     theme: 'dark',
+    showWelcomeTutorial: true,
   },
 };

@@ -6,6 +6,7 @@ import { PromptModal } from "./PromptModal/PromptModal";
 import { ImportModal } from "./ImportModal/ImportModal";
 import { SettingsModal } from "./SettingsModal/SettingsModal";
 import { SetupWizardModal } from "./SetupWizardModal/SetupWizardModal";
+import { WelcomeModal } from "./WelcomeModal/WelcomeModal";
 import { Toolbar, ToolbarButtonHook } from "./Toolbar/Toolbar";
 import { ColumnDefinition, TaskListPanel } from "./TaskListPanel/TaskListPanel";
 import { SecondaryPanel } from "./SecondaryPanel/SecondaryPanel";
@@ -111,6 +112,11 @@ export const AppInner: React.FC<{
 
         <SetupWizardModal
           tasks={tasks}
+          terminalHeight={terminalHeight}
+          terminalWidth={terminalWidth}
+        />
+
+        <WelcomeModal
           terminalHeight={terminalHeight}
           terminalWidth={terminalWidth}
         />
