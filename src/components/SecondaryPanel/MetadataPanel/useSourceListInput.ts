@@ -1,7 +1,7 @@
 import { useInput } from "ink";
 import open from "open";
 import clipboard from "clipboardy";
-import { MetadataSourceState } from "../flows/musicDownloadFlow/types";
+import { MetadataSourceState } from "../../../flows/musicDownloadFlow/types";
 
 interface UseSourceListInputParams {
   sources: MetadataSourceState[];
@@ -99,7 +99,7 @@ export function useSourceListInput({
       // [Enter] — open source URL (Spotify → desktop app via spotify: URI)
       if (key.return && selectedIndex >= 0) {
         const url = sources[selectedIndex]?.metadata.url;
-        if (url) open(toOpenableUri(url)).catch(() => {});
+        if (url) open(toOpenableUri(url)).catch(() => { });
         return;
       }
 
@@ -109,7 +109,7 @@ export function useSourceListInput({
         if (url)
           try {
             clipboard.writeSync(url);
-          } catch {}
+          } catch { }
         return;
       }
 

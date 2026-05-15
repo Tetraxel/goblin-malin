@@ -70,9 +70,9 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
 
   if (!isActive) return null;
 
-  const modalWidth = Math.min(118, Math.max(64, terminalWidth - 8));
+  const modalWidth = Math.min(120, terminalWidth - 8);
 
-  const hasSmallScreen = terminalWidth < 118;
+  const hasSmallScreen = terminalWidth < 120;
 
   return (
     <Box

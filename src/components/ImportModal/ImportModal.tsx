@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { useFocusContext } from "../../contexts/FocusContext";
-import { DetectedUrl, SupportedPlatform } from "../../utils/detectUrls";
+import { DetectedUrl, SupportedPlatform } from "./detectUrls";
 import { providerDisplayRegistry } from "../../base/providerDisplay";
 import { useTheme } from "../../base/themeContext";
 

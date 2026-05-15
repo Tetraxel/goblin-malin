@@ -4,7 +4,7 @@ import { useToolbarActionsRef } from '../contexts/ToolbarActionsContext';
 import { FlowBase } from '../base/flow/flow-base';
 import { Task } from '../base/task/task';
 import { PromptType } from '../base/task/task-prompt';
-import { useActivePrompt } from './useActivePrompt';
+import { useActivePrompt } from '../components/PromptModal/useActivePrompt';
 import { matchesShortcut } from '../types/actions';
 
 export type KeyHandler = (input: string, key: Key) => void;

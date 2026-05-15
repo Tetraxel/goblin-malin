@@ -1,10 +1,10 @@
 import { useState, useCallback } from "react";
-import { PendingImport } from "../components/ImportModal";
-import { FlowBase } from "../base/flow/flow-base";
-import { useFocusContext } from "../contexts/FocusContext";
-import { globalLogger } from "../base/logger/logger";
-import { readClipboard } from "../utils/clipboard";
-import { detectUrls } from "../utils/detectUrls";
+import { PendingImport } from "./ImportModal";
+import { FlowBase } from "../../base/flow/flow-base";
+import { useFocusContext } from "../../contexts/FocusContext";
+import { globalLogger } from "../../base/logger/logger";
+import { readClipboard } from "./clipboard";
+import { detectUrls } from "./detectUrls";
 
 export function useImportFlow(currentFlow: FlowBase | undefined) {
   const { focusState } = useFocusContext();

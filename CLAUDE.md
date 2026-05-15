@@ -31,8 +31,9 @@ Only two metadata services are registered: `spotify` and `youtube`. Only one dow
 
 ## Dev commands
 
-```
-npm run dev   # run with tsx (use this)
+```bash
+npm run dev  # start the TUI (use this)
+npm run type-check  # Check typescript errors
 ```
 
 Entry point: `src/index.tsx`.

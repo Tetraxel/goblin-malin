@@ -71,27 +71,27 @@ export class TaskPrompt {
         return this.current?.prompt ?? null;
     }
 
-    async askConfirm(message: string, defaultValue = false): Promise<boolean> {
-        const prompt: ConfirmPrompt = {
-            id: `${this.id}-confirm-${Date.now()}`,
-            type: PromptType.Confirm,
-            message,
-            defaultValue,
-        };
+    // async askConfirm(message: string, defaultValue = false): Promise<boolean> {
+    //     const prompt: ConfirmPrompt = {
+    //         id: `${this.id}-confirm-${Date.now()}`,
+    //         type: PromptType.Confirm,
+    //         message,
+    //         defaultValue,
+    //     };
 
-        return this.requestUserInput<boolean>(prompt);
-    }
+    //     return this.requestUserInput<boolean>(prompt);
+    // }
 
-    async askSelect(message: string, options: { label: string; value: string }[]): Promise<string> {
-        const prompt: SelectPrompt = {
-            id: `${this.id}-select-${Date.now()}`,
-            type: PromptType.Select,
-            message,
-            options,
-        };
+    // async askSelect(message: string, options: { label: string; value: string }[]): Promise<string> {
+    //     const prompt: SelectPrompt = {
+    //         id: `${this.id}-select-${Date.now()}`,
+    //         type: PromptType.Select,
+    //         message,
+    //         options,
+    //     };
 
-        return this.requestUserInput<string>(prompt);
-    }
+    //     return this.requestUserInput<string>(prompt);
+    // }
 
     async askInput(options: { status: string, title: string, message: string, defaultValue?: string, hint?: string }): Promise<string> {
         const prompt: InputPrompt = {

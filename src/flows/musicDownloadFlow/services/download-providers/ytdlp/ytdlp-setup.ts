@@ -2,8 +2,8 @@ import * as fs from 'fs/promises';
 import { createWriteStream } from 'fs';
 import * as path from 'path';
 import * as https from 'https';
-import { getBinDir } from './appPaths';
-import { globalLogger } from '../base/logger/logger';
+import { getBinDir } from '../../../../../utils/appPaths';
+import { globalLogger } from '../../../../../base/logger/logger';
 
 interface GitHubRelease {
     tag_name: string;

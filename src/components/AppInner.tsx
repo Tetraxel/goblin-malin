@@ -16,7 +16,7 @@ import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
 import { Task, TaskAttributes } from "../base/task/task";
 import { MusicDownloadTaskAttributes } from "../flows/musicDownloadFlow/types";
 import { FlowBase } from "../base/flow/flow-base";
-import { useImportFlow } from "../hooks/useImportFlow";
+import { useImportFlow } from "./ImportModal/useImportFlow";
 import { useTheme } from "../base/themeContext";
 
 export const AppInner: React.FC<{

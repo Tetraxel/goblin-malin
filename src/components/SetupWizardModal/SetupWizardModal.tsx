@@ -5,7 +5,7 @@ import { Task } from "../../base/task/task";
 import { PromptType, SetupWizardPrompt } from "../../base/task/task-prompt";
 import { SetupWizardConfig } from "../../base/setupWizard";
 import { useFocusContext } from "../../contexts/FocusContext";
-import { useActiveWizardPrompt } from "../../hooks/useActiveWizardPrompt";
+import { useActiveWizardPrompt } from "./useActiveWizardPrompt";
 import { openUrl } from "../../utils/openUrl";
 import {
   removeEnvVars,

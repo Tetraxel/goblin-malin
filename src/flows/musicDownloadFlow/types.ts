@@ -1,4 +1,13 @@
-import { MusicBrainzRecording } from './services/metadata-providers/musicbrainz/MusicBrainzService';
+import { MusicBrainzApi, IReleaseGroup, IRecordingMatch, IReleaseGroupMatch, IRelease } from 'musicbrainz-api';
+
+//----------------------//
+//     MUSICBRAINZ      //
+//----------------------//
+
+export type MusicBrainzReleaseGroup = IReleaseGroupMatch
+export type MusicBrainzRelease = IRelease
+export type MusicBrainzRecording = IRecordingMatch
+
 
 //----------------------//
 //         BASE         //

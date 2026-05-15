@@ -1,7 +1,7 @@
 import path from 'path';
 import { getCacheDir } from '../../../../utils/appPaths';
 import { globalLogger } from '../../../../base/logger/logger';
-import { loadJsonFile, saveJsonFile } from '../../../../utils/json';
+import { loadJsonFile, saveJsonFile } from '../metadata-providers/songlink/json';
 import { sleep } from '../../../../utils/sleep';
 
 const SONGLINK_API_BASE_URL = "https://api.song.link/v1-alpha.1/links";

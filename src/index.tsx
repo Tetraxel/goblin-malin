@@ -64,7 +64,11 @@ export function start(): void {
 
   process.stdout.write("\x1b[?1049h"); // enter alternate screen buffer
 
-  const instance = render(<App />, { patchConsole: true, maxFps: 60, exitOnCtrlC: false });
+  const instance = render(<App />, {
+    patchConsole: true,
+    maxFps: 60,
+    exitOnCtrlC: false,
+  });
 
   instance.waitUntilExit().then(() => {
     process.stdout.write("\x1b[?1049l"); // restore main screen buffer

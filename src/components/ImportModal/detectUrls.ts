@@ -1,4 +1,4 @@
-import { urlParserRegistry, ParsedUrl } from '../base/urlParser';
+import { urlParserRegistry, ParsedUrl } from '../../base/urlParser';
 
 export type SupportedPlatform = string;
 export type DetectedUrl = ParsedUrl & { raw: string };

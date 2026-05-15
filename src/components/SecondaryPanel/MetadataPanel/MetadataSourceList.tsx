@@ -6,7 +6,7 @@ import {
   MetadataOverrides,
 } from "../../../flows/musicDownloadFlow/types";
 import { CompiledMetadata } from "../../../flows/musicDownloadFlow/utils/compiledMetadata";
-import { useSourceListInput } from "../../../hooks/useSourceListInput";
+import { useSourceListInput } from "./useSourceListInput";
 import { MetadataSourceRow } from "./MetadataSourceRow";
 import { MetadataCompiledRow } from "./MetadataCompiledRow";
 import { useTheme } from "../../../base/themeContext";

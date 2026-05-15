@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Task } from '../base/task/task';
-import { TaskPrompt } from '../base/task/task-prompt';
-import { PromptType, SetupWizardPrompt } from '../base/task/task-prompt';
-import { SetupWizardConfig } from '../base/setupWizard';
+import { Task } from '../../base/task/task';
+import { TaskPrompt } from '../../base/task/task-prompt';
+import { PromptType, SetupWizardPrompt } from '../../base/task/task-prompt';
+import { SetupWizardConfig } from '../../base/setupWizard';
 
 interface ActiveWizardPromptResult {
   task: Task | null;

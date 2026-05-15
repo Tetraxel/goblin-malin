@@ -8,7 +8,7 @@ import { StatusType } from '../../../../../base/task/task-status';
 import { Logger } from '../../../../../base/logger/logger';
 import { getBinDir } from '../../../../../utils/appPaths';
 import { getTempDownloadDir } from '../../../saveSettings';
-import { ensureYtDlpSetup } from '../../../../../utils/ytdlp-setup';
+import { ensureYtDlpSetup } from './ytdlp-setup';
 import { ensureFfmpeg } from '../../../../../utils/ffmpeg-setup';
 import { APIProvider, TrackMetadata, TrackDownloadSource, LocalFile, FileInfo } from '../../../types';
 import { DownloadTask } from '../../../utils/downloadTask';
