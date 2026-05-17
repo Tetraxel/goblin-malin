@@ -100,12 +100,20 @@ export const LogPanel = ({
   );
 
   const clampedOffset = Math.min(scrollOffset, maxOffset);
-  const showIndicator = clampedOffset > 0;
-  // Reserve one row for the indicator when it's visible
-  const logRows = showIndicator ? height - 1 : height;
-  const visibleEnd = showIndicator
+  const showBottomIndicator = clampedOffset > 0;
+  // First pass: determine if a top indicator is needed (without reserving its row yet)
+  const logRowsNoTop = showBottomIndicator ? height - 1 : height;
+  const visibleEnd = showBottomIndicator
     ? filteredLogs.length - clampedOffset
     : undefined;
+  const visibleStartNoTop = Math.max(
+    0,
+    (visibleEnd ?? filteredLogs.length) - logRowsNoTop,
+  );
+  const showTopIndicator = visibleStartNoTop > 0;
+  // Reserve one row per visible indicator
+  const logRows =
+    logRowsNoTop - (showTopIndicator ? 1 : 0);
   const visibleStart = Math.max(
     0,
     (visibleEnd ?? filteredLogs.length) - logRows,
@@ -115,7 +123,6 @@ export const LogPanel = ({
   return (
     <Box
       flexDirection="row"
-      overflow="hidden"
       borderStyle="single"
       borderColor={theme.ui.border}
       borderBackgroundColor={theme.ui.background}
@@ -123,15 +130,38 @@ export const LogPanel = ({
       borderBottom={false}
       height={height}
       flexGrow={1}
+      overflow="hidden"
     >
-      <Box flexDirection="column" overflow="hidden" flexGrow={1}>
+      <Box
+        flexDirection="column"
+        alignSelf="flex-end"
+        alignContent="flex-end"
+        justifyContent="flex-end"
+        overflow="hidden"
+        flexGrow={1}
+        flexShrink={0}
+      >
+        {showTopIndicator && (
+          <Box paddingX={1} flexShrink={0}>
+            <Text color={theme.ui.border} dimColor>
+              ↑ {visibleStart} more above
+            </Text>
+          </Box>
+        )}
         {visibleLogs.map((log) => (
-          <Box key={log.id} paddingX={1} width={width} height={1}>
-            <Text>{getLogString(log)}</Text>
+          <Box
+            key={log.id}
+            paddingX={1}
+            height={1}
+            overflow="hidden"
+            flexGrow={1}
+            flexShrink={0}
+          >
+            <Text wrap="truncate-end">{getLogString(log)}</Text>
           </Box>
         ))}
-        {showIndicator && (
-          <Box paddingX={1}>
+        {showBottomIndicator && (
+          <Box paddingX={1} flexShrink={0}>
             <Text color={theme.ui.border} dimColor>
               ↓ {clampedOffset} more below
             </Text>
