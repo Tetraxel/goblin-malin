@@ -8,6 +8,7 @@ import { taskIdFromUrl } from './utils/taskId';
 import { ToolbarButtonHook } from '../../components/Toolbar/Toolbar';
 import { ColumnDefinition } from '../../components/TaskListPanel/TaskListPanel';
 import { ActionBarRow, ContextualActionBar, ContextualActions } from '../../types/actions';
+import { runWithoutCache } from '../../utils/cache';
 import clipboard from 'clipboardy';
 import open from 'open';
 import { useExitButton } from './toolbar/useExitButton';
@@ -218,11 +219,24 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 onClick: () => hasBeenRun ? task.restart() : task.start(),
             },
         ];
+        if (hasBeenRun) {
+            taskActions.push({
+                shortcuts: [{ input: "R" }],
+                label: "Restart (no cache)",
+                description: "Restart from scratch, bypassing cached results",
+                onClick: () => runWithoutCache(() => task.restart()),
+            });
+        }
         if (attrs?.primaryMetadataFetched) {
             taskActions.push({
                 shortcuts: [{ input: "f" }],
                 label: "Re-fetch primary metadata",
                 onClick: () => task.startPrimaryMetadataFetching(),
+            });
+            taskActions.push({
+                shortcuts: [{ input: "F", shift: true }],
+                label: "Re-fetch primary metadata (no cache)",
+                onClick: () => runWithoutCache(() => task.startPrimaryMetadataFetching()),
             });
         }
         if (attrs?.metadataDiscovered) {
@@ -231,12 +245,22 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 label: "Re-discover metadata providers",
                 onClick: () => task.startMetadataDiscovering(),
             });
+            taskActions.push({
+                shortcuts: [{ input: "D", shift: true }],
+                label: "Re-discover metadata providers (no cache)",
+                onClick: () => runWithoutCache(() => task.startMetadataDiscovering()),
+            });
         }
         if (attrs?.downloadsFetched) {
             taskActions.push({
                 shortcuts: [{ input: "w" }],
                 label: "Re-download all sources",
                 onClick: () => task.startDownloads(),
+            });
+            taskActions.push({
+                shortcuts: [{ input: "W", shift: true }],
+                label: "Re-download all sources (no cache)",
+                onClick: () => runWithoutCache(() => task.startDownloads()),
             });
         }
 

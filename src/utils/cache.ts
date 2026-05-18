@@ -1,7 +1,14 @@
+import { AsyncLocalStorage } from 'async_hooks';
 import { create } from 'flat-cache';
 import * as fs from 'fs';
 import { globalLogger } from '../base/logger/logger';
 import { getCacheDir } from './appPaths';
+
+const skipCacheStorage = new AsyncLocalStorage<boolean>();
+
+export function withSkipCache<T>(fn: () => Promise<T>): Promise<T> {
+    return skipCacheStorage.run(true, fn);
+}
 
 // Global cache instance — path captured once at startup, consistent with clearCache
 const CACHE_ID = 'api-cache'
@@ -26,6 +33,10 @@ export function clearCache(): void {
     globalLogger.info('Cache cleared');
 }
 
+export function runWithoutCache<T>(fn: () => Promise<T>): Promise<T> {
+    return withSkipCache(fn);
+}
+
 interface CacheOptions {
     ttl?: number;
     keyGenerator?: (...args: any[]) => string;
@@ -45,16 +56,20 @@ export function Cached(options: CacheOptions = {}) {
             // Generate cache key
             const cacheKey = `${className}:${propertyKey}:${JSON.stringify(args)}`;
 
-            // Check cache
-            const cached = cache.get(cacheKey);
-            if (cached !== undefined) {
-                globalLogger.debug(`Cache found for ${cacheKey}`);
-                return cached;
+            // Return existing cache value ONLY if skipCache is not set in the AsyncLocalStorage context
+            const shouldSkip = skipCacheStorage.getStore() === true;
+            if (!shouldSkip) {
+                const cached = cache.get(cacheKey);
+                if (cached !== undefined) {
+                    globalLogger.debug(`Cache found for ${cacheKey}`);
+                    return cached;
+                }
+                globalLogger.debug(`Cache miss for ${cacheKey}`);
+            } else {
+                globalLogger.debug(`Cache skip requested for ${cacheKey}`);
             }
 
-            // Call original method
-            globalLogger.debug(`Cache miss for ${cacheKey}`);
-
+            // Call original method and cache result
             try {
                 const result = await originalMethod.apply(this, args);
                 globalLogger.debug(`Cache saved for "${cacheKey}"`)
