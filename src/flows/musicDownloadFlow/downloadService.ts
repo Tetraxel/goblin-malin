@@ -1,5 +1,4 @@
 import { ServiceBase } from '../../base/service-base';
-import { Task } from '../../base/task/task';
 import { Logger } from '../../base/logger/logger';
 import { TrackMetadata, TrackDownloadSource, APIProvider } from './types';
 import { DownloadTask } from './utils/downloadTask';

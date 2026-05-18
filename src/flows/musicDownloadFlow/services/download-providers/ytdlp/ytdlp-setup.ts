@@ -55,7 +55,7 @@ export async function ensureYtDlpSetup(): Promise<string> {
         globalLogger.info(`Successfully downloaded yt-dlp ${latestVersion} to ${binaryPath}`);
         return binaryPath;
     }
-    catch (error) {
+    catch {
         const existingBinary = await findExistingBinary('yt-dlp_', '.exe');
         if (existingBinary) {
             globalLogger.info(`Using existing yt-dlp at ${existingBinary}`);

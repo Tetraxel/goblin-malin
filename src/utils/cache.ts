@@ -29,7 +29,12 @@ export const cache = create({
 
 export function clearCache(): void {
     cache.clear();
-    try { fs.rmSync(cacheDir, { recursive: true, force: true }); } catch { }
+    try {
+        fs.rmSync(cacheDir, { recursive: true, force: true });
+    }
+    catch {
+        /* empty */
+    }
     globalLogger.info('Cache cleared');
 }
 
@@ -39,7 +44,7 @@ export function runWithoutCache<T>(fn: () => Promise<T>): Promise<T> {
 
 interface CacheOptions {
     ttl?: number;
-    keyGenerator?: (...args: any[]) => string;
+    keyGenerator?: (...args: unknown[]) => string;
 }
 
 // Method decorator to handle both @Cached and @Cached()
@@ -70,18 +75,14 @@ export function Cached(options: CacheOptions = {}) {
             }
 
             // Call original method and cache result
-            try {
-                const result = await originalMethod.apply(this, args);
-                globalLogger.debug(`Cache saved for "${cacheKey}"`)
-                cache.set(cacheKey, result, options.ttl);
+            const result = await originalMethod.apply(this, args);
+            globalLogger.debug(`Cache saved for "${cacheKey}"`)
+            cache.set(cacheKey, result, options.ttl);
 
-                if (result === undefined || result === null || result === "")
-                    globalLogger.warn(`Cached a value "${result}" that may be an error case`)
+            if (result === undefined || result === null || result === "")
+                globalLogger.warn(`Cached a value "${result}" that may be an error case`)
 
-                return result;
-            } catch (err) {
-                throw err;
-            }
+            return result;
         };
 
         return descriptor;

@@ -17,7 +17,6 @@ interface SecondaryPanelProps {
 export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({
   tasks,
   width,
-  flow,
 }) => {
   const { focusState } = useFocusContext();
   const { primaryMode, subTab } = focusState.secondaryPanel;

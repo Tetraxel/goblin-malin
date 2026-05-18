@@ -15,7 +15,7 @@ export async function loadJsonFile<T>(filePath: string, defaultValue: T): Promis
     try {
         const content = await fs.readFile(filePath, 'utf-8');
         return JSON.parse(content) as T;
-    } catch (err) {
+    } catch {
         return defaultValue;
     }
 }

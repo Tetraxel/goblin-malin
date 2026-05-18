@@ -39,27 +39,27 @@ export const App: React.FC = () => {
   useEffect(() => {
     orchestrator.registerFlow(MusicDownloadFlow, true);
     setActiveFlowId(orchestrator.getEnabledFlows()?.[0].id);
-  }, []);
+  }, [orchestrator]);
 
   // [!] This is important to allow dynamic updates of buttons and columns when the flow changes
   useEffect(() => {
     if (!currentFlow) return;
     globalLogger.debug(`Active flow changed: ${currentFlow?.displayName}`);
     // Subscribe to currentFlow changes to update buttons and columns dynamically
-    const unsubscribe = currentFlow.subscribe((updatedFlow) => {
+    const unsubscribe = currentFlow.subscribe((_updatedFlow) => {
       globalLogger.debug(`flow state changed, updating UI...`);
       setToolbarButtons(currentFlow.getToolbarButtons() ?? []);
       setColumns(currentFlow.getColumns() ?? []);
     });
     return unsubscribe;
-  }, [currentFlow?.id]);
+  }, [currentFlow, currentFlow?.id]);
 
   useEffect(() => {
     const unsubscribe = orchestrator.subscribe((orchestrator) => {
       setTasks(orchestrator.getTasks());
     });
     return unsubscribe;
-  }, [orchestrator.id]);
+  }, [orchestrator, orchestrator.id]);
 
   const filteredTasks = useMemo(
     () => tasks.filter((task) => task.getFlowId() === activeFlowId),

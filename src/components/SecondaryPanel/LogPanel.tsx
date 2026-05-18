@@ -7,7 +7,7 @@ import { useFocusContext } from "../../contexts/FocusContext";
 import { Task } from "../../base/task/task";
 import { useTheme } from "../../base/themeContext";
 
-function formatDetails(details?: Record<string, any>): string {
+function formatDetails(details?: Record<string, unknown>): string {
   if (!details || Object.keys(details).length === 0) {
     return "";
   }
@@ -38,17 +38,14 @@ function getLogString(log: LogMetadata): string {
 
 export const LogPanel = ({
   tasks,
-  width: widthProp,
   height: heightProp,
 }: {
   tasks: Task[];
-  width?: number;
   height?: number;
 }) => {
   const theme = useTheme();
   const { focusState } = useFocusContext();
   const height = heightProp ?? focusState.layout.secondaryPanelHeight;
-  const width = widthProp ?? focusState.logPanel.width;
 
   const selectedTask =
     focusState.activeWindow === "taskList"
@@ -80,8 +77,7 @@ export const LogPanel = ({
   }, [isActive]);
 
   const filteredLogs = logs.filter(
-    (log) =>
-      !selectedTask || !log.task || selectedTask === log.task,
+    (log) => !selectedTask || !log.task || selectedTask === log.task,
   );
 
   // When scrolled (indicator row visible), only height-1 rows are available for logs
@@ -112,8 +108,7 @@ export const LogPanel = ({
   );
   const showTopIndicator = visibleStartNoTop > 0;
   // Reserve one row per visible indicator
-  const logRows =
-    logRowsNoTop - (showTopIndicator ? 1 : 0);
+  const logRows = logRowsNoTop - (showTopIndicator ? 1 : 0);
   const visibleStart = Math.max(
     0,
     (visibleEnd ?? filteredLogs.length) - logRows,

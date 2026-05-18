@@ -6,7 +6,6 @@ import { MusicDownloadTaskAttributes } from "../../../types";
 
 export const YtDlpCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   task,
-  width,
   isSelected,
 }) => {
   const downloadSource = task.attributes?.downloadSources.find(

@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import { Task } from "../../../base/task/task";
 import { globalLogger, Logger } from "../../../base/logger/logger";
 import { StatusType } from "../../../base/task/task-status";
-import { MusicDownloadTaskAttributes, StandardTrack, TrackMetadata, TrackDownloadSource, MetadataSourceState } from "../types";
+import { MusicDownloadTaskAttributes, TrackMetadata, TrackDownloadSource, MetadataSourceState } from "../types";
 import { MetadataService } from '../metadataService';
 import { DownloadService } from '../downloadService';
 import { ServiceRegistry } from '../../../base/service-registry';
@@ -325,7 +325,12 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             // Delete saved files from other sources (they're being replaced)
             for (const src of sources) {
                 if (src !== selectedSource && src.savedFile) {
-                    try { await fs.unlink(src.savedFile.path); } catch (e: any) { if (e.code !== 'ENOENT') throw e; }
+                    try {
+                        await fs.unlink(src.savedFile.path);
+                    } catch (e: unknown) {
+                        if ((e as NodeJS.ErrnoException).code !== 'ENOENT')
+                            throw e;
+                    }
                 }
             }
 

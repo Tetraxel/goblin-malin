@@ -13,7 +13,7 @@ export abstract class MetadataService extends ServiceBase {
         super(serviceName, task, logger);
     }
 
-    static parseUrl(url: string): ParsedUrl | null {
+    static parseUrl(_url: string): ParsedUrl | null {
         throw new Error('Method not implemented!');
     }
 

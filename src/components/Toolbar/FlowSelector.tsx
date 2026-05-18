@@ -7,7 +7,7 @@ export const FlowSelector: React.FC<{
   flows: ReturnType<FlowOrchestrator["getAllFlows"]>;
   currentFlow: FlowBase;
   onFlowChange: (flowId: string) => void;
-}> = ({ flows, currentFlow, onFlowChange }) => {
+}> = ({ flows, currentFlow }) => {
   return (
     <Box>
       {flows.map((flow) => (

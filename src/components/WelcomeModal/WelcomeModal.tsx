@@ -116,7 +116,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
           <Text>
             Paste a Spotify or YouTube link — Goblin Malin handles the rest.
           </Text>
-          <Text dimColor>Here's how it works:</Text>
+          <Text dimColor>{"Here's how it works:"}</Text>
         </Box>
 
         <Box flexDirection="column" marginTop={1}>
@@ -148,7 +148,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
           <Text color={dontShowAgain ? theme.text.active : theme.text.muted}>
             {dontShowAgain ? "[x]" : "[ ]"}
           </Text>
-          <Text dimColor> Don't show this again</Text>
+          <Text dimColor>{" Don't show this again"}</Text>
         </Box>
 
         <Box marginTop={1} flexDirection="row">

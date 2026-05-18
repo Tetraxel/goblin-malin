@@ -86,7 +86,7 @@ export async function ensureFfmpeg(): Promise<string> {
         globalLogger.info(`Successfully downloaded ffmpeg ${versionDate} to ${binaryPath}`);
         return binaryPath;
     }
-    catch (error) {
+    catch {
         const existingBinary = await findExistingBinary('ffmpeg_', '.exe');
         if (existingBinary) {
             globalLogger.info(`Using existing ffmpeg at ${existingBinary}`);

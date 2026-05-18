@@ -6,7 +6,6 @@ import { computeCompiledMetadata } from "../utils/compiledMetadata";
 
 export const TrackCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   task,
-  width,
   isSelected,
 }) => {
   const sources = task.attributes?.metadataSources ?? [];

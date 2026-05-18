@@ -5,8 +5,6 @@ import { MusicDownloadTaskAttributes } from "../types";
 
 export const ToDownloadCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   task,
-  taskReference,
-  width,
   isSelected,
 }) => {
   const toDownload = task.attributes?.toDownload ?? false;

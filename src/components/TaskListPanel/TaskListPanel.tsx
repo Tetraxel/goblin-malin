@@ -4,7 +4,6 @@ import { TaskRow } from "./TaskRow";
 import { Task, TaskSnapshot } from "../../base/task/task";
 import { useFocusContext } from "../../contexts/FocusContext";
 import { FlowBase } from "../../base/flow/flow-base";
-import { globalLogger } from "../../base/logger/logger";
 import {
   Shortcut,
   ContextualActions,

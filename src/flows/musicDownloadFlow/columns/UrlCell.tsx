@@ -5,7 +5,6 @@ import { MusicDownloadTaskAttributes } from "../types";
 
 export const UrlCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   task,
-  width,
   isSelected,
 }) => {
   const primaryMetadata = task.attributes?.metadataSources.find(

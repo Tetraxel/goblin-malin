@@ -57,7 +57,7 @@ export class FlowBase<TaskAttributes = any> {
         }
     }
 
-    public async restartTask(task: Task<TaskAttributes>): Promise<void> {
+    public async restartTask(_task: Task<TaskAttributes>): Promise<void> {
         throw Error('Not implemented')
     }
 
@@ -77,7 +77,7 @@ export class FlowBase<TaskAttributes = any> {
         return this.displayMode;
     }
 
-    public switchMode(input: string): void {
+    public switchMode(_input: string): void {
         throw Error('Not implemented')
     }
 
@@ -85,7 +85,7 @@ export class FlowBase<TaskAttributes = any> {
     public getToolbarButtons(): ToolbarButtonHook[] {
         throw Error('Not implemented')
     }
-    public getContextualActionBar(task: Task<TaskAttributes>, attributes: object): ContextualActionBar {
+    public getContextualActionBar(_task: Task<TaskAttributes>, _attributes: object): ContextualActionBar {
         throw Error('Not implemented')
     }
     public getColumns(): ColumnDefinition<TaskAttributes>[] {

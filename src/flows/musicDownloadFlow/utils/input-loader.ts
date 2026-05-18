@@ -2,9 +2,7 @@ import * as path from 'path';
 import fs from 'fs/promises';
 import { readFileSync } from 'fs';
 import { PROJECT_ROOT } from '../../../constants';
-import { Task } from '../../../base/task/task';
 import { globalLogger } from '../../../base/logger/logger';
-import { MusicDownloadFlow } from '../musicDownloadFlow';
 
 interface TrackInput {
   trackUrl: string;

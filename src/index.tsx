@@ -59,8 +59,6 @@ export function start(): void {
     /* ignore if stdin manipulation fails */
   }
 
-  process.stdout.rows = process.stdout.rows;
-  process.stdout.columns = process.stdout.columns;
 
   process.stdout.write("\x1b[?1049h"); // enter alternate screen buffer
 

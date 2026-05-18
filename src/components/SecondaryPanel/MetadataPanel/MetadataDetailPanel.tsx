@@ -42,7 +42,6 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
   selectedFieldIndex,
   isActive,
   width,
-  height,
   onOverrideChange,
   onInnerFocusSwitch,
 }) => {
@@ -110,7 +109,7 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
         if (value !== "—")
           try {
             clipboard.writeSync(value);
-          } catch {}
+          } catch { /* ignored */ }
         return;
       }
     },

@@ -30,7 +30,7 @@ export class Env {
                 throw new EnvironmentError(key);
             }
             return value;
-        } catch (error) {
+        } catch {
             const value = await this.task.getPrompt().askInput(
                 {
                     status: `Missing env key ${key}`,

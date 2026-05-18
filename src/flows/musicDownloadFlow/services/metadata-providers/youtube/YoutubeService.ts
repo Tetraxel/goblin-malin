@@ -1,11 +1,9 @@
 import YTMusic, {
-    type SongDetailed,
     type SongFull,
     type VideoFull,
     type ArtistFull,
     type AlbumFull
 } from 'ytmusic-api';
-import fs from 'fs/promises';
 import { MetadataService } from '../../../metadataService';
 import { ProviderDisplay } from '../../../../../base/providerDisplay';
 import { ProviderSettingsSchema } from '../../../../../base/providerSettings';

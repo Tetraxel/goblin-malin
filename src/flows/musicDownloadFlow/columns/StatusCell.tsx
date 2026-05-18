@@ -68,7 +68,6 @@ const getStatusText = (status: StatusAttributes): string => {
 
 export const StatusCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   task,
-  width,
   isSelected,
 }) => {
   const theme = useTheme();

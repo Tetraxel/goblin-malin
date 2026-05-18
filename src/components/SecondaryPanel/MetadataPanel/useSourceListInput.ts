@@ -109,7 +109,7 @@ export function useSourceListInput({
         if (url)
           try {
             clipboard.writeSync(url);
-          } catch { }
+          } catch { /* ignored */ }
         return;
       }
 

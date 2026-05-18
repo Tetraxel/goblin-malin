@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, type DOMElement, useInput } from "ink";
+import { Box, type DOMElement } from "ink";
 import { type ComponentPropsWithoutRef, forwardRef } from "react";
 
 import { useScreenSize } from "../hooks/useScreenSize";

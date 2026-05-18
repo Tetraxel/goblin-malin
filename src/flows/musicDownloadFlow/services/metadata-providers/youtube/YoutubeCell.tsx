@@ -5,7 +5,6 @@ import { MusicDownloadTaskAttributes } from "../../../types";
 
 export const YoutubeCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   task,
-  width,
   isSelected,
 }) => {
   const metadata = task.attributes?.metadataSources.find(

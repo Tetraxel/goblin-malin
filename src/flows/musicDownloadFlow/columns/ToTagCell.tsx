@@ -5,8 +5,6 @@ import { MusicDownloadTaskAttributes } from "../types";
 
 export const ToTagCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
   task,
-  taskReference,
-  width,
   isSelected,
 }) => {
   const toTag = task.attributes?.toTag ?? false;
