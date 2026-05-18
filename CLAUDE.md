@@ -27,13 +27,11 @@ Unregistered API platforms (youtubeMusic, deezer, appleMusic, etc.) that appear 
 
 ## Active vs. disabled code
 
-Only two metadata services are registered: `spotify` and `youtube`. Only one download service is registered: `ytdlp`. MusicBrainz, Song.link, and Soulseek are implemented but commented out in `src/flows/musicDownloadFlow/musicDownloadFlow.ts`.
+Only two metadata services are registered: `spotify` and `youtube`. Only one download service is registered: `ytdlp`.
 
 ## Dev commands
 
 ```bash
-npm run dev  # start the TUI (use this)
-npm run type-check  # Check typescript errors
+yarn run dev  # start the TUI (use this)
+yarn run type-check  # Check typescript errors
 ```
-
-Entry point: `src/index.tsx`.

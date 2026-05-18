@@ -27,7 +27,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({
   const currentPrompt = prompt?.getCurrentPrompt();
 
   useEffect(() => {
-    if (Boolean(prompt)) {
+    if (prompt) {
       switchWindow("prompt");
     } else {
       switchBack();

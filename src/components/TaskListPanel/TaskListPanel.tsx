@@ -61,7 +61,7 @@ export function calculateColumnWidths<TAttributes>(
     0,
   );
 
-  let remainingWidth = availableWidth - totalMinWidth;
+  const remainingWidth = availableWidth - totalMinWidth;
 
   const columnsWithBase = columnsWithMin.map((col) => {
     const baseWidth = col.minWidth!;
@@ -79,7 +79,7 @@ export function calculateColumnWidths<TAttributes>(
     (sum, col) => sum + col.baseWidth,
     0,
   );
-  let leftoverWidth = availableWidth - usedWidth;
+  const leftoverWidth = availableWidth - usedWidth;
 
   const totalFlexGrow = columnsWithBase
     .filter((col) => col.hasFlexGrow)

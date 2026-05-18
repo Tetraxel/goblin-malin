@@ -258,7 +258,7 @@ export const useFocusManager = ({
     (direction: 'up' | 'down' | 'left' | 'right') => {
       setFocusState((prev) => {
         if (direction === 'up' || direction === 'down') {
-          let newIndex =
+          const newIndex =
             direction === 'up'
               ? prev.taskList.selectedTaskIndex - 1
               : prev.taskList.selectedTaskIndex + 1;

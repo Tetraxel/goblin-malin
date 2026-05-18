@@ -1,4 +1,5 @@
 import { defineConfig } from "tsup";
+import { cpSync } from "fs";
 
 export default defineConfig({
   entry: {
@@ -9,4 +10,7 @@ export default defineConfig({
   dts: true,
   clean: true,
   sourcemap: false,
+  async onSuccess() {
+    cpSync("src/assets", "dist/assets", { recursive: true });
+  },
 });

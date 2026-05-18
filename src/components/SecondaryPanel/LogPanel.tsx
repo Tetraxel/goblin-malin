@@ -81,7 +81,7 @@ export const LogPanel = ({
 
   const filteredLogs = logs.filter(
     (log) =>
-      !Boolean(selectedTask) || !Boolean(log.task) || selectedTask === log.task,
+      !selectedTask || !log.task || selectedTask === log.task,
   );
 
   // When scrolled (indicator row visible), only height-1 rows are available for logs

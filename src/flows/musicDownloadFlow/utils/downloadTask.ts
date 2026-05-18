@@ -56,7 +56,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
     }
 
     private addMetadataSource(metadata: TrackMetadata, isPrimary: boolean): void {
-        var currentMetadataSources = this.getAttributes()?.metadataSources ?? [];
+        let currentMetadataSources = this.getAttributes()?.metadataSources ?? [];
         // Keep only one primary source: if the metadata inserted is primary, remove the old one
         if (isPrimary)
             currentMetadataSources = currentMetadataSources.filter(s => !s.isPrimarySource);

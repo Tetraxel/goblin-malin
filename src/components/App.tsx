@@ -11,16 +11,12 @@ import { Task, TaskAttributes } from "../base/task/task";
 import { MusicDownloadTaskAttributes } from "../flows/musicDownloadFlow/types";
 import { globalLogger } from "../base/logger/logger";
 import { getInstance } from "../utils/mpvPlayer";
-import { fileURLToPath } from "url";
-import path from "path";
+import { getAssetPath } from "../utils/appPaths";
 import { AppInner } from "./AppInner";
 
 export const App: React.FC = () => {
   useEffect(() => {
-    const initWav = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      "../../init.wav",
-    );
+    const initWav = getAssetPath("sounds", "init.wav");
     const player = getInstance();
     player
       .setVolume(50)

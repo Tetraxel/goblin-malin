@@ -89,7 +89,7 @@ export class YtDlpService extends DownloadService {
 
                 // Load cookies if available
                 const cookiesPath = path.join(getBinDir(), 'cookies.txt');
-                let downloadOptions: FormatOptions<keyof QualityOptions> = {
+                const downloadOptions: FormatOptions<keyof QualityOptions> = {
                     paths: getTempDownloadDir(),
                     output: filename,
                     audioFormat: format,
