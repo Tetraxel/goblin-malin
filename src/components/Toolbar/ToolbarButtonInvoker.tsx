@@ -1,5 +1,5 @@
 import { Box, Text } from "ink";
-import React from "react";
+import React, { useLayoutEffect } from "react";
 import { ToolbarButtonHook } from "./Toolbar";
 import { FlowBase } from "../../base/flow/flow-base";
 import { FlowOrchestrator } from "../../base/flow/flow-orchestrator";
@@ -27,7 +27,9 @@ export const ToolbarButtonInvoker = ({
 
   // Register the current onPress for this button index into the shared ref.
   // Runs on every render so the handler always sees the latest closure.
-  actionsRef.current[index] = onPress;
+  useLayoutEffect(() => {
+    actionsRef.current[index] = onPress;
+  });
 
   if (!enabled) return null;
   return (

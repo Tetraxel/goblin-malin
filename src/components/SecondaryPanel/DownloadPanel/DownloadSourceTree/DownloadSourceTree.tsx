@@ -150,13 +150,11 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     );
   }
 
-  let groupBreak = false;
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">
       {treeItems.map((item, i) => {
         if (item.type === "provider-header") {
-          const addMargin = groupBreak;
-          groupBreak = true;
+          const addMargin = treeItems.slice(0, i).some(t => t.type === "provider-header");
           return (
             <ProviderHeader
               key={`ph-${i}`}
