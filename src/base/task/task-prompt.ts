@@ -114,7 +114,7 @@ export class TaskPrompt {
             const prompt: SetupWizardPrompt = {
                 id: `${this.id}-wizard-${Date.now()}`,
                 type: PromptType.SetupWizard,
-                status: `⚙  Setup wizard: ${config.title}`,
+                status: config.title,
                 title: config.title,
                 config,
                 resolve,

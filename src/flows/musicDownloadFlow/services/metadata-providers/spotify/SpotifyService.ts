@@ -80,6 +80,7 @@ export class SpotifyService extends MetadataService {
     static readonly setupWizard: SetupWizardConfig = {
         title: "⚙  Spotify Setup Wizard",
         providerKey: "spotify",
+providerType: "metadata",
         envSection: { name: "SPOTIFY", url: "https://developer.spotify.com/dashboard" },
         description: [
             {

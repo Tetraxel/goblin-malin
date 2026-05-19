@@ -75,6 +75,11 @@ export class SettingsStore {
         });
     }
 
+    patchFlowSettings(flowId: string, patch: DeepPartial<Record<string, unknown>>): void {
+        const current = this.getFlowSettings<Record<string, unknown>>(flowId, {});
+        this.writeFlowSettings(flowId, deepMerge(current, patch));
+    }
+
     // ── Change notifications ───────────────────────────────────────────────────
 
     onSettingsChanged(callback: () => void): () => void {

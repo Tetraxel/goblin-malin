@@ -15,6 +15,7 @@ export interface WizardField {
 export interface SetupWizardConfig {
     title: string;
     providerKey?: string;
+    providerType?: "metadata" | "download";
     description: WizardContentBlock[];
     fields: WizardField[];
     /** If set, saved env vars are grouped under a labelled section comment in .env */

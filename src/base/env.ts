@@ -3,6 +3,7 @@ import { Logger } from "./logger/logger";
 import { EnvironmentError } from "../exceptions/EnvironmentError";
 import { SetupWizardConfig } from "./setupWizard";
 import { saveEnvVar, saveEnvVarsGroup } from "../utils/envFile";
+import { SettingsStore } from "../settings/settingsStore";
 
 export class Env {
     protected task: Task;
@@ -50,7 +51,14 @@ export class Env {
         const missing = config.fields.filter((f) => !process.env[f.envVar]);
 
         if (missing.length > 0) {
-            const values = await this.task.getPrompt().askSetupWizard(config);
+            let values: Record<string, string>;
+            try {
+                values = await this.task.getPrompt().askSetupWizard(config);
+            } catch (error) {
+                this.persistProviderDisabled(config);
+                throw error;
+            }
+
             const nonEmpty = Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim()));
             try {
                 if (config.envSection && Object.keys(nonEmpty).length > 0) {
@@ -72,6 +80,14 @@ export class Env {
         }
 
         return Object.fromEntries(config.fields.map((f) => [f.envVar, process.env[f.envVar]!]));
+    }
+
+    private persistProviderDisabled(config: SetupWizardConfig): void {
+        if (!config.providerKey || !config.providerType) return;
+        SettingsStore.getInstance().patchFlowSettings(this.task.getFlowId(), {
+            [config.providerType]: { providers: { [config.providerKey]: { enabled: false } } },
+        });
+        this.logger.info(`Disabled provider '${config.providerKey}' in settings.`);
     }
 
     private async saveToEnvFile(key: string, value: string): Promise<void> {
