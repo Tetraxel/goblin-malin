@@ -1,10 +1,10 @@
-import { SettingsStore } from '../../settings/settingsStore';
+import { SettingsStore } from "../../settings/settingsStore";
 
 export class FlowSettings<TSettings extends Record<string, unknown>> {
     constructor(
         private readonly flowId: string,
-        private readonly getDefaults: () => TSettings,
-    ) { }
+        private readonly getDefaults: () => TSettings
+    ) {}
 
     get(): TSettings {
         return SettingsStore.getInstance().getFlowSettings(this.flowId, this.getDefaults());

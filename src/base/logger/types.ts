@@ -1,4 +1,4 @@
-import { Task } from "../task/task"
+import { Task } from "../task/task";
 
 export enum LogLevel {
     INFO = "INFO",
@@ -8,18 +8,18 @@ export enum LogLevel {
 }
 
 export type LogDetails = {
-    [key: string]: unknown
-}
+    [key: string]: unknown;
+};
 
 export interface LogMetadata {
-    id: string,
-    timestamp: Date
-    level: LogLevel
-    message: string
-    service?: string
-    flow?: string
+    id: string;
+    timestamp: Date;
+    level: LogLevel;
+    message: string;
+    service?: string;
+    flow?: string;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    task?: Task<any>
-    details?: LogDetails // will be printed in the terminal
-    [key: string]: unknown // Allow additional context fields
+    task?: Task<any>;
+    details?: LogDetails; // will be printed in the terminal
+    [key: string]: unknown; // Allow additional context fields
 }

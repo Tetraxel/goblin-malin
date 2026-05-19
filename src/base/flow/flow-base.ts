@@ -31,22 +31,25 @@ export class FlowBase<TaskAttributes = any> {
 
     // Default implementations
     public async initialize(): Promise<void> {
-        throw Error('Not implemented')
+        throw Error("Not implemented");
     }
 
     public createTasksFromUrls(_urls: string[], _opts: Record<string, unknown>): Task<TaskAttributes>[] {
-        throw Error('Not implemented')
+        throw Error("Not implemented");
     }
 
     public async importTasks(tasks: Task<TaskAttributes>[]): Promise<void> {
-        const existingIds = new Set(this.orchestrator.getTasks().map(t => t.getId()));
+        const existingIds = new Set(this.orchestrator.getTasks().map((t) => t.getId()));
         const seen = new Set<string>();
         const newTasks: Task<TaskAttributes>[] = [];
         let skippedCount = 0;
 
         for (const task of tasks) {
             const id = task.getId();
-            if (existingIds.has(id) || seen.has(id)) { skippedCount++; continue; }
+            if (existingIds.has(id) || seen.has(id)) {
+                skippedCount++;
+                continue;
+            }
             seen.add(id);
             newTasks.push(task);
         }
@@ -59,15 +62,15 @@ export class FlowBase<TaskAttributes = any> {
     }
 
     public async restartTask(_task: Task<TaskAttributes>): Promise<void> {
-        throw Error('Not implemented')
+        throw Error("Not implemented");
     }
 
     public async runAll(): Promise<void> {
-        throw Error('Not implemented')
+        throw Error("Not implemented");
     }
 
     public async stopAll(): Promise<void> {
-        throw Error('Not implemented')
+        throw Error("Not implemented");
     }
 
     public getMaxConcurrentTasks(): number {
@@ -79,18 +82,18 @@ export class FlowBase<TaskAttributes = any> {
     }
 
     public switchMode(_input: string): void {
-        throw Error('Not implemented')
+        throw Error("Not implemented");
     }
 
     // UI methods
     public getToolbarButtons(): ToolbarButtonHook[] {
-        throw Error('Not implemented')
+        throw Error("Not implemented");
     }
     public getContextualActionBar(_task: Task<TaskAttributes>, _attributes: object): ContextualActionBar {
-        throw Error('Not implemented')
+        throw Error("Not implemented");
     }
     public getColumns(): ColumnDefinition<TaskAttributes>[] {
-        throw Error('Not implemented')
+        throw Error("Not implemented");
     }
 
     // Optional settings interface — flows that support settings implement these
@@ -98,7 +101,7 @@ export class FlowBase<TaskAttributes = any> {
     public buildFlowSettingsItems?(
         flowSettings: Record<string, unknown>,
         onChange: (patch: Record<string, unknown>) => void,
-        onOpenWizard?: (config: SetupWizardConfig, onDisable?: () => void) => void,
+        onOpenWizard?: (config: SetupWizardConfig, onDisable?: () => void) => void
     ): SettingsItem[];
     public saveFlowSettings?(settings: Record<string, unknown>): void;
 
@@ -113,6 +116,6 @@ export class FlowBase<TaskAttributes = any> {
     }
 
     protected notifyTaskSubscribers(): void {
-        this.subscribers?.forEach(callback => callback(this));
+        this.subscribers?.forEach((callback) => callback(this));
     }
 }

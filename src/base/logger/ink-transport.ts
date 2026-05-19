@@ -1,5 +1,5 @@
 import { LogEntry } from "winston";
-import Transport from 'winston-transport'
+import Transport from "winston-transport";
 
 export class InkTransport extends Transport {
     private history: LogEntry[] = [];
@@ -7,12 +7,12 @@ export class InkTransport extends Transport {
     private subscribers: Set<(logs: LogEntry[]) => void> = new Set();
 
     constructor(opts: Record<string, unknown>) {
-        super(opts)
+        super(opts);
     }
 
     log(info: LogEntry, callback: () => void): void {
         setImmediate(() => {
-            this.emit('logged', info);
+            this.emit("logged", info);
         });
         this.history.push(info);
         this.pending.push(info);
@@ -32,7 +32,7 @@ export class InkTransport extends Transport {
     private notifySubscribers(): void {
         const batch = [...this.pending];
         this.pending = [];
-        this.subscribers.forEach(callback => callback(batch));
+        this.subscribers.forEach((callback) => callback(batch));
     }
 
     getLogs(): LogEntry[] {
@@ -44,4 +44,4 @@ export class InkTransport extends Transport {
     }
 }
 
-export const inkTransport = new InkTransport({ maxLogs: 300, level: 'debug' });
+export const inkTransport = new InkTransport({ maxLogs: 300, level: "debug" });

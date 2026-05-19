@@ -1,46 +1,44 @@
-import fs from 'fs/promises';
+import fs from "fs/promises";
 import { Task } from "../../../base/task/task";
 import { globalLogger, Logger } from "../../../base/logger/logger";
 import { StatusType } from "../../../base/task/task-status";
 import { MusicDownloadTaskAttributes, TrackMetadata, TrackDownloadSource, MetadataSourceState } from "../types";
-import { MetadataService } from '../metadataService';
-import { DownloadService } from '../downloadService';
-import { ServiceRegistry } from '../../../base/service-registry';
-import { ServiceScope } from '../../../base/service-scope';
-import { computeConfidenceScore } from './confidence';
-import { computeCompiledMetadata } from './compiledMetadata';
-import { compiledMetadataToTags } from './compiledMetadataToTags';
-import { computeOutputPath } from './computeOutputPath';
-import { cleanAndTagFlac } from '../../../utils/metadata';
-import { getSaveSettings } from '../saveSettings';
-
+import { MetadataService } from "../metadataService";
+import { DownloadService } from "../downloadService";
+import { ServiceRegistry } from "../../../base/service-registry";
+import { ServiceScope } from "../../../base/service-scope";
+import { computeConfidenceScore } from "./confidence";
+import { computeCompiledMetadata } from "./compiledMetadata";
+import { compiledMetadataToTags } from "./compiledMetadataToTags";
+import { computeOutputPath } from "./computeOutputPath";
+import { cleanAndTagFlac } from "../../../utils/metadata";
+import { getSaveSettings } from "../saveSettings";
 
 export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
     private metadataServices: ServiceScope<DownloadTask, MetadataService>;
     private downloadServices: ServiceScope<DownloadTask, DownloadService>;
 
-    constructor(
-        {
-            id,
-            initialInput,
-            attributes,
-            flowId,
-            logger,
-            metadataServiceRegistry,
-            downloadServiceRegistry,
-            isMetadataEnabled,
-            isDownloadEnabled,
-        }: {
-            id: string;
-            initialInput?: string;
-            attributes?: MusicDownloadTaskAttributes,
-            flowId: string,
-            logger: Logger,
-            metadataServiceRegistry: ServiceRegistry<DownloadTask, MetadataService>,
-            downloadServiceRegistry: ServiceRegistry<DownloadTask, DownloadService>,
-            isMetadataEnabled: (key: string) => boolean,
-            isDownloadEnabled: (key: string) => boolean,
-        }) {
+    constructor({
+        id,
+        initialInput,
+        attributes,
+        flowId,
+        logger,
+        metadataServiceRegistry,
+        downloadServiceRegistry,
+        isMetadataEnabled,
+        isDownloadEnabled,
+    }: {
+        id: string;
+        initialInput?: string;
+        attributes?: MusicDownloadTaskAttributes;
+        flowId: string;
+        logger: Logger;
+        metadataServiceRegistry: ServiceRegistry<DownloadTask, MetadataService>;
+        downloadServiceRegistry: ServiceRegistry<DownloadTask, DownloadService>;
+        isMetadataEnabled: (key: string) => boolean;
+        isDownloadEnabled: (key: string) => boolean;
+    }) {
         super({ id, initialInput, attributes, flowId, logger });
 
         this.metadataServices = metadataServiceRegistry.createScope(this, this.logger, isMetadataEnabled);
@@ -48,29 +46,33 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
     }
 
     private getPrimaryMetadata(): MetadataSourceState | undefined {
-        return this.getAttributes()?.metadataSources.find(s => s.isPrimarySource);
+        return this.getAttributes()?.metadataSources.find((s) => s.isPrimarySource);
     }
 
     private sortMetadataSourcesByConfidence(sources: MetadataSourceState[]): MetadataSourceState[] {
-        return [...sources].sort((a, b) => a.isPrimarySource ? -1 : (b.confidence ?? 0) - (a.confidence ?? 0));
+        return [...sources].sort((a, b) => (a.isPrimarySource ? -1 : (b.confidence ?? 0) - (a.confidence ?? 0)));
     }
 
     private addMetadataSource(metadata: TrackMetadata, isPrimary: boolean): void {
         let currentMetadataSources = this.getAttributes()?.metadataSources ?? [];
         // Keep only one primary source: if the metadata inserted is primary, remove the old one
-        if (isPrimary)
-            currentMetadataSources = currentMetadataSources.filter(s => !s.isPrimarySource);
+        if (isPrimary) currentMetadataSources = currentMetadataSources.filter((s) => !s.isPrimarySource);
 
         const primary = this.getPrimaryMetadata()?.metadata;
-        const confidence = isPrimary || !primary
-            ? 100
-            : computeConfidenceScore(metadata, primary);
+        const confidence = isPrimary || !primary ? 100 : computeConfidenceScore(metadata, primary);
 
-        const existingSourceIndex = currentMetadataSources.findIndex(source => source.metadata.platform === metadata.platform);
+        const existingSourceIndex = currentMetadataSources.findIndex(
+            (source) => source.metadata.platform === metadata.platform
+        );
 
         // Update existing source
         if (existingSourceIndex !== -1) {
-            currentMetadataSources[existingSourceIndex] = { ...currentMetadataSources[existingSourceIndex], metadata, isPrimarySource: isPrimary, confidence };
+            currentMetadataSources[existingSourceIndex] = {
+                ...currentMetadataSources[existingSourceIndex],
+                metadata,
+                isPrimarySource: isPrimary,
+                confidence,
+            };
         }
         // Add new source
         else {
@@ -91,13 +93,13 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
 
     async start(): Promise<void> {
         try {
-            if (this.getAttributes()?.state !== 'pending') {
+            if (this.getAttributes()?.state !== "pending") {
                 this.logger.info(`Skipping because task already processed ${this.getInitialInput()}`);
                 return;
             }
 
             this.logger.info(`Starting to process ${this.getInitialInput()}`);
-            this.updateAttributes({ state: 'running' });
+            this.updateAttributes({ state: "running" });
 
             if (this.getAttributes()?.toTag) {
                 // If primary metadata is not fetched -> fetch it
@@ -111,9 +113,9 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             if (this.getAttributes()?.toDownload) {
                 await this.startDownloads();
             }
-            this.updateAttributes({ state: 'finished' });
+            this.updateAttributes({ state: "finished" });
         } catch (error) {
-            this.updateAttributes({ state: 'failed' });
+            this.updateAttributes({ state: "failed" });
             throw error;
         }
 
@@ -147,12 +149,16 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         const url = this.getAttributes()?.userInput.url;
 
         if (!url) {
-            throw new Error('No user input URL provided');
+            throw new Error("No user input URL provided");
         }
 
         this.logger.info(`Fetching primary metadata for URL: ${url}`);
-        const nonPrimarySources = (this.getAttributes()?.metadataSources ?? []).filter(s => !s.isPrimarySource);
-        this.updateAttributes({ metadataSources: nonPrimarySources, primaryMetadataInProgress: true, primaryMetadataFetched: false });
+        const nonPrimarySources = (this.getAttributes()?.metadataSources ?? []).filter((s) => !s.isPrimarySource);
+        this.updateAttributes({
+            metadataSources: nonPrimarySources,
+            primaryMetadataInProgress: true,
+            primaryMetadataFetched: false,
+        });
 
         try {
             const services = this.metadataServices.getAllServices();
@@ -161,7 +167,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
                 try {
                     // Check if this service can handle the URL
                     const type = service.getType(url);
-                    if (type === 'track') {
+                    if (type === "track") {
                         this.logger.debug(`Fetching metadata using ${service.constructor.name}`);
 
                         const metadata = await service.getTrackMetadata(url);
@@ -175,7 +181,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             }
 
             if (!this.getPrimaryMetadata()) {
-                this.status.update({ type: StatusType.Error, message: 'Primary metadata unavailable' });
+                this.status.update({ type: StatusType.Error, message: "Primary metadata unavailable" });
                 this.logger.error(`No metadata service could fetch primary metadata for the URL: ${url}`);
                 throw new Error(`No metadata service could fetch metadata for the URL: ${url}`);
             }
@@ -192,11 +198,15 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         const primarySource = this.getPrimaryMetadata();
 
         if (!primarySource || !primarySource.metadata) {
-            throw new Error('No primary metadata source available for metadata discovering');
+            throw new Error("No primary metadata source available for metadata discovering");
         }
 
         this.logger.info(`Discovering metadata from all other sources using primary metadata`);
-        this.updateAttributes({ metadataSources: [primarySource], metadataDiscoveringInProgress: true, metadataDiscovered: false });
+        this.updateAttributes({
+            metadataSources: [primarySource],
+            metadataDiscoveringInProgress: true,
+            metadataDiscovered: false,
+        });
 
         try {
             const services = this.metadataServices.getAllServices();
@@ -208,11 +218,14 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
                     const metadata = await service.searchTrack(primarySource.metadata);
 
                     // Skip if discovered metadata is the same as the primary source
-                    if (primarySource && (
-                        metadata.platform === primarySource.metadata.platform ||
-                        metadata.apiProvider === primarySource.metadata.apiProvider
-                    )) {
-                        this.logger.debug(`Skipping discovered metadata from ${service.id}: conflicts with primary source`);
+                    if (
+                        primarySource &&
+                        (metadata.platform === primarySource.metadata.platform ||
+                            metadata.apiProvider === primarySource.metadata.apiProvider)
+                    ) {
+                        this.logger.debug(
+                            `Skipping discovered metadata from ${service.id}: conflicts with primary source`
+                        );
                         continue;
                     }
 
@@ -233,7 +246,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
     async startSingleProviderSearch(serviceKey: string): Promise<void> {
         const primaryMetadata = this.getPrimaryMetadata()?.metadata;
         if (!primaryMetadata) {
-            this.logger.warn('No primary metadata available for re-search');
+            this.logger.warn("No primary metadata available for re-search");
             return;
         }
         try {
@@ -248,7 +261,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
 
     async restart(): Promise<void> {
         this.updateAttributes({
-            state: 'pending',
+            state: "pending",
             metadataSources: [],
             metadataOverride: {},
             downloadSources: [],
@@ -271,9 +284,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         if (!sources[index]) return;
         this.updateAttributes({
             downloadSources: sources.map((s, i) =>
-                i === index
-                    ? { ...s, isRejected: rejected, selected: rejected ? false : s.selected }
-                    : s
+                i === index ? { ...s, isRejected: rejected, selected: rejected ? false : s.selected } : s
             ),
         });
     }
@@ -288,8 +299,14 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
                 localFile: {
                     ...s.localFile!,
                     path: newPath,
-                    state: 'found' as const,
-                    name: newPath.split(/[\\/]/).pop()?.replace(/\.[^/.]+$/, '') ?? s.localFile?.name ?? '',
+                    state: "found" as const,
+                    name:
+                        newPath
+                            .split(/[\\/]/)
+                            .pop()
+                            ?.replace(/\.[^/.]+$/, "") ??
+                        s.localFile?.name ??
+                        "",
                 },
             };
         });
@@ -299,24 +316,21 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
     async saveTrack(): Promise<void> {
         const attrs = this.getAttributes();
         const sources = attrs?.downloadSources ?? [];
-        const selectedSource = sources.find(s => s.selected);
+        const selectedSource = sources.find((s) => s.selected);
 
-        if (!selectedSource) throw new Error('No download source selected');
-        if (selectedSource.localFile?.state !== 'found') throw new Error('Local file not found');
+        if (!selectedSource) throw new Error("No download source selected");
+        if (selectedSource.localFile?.state !== "found") throw new Error("Local file not found");
 
         const settings = getSaveSettings();
-        globalLogger.info('Saving track with settings:', { settings });
+        globalLogger.info("Saving track with settings:", { settings });
 
-        const compiled = computeCompiledMetadata(
-            attrs!.metadataSources,
-            attrs!.metadataOverride,
-        );
+        const compiled = computeCompiledMetadata(attrs!.metadataSources, attrs!.metadataOverride);
         const tags = compiledMetadataToTags(compiled, {
             includeMusicBrainzTags: settings.includeMusicBrainzTags,
         });
         const outputPath = computeOutputPath(compiled, settings.outputDir);
 
-        this.status.update({ type: StatusType.Processing, message: 'Saving…' });
+        this.status.update({ type: StatusType.Processing, message: "Saving…" });
 
         const existingSavedPath = selectedSource.savedFile?.path ?? null;
         let outputCreated = false;
@@ -328,8 +342,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
                     try {
                         await fs.unlink(src.savedFile.path);
                     } catch (e: unknown) {
-                        if ((e as NodeJS.ErrnoException).code !== 'ENOENT')
-                            throw e;
+                        if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
                     }
                 }
             }
@@ -337,7 +350,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             if (existingSavedPath) {
                 // Re-saving same source: rename to new path if it changed, otherwise just re-tag
                 if (existingSavedPath !== outputPath) {
-                    const { moveFile } = await import('../../../utils/metadata');
+                    const { moveFile } = await import("../../../utils/metadata");
                     await moveFile(existingSavedPath, outputPath);
                 }
                 outputCreated = true;
@@ -350,19 +363,19 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             await cleanAndTagFlac(outputPath, tags);
 
             this.updateAttributes({
-                downloadSources: sources.map(s =>
+                downloadSources: sources.map((s) =>
                     s === selectedSource
                         ? { ...s, savedFile: { path: outputPath, savedAt: new Date() } }
                         : { ...s, savedFile: undefined }
                 ),
             });
 
-            this.status.set({ type: StatusType.Success, message: 'Saved' });
+            this.status.set({ type: StatusType.Success, message: "Saved" });
         } catch (err) {
             if (outputCreated) {
-                await fs.unlink(outputPath).catch(() => { });
+                await fs.unlink(outputPath).catch(() => {});
             }
-            this.status.set({ type: StatusType.Error, message: 'Save failed' });
+            this.status.set({ type: StatusType.Error, message: "Save failed" });
             throw err;
         }
     }
@@ -371,8 +384,8 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         const metadataSources = this.getAttributes()?.metadataSources;
 
         if (!metadataSources || metadataSources.length === 0) {
-            this.logger.warn('No metadata sources available for download');
-            throw new Error('No metadata sources available for download');
+            this.logger.warn("No metadata sources available for download");
+            throw new Error("No metadata sources available for download");
         }
 
         this.logger.info(`Starting downloads with ${metadataSources.length} metadata sources`);
@@ -385,13 +398,11 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             try {
                 // Find the first compatible metadata source for this download service
                 // TODO: trying multiple metadata sources for the same download service to compare audio files
-                const compatibleSource = metadataSources.find((source) =>
-                    downloadService.canDownload(source.metadata)
-                );
+                const compatibleSource = metadataSources.find((source) => downloadService.canDownload(source.metadata));
 
                 if (!compatibleSource) {
                     this.logger.warn(
-                        `No compatible metadata source found for ${downloadService.id}. Compatible providers: ${downloadService.compatibleMetadataProviders.join(', ')}`
+                        `No compatible metadata source found for ${downloadService.id}. Compatible providers: ${downloadService.compatibleMetadataProviders.join(", ")}`
                     );
                     continue;
                 }
@@ -411,7 +422,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         }
 
         // Only the first successfully downloaded source is auto-selected
-        const firstDownloadedIdx = downloadSources.findIndex(s => s.state === 'downloaded');
+        const firstDownloadedIdx = downloadSources.findIndex((s) => s.state === "downloaded");
         const sourcesWithSelection = downloadSources.map((s, i) => ({
             ...s,
             selected: i === firstDownloadedIdx,
@@ -421,9 +432,11 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         this.updateAttributes({ downloadsFetched: true });
 
         if (downloadSources.length === 0) {
-            this.logger.warn('No successful downloads');
+            this.logger.warn("No successful downloads");
         } else {
-            this.logger.info(`Completed downloads: ${downloadSources.filter((s) => s.state === 'downloaded').length} successful, ${downloadSources.filter((s) => s.state === 'failed').length} failed`);
+            this.logger.info(
+                `Completed downloads: ${downloadSources.filter((s) => s.state === "downloaded").length} successful, ${downloadSources.filter((s) => s.state === "failed").length} failed`
+            );
         }
     }
 

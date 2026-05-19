@@ -1,8 +1,8 @@
-import { EventEmitter } from 'events';
-import { Logger } from './logger/logger';
-import { Task } from './task/task';
-import { Env } from './env';
-import { StatusType, TaskStatus } from './task/task-status';
+import { EventEmitter } from "events";
+import { Logger } from "./logger/logger";
+import { Task } from "./task/task";
+import { Env } from "./env";
+import { StatusType, TaskStatus } from "./task/task-status";
 
 export abstract class ServiceBase extends EventEmitter {
     public id: string;
@@ -22,7 +22,7 @@ export abstract class ServiceBase extends EventEmitter {
             service: this.id,
             task: this.task,
         });
-        this.env = new Env(task, this.logger)
+        this.env = new Env(task, this.logger);
         this.status = this.task.getStatus();
     }
 
@@ -39,7 +39,7 @@ export abstract class ServiceBase extends EventEmitter {
             });
             // If there is already a promise with same key, just await it
             this.logger.info(`Awaiting for parallel promise ${key}`);
-            const result = await existingPromise as T;
+            const result = (await existingPromise) as T;
             this.logger.info(`Returning result coming from the parallel promise: ${result}`);
             return result;
         }
@@ -66,7 +66,7 @@ export abstract class ServiceBase extends EventEmitter {
 
     // /**
     //  * Executes a function exclusively based on a key.
-    //  * If another instance is already running this key, it waits for the result 
+    //  * If another instance is already running this key, it waits for the result
     //  * of that specific run instead of starting a new one.
     //  */
     // protected async runExclusive<T>(actionKey: string, operation: () => Promise<T>): Promise<T> {
@@ -80,7 +80,7 @@ export abstract class ServiceBase extends EventEmitter {
     //             timeTracking: false,
     //         });
 
-    //         // Assign the same promise to return the right result 
+    //         // Assign the same promise to return the right result
     //         this.logger.info(`Awaiting for parallel promise ${key}`)
     //         const result = await ServiceBase._executionLocks.get(key) as Promise<T>;
     //         this.logger.info(`Returning result coming from the parallel promise: ${result}`)

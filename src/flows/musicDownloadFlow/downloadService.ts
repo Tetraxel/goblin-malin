@@ -1,7 +1,7 @@
-import { ServiceBase } from '../../base/service-base';
-import { Logger } from '../../base/logger/logger';
-import { TrackMetadata, TrackDownloadSource, APIProvider } from './types';
-import { DownloadTask } from './utils/downloadTask';
+import { ServiceBase } from "../../base/service-base";
+import { Logger } from "../../base/logger/logger";
+import { TrackMetadata, TrackDownloadSource, APIProvider } from "./types";
+import { DownloadTask } from "./utils/downloadTask";
 
 /**
  * Abstract base class for download providers.

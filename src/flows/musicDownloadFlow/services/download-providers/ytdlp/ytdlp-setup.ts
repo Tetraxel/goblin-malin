@@ -1,9 +1,9 @@
-import * as fs from 'fs/promises';
-import { createWriteStream } from 'fs';
-import * as path from 'path';
-import * as https from 'https';
-import { getBinDir } from '../../../../../utils/appPaths';
-import { globalLogger } from '../../../../../base/logger/logger';
+import * as fs from "fs/promises";
+import { createWriteStream } from "fs";
+import * as path from "path";
+import * as https from "https";
+import { getBinDir } from "../../../../../utils/appPaths";
+import { globalLogger } from "../../../../../base/logger/logger";
 
 interface GitHubRelease {
     tag_name: string;
@@ -22,12 +22,12 @@ export async function ensureYtDlpSetup(): Promise<string> {
             latestVersion = await getLatestYtDlpVersion();
         } catch (error) {
             globalLogger.warn(`Failed to fetch latest yt-dlp version: ${error}`);
-            globalLogger.info('Attempting to use existing binary…');
+            globalLogger.info("Attempting to use existing binary…");
         }
 
         // If GitHub API failed, try to find existing binary
         if (!latestVersion) {
-            throw new Error('yt-dlp release not found')
+            throw new Error("yt-dlp release not found");
         }
 
         const binaryName = `yt-dlp_${latestVersion}.exe`;
@@ -46,7 +46,7 @@ export async function ensureYtDlpSetup(): Promise<string> {
         await fs.mkdir(getBinDir(), { recursive: true });
 
         // Clean up old yt-dlp versions (optional)
-        await cleanupOldVersions('yt-dlp_', binaryName);
+        await cleanupOldVersions("yt-dlp_", binaryName);
 
         // Download the binary
         const downloadUrl = `https://github.com/yt-dlp/yt-dlp/releases/download/${latestVersion}/yt-dlp.exe`;
@@ -54,23 +54,20 @@ export async function ensureYtDlpSetup(): Promise<string> {
 
         globalLogger.info(`Successfully downloaded yt-dlp ${latestVersion} to ${binaryPath}`);
         return binaryPath;
-    }
-    catch {
-        const existingBinary = await findExistingBinary('yt-dlp_', '.exe');
+    } catch {
+        const existingBinary = await findExistingBinary("yt-dlp_", ".exe");
         if (existingBinary) {
             globalLogger.info(`Using existing yt-dlp at ${existingBinary}`);
             return existingBinary;
         }
-        throw new Error('Failed to fetch latest version from GitHub and no existing binary found');
+        throw new Error("Failed to fetch latest version from GitHub and no existing binary found");
     }
 }
 
 async function findExistingBinary(prefix: string, suffix: string): Promise<string | null> {
     try {
         const files = await fs.readdir(getBinDir());
-        const binaries = files.filter(file =>
-            file.startsWith(prefix) && file.endsWith(suffix)
-        );
+        const binaries = files.filter((file) => file.startsWith(prefix) && file.endsWith(suffix));
 
         if (binaries.length === 0) {
             return null;
@@ -91,32 +88,34 @@ async function findExistingBinary(prefix: string, suffix: string): Promise<strin
 
 async function getLatestYtDlpVersion(): Promise<string> {
     return new Promise((resolve, reject) => {
-        https.get(
-            'https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest',
-            {
-                headers: {
-                    'User-Agent': 'Node.js yt-dlp installer',
+        https
+            .get(
+                "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
+                {
+                    headers: {
+                        "User-Agent": "Node.js yt-dlp installer",
+                    },
                 },
-            },
-            (res) => {
-                let data = '';
+                (res) => {
+                    let data = "";
 
-                res.on('data', (chunk) => {
-                    data += chunk;
-                });
+                    res.on("data", (chunk) => {
+                        data += chunk;
+                    });
 
-                res.on('end', () => {
-                    try {
-                        const release: GitHubRelease = JSON.parse(data);
-                        resolve(release.tag_name);
-                    } catch (error) {
-                        reject(new Error(`Failed to parse GitHub API response: ${error}`));
-                    }
-                });
-            }
-        ).on('error', (error) => {
-            reject(new Error(`Failed to fetch latest version: ${error}`));
-        });
+                    res.on("end", () => {
+                        try {
+                            const release: GitHubRelease = JSON.parse(data);
+                            resolve(release.tag_name);
+                        } catch (error) {
+                            reject(new Error(`Failed to parse GitHub API response: ${error}`));
+                        }
+                    });
+                }
+            )
+            .on("error", (error) => {
+                reject(new Error(`Failed to fetch latest version: ${error}`));
+            });
     });
 }
 
@@ -124,10 +123,8 @@ async function getLatestYtDlpVersion(): Promise<string> {
 async function cleanupOldVersions(prefix: string, currentVersion: string): Promise<void> {
     try {
         const files = await fs.readdir(getBinDir());
-        const oldVersions = files.filter(file =>
-            file.startsWith(prefix) &&
-            file.endsWith('.exe') &&
-            file !== currentVersion
+        const oldVersions = files.filter(
+            (file) => file.startsWith(prefix) && file.endsWith(".exe") && file !== currentVersion
         );
 
         for (const file of oldVersions) {
@@ -141,34 +138,36 @@ async function cleanupOldVersions(prefix: string, currentVersion: string): Promi
 
 async function downloadFile(url: string, destination: string): Promise<void> {
     return new Promise((resolve, reject) => {
-        https.get(url, (res) => {
-            if (res.statusCode === 302 || res.statusCode === 301) {
-                // Follow redirect
-                if (res.headers.location) {
-                    downloadFile(res.headers.location, destination).then(resolve).catch(reject);
+        https
+            .get(url, (res) => {
+                if (res.statusCode === 302 || res.statusCode === 301) {
+                    // Follow redirect
+                    if (res.headers.location) {
+                        downloadFile(res.headers.location, destination).then(resolve).catch(reject);
+                        return;
+                    }
+                }
+
+                if (res.statusCode !== 200) {
+                    reject(new Error(`Failed to download: HTTP ${res.statusCode}`));
                     return;
                 }
-            }
 
-            if (res.statusCode !== 200) {
-                reject(new Error(`Failed to download: HTTP ${res.statusCode}`));
-                return;
-            }
+                const fileStream = createWriteStream(destination);
+                res.pipe(fileStream);
 
-            const fileStream = createWriteStream(destination);
-            res.pipe(fileStream);
+                fileStream.on("finish", () => {
+                    fileStream.close();
+                    resolve();
+                });
 
-            fileStream.on('finish', () => {
-                fileStream.close();
-                resolve();
+                fileStream.on("error", (error: Error) => {
+                    fs.unlink(destination).catch(() => {}); // Clean up partial download
+                    reject(error);
+                });
+            })
+            .on("error", (error) => {
+                reject(new Error(`Download failed: ${error}`));
             });
-
-            fileStream.on('error', (error: Error) => {
-                fs.unlink(destination).catch(() => { }); // Clean up partial download
-                reject(error);
-            });
-        }).on('error', (error) => {
-            reject(new Error(`Download failed: ${error}`));
-        });
     });
 }

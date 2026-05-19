@@ -1,19 +1,14 @@
-import YTMusic, {
-    type SongFull,
-    type VideoFull,
-    type ArtistFull,
-    type AlbumFull
-} from 'ytmusic-api';
-import { MetadataService } from '../../../metadataService';
-import { ProviderDisplay } from '../../../../../base/providerDisplay';
-import { ProviderSettingsSchema } from '../../../../../base/providerSettings';
-import { ParsedUrl } from '../../../../../base/urlParser';
-import { StatusType } from '../../../../../base/task/task-status';
-import { Logger } from '../../../../../base/logger/logger';
-import { Cached } from '../../../../../utils/cache';
-import { DownloadTask } from '../../../utils/downloadTask';
-import { StandardTrack, TrackMetadata, TrackUri } from '../../../types';
-import { YoutubeCell } from './YoutubeCell';
+import YTMusic, { type SongFull, type VideoFull, type ArtistFull, type AlbumFull } from "ytmusic-api";
+import { MetadataService } from "../../../metadataService";
+import { ProviderDisplay } from "../../../../../base/providerDisplay";
+import { ProviderSettingsSchema } from "../../../../../base/providerSettings";
+import { ParsedUrl } from "../../../../../base/urlParser";
+import { StatusType } from "../../../../../base/task/task-status";
+import { Logger } from "../../../../../base/logger/logger";
+import { Cached } from "../../../../../utils/cache";
+import { DownloadTask } from "../../../utils/downloadTask";
+import { StandardTrack, TrackMetadata, TrackUri } from "../../../types";
+import { YoutubeCell } from "./YoutubeCell";
 
 export class YoutubeService extends MetadataService {
     static readonly display: ProviderDisplay = {
@@ -21,21 +16,21 @@ export class YoutubeService extends MetadataService {
         acronym: "YT",
         color: "#ff0033",
         colorSubtle: "#7a1500",
-        colorBright: "#ff4040"
+        colorBright: "#ff4040",
     };
     static readonly defaultSettings: ProviderSettingsSchema = {
-        enabled: { label: 'Enable', defaultValue: true, kind: 'checkbox' },
+        enabled: { label: "Enable", defaultValue: true, kind: "checkbox" },
     };
     static readonly cellComponent = YoutubeCell;
 
     private static client: YTMusic;
 
     constructor(task: DownloadTask, logger: Logger) {
-        super('Youtube', task, logger);
+        super("Youtube", task, logger);
     }
 
     private async getClient(): Promise<YTMusic> {
-        return this.runExclusive('init', async () => {
+        return this.runExclusive("init", async () => {
             if (!YoutubeService.client) {
                 const ytMusic = new YTMusic();
                 await ytMusic.initialize();
@@ -69,7 +64,7 @@ export class YoutubeService extends MetadataService {
 
             return song;
         } catch (error) {
-            this.logger.error('Error getting song:', { error });
+            this.logger.error("Error getting song:", { error });
             this.status.set({
                 type: StatusType.Error,
                 message: "Error fetching song data",
@@ -102,7 +97,7 @@ export class YoutubeService extends MetadataService {
 
             return video;
         } catch (error) {
-            this.logger.error('Error getting video:', { error });
+            this.logger.error("Error getting video:", { error });
             this.status.set({
                 type: StatusType.Error,
                 message: "Error fetching video data",
@@ -135,7 +130,7 @@ export class YoutubeService extends MetadataService {
 
             return artist;
         } catch (error) {
-            this.logger.error('Error getting artist:', { error });
+            this.logger.error("Error getting artist:", { error });
             this.status.set({
                 type: StatusType.Error,
                 message: "Error fetching artist data",
@@ -168,7 +163,7 @@ export class YoutubeService extends MetadataService {
 
             return album;
         } catch (error) {
-            this.logger.error('Error getting album:', { error });
+            this.logger.error("Error getting album:", { error });
             this.status.set({
                 type: StatusType.Error,
                 message: "Error fetching album data",
@@ -179,22 +174,26 @@ export class YoutubeService extends MetadataService {
 
     static parseUrl(url: string): ParsedUrl | null {
         let parsed: URL;
-        try { parsed = new URL(url); } catch { return null; }
-        const host = parsed.hostname.replace(/^www\./, '');
+        try {
+            parsed = new URL(url);
+        } catch {
+            return null;
+        }
+        const host = parsed.hostname.replace(/^www\./, "");
 
-        if (host === 'music.youtube.com') {
-            if (!parsed.pathname.startsWith('/watch')) return null;
-            return { platform: 'youtubeMusic', type: 'track', id: parsed.searchParams.get('v') ?? undefined };
+        if (host === "music.youtube.com") {
+            if (!parsed.pathname.startsWith("/watch")) return null;
+            return { platform: "youtubeMusic", type: "track", id: parsed.searchParams.get("v") ?? undefined };
         }
 
-        if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
-            if (parsed.pathname !== '/watch') return null;
-            return { platform: 'youtube', type: 'track', id: parsed.searchParams.get('v') ?? undefined };
+        if (host === "youtube.com" || host.endsWith(".youtube.com")) {
+            if (parsed.pathname !== "/watch") return null;
+            return { platform: "youtube", type: "track", id: parsed.searchParams.get("v") ?? undefined };
         }
 
-        if (host === 'youtu.be') {
+        if (host === "youtu.be") {
             const id = parsed.pathname.slice(1) || undefined;
-            return { platform: 'youtube', type: 'track', id };
+            return { platform: "youtube", type: "track", id };
         }
 
         return null;
@@ -222,23 +221,27 @@ export class YoutubeService extends MetadataService {
             url,
             uri: `https://www.youtube.com/watch?v=${song.videoId}`,
             album: undefined, // YouTube API doesn't provide album info in SongFull
-            artists: song.artist ? [{
-                id: song.artist.artistId || '',
-                type: 'artist' as const,
-                name: song.artist.name,
-                url: song.artist.artistId ? `https://music.youtube.com/browse/${song.artist.artistId}` : '',
-                uri: `youtube:artist:${song.artist.artistId || song.artist.name}`
-            }] : []
+            artists: song.artist
+                ? [
+                      {
+                          id: song.artist.artistId || "",
+                          type: "artist" as const,
+                          name: song.artist.name,
+                          url: song.artist.artistId ? `https://music.youtube.com/browse/${song.artist.artistId}` : "",
+                          uri: `youtube:artist:${song.artist.artistId || song.artist.name}`,
+                      },
+                  ]
+                : [],
         };
 
         const metadata: TrackMetadata = {
             ...standardTrack,
-            platform: 'youtube',
-            apiProvider: 'youtube',
-            uri: `YOUTUBE::TRACK::${song.videoId}` as TrackUri<'youtube'>,
+            platform: "youtube",
+            apiProvider: "youtube",
+            uri: `YOUTUBE::TRACK::${song.videoId}` as TrackUri<"youtube">,
 
             fetchedAt: new Date(),
-            type: 'track',
+            type: "track",
         };
 
         return metadata;
@@ -249,12 +252,12 @@ export class YoutubeService extends MetadataService {
         const trackName = sourceTrackMetadata.trackName;
 
         if (!artist || !trackName) {
-            throw new Error('Artist name and track name are required for search');
+            throw new Error("Artist name and track name are required for search");
         }
 
         this.status.set({
             type: StatusType.Processing,
-            message: 'Searching YouTube Music',
+            message: "Searching YouTube Music",
             timeTracking: true,
             progress: 0,
         });
@@ -284,23 +287,29 @@ export class YoutubeService extends MetadataService {
                 url: `https://www.youtube.com/watch?v=${song.videoId}`,
                 uri: `https://www.youtube.com/watch?v=${song.videoId}`,
                 album: undefined,
-                artists: song.artist ? [{
-                    id: song.artist.artistId || '',
-                    type: 'artist' as const,
-                    name: song.artist.name,
-                    url: song.artist.artistId ? `https://music.youtube.com/browse/${song.artist.artistId}` : '',
-                    uri: `youtube:artist:${song.artist.artistId || song.artist.name}`
-                }] : []
+                artists: song.artist
+                    ? [
+                          {
+                              id: song.artist.artistId || "",
+                              type: "artist" as const,
+                              name: song.artist.name,
+                              url: song.artist.artistId
+                                  ? `https://music.youtube.com/browse/${song.artist.artistId}`
+                                  : "",
+                              uri: `youtube:artist:${song.artist.artistId || song.artist.name}`,
+                          },
+                      ]
+                    : [],
             };
 
             const metadata: TrackMetadata = {
                 ...standardTrack,
-                platform: 'youtube',
-                apiProvider: 'youtube',
-                uri: `YOUTUBE::TRACK::${song.videoId}` as TrackUri<'youtube'>,
-    
+                platform: "youtube",
+                apiProvider: "youtube",
+                uri: `YOUTUBE::TRACK::${song.videoId}` as TrackUri<"youtube">,
+
                 fetchedAt: new Date(),
-                type: 'track',
+                type: "track",
             };
 
             this.status.clear();
@@ -309,7 +318,7 @@ export class YoutubeService extends MetadataService {
             this.logger.error(`Error searching YouTube Music for: ${sourceTrackMetadata.trackName}`, { error });
             this.status.set({
                 type: StatusType.Error,
-                message: 'Error searching YouTube Music',
+                message: "Error searching YouTube Music",
             });
             throw error;
         }

@@ -1,13 +1,12 @@
-import { IRecordingMatch, IReleaseGroupMatch, IRelease } from 'musicbrainz-api';
+import { IRecordingMatch, IReleaseGroupMatch, IRelease } from "musicbrainz-api";
 
 //----------------------//
 //     MUSICBRAINZ      //
 //----------------------//
 
-export type MusicBrainzReleaseGroup = IReleaseGroupMatch
-export type MusicBrainzRelease = IRelease
-export type MusicBrainzRecording = IRecordingMatch
-
+export type MusicBrainzReleaseGroup = IReleaseGroupMatch;
+export type MusicBrainzRelease = IRelease;
+export type MusicBrainzRecording = IRecordingMatch;
 
 //----------------------//
 //         BASE         //
@@ -24,16 +23,16 @@ export interface BaseTrack {
     uri?: string;
     artists: StandardArtist[];
     album?: StandardAlbum;
-    linksByPlatform?: Partial<Record<Platform, string>>
-    localRelativePath?: string
-    musicBrainzRecording?: MusicBrainzRecording
+    linksByPlatform?: Partial<Record<Platform, string>>;
+    localRelativePath?: string;
+    musicBrainzRecording?: MusicBrainzRecording;
 }
 
-export type StandardTrack = BaseTrack
+export type StandardTrack = BaseTrack;
 
 export interface StandardArtist {
     id?: string;
-    type: 'artist';
+    type: "artist";
     name: string;
     url?: string;
     uri?: string;
@@ -55,59 +54,59 @@ export interface StandardAlbum {
 //----------------------//
 
 export type UrlInput = {
-    type: 'url';
+    type: "url";
     url: string; // track, album, playlist
-}
+};
 
-export type UserInput = UrlInput
+export type UserInput = UrlInput;
 
 //----------------------//
 //       METADATA       //
 //----------------------//
 
 export type Platform =
-    | 'musicBrainz'
-    | 'spotify'
-    | 'itunes'
-    | 'appleMusic'
-    | 'youtube'
-    | 'youtubeMusic'
-    | 'google'
-    | 'googleStore'
-    | 'pandora'
-    | 'deezer'
-    | 'tidal'
-    | 'amazonStore'
-    | 'amazonMusic'
-    | 'soundcloud'
-    | 'napster'
-    | 'yandex'
-    | 'spinrilla'
-    | 'audius'
-    | 'audiomack'
-    | 'anghami'
-    | 'boomplay'
-    | 'bandcamp';
+    | "musicBrainz"
+    | "spotify"
+    | "itunes"
+    | "appleMusic"
+    | "youtube"
+    | "youtubeMusic"
+    | "google"
+    | "googleStore"
+    | "pandora"
+    | "deezer"
+    | "tidal"
+    | "amazonStore"
+    | "amazonMusic"
+    | "soundcloud"
+    | "napster"
+    | "yandex"
+    | "spinrilla"
+    | "audius"
+    | "audiomack"
+    | "anghami"
+    | "boomplay"
+    | "bandcamp";
 
 export type APIProvider =
-    | 'musicBrainz'
-    | 'spotify'
-    | 'itunes'
-    | 'youtube'
-    | 'google'
-    | 'pandora'
-    | 'deezer'
-    | 'tidal'
-    | 'amazon'
-    | 'soundcloud'
-    | 'napster'
-    | 'yandex'
-    | 'spinrilla'
-    | 'audius'
-    | 'audiomack'
-    | 'anghami'
-    | 'boomplay'
-    | 'bandcamp';
+    | "musicBrainz"
+    | "spotify"
+    | "itunes"
+    | "youtube"
+    | "google"
+    | "pandora"
+    | "deezer"
+    | "tidal"
+    | "amazon"
+    | "soundcloud"
+    | "napster"
+    | "yandex"
+    | "spinrilla"
+    | "audius"
+    | "audiomack"
+    | "anghami"
+    | "boomplay"
+    | "bandcamp";
 
 export type TrackUri<PlatformString extends string = string> = `${Uppercase<PlatformString>}::TRACK::${string}`;
 
@@ -126,61 +125,69 @@ export type BaseTrackMetadata = {
     platform: Platform;
     apiProvider: APIProvider;
     fetchedAt: Date;
-    type: 'track';
+    type: "track";
     bpm?: number;
     key?: string;
     genres?: string[];
-}
+};
 
 export type MusicBrainzTrackMetadata = BaseTrackMetadata & {
-    platform: 'musicBrainz';
-    apiProvider: 'musicBrainz';
-    uri: TrackUri<'musicBrainz'>; // "MUSICBRAINZ::TRACK::4rye8ZgoRgbQPfgBqxjfqG"
-    musicBrainzRecording?: MusicBrainzRecording
-}
+    platform: "musicBrainz";
+    apiProvider: "musicBrainz";
+    uri: TrackUri<"musicBrainz">; // "MUSICBRAINZ::TRACK::4rye8ZgoRgbQPfgBqxjfqG"
+    musicBrainzRecording?: MusicBrainzRecording;
+};
 
 export type SpotifyTrackMetadata = BaseTrackMetadata & {
-    platform: 'spotify';
-    apiProvider: 'spotify';
-    uri: TrackUri<'spotify'>; // "SPOTIFY::TRACK::4rye8ZgoRgbQPfgBqxjfqG"
-}
+    platform: "spotify";
+    apiProvider: "spotify";
+    uri: TrackUri<"spotify">; // "SPOTIFY::TRACK::4rye8ZgoRgbQPfgBqxjfqG"
+};
 
 export type DeezerTrackMetadata = BaseTrackMetadata & {
-    platform: 'deezer';
-    apiProvider: 'deezer';
-    uri: TrackUri<'deezer'>; // "DEEZER::TRACK::4rye8ZgoRgbQPfgBqxjfqG"
-}
+    platform: "deezer";
+    apiProvider: "deezer";
+    uri: TrackUri<"deezer">; // "DEEZER::TRACK::4rye8ZgoRgbQPfgBqxjfqG"
+};
 
 export type AppleMusicTrackMetadata = BaseTrackMetadata & {
-    platform: 'appleMusic';
-    apiProvider: 'itunes';
-}
+    platform: "appleMusic";
+    apiProvider: "itunes";
+};
 
 export type YoutubeTrackMetadata = BaseTrackMetadata & {
-    platform: 'youtube';
-    apiProvider: 'youtube';
-    uri: TrackUri<'youtube'>; // "YOUTUBE::TRACK::4rye8ZgoRgbQPfgBqxjfqG"
-}
+    platform: "youtube";
+    apiProvider: "youtube";
+    uri: TrackUri<"youtube">; // "YOUTUBE::TRACK::4rye8ZgoRgbQPfgBqxjfqG"
+};
 
 export type YoutubeMusicTrackMetadata = BaseTrackMetadata & {
-    platform: 'youtubeMusic';
-    apiProvider: 'youtube';
-    uri: TrackUri<'youtubeMusic'>; // "YOUTUBEMUSIC::TRACK::4rye8ZgoRgbQPfgBqxjfqG"
-}
+    platform: "youtubeMusic";
+    apiProvider: "youtube";
+    uri: TrackUri<"youtubeMusic">; // "YOUTUBEMUSIC::TRACK::4rye8ZgoRgbQPfgBqxjfqG"
+};
 
 export type SoundcloudTrackMetadata = BaseTrackMetadata & {
-    platform: 'soundcloud';
-    apiProvider: 'soundcloud';
-    uri: TrackUri<'soundcloud'>; // "SOUNDCLOUD::TRACK::4rye8ZgoRgbQPfgBqxjfqG"
-}
+    platform: "soundcloud";
+    apiProvider: "soundcloud";
+    uri: TrackUri<"soundcloud">; // "SOUNDCLOUD::TRACK::4rye8ZgoRgbQPfgBqxjfqG"
+};
 
 export type TidalTrackMetadata = BaseTrackMetadata & {
-    platform: 'tidal';
-    apiProvider: 'tidal';
-    uri: TrackUri<'tidal'>; // "TIDAL::TRACK::4rye8ZgoRgbQPfgBqxjfqG"
-}
+    platform: "tidal";
+    apiProvider: "tidal";
+    uri: TrackUri<"tidal">; // "TIDAL::TRACK::4rye8ZgoRgbQPfgBqxjfqG"
+};
 
-export type TrackMetadata = MusicBrainzTrackMetadata | SpotifyTrackMetadata | DeezerTrackMetadata | AppleMusicTrackMetadata | YoutubeTrackMetadata | YoutubeMusicTrackMetadata | SoundcloudTrackMetadata | TidalTrackMetadata;
+export type TrackMetadata =
+    | MusicBrainzTrackMetadata
+    | SpotifyTrackMetadata
+    | DeezerTrackMetadata
+    | AppleMusicTrackMetadata
+    | YoutubeTrackMetadata
+    | YoutubeMusicTrackMetadata
+    | SoundcloudTrackMetadata
+    | TidalTrackMetadata;
 
 export type MetadataSourceState = {
     metadata: TrackMetadata;
@@ -204,23 +211,22 @@ export type MetadataOverrides = Partial<{
     genres: string[];
 }>;
 
-
 //----------------------//
 //       DOWNLOAD       //
 //----------------------//
 
-export type DownloadProvider = 'ytdlp' | 'soulseek';
+export type DownloadProvider = "ytdlp" | "soulseek";
 
 export type LocalFile = {
     state: "found" | "not_found";
     path: string;
     name: string;
-    extension: 'flac';
+    extension: "flac";
     sourceUrl?: string;
-}
+};
 
 export type FileInfo = {
-    format: 'flac' | 'mp3' | 'ogg';
+    format: "flac" | "mp3" | "ogg";
     sizeBytes: number;
     durationMs: number;
     embeddedTags: Record<string, string | string[]>;
@@ -232,7 +238,7 @@ export type SavedFile = {
 };
 
 export type TrackDownloadSource = {
-    state: 'pending' | 'searching' | 'downloading' | 'downloaded' | 'failed';
+    state: "pending" | "searching" | "downloading" | "downloaded" | "failed";
     provider: DownloadProvider;
     track: TrackMetadata;
     localFile?: LocalFile;
@@ -243,13 +249,12 @@ export type TrackDownloadSource = {
     savedFile?: SavedFile;
 };
 
-
 //----------------------//
 //         TASK         //
 //----------------------//
 
 export type TrackDownloadTask = {
-    state: 'pending' | 'running' | 'finished' | 'failed';
+    state: "pending" | "running" | "finished" | "failed";
     primaryMetadataInProgress?: boolean;
     metadataDiscoveringInProgress?: boolean;
     primaryMetadataFetched?: boolean;
@@ -262,10 +267,10 @@ export type TrackDownloadTask = {
     metadataOverride: MetadataOverrides;
     downloadSources: TrackDownloadSource[];
     parentAlbumDownloadTask?: AlbumDownloadTask;
-}
+};
 
 export type TracksDownloadTask = {
-    state: 'pending' | 'running' | 'finished' | 'failed';
+    state: "pending" | "running" | "finished" | "failed";
     toTag?: boolean;
     toDownload?: boolean;
     userInput: UserInput;
@@ -273,10 +278,10 @@ export type TracksDownloadTask = {
     metadataOverride: MetadataOverrides;
     downloadSources: TrackDownloadSource[];
     tracks: TrackDownloadTask[];
-}
+};
 
-export type AlbumDownloadTask = TracksDownloadTask
+export type AlbumDownloadTask = TracksDownloadTask;
 // export type PlaylistDownloadTask = TracksDownloadTask
 // export type LivePlaylistDownloadTask = PlaylistDownloadTask
 
-export type MusicDownloadTaskAttributes = TrackDownloadTask // | AlbumDownloadTask
+export type MusicDownloadTaskAttributes = TrackDownloadTask; // | AlbumDownloadTask

@@ -8,105 +8,100 @@ import { useTheme } from "../../../base/themeContext";
 import { Theme } from "../../../base/theme";
 
 function getPlatformColor(apiProvider: string): string {
-  return providerDisplayRegistry.get(apiProvider).colorSubtle;
+    return providerDisplayRegistry.get(apiProvider).colorSubtle;
 }
 
 function attributionBadge(
-  attr: FieldAttribution | undefined,
-  theme: Theme,
+    attr: FieldAttribution | undefined,
+    theme: Theme
 ): {
-  text: string;
-  color: string;
-  italic?: boolean;
+    text: string;
+    color: string;
+    italic?: boolean;
 } {
-  if (!attr) return { text: "", color: theme.text.secondary };
-  if (attr === "manual")
-    return { text: "EDITED", color: theme.field.overridden, italic: true };
-  if (attr === "none") return { text: "—", color: theme.text.secondary };
-  return {
-    text: `${attr.toUpperCase().slice(0, 8)}`,
-    color: getPlatformColor(attr),
-  };
+    if (!attr) return { text: "", color: theme.text.secondary };
+    if (attr === "manual") return { text: "EDITED", color: theme.field.overridden, italic: true };
+    if (attr === "none") return { text: "—", color: theme.text.secondary };
+    return {
+        text: `${attr.toUpperCase().slice(0, 8)}`,
+        color: getPlatformColor(attr),
+    };
 }
 
 const LABEL_W = 10;
 
 export interface FieldRowProps {
-  field: FieldDef;
-  isFocused: boolean;
-  isCompiled: boolean;
-  isEditing: boolean;
-  value: string;
-  attribution: FieldAttribution | undefined;
-  hasOverride: boolean;
-  editValue: string;
-  editError: boolean;
-  onEditValueChange: (value: string) => void;
-  onEditSubmit: (value: string) => void;
+    field: FieldDef;
+    isFocused: boolean;
+    isCompiled: boolean;
+    isEditing: boolean;
+    value: string;
+    attribution: FieldAttribution | undefined;
+    hasOverride: boolean;
+    editValue: string;
+    editError: boolean;
+    onEditValueChange: (value: string) => void;
+    onEditSubmit: (value: string) => void;
 }
 
 export const FieldRow: React.FC<FieldRowProps> = ({
-  field,
-  isFocused,
-  isCompiled,
-  isEditing,
-  value,
-  attribution,
-  hasOverride,
-  editValue,
-  editError,
-  onEditValueChange,
-  onEditSubmit,
+    field,
+    isFocused,
+    isCompiled,
+    isEditing,
+    value,
+    attribution,
+    hasOverride,
+    editValue,
+    editError,
+    onEditValueChange,
+    onEditSubmit,
 }) => {
-  const theme = useTheme();
-  const badge = attributionBadge(attribution, theme);
+    const theme = useTheme();
+    const badge = attributionBadge(attribution, theme);
 
-  return (
-    <Box flexDirection="row" paddingX={1} flexShrink={0} flexGrow={1}>
-      <Box width={2} minWidth={2} flexShrink={0}>
-        {isFocused && <Text color={theme.text.active}>{"☛"}</Text>}
-      </Box>
-      <Box width={LABEL_W} flexShrink={0}>
-        <Text color={isFocused ? theme.field.selected : theme.ui.border} bold>
-          {field.label.toUpperCase().padEnd(LABEL_W)}
-        </Text>
-      </Box>
+    return (
+        <Box flexDirection="row" paddingX={1} flexShrink={0} flexGrow={1}>
+            <Box width={2} minWidth={2} flexShrink={0}>
+                {isFocused && <Text color={theme.text.active}>{"☛"}</Text>}
+            </Box>
+            <Box width={LABEL_W} flexShrink={0}>
+                <Text color={isFocused ? theme.field.selected : theme.ui.border} bold>
+                    {field.label.toUpperCase().padEnd(LABEL_W)}
+                </Text>
+            </Box>
 
-      {isEditing ? (
-        <Box flexWrap="wrap" flexDirection="row" flexGrow={1}>
-          <TextInput
-            value={editValue}
-            onChange={onEditValueChange}
-            onSubmit={onEditSubmit}
-          />
-          {editError && <Text color={theme.field.error}> ✗ invalid</Text>}
-        </Box>
-      ) : (
-        <Box flexGrow={1}>
-          <Text
-            color={
-              value === "—"
-                ? theme.field.missing
-                : hasOverride
-                  ? theme.field.overridden
-                  : theme.field.normal
-            }
-            underline={isFocused}
-            dimColor={value === "—"}
-            wrap="truncate-end"
-          >
-            {value}
-          </Text>
-        </Box>
-      )}
+            {isEditing ? (
+                <Box flexWrap="wrap" flexDirection="row" flexGrow={1}>
+                    <TextInput value={editValue} onChange={onEditValueChange} onSubmit={onEditSubmit} />
+                    {editError && <Text color={theme.field.error}> ✗ invalid</Text>}
+                </Box>
+            ) : (
+                <Box flexGrow={1}>
+                    <Text
+                        color={
+                            value === "—"
+                                ? theme.field.missing
+                                : hasOverride
+                                  ? theme.field.overridden
+                                  : theme.field.normal
+                        }
+                        underline={isFocused}
+                        dimColor={value === "—"}
+                        wrap="truncate-end"
+                    >
+                        {value}
+                    </Text>
+                </Box>
+            )}
 
-      {isCompiled && !isEditing && !editError && (
-        <Box minWidth={badge.text.length + 1} paddingLeft={1} flexShrink={0}>
-          <Text color={badge.color} dimColor italic={badge.italic}>
-            {badge.text}
-          </Text>
+            {isCompiled && !isEditing && !editError && (
+                <Box minWidth={badge.text.length + 1} paddingLeft={1} flexShrink={0}>
+                    <Text color={badge.color} dimColor italic={badge.italic}>
+                        {badge.text}
+                    </Text>
+                </Box>
+            )}
         </Box>
-      )}
-    </Box>
-  );
+    );
 };

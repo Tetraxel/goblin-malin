@@ -62,8 +62,8 @@ export class TaskPrompt {
     private notifySubscribers: () => void;
 
     public constructor(id: string, status: TaskStatus, notifyTaskSubscribers: () => void) {
-        this.id = id
-        this.status = status
+        this.id = id;
+        this.status = status;
         this.notifySubscribers = notifyTaskSubscribers;
     }
 
@@ -93,11 +93,17 @@ export class TaskPrompt {
     //     return this.requestUserInput<string>(prompt);
     // }
 
-    async askInput(options: { status: string, title: string, message: string, defaultValue?: string, hint?: string }): Promise<string> {
+    async askInput(options: {
+        status: string;
+        title: string;
+        message: string;
+        defaultValue?: string;
+        hint?: string;
+    }): Promise<string> {
         const prompt: InputPrompt = {
             id: `${this.id}-input-${Date.now()}`,
             type: PromptType.Input,
-            ...options
+            ...options,
         };
 
         return this.requestUserInput<string>(prompt);

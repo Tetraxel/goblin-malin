@@ -1,84 +1,86 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { EventEmitter } from 'events';
-import { PROJECT_ROOT } from '../constants';
-import { AppSettings, DEFAULT_APP_SETTINGS } from './appSettings';
-import { DeepPartial } from '../utils/types';
-import { deepMerge } from '../utils/deepMerge';
+import * as fs from "fs";
+import * as path from "path";
+import { EventEmitter } from "events";
+import { PROJECT_ROOT } from "../constants";
+import { AppSettings, DEFAULT_APP_SETTINGS } from "./appSettings";
+import { DeepPartial } from "../utils/types";
+import { deepMerge } from "../utils/deepMerge";
 
-const CONFIG_DIR = path.join(PROJECT_ROOT, 'config');
-const SETTINGS_PATH = path.join(CONFIG_DIR, 'settings.json');
+const CONFIG_DIR = path.join(PROJECT_ROOT, "config");
+const SETTINGS_PATH = path.join(CONFIG_DIR, "settings.json");
 
 /** Shape of the full JSON file on disk. */
 type StoredSettings = {
-  general: AppSettings['general'];
-  flows: Record<string, Record<string, unknown>>;
+    general: AppSettings["general"];
+    flows: Record<string, Record<string, unknown>>;
 };
 
 export class SettingsStore {
-  private static instance: SettingsStore;
-  private cache: StoredSettings | null = null;
-  private readonly emitter = new EventEmitter();
+    private static instance: SettingsStore;
+    private cache: StoredSettings | null = null;
+    private readonly emitter = new EventEmitter();
 
-  static getInstance(): SettingsStore {
-    if (!SettingsStore.instance) SettingsStore.instance = new SettingsStore();
-    return SettingsStore.instance;
-  }
-
-  private readFromDisk(): StoredSettings {
-    try {
-      const raw = fs.readFileSync(SETTINGS_PATH, 'utf-8');
-      return JSON.parse(raw) as StoredSettings;
-    } catch {
-      return { general: DEFAULT_APP_SETTINGS.general, flows: {} };
+    static getInstance(): SettingsStore {
+        if (!SettingsStore.instance) SettingsStore.instance = new SettingsStore();
+        return SettingsStore.instance;
     }
-  }
 
-  private writeToDisk(settings: StoredSettings): void {
-    fs.mkdirSync(CONFIG_DIR, { recursive: true });
-    const tmp = SETTINGS_PATH + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(settings, null, 2), 'utf-8');
-    fs.renameSync(tmp, SETTINGS_PATH);
-    this.cache = settings;
-    this.emitter.emit('change');
-  }
+    private readFromDisk(): StoredSettings {
+        try {
+            const raw = fs.readFileSync(SETTINGS_PATH, "utf-8");
+            return JSON.parse(raw) as StoredSettings;
+        } catch {
+            return { general: DEFAULT_APP_SETTINGS.general, flows: {} };
+        }
+    }
 
-  private getCached(): StoredSettings {
-    if (!this.cache) this.cache = this.readFromDisk();
-    return this.cache;
-  }
+    private writeToDisk(settings: StoredSettings): void {
+        fs.mkdirSync(CONFIG_DIR, { recursive: true });
+        const tmp = SETTINGS_PATH + ".tmp";
+        fs.writeFileSync(tmp, JSON.stringify(settings, null, 2), "utf-8");
+        fs.renameSync(tmp, SETTINGS_PATH);
+        this.cache = settings;
+        this.emitter.emit("change");
+    }
 
-  // ── App (global) settings ──────────────────────────────────────────────────
+    private getCached(): StoredSettings {
+        if (!this.cache) this.cache = this.readFromDisk();
+        return this.cache;
+    }
 
-  getAppSettings(): AppSettings {
-    const s = this.getCached();
-    return deepMerge(DEFAULT_APP_SETTINGS, { general: s.general } as DeepPartial<AppSettings>);
-  }
+    // ── App (global) settings ──────────────────────────────────────────────────
 
-  writeAppSettings(settings: AppSettings): void {
-    const current = this.getCached();
-    this.writeToDisk({ ...current, general: settings.general });
-  }
+    getAppSettings(): AppSettings {
+        const s = this.getCached();
+        return deepMerge(DEFAULT_APP_SETTINGS, { general: s.general } as DeepPartial<AppSettings>);
+    }
 
-  // ── Flow settings ──────────────────────────────────────────────────────────
+    writeAppSettings(settings: AppSettings): void {
+        const current = this.getCached();
+        this.writeToDisk({ ...current, general: settings.general });
+    }
 
-  getFlowSettings<T extends Record<string, unknown>>(flowId: string, defaults: T): T {
-    const stored = (this.getCached().flows?.[flowId] ?? {}) as DeepPartial<T>;
-    return deepMerge(defaults, stored);
-  }
+    // ── Flow settings ──────────────────────────────────────────────────────────
 
-  writeFlowSettings(flowId: string, settings: Record<string, unknown>): void {
-    const current = this.getCached();
-    this.writeToDisk({
-      ...current,
-      flows: { ...(current.flows ?? {}), [flowId]: settings },
-    });
-  }
+    getFlowSettings<T extends Record<string, unknown>>(flowId: string, defaults: T): T {
+        const stored = (this.getCached().flows?.[flowId] ?? {}) as DeepPartial<T>;
+        return deepMerge(defaults, stored);
+    }
 
-  // ── Change notifications ───────────────────────────────────────────────────
+    writeFlowSettings(flowId: string, settings: Record<string, unknown>): void {
+        const current = this.getCached();
+        this.writeToDisk({
+            ...current,
+            flows: { ...(current.flows ?? {}), [flowId]: settings },
+        });
+    }
 
-  onSettingsChanged(callback: () => void): () => void {
-    this.emitter.on('change', callback);
-    return () => { this.emitter.off('change', callback); };
-  }
+    // ── Change notifications ───────────────────────────────────────────────────
+
+    onSettingsChanged(callback: () => void): () => void {
+        this.emitter.on("change", callback);
+        return () => {
+            this.emitter.off("change", callback);
+        };
+    }
 }

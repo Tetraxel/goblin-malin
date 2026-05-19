@@ -6,8 +6,6 @@
 // import { Cached } from '../../../../../utils/cache';
 // import { DownloadTask } from '../../../utils/downloadTask';
 
-
-
 // // TODO: add static cellComponent = MusicBrainzCell once MusicBrainz is activated.
 // // Importing MusicBrainzCell here would create a circular dep since MusicBrainzCell
 // // imports MusicBrainzRecording/MusicBrainzRelease from this file. Extract those

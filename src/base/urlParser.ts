@@ -1,13 +1,17 @@
 export type ParsedUrl = {
     platform: string;
-    type: 'track' | 'album' | 'playlist' | 'unknown';
+    type: "track" | "album" | "playlist" | "unknown";
     id?: string;
 };
 
 export type UrlParser = (url: string) => ParsedUrl | null;
 
 function tryParseUrl(url: string): URL | null {
-    try { return new URL(url); } catch { return null; }
+    try {
+        return new URL(url);
+    } catch {
+        return null;
+    }
 }
 
 const BUILTIN_URL_PARSERS: UrlParser[] = [
@@ -15,34 +19,34 @@ const BUILTIN_URL_PARSERS: UrlParser[] = [
     (url) => {
         const p = tryParseUrl(url);
         if (!p) return null;
-        const host = p.hostname.replace(/^www\./, '');
-        if (host !== 'soundcloud.com' && !host.endsWith('.soundcloud.com')) return null;
-        if (p.pathname === '/' || p.pathname === '') return null;
-        return { platform: 'soundcloud', type: 'track' };
+        const host = p.hostname.replace(/^www\./, "");
+        if (host !== "soundcloud.com" && !host.endsWith(".soundcloud.com")) return null;
+        if (p.pathname === "/" || p.pathname === "") return null;
+        return { platform: "soundcloud", type: "track" };
     },
     // deezer
     (url) => {
         const p = tryParseUrl(url);
         if (!p) return null;
-        const host = p.hostname.replace(/^www\./, '');
-        if (host !== 'deezer.com' && !host.endsWith('.deezer.com')) return null;
-        if (/\/track\//.test(p.pathname)) return { platform: 'deezer', type: 'track' };
+        const host = p.hostname.replace(/^www\./, "");
+        if (host !== "deezer.com" && !host.endsWith(".deezer.com")) return null;
+        if (/\/track\//.test(p.pathname)) return { platform: "deezer", type: "track" };
         return null;
     },
     // apple music
     (url) => {
         const p = tryParseUrl(url);
         if (!p) return null;
-        if (p.hostname !== 'music.apple.com') return null;
-        return { platform: 'appleMusic', type: 'track' };
+        if (p.hostname !== "music.apple.com") return null;
+        return { platform: "appleMusic", type: "track" };
     },
     // tidal
     (url) => {
         const p = tryParseUrl(url);
         if (!p) return null;
-        const host = p.hostname.replace(/^www\./, '');
-        if (host !== 'tidal.com' && !host.endsWith('.tidal.com')) return null;
-        if (/\/track\//.test(p.pathname)) return { platform: 'tidal', type: 'track' };
+        const host = p.hostname.replace(/^www\./, "");
+        if (host !== "tidal.com" && !host.endsWith(".tidal.com")) return null;
+        if (/\/track\//.test(p.pathname)) return { platform: "tidal", type: "track" };
         return null;
     },
 ];

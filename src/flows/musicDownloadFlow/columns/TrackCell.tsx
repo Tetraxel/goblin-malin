@@ -4,22 +4,15 @@ import { ColumnComponent } from "../../../components/TaskListPanel/TaskListPanel
 import { MusicDownloadTaskAttributes } from "../types";
 import { computeCompiledMetadata } from "../utils/compiledMetadata";
 
-export const TrackCell: ColumnComponent<MusicDownloadTaskAttributes> = ({
-  task,
-  isSelected,
-}) => {
-  const sources = task.attributes?.metadataSources ?? [];
-  const overrides = task.attributes?.metadataOverride ?? {};
-  const compiled = computeCompiledMetadata(sources, overrides);
-  const trackName = compiled.trackName;
+export const TrackCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, isSelected }) => {
+    const sources = task.attributes?.metadataSources ?? [];
+    const overrides = task.attributes?.metadataOverride ?? {};
+    const compiled = computeCompiledMetadata(sources, overrides);
+    const trackName = compiled.trackName;
 
-  return (
-    <Text
-      color={isSelected ? "green" : "white"}
-      underline={isSelected}
-      wrap="truncate-end"
-    >
-      {trackName}
-    </Text>
-  );
+    return (
+        <Text color={isSelected ? "green" : "white"} underline={isSelected} wrap="truncate-end">
+            {trackName}
+        </Text>
+    );
 };

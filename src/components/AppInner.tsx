@@ -20,107 +20,74 @@ import { useImportFlow } from "./ImportModal/useImportFlow";
 import { useTheme } from "../base/themeContext";
 
 export const AppInner: React.FC<{
-  tasks: Task<TaskAttributes>[];
-  filteredTasks: Task<TaskAttributes>[];
-  toolbarButtons: ToolbarButtonHook[];
-  columns: ColumnDefinition<MusicDownloadTaskAttributes>[];
-  currentFlow: FlowBase | undefined;
-  orchestrator: FlowOrchestrator;
-  setActiveFlowId: (id: string) => void;
-  terminalHeight: number;
-  terminalWidth: number;
+    tasks: Task<TaskAttributes>[];
+    filteredTasks: Task<TaskAttributes>[];
+    toolbarButtons: ToolbarButtonHook[];
+    columns: ColumnDefinition<MusicDownloadTaskAttributes>[];
+    currentFlow: FlowBase | undefined;
+    orchestrator: FlowOrchestrator;
+    setActiveFlowId: (id: string) => void;
+    terminalHeight: number;
+    terminalWidth: number;
 }> = ({
-  tasks,
-  filteredTasks,
-  toolbarButtons,
-  columns,
-  currentFlow,
-  orchestrator,
-  setActiveFlowId,
-  terminalHeight,
-  terminalWidth,
+    tasks,
+    filteredTasks,
+    toolbarButtons,
+    columns,
+    currentFlow,
+    orchestrator,
+    setActiveFlowId,
+    terminalHeight,
+    terminalWidth,
 }) => {
-  const theme = useTheme();
-  const {
-    pendingImport,
-    openImportFlow,
-    handleImportConfirm,
-    handleImportCancel,
-  } = useImportFlow(currentFlow);
+    const theme = useTheme();
+    const { pendingImport, openImportFlow, handleImportConfirm, handleImportCancel } = useImportFlow(currentFlow);
 
-  return (
-    <ImportActionsProvider openImportFlow={openImportFlow}>
-      {/* InputRouter: single root useInput — must be inside FocusProvider */}
-      <InputRouter
-        tasks={filteredTasks}
-        flow={currentFlow}
-        openImportFlow={openImportFlow}
-      />
+    return (
+        <ImportActionsProvider openImportFlow={openImportFlow}>
+            {/* InputRouter: single root useInput — must be inside FocusProvider */}
+            <InputRouter tasks={filteredTasks} flow={currentFlow} openImportFlow={openImportFlow} />
 
-      <Box
-        flexDirection="column"
-        height={terminalHeight}
-        backgroundColor={theme.ui.background}
-      >
-        {currentFlow && (
-          <Toolbar
-            buttons={toolbarButtons}
-            width={terminalWidth}
-            flows={orchestrator.getAllFlows()}
-            onFlowChange={setActiveFlowId}
-            flow={currentFlow}
-            orchestrator={orchestrator}
-          />
-        )}
-        {currentFlow && (
-          <TaskListPanel
-            columns={columns}
-            tasks={filteredTasks}
-            width={terminalWidth}
-            flow={currentFlow}
-          />
-        )}
-        <SecondaryPanel
-          tasks={filteredTasks}
-          width={terminalWidth}
-          flow={currentFlow}
-        />
-        <Separator width={terminalWidth} />
-        <Footer />
+            <Box flexDirection="column" height={terminalHeight} backgroundColor={theme.ui.background}>
+                {currentFlow && (
+                    <Toolbar
+                        buttons={toolbarButtons}
+                        width={terminalWidth}
+                        flows={orchestrator.getAllFlows()}
+                        onFlowChange={setActiveFlowId}
+                        flow={currentFlow}
+                        orchestrator={orchestrator}
+                    />
+                )}
+                {currentFlow && (
+                    <TaskListPanel columns={columns} tasks={filteredTasks} width={terminalWidth} flow={currentFlow} />
+                )}
+                <SecondaryPanel tasks={filteredTasks} width={terminalWidth} flow={currentFlow} />
+                <Separator width={terminalWidth} />
+                <Footer />
 
-        {/* Modals rendered above everything else */}
+                {/* Modals rendered above everything else */}
 
-        <PromptModal
-          tasks={tasks}
-          terminalHeight={terminalHeight}
-          terminalWidth={terminalWidth}
-        />
+                <PromptModal tasks={tasks} terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
 
-        <ImportModal
-          pendingImport={pendingImport}
-          terminalHeight={terminalHeight}
-          terminalWidth={terminalWidth}
-          onConfirm={handleImportConfirm}
-          onCancel={handleImportCancel}
-        />
+                <ImportModal
+                    pendingImport={pendingImport}
+                    terminalHeight={terminalHeight}
+                    terminalWidth={terminalWidth}
+                    onConfirm={handleImportConfirm}
+                    onCancel={handleImportCancel}
+                />
 
-        <SettingsModal
-          terminalHeight={terminalHeight}
-          terminalWidth={terminalWidth}
-          currentFlow={currentFlow}
-        />
+                <SettingsModal
+                    terminalHeight={terminalHeight}
+                    terminalWidth={terminalWidth}
+                    currentFlow={currentFlow}
+                />
 
-        <SetupWizardModal
-          tasks={tasks}
-          terminalHeight={terminalHeight}
-          terminalWidth={terminalWidth}
-        />
+                <SetupWizardModal tasks={tasks} terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
 
-        <WelcomeModal
-          terminalHeight={terminalHeight}
-          terminalWidth={terminalWidth}
-        />
-      </Box>
-    </ImportActionsProvider>
-  );
+                <WelcomeModal terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
+            </Box>
+        </ImportActionsProvider>
+    );
 };

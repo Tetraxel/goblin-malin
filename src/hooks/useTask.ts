@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { Task } from '../base/task/task';
-import { globalLogger } from '../base/logger/logger';
+import { useEffect, useState } from "react";
+import { Task } from "../base/task/task";
+import { globalLogger } from "../base/logger/logger";
 
 /**
  * Hook that subscribes to a Task instance and returns its current state.
@@ -23,6 +23,6 @@ export const useTask = <TAttributes>(task: Task<TAttributes>) => {
         return unsubscribe;
     }, [task]); // Re-subscribe if the task instance changes
 
-    return taskSnapshot
+    return taskSnapshot;
     // return taskSnapshot as ReturnType<Task<Attributes>['get']>;
 };

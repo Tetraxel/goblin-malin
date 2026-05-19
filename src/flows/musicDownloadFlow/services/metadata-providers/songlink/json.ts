@@ -1,6 +1,5 @@
-import fs from 'fs/promises';
-import { getCacheDir } from '../../../../../utils/appPaths';
-
+import fs from "fs/promises";
+import { getCacheDir } from "../../../../../utils/appPaths";
 
 async function ensureCacheDir() {
     try {
@@ -13,7 +12,7 @@ async function ensureCacheDir() {
 export async function loadJsonFile<T>(filePath: string, defaultValue: T): Promise<T> {
     await ensureCacheDir();
     try {
-        const content = await fs.readFile(filePath, 'utf-8');
+        const content = await fs.readFile(filePath, "utf-8");
         return JSON.parse(content) as T;
     } catch {
         return defaultValue;
@@ -22,5 +21,5 @@ export async function loadJsonFile<T>(filePath: string, defaultValue: T): Promis
 
 export async function saveJsonFile(filePath: string, data: unknown): Promise<void> {
     // await ensureCacheDir();
-    await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
 }

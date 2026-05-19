@@ -14,7 +14,7 @@ export class ServiceScope<TTask extends Task<any>, TService extends ServiceBase>
         factories: Map<string, ServiceFactory<TTask, TService>>,
         private task: TTask,
         private logger: Logger,
-        isEnabled?: (name: string) => boolean,
+        isEnabled?: (name: string) => boolean
     ) {
         this.factories = new Map(factories);
         this.isEnabled = isEnabled;

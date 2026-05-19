@@ -1,6 +1,6 @@
-import { ToolbarButtonHook } from '../../../components/Toolbar/Toolbar';
-import { cache } from '../../../utils/cache';
-import { useTheme } from '../../../base/themeContext';
+import { ToolbarButtonHook } from "../../../components/Toolbar/Toolbar";
+import { cache } from "../../../utils/cache";
+import { useTheme } from "../../../base/themeContext";
 
 const LEAVE_ALT_SCREEN_COMMAND = "\x1b[?1049l";
 

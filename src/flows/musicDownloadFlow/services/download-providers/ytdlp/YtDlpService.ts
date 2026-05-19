@@ -1,54 +1,62 @@
-import fs from 'fs';
-import path from 'path';
-import { FormatOptions, QualityOptions, YtDlp } from 'ytdlp-nodejs';
-import { DownloadService } from '../../../downloadService';
-import { ProviderDisplay } from '../../../../../base/providerDisplay';
-import { ProviderSettingsSchema } from '../../../../../base/providerSettings';
-import { StatusType } from '../../../../../base/task/task-status';
-import { Logger } from '../../../../../base/logger/logger';
-import { getBinDir } from '../../../../../utils/appPaths';
-import { getTempDownloadDir } from '../../../saveSettings';
-import { ensureYtDlpSetup } from './ytdlp-setup';
-import { ensureFfmpeg } from '../../../../../utils/ffmpeg-setup';
-import { APIProvider, TrackMetadata, TrackDownloadSource, LocalFile, FileInfo } from '../../../types';
-import { DownloadTask } from '../../../utils/downloadTask';
-import { readFileInfo } from '../../../utils/readFileInfo';
-import { YtDlpCell } from './YtDlpCell';
+import fs from "fs";
+import path from "path";
+import { FormatOptions, QualityOptions, YtDlp } from "ytdlp-nodejs";
+import { DownloadService } from "../../../downloadService";
+import { ProviderDisplay } from "../../../../../base/providerDisplay";
+import { ProviderSettingsSchema } from "../../../../../base/providerSettings";
+import { StatusType } from "../../../../../base/task/task-status";
+import { Logger } from "../../../../../base/logger/logger";
+import { getBinDir } from "../../../../../utils/appPaths";
+import { getTempDownloadDir } from "../../../saveSettings";
+import { ensureYtDlpSetup } from "./ytdlp-setup";
+import { ensureFfmpeg } from "../../../../../utils/ffmpeg-setup";
+import { APIProvider, TrackMetadata, TrackDownloadSource, LocalFile, FileInfo } from "../../../types";
+import { DownloadTask } from "../../../utils/downloadTask";
+import { readFileInfo } from "../../../utils/readFileInfo";
+import { YtDlpCell } from "./YtDlpCell";
 
 export class YtDlpService extends DownloadService {
-    static readonly display: ProviderDisplay = { label: "YtDlp", acronym: "YTDLP", color: "#ff0033", colorSubtle: "#7a1500", colorBright: "#ff4040" };
+    static readonly display: ProviderDisplay = {
+        label: "YtDlp",
+        acronym: "YTDLP",
+        color: "#ff0033",
+        colorSubtle: "#7a1500",
+        colorBright: "#ff4040",
+    };
     static readonly defaultSettings: ProviderSettingsSchema = {
-        enabled: { label: 'Enable', defaultValue: true, kind: 'checkbox' },
-        autoDownloadBinary: { label: 'Auto-download latest binaries', defaultValue: true, kind: 'checkbox' },
+        enabled: { label: "Enable", defaultValue: true, kind: "checkbox" },
+        autoDownloadBinary: { label: "Auto-download latest binaries", defaultValue: true, kind: "checkbox" },
     };
     static readonly cellComponent = YtDlpCell;
 
-    public compatibleMetadataProviders: APIProvider[] = ['youtube', 'soundcloud'];
+    public compatibleMetadataProviders: APIProvider[] = ["youtube", "soundcloud"];
     private static client: YtDlp;
 
     constructor(task: DownloadTask, logger: Logger) {
-        super('YtDlp', task, logger)
+        super("YtDlp", task, logger);
     }
 
     private async getClient(): Promise<YtDlp> {
-        return this.runExclusive('init', async () => {
+        return this.runExclusive("init", async () => {
             if (!YtDlpService.client) {
-                const ytDlpBinaryPath = await ensureYtDlpSetup()
-                const ffmpefBinaryPath = await ensureFfmpeg()
+                const ytDlpBinaryPath = await ensureYtDlpSetup();
+                const ffmpefBinaryPath = await ensureFfmpeg();
                 const ytDlpClient = new YtDlp({
                     binaryPath: ytDlpBinaryPath,
                     ffmpegPath: ffmpefBinaryPath,
                 });
-                YtDlpService.client = ytDlpClient
+                YtDlpService.client = ytDlpClient;
             }
-            return YtDlpService.client
+            return YtDlpService.client;
         });
     }
 
     async downloadTrack(trackMetadata: TrackMetadata): Promise<TrackDownloadSource> {
         // Check if this service can handle the track's source
         if (!this.canDownload(trackMetadata)) {
-            throw new Error(`YtDlpService cannot download from ${trackMetadata.apiProvider}. Compatible providers: ${this.compatibleMetadataProviders.join(', ')}`);
+            throw new Error(
+                `YtDlpService cannot download from ${trackMetadata.apiProvider}. Compatible providers: ${this.compatibleMetadataProviders.join(", ")}`
+            );
         }
 
         const trackUrl = trackMetadata.url;
@@ -63,10 +71,10 @@ export class YtDlpService extends DownloadService {
             });
 
             // Generate output filename from track metadata
-            const artistName = trackMetadata.artists?.[0]?.name || 'Unknown Artist';
+            const artistName = trackMetadata.artists?.[0]?.name || "Unknown Artist";
             const outputName = `${artistName} - ${trackMetadata.trackName}`;
-            const uriSlug = trackMetadata.uri?.replace(/::/g, '-').replace(/:/g, '-') ?? '';
-            const format = 'flac';
+            const uriSlug = trackMetadata.uri?.replace(/::/g, "-").replace(/:/g, "-") ?? "";
+            const format = "flac";
             const filename = uriSlug ? `${outputName} ${uriSlug}.${format}` : `${outputName}.${format}`;
             const fullPath = path.join(getTempDownloadDir(), filename);
 
@@ -75,10 +83,10 @@ export class YtDlpService extends DownloadService {
             if (fs.existsSync(fullPath)) {
                 this.logger.info(`File already exists, skipping download: ${filename}`);
                 localFile = {
-                    state: 'found',
+                    state: "found",
                     path: fullPath,
                     name: outputName,
-                    extension: 'flac',
+                    extension: "flac",
                     sourceUrl: trackUrl,
                 };
             } else {
@@ -88,7 +96,7 @@ export class YtDlpService extends DownloadService {
                 }
 
                 // Load cookies if available
-                const cookiesPath = path.join(getBinDir(), 'cookies.txt');
+                const cookiesPath = path.join(getBinDir(), "cookies.txt");
                 const downloadOptions: FormatOptions<keyof QualityOptions> = {
                     paths: getTempDownloadDir(),
                     output: filename,
@@ -97,7 +105,9 @@ export class YtDlpService extends DownloadService {
                     restrictFilenames: true,
                     onProgress: (progress) => {
                         this.status.update({ progress: progress.percentage });
-                        this.logger.debug(`Download progress: ${progress.percentage}% ${progress.speed_str} (ETA: ${progress.eta_str})`);
+                        this.logger.debug(
+                            `Download progress: ${progress.percentage}% ${progress.speed_str} (ETA: ${progress.eta_str})`
+                        );
                     },
                 };
 
@@ -105,9 +115,8 @@ export class YtDlpService extends DownloadService {
                 if (fs.existsSync(cookiesPath)) {
                     this.logger.debug(`Using cookies from ${cookiesPath}`);
                     downloadOptions.cookies = cookiesPath;
-                }
-                else {
-                    this.logger.warn('No cookies file found, proceeding without cookies');
+                } else {
+                    this.logger.warn("No cookies file found, proceeding without cookies");
                 }
 
                 // Download the track
@@ -116,10 +125,10 @@ export class YtDlpService extends DownloadService {
 
                 this.logger.info(`Successfully downloaded: ${filename}`);
                 localFile = {
-                    state: 'found',
+                    state: "found",
                     path: fullPath,
                     name: outputName,
-                    extension: 'flac',
+                    extension: "flac",
                     sourceUrl: trackUrl,
                 };
             }
@@ -134,8 +143,8 @@ export class YtDlpService extends DownloadService {
             }
 
             const downloadSource: TrackDownloadSource = {
-                state: 'downloaded',
-                provider: 'ytdlp',
+                state: "downloaded",
+                provider: "ytdlp",
                 track: trackMetadata,
                 localFile,
                 downloadedAt: new Date(),

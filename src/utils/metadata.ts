@@ -1,8 +1,8 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import NodeId3 from 'node-id3';
-import { readFlacTags, writeFlacTags, FlacTagMap, FlacTags } from 'flac-tagger';
-import { globalLogger } from '../base/logger/logger';
+import * as fs from "fs";
+import * as path from "path";
+import NodeId3 from "node-id3";
+import { readFlacTags, writeFlacTags, FlacTagMap, FlacTags } from "flac-tagger";
+import { globalLogger } from "../base/logger/logger";
 
 export type Metadata = {
     trackTitle: string;
@@ -19,18 +19,17 @@ export type Metadata = {
     musicBrainzAlbumId?: string;
     musicBrainzArtistId?: string;
     musicBrainzReleaseGroupId?: string;
-}
+};
 
 export async function cleanAndTagFlac(filePath: string, metadata: Metadata) {
-
     // --- STEP 1: CLEAN THE FILE ---
     globalLogger.info(`--- Step 1: Cleaning invalid ID3 tags from ${filePath} ---`);
     try {
         const success = NodeId3.removeTags(filePath);
         if (success) {
-            globalLogger.info('Successfully removed invalid ID3 tags. ✅');
+            globalLogger.info("Successfully removed invalid ID3 tags. ✅");
         } else {
-            globalLogger.info('File did not contain any ID3 tags to remove.');
+            globalLogger.info("File did not contain any ID3 tags to remove.");
         }
     } catch (err) {
         globalLogger.error(`Error cleaning file: ${(err as Error).message}. Stopping.`);
@@ -54,19 +53,13 @@ export async function cleanAndTagFlac(filePath: string, metadata: Metadata) {
             ...(metadata.genres?.length ? { GENRE: metadata.genres } : {}),
             ...(metadata.bpm != null ? { BPM: String(metadata.bpm) } : {}),
             ...(metadata.key ? { KEY: metadata.key } : {}),
-            ...(metadata.musicBrainzTrackId
-                ? { MUSICBRAINZ_TRACKID: metadata.musicBrainzTrackId }
-                : {}),
-            ...(metadata.musicBrainzAlbumId
-                ? { MUSICBRAINZ_ALBUMID: metadata.musicBrainzAlbumId }
-                : {}),
-            ...(metadata.musicBrainzArtistId
-                ? { MUSICBRAINZ_ARTISTID: metadata.musicBrainzArtistId }
-                : {}),
+            ...(metadata.musicBrainzTrackId ? { MUSICBRAINZ_TRACKID: metadata.musicBrainzTrackId } : {}),
+            ...(metadata.musicBrainzAlbumId ? { MUSICBRAINZ_ALBUMID: metadata.musicBrainzAlbumId } : {}),
+            ...(metadata.musicBrainzArtistId ? { MUSICBRAINZ_ARTISTID: metadata.musicBrainzArtistId } : {}),
             ...(metadata.musicBrainzReleaseGroupId
                 ? { MUSICBRAINZ_RELEASEGROUPID: metadata.musicBrainzReleaseGroupId }
                 : {}),
-        }
+        };
 
         const tagsToWrite: FlacTags = {
             ...currentTags,
@@ -74,13 +67,12 @@ export async function cleanAndTagFlac(filePath: string, metadata: Metadata) {
         };
 
         await writeFlacTags(tagsToWrite, filePath);
-        globalLogger.info('FLAC metadata updated successfully! ✅');
-
+        globalLogger.info("FLAC metadata updated successfully! ✅");
     } catch (error) {
         const err = error as Error & { code?: string };
         globalLogger.error(`Error writing FLAC metadata: ${err.message}`);
-        if (err.message === 'Invalid stream header') {
-            globalLogger.error('This is unexpected, the file should be clean.');
+        if (err.message === "Invalid stream header") {
+            globalLogger.error("This is unexpected, the file should be clean.");
         }
     }
 }
@@ -90,7 +82,7 @@ export async function moveFile(srcPath: string, destPath: string): Promise<void>
     try {
         await fs.promises.rename(srcPath, destPath);
     } catch (err) {
-        if ((err as NodeJS.ErrnoException).code === 'EXDEV') {
+        if ((err as NodeJS.ErrnoException).code === "EXDEV") {
             // Cross-device / cross-partition: fall back to copy + delete
             await fs.promises.copyFile(srcPath, destPath);
             await fs.promises.unlink(srcPath);

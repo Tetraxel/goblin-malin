@@ -1,6 +1,6 @@
-import { StatusAttributes, TaskStatus } from './task-status';
-import { TaskPrompt, UserPrompt } from './task-prompt';
-import { Logger } from '../logger/logger';
+import { StatusAttributes, TaskStatus } from "./task-status";
+import { TaskPrompt, UserPrompt } from "./task-prompt";
+import { Logger } from "../logger/logger";
 
 export interface DownloadTaskData {
     id: string;
@@ -11,14 +11,14 @@ export interface DownloadTaskData {
 
 export type TaskSubscriber<TTAttributes> = (task: Task<TTAttributes>) => void;
 export type TaskSubscribers<TTAttributes> = Set<TaskSubscriber<TTAttributes>>;
-export type TaskAttributes = Record<string, unknown>
+export type TaskAttributes = Record<string, unknown>;
 export type TaskSnapshot<TTAttributes = TaskAttributes> = {
     id: string;
     initialInput: string | undefined;
     attributes: TTAttributes | undefined;
     status: StatusAttributes;
     prompt: UserPrompt | null;
-}
+};
 
 export class Task<TTaskAttributes = TaskAttributes> {
     public readonly id: string;
@@ -30,18 +30,28 @@ export class Task<TTaskAttributes = TaskAttributes> {
     protected prompt: TaskPrompt;
     protected subscribers: TaskSubscribers<TTaskAttributes> = new Set();
 
-    public enabled: boolean = true
-    public running: boolean = false
-    public runnedAt: Date | undefined
-    public finishedAt: Date | undefined
-    public attempt: number = 0
-    public success: boolean = false
+    public enabled: boolean = true;
+    public running: boolean = false;
+    public runnedAt: Date | undefined;
+    public finishedAt: Date | undefined;
+    public attempt: number = 0;
+    public success: boolean = false;
 
-    constructor({ id, initialInput, attributes, flowId, logger }: {
-        id: string; initialInput?: string; attributes?: TTaskAttributes, flowId: string, logger: Logger
+    constructor({
+        id,
+        initialInput,
+        attributes,
+        flowId,
+        logger,
+    }: {
+        id: string;
+        initialInput?: string;
+        attributes?: TTaskAttributes;
+        flowId: string;
+        logger: Logger;
     }) {
         this.id = id;
-        this.flowId = flowId
+        this.flowId = flowId;
         this.initialInput = initialInput;
         this.attributes = attributes;
         this.logger = logger.createChild({
@@ -111,11 +121,11 @@ export class Task<TTaskAttributes = TaskAttributes> {
     }
 
     async start(): Promise<void> {
-        throw Error('Not implemented')
+        throw Error("Not implemented");
     }
 
     async stop(): Promise<void> {
-        throw Error('Not implemented')
+        throw Error("Not implemented");
     }
 
     // Subscribe to any changes in the task (including status changes)
@@ -129,6 +139,6 @@ export class Task<TTaskAttributes = TaskAttributes> {
     }
 
     protected notifyTaskSubscribers(): void {
-        this.subscribers?.forEach(callback => callback(this));
+        this.subscribers?.forEach((callback) => callback(this));
     }
 }

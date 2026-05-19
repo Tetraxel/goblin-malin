@@ -6,91 +6,70 @@ import { StateBadge } from "../StateBadge";
 import { useTheme } from "../../../../base/themeContext";
 
 interface SourceFileRowProps {
-  source: TrackDownloadSource;
-  sourceIndex: number;
-  isSelected: boolean;
-  isActive: boolean;
-  width: number;
+    source: TrackDownloadSource;
+    sourceIndex: number;
+    isSelected: boolean;
+    isActive: boolean;
+    width: number;
 }
 
-export function SourceFileRow({
-  source,
-  sourceIndex,
-  isSelected,
-  isActive,
-  width,
-}: SourceFileRowProps) {
-  const theme = useTheme();
-  const bg =
-    isSelected && isActive
-      ? theme.ui.rowActiveBackground
-      : isSelected
-        ? theme.ui.rowBackground
-        : undefined;
+export function SourceFileRow({ source, sourceIndex, isSelected, isActive, width }: SourceFileRowProps) {
+    const theme = useTheme();
+    const bg = isSelected && isActive ? theme.ui.rowActiveBackground : isSelected ? theme.ui.rowBackground : undefined;
 
-  const localFile = source.localFile;
-  const filename = localFile
-    ? `${localFile.name}.${localFile.extension}`
-    : null;
-  const sizeText = source.fileInfo
-    ? formatBytes(source.fileInfo.sizeBytes)
-    : "";
+    const localFile = source.localFile;
+    const filename = localFile ? `${localFile.name}.${localFile.extension}` : null;
+    const sizeText = source.fileInfo ? formatBytes(source.fileInfo.sizeBytes) : "";
 
-  return (
-    <Box
-      flexDirection="row"
-      width={width}
-      minWidth={width}
-      height={1}
-      overflow="hidden"
-      backgroundColor={bg}
-      paddingLeft={1}
-    >
-      <Box width={3} minWidth={3} flexShrink={0}>
-        <Text color={theme.ui.focusIndicator}>
-          {isSelected && isActive ? "☛ " : "  "}
-        </Text>
-      </Box>
-      <Box width={2} minWidth={2} flexShrink={0}>
-        {source.isRejected ? (
-          <Text color={theme.status.error}>✘ </Text>
-        ) : source.selected ? (
-          <Text color={theme.ui.selection}>✓ </Text>
-        ) : (
-          <Text>{"  "}</Text>
-        )}
-      </Box>
-      <Box minWidth={3} flexShrink={0}>
-        <Text
-          color={theme.text.secondary}
-          dimColor={source.isRejected}
-          strikethrough={source.isRejected}
+    return (
+        <Box
+            flexDirection="row"
+            width={width}
+            minWidth={width}
+            height={1}
+            overflow="hidden"
+            backgroundColor={bg}
+            paddingLeft={1}
         >
-          {`${sourceIndex + 1}. `}
-        </Text>
-      </Box>
-      <Box flexGrow={1} overflow="hidden">
-        {filename ? (
-          <Text
-            color={theme.text.primary}
-            wrap="truncate-end"
-            dimColor={source.isRejected}
-            strikethrough={source.isRejected}
-          >
-            {filename}
-          </Text>
-        ) : (
-          <StateBadge source={source} />
-        )}
-      </Box>
-      {sizeText !== "" && (
-        <Box minWidth={sizeText.length + 1} paddingLeft={1} flexShrink={0}>
-          <Text color={theme.text.secondary}>{sizeText}</Text>
+            <Box width={3} minWidth={3} flexShrink={0}>
+                <Text color={theme.ui.focusIndicator}>{isSelected && isActive ? "☛ " : "  "}</Text>
+            </Box>
+            <Box width={2} minWidth={2} flexShrink={0}>
+                {source.isRejected ? (
+                    <Text color={theme.status.error}>✘ </Text>
+                ) : source.selected ? (
+                    <Text color={theme.ui.selection}>✓ </Text>
+                ) : (
+                    <Text>{"  "}</Text>
+                )}
+            </Box>
+            <Box minWidth={3} flexShrink={0}>
+                <Text color={theme.text.secondary} dimColor={source.isRejected} strikethrough={source.isRejected}>
+                    {`${sourceIndex + 1}. `}
+                </Text>
+            </Box>
+            <Box flexGrow={1} overflow="hidden">
+                {filename ? (
+                    <Text
+                        color={theme.text.primary}
+                        wrap="truncate-end"
+                        dimColor={source.isRejected}
+                        strikethrough={source.isRejected}
+                    >
+                        {filename}
+                    </Text>
+                ) : (
+                    <StateBadge source={source} />
+                )}
+            </Box>
+            {sizeText !== "" && (
+                <Box minWidth={sizeText.length + 1} paddingLeft={1} flexShrink={0}>
+                    <Text color={theme.text.secondary}>{sizeText}</Text>
+                </Box>
+            )}
+            <Box paddingLeft={1} paddingRight={1} flexShrink={0}>
+                <StateBadge source={source} />
+            </Box>
         </Box>
-      )}
-      <Box paddingLeft={1} paddingRight={1} flexShrink={0}>
-        <StateBadge source={source} />
-      </Box>
-    </Box>
-  );
+    );
 }

@@ -1,7 +1,7 @@
 // hooks/useActivePrompt.ts
-import { useEffect, useState } from 'react';
-import { Task } from '../../base/task/task';
-import { TaskPrompt } from '../../base/task/task-prompt';
+import { useEffect, useState } from "react";
+import { Task } from "../../base/task/task";
+import { TaskPrompt } from "../../base/task/task-prompt";
 
 interface ActivePromptResult {
     task: Task | null;
@@ -9,7 +9,7 @@ interface ActivePromptResult {
 }
 
 const getFirstPendingPrompt = (tasks: Task[]): ActivePromptResult => {
-    const task = tasks.find(t => t.getPrompt().isPendingUserInput()) || null;
+    const task = tasks.find((t) => t.getPrompt().isPendingUserInput()) || null;
     return {
         task,
         prompt: task?.getPrompt() || null,
@@ -25,16 +25,15 @@ export const useActivePrompt = (tasks: Task[]): ActivePromptResult => {
 
     useEffect(() => {
         const updateActivePrompt = () => {
-            setActivePrompt(prev => {
+            setActivePrompt((prev) => {
                 // Only change the active prompt if there is no current active prompt
-                if (!prev.task?.getPrompt().getCurrentPrompt())
-                    return getFirstPendingPrompt(tasks);
+                if (!prev.task?.getPrompt().getCurrentPrompt()) return getFirstPendingPrompt(tasks);
                 return prev;
             });
         };
 
         // Subscribe to all tasks
-        const unsubscribers = tasks.map(task =>
+        const unsubscribers = tasks.map((task) =>
             task.subscribe(() => {
                 updateActivePrompt();
             })
@@ -45,7 +44,7 @@ export const useActivePrompt = (tasks: Task[]): ActivePromptResult => {
 
         // Cleanup: unsubscribe from all tasks
         return () => {
-            unsubscribers.forEach(unsubscribe => unsubscribe());
+            unsubscribers.forEach((unsubscribe) => unsubscribe());
         };
     }, [tasks]); // Re-subscribe when tasks array changes
 

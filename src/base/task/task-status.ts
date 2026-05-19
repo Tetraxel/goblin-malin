@@ -1,4 +1,3 @@
-
 export enum StatusType {
     Default = "default",
     Processing = "processing",
@@ -8,7 +7,7 @@ export enum StatusType {
     Skipped = "skipped",
     Error = "error",
     Success = "success",
-    NoStatus = "noStatus"
+    NoStatus = "noStatus",
 }
 
 export interface StatusAttributes {
@@ -90,8 +89,6 @@ export class TaskStatus {
     }
 
     private notifySubscribers(): void {
-        this.subscribers.forEach(callback =>
-            callback(this.get())
-        );
+        this.subscribers.forEach((callback) => callback(this.get()));
     }
 }

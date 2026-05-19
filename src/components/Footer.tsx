@@ -6,45 +6,41 @@ import { LogMetadata } from "../base/logger/types";
 import { useTheme } from "../base/themeContext";
 
 export const Footer: React.FC = () => {
-  const theme = useTheme();
-  const { focusState } = useFocusContext();
-  const height = focusState.footer.height;
-  const subTab = focusState.secondaryPanel.subTab;
-  const [lastLog, setLastLog] = useState<LogMetadata | null>(null);
-  const [logCount, setLogCount] = useState(0);
+    const theme = useTheme();
+    const { focusState } = useFocusContext();
+    const height = focusState.footer.height;
+    const subTab = focusState.secondaryPanel.subTab;
+    const [lastLog, setLastLog] = useState<LogMetadata | null>(null);
+    const [logCount, setLogCount] = useState(0);
 
-  useEffect(() => {
-    const unsubscribe = inkTransport.subscribe((logs) => {
-      if (logs.length > 0) {
-        setLastLog(logs[logs.length - 1] as LogMetadata);
-        setLogCount((prev) => prev + logs.length);
-      }
-    });
-    return unsubscribe;
-  }, []);
+    useEffect(() => {
+        const unsubscribe = inkTransport.subscribe((logs) => {
+            if (logs.length > 0) {
+                setLastLog(logs[logs.length - 1] as LogMetadata);
+                setLogCount((prev) => prev + logs.length);
+            }
+        });
+        return unsubscribe;
+    }, []);
 
-  const logText = lastLog
-    ? `[${lastLog.level?.toUpperCase() ?? "LOG"}] ${lastLog.message}`
-    : "";
+    const logText = lastLog ? `[${lastLog.level?.toUpperCase() ?? "LOG"}] ${lastLog.message}` : "";
 
-  const countSuffix = `${logCount} logs • `;
+    const countSuffix = `${logCount} logs • `;
 
-  return (
-    <Box
-      borderStyle="single"
-      borderColor={theme.ui.border}
-      borderBackgroundColor={theme.ui.background}
-      paddingX={1}
-      borderTop={false}
-      overflow="hidden"
-      height={height}
-    >
-      <Text color={theme.text.secondary}>
-        {subTab === "logs" && (
-          <Text color={theme.ui.border}>{countSuffix}</Text>
-        )}
-        <Text>{logText}</Text>
-      </Text>
-    </Box>
-  );
+    return (
+        <Box
+            borderStyle="single"
+            borderColor={theme.ui.border}
+            borderBackgroundColor={theme.ui.background}
+            paddingX={1}
+            borderTop={false}
+            overflow="hidden"
+            height={height}
+        >
+            <Text color={theme.text.secondary}>
+                {subTab === "logs" && <Text color={theme.ui.border}>{countSuffix}</Text>}
+                <Text>{logText}</Text>
+            </Text>
+        </Box>
+    );
 };

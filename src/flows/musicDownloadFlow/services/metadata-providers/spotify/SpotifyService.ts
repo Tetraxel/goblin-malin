@@ -1,15 +1,15 @@
 import { SpotifyApi, Track } from "@spotify/web-api-ts-sdk";
-import { MetadataService } from '../../../metadataService';
-import { ProviderDisplay } from '../../../../../base/providerDisplay';
-import { ProviderSettingsSchema } from '../../../../../base/providerSettings';
-import { SetupWizardConfig } from '../../../../../base/setupWizard';
-import { ParsedUrl } from '../../../../../base/urlParser';
-import { Cached } from '../../../../../utils/cache';
+import { MetadataService } from "../../../metadataService";
+import { ProviderDisplay } from "../../../../../base/providerDisplay";
+import { ProviderSettingsSchema } from "../../../../../base/providerSettings";
+import { SetupWizardConfig } from "../../../../../base/setupWizard";
+import { ParsedUrl } from "../../../../../base/urlParser";
+import { Cached } from "../../../../../utils/cache";
 import { Logger } from "../../../../../base/logger/logger";
 import { StatusType } from "../../../../../base/task/task-status";
 import { StandardTrack, TrackMetadata, TrackUri } from "../../../types";
 import { DownloadTask } from "../../../utils/downloadTask";
-import { SpotifyCell } from './SpotifyCell';
+import { SpotifyCell } from "./SpotifyCell";
 
 export type SpotifyTokenResponse = {
     access_token: string;
@@ -28,7 +28,7 @@ export type SpotifyArtistSimple = {
 
 export type SpotifyAlbumSimple = {
     id: string;
-    album_type: 'album' | 'single' | 'compilation';
+    album_type: "album" | "single" | "compilation";
     name: string;
     release_date: string;
     artists: SpotifyArtistSimple[];
@@ -72,36 +72,40 @@ export class SpotifyService extends MetadataService {
         acronym: "SPOTIFY",
         color: "#1ed760",
         colorSubtle: "#156b30",
-        colorBright: "#1db954"
+        colorBright: "#1db954",
     };
     static readonly defaultSettings: ProviderSettingsSchema = {
-        enabled: { label: 'Enable', defaultValue: true, kind: 'checkbox' },
+        enabled: { label: "Enable", defaultValue: true, kind: "checkbox" },
     };
     static readonly setupWizard: SetupWizardConfig = {
-        title: '⚙  Spotify Setup Wizard',
-        providerKey: 'spotify',
-        envSection: { name: 'SPOTIFY', url: 'https://developer.spotify.com/dashboard' },
+        title: "⚙  Spotify Setup Wizard",
+        providerKey: "spotify",
+        envSection: { name: "SPOTIFY", url: "https://developer.spotify.com/dashboard" },
         description: [
             {
-                type: 'note',
-                text: 'You need a Premium Spotify Account to access the Spotify API.',
+                type: "note",
+                text: "You need a Premium Spotify Account to access the Spotify API.",
             },
             {
-                type: 'paragraph',
-                text: 'Steps to setup Spotify API access:',
+                type: "paragraph",
+                text: "Steps to setup Spotify API access:",
             },
             {
-                type: 'orderedList',
+                type: "orderedList",
                 items: [
-                    { type: 'link', text: 'Log in to the Spotify Developer Dashboard', url: 'https://developer.spotify.com/dashboard' },
-                    { type: 'text', text: 'Click "Create app"' },
-                    { type: 'text', text: 'Copy the CLIENT_ID and CLIENT_SECRET from the app page' },
+                    {
+                        type: "link",
+                        text: "Log in to the Spotify Developer Dashboard",
+                        url: "https://developer.spotify.com/dashboard",
+                    },
+                    { type: "text", text: 'Click "Create app"' },
+                    { type: "text", text: "Copy the CLIENT_ID and CLIENT_SECRET from the app page" },
                 ],
             },
         ],
         fields: [
-            { envVar: 'SPOTIFY_CLIENT_ID', label: 'CLIENT_ID', hint: 'e.g. b94c59cdcd…' },
-            { envVar: 'SPOTIFY_CLIENT_SECRET', label: 'CLIENT_SECRET', hint: 'e.g. fa5a8a70ab…' },
+            { envVar: "SPOTIFY_CLIENT_ID", label: "CLIENT_ID", hint: "e.g. b94c59cdcd…" },
+            { envVar: "SPOTIFY_CLIENT_SECRET", label: "CLIENT_SECRET", hint: "e.g. fa5a8a70ab…" },
         ],
     };
     static readonly cellComponent = SpotifyCell;
@@ -109,16 +113,16 @@ export class SpotifyService extends MetadataService {
     private static client: SpotifyApi;
 
     constructor(task: DownloadTask, logger: Logger) {
-        super('SpotifyService', task, logger)
+        super("SpotifyService", task, logger);
     }
 
     private async getClient(): Promise<SpotifyApi> {
-        return this.runExclusive('init', async () => {
+        return this.runExclusive("init", async () => {
             if (!SpotifyService.client) {
                 const vars = await this.env.getVariablesWithWizard(SpotifyService.setupWizard);
                 SpotifyService.client = SpotifyApi.withClientCredentials(
-                    vars['SPOTIFY_CLIENT_ID'],
-                    vars['SPOTIFY_CLIENT_SECRET'],
+                    vars["SPOTIFY_CLIENT_ID"],
+                    vars["SPOTIFY_CLIENT_SECRET"]
                 );
             }
             return SpotifyService.client;
@@ -132,15 +136,11 @@ export class SpotifyService extends MetadataService {
      * @returns The track data or null on failure.
      */
     @Cached()
-    async getTrackInfo(
-        trackId: string
-    ): Promise<Track | null> {
-        const client = await this.getClient()
+    async getTrackInfo(trackId: string): Promise<Track | null> {
+        const client = await this.getClient();
 
         try {
-            this.logger.info(
-                `Get track info: "${trackId}"…`
-            );
+            this.logger.info(`Get track info: "${trackId}"…`);
             this.status.set({
                 type: StatusType.Processing,
                 message: "Get spotify track info",
@@ -158,7 +158,7 @@ export class SpotifyService extends MetadataService {
                 type: StatusType.Error,
                 message: "Error fetching Spotify track info",
             });
-            throw error
+            throw error;
         }
     }
 
@@ -178,38 +178,42 @@ export class SpotifyService extends MetadataService {
                 albumName: spotifyTrack.album.name,
                 totalTracks: spotifyTrack.album.total_tracks,
                 releaseDate: spotifyTrack.album.release_date,
-                url: spotifyTrack.album.external_urls?.spotify || '',
+                url: spotifyTrack.album.external_urls?.spotify || "",
                 uri: spotifyTrack.album.uri || `spotify:album:${spotifyTrack.album.id}`,
-                artists: spotifyTrack.album.artists.map(artist => ({
+                artists: spotifyTrack.album.artists.map((artist) => ({
                     id: artist.id,
-                    type: 'artist' as const,
+                    type: "artist" as const,
                     name: artist.name,
                     url: artist.external_urls?.spotify,
-                    uri: artist.uri || `spotify:artist:${artist.id}`
-                }))
+                    uri: artist.uri || `spotify:artist:${artist.id}`,
+                })),
             },
-            artists: spotifyTrack.artists.map(artist => ({
+            artists: spotifyTrack.artists.map((artist) => ({
                 id: artist.id,
-                type: 'artist' as const,
+                type: "artist" as const,
                 name: artist.name,
                 url: artist.external_urls?.spotify,
-                uri: artist.uri || `spotify:artist:${artist.id}`
-            }))
+                uri: artist.uri || `spotify:artist:${artist.id}`,
+            })),
         };
     }
 
     static parseUrl(url: string): ParsedUrl | null {
         let parsed: URL;
-        try { parsed = new URL(url); } catch { return null; }
-        const host = parsed.hostname.replace(/^www\./, '');
-        if (host !== 'open.spotify.com' && !host.endsWith('.spotify.com')) return null;
+        try {
+            parsed = new URL(url);
+        } catch {
+            return null;
+        }
+        const host = parsed.hostname.replace(/^www\./, "");
+        if (host !== "open.spotify.com" && !host.endsWith(".spotify.com")) return null;
         const path = parsed.pathname;
         const trackMatch = path.match(/\/(?:intl-[a-z]{2}\/)?track\/([a-zA-Z0-9]+)/);
-        if (trackMatch) return { platform: 'spotify', type: 'track', id: trackMatch[1] };
+        if (trackMatch) return { platform: "spotify", type: "track", id: trackMatch[1] };
         const albumMatch = path.match(/\/album\/([a-zA-Z0-9]+)/);
-        if (albumMatch) return { platform: 'spotify', type: 'album', id: albumMatch[1] };
+        if (albumMatch) return { platform: "spotify", type: "album", id: albumMatch[1] };
         const playlistMatch = path.match(/\/playlist\/([a-zA-Z0-9]+)/);
-        if (playlistMatch) return { platform: 'spotify', type: 'playlist', id: playlistMatch[1] };
+        if (playlistMatch) return { platform: "spotify", type: "playlist", id: playlistMatch[1] };
         return null;
     }
 
@@ -229,12 +233,12 @@ export class SpotifyService extends MetadataService {
 
         const metadata: TrackMetadata = {
             ...standardTrack,
-            platform: 'spotify',
-            apiProvider: 'spotify',
-            uri: `SPOTIFY::TRACK::${spotifyTrack.id}` as TrackUri<'spotify'>,
+            platform: "spotify",
+            apiProvider: "spotify",
+            uri: `SPOTIFY::TRACK::${spotifyTrack.id}` as TrackUri<"spotify">,
 
             fetchedAt: new Date(),
-            type: 'track',
+            type: "track",
         };
 
         return metadata;
@@ -247,12 +251,12 @@ export class SpotifyService extends MetadataService {
         const trackName = sourceTrackMetadata.trackName;
 
         if (!artist || !trackName) {
-            throw new Error('Artist name and track name are required for search');
+            throw new Error("Artist name and track name are required for search");
         }
 
         this.status.set({
             type: StatusType.Processing,
-            message: 'Searching Spotify',
+            message: "Searching Spotify",
             timeTracking: true,
             progress: 0,
         });
@@ -260,13 +264,12 @@ export class SpotifyService extends MetadataService {
         try {
             let query = `${trackName} artist:${artist}`;
 
-            if (sourceTrackMetadata.isrc)
-                query = query.concat(` isrc:${sourceTrackMetadata.isrc}`)
+            if (sourceTrackMetadata.isrc) query = query.concat(` isrc:${sourceTrackMetadata.isrc}`);
 
             const searchResults = await client.search(
                 query,
-                ['track'],
-                'FR', // TODO: make country code configurable
+                ["track"],
+                "FR", // TODO: make country code configurable
                 1
             );
 
@@ -275,17 +278,17 @@ export class SpotifyService extends MetadataService {
             }
 
             const spotifyTrack = searchResults.tracks.items[0];
-            const spotifyUrl = spotifyTrack.external_urls?.spotify || '';
+            const spotifyUrl = spotifyTrack.external_urls?.spotify || "";
             const standardTrack = this.convertSpotifyTrack(spotifyTrack, spotifyUrl);
 
             const metadata: TrackMetadata = {
                 ...standardTrack,
-                platform: 'spotify',
-                apiProvider: 'spotify',
-                uri: `SPOTIFY::TRACK::${spotifyTrack.id}` as TrackUri<'spotify'>,
+                platform: "spotify",
+                apiProvider: "spotify",
+                uri: `SPOTIFY::TRACK::${spotifyTrack.id}` as TrackUri<"spotify">,
 
                 fetchedAt: new Date(),
-                type: 'track',
+                type: "track",
             };
 
             this.status.clear();
@@ -294,7 +297,7 @@ export class SpotifyService extends MetadataService {
             this.logger.error(`Error searching Spotify for: ${sourceTrackMetadata.trackName}`, { error });
             this.status.set({
                 type: StatusType.Error,
-                message: 'Error searching Spotify',
+                message: "Error searching Spotify",
             });
             throw error;
         }

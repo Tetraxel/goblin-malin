@@ -21,25 +21,23 @@ export class Env {
         options: {
             defaultValue?: string;
             description?: string;
-            hint?: string
+            hint?: string;
         } = {}
     ): Promise<string> {
         try {
-            const value = process.env[key]
+            const value = process.env[key];
             if (value === undefined) {
                 throw new EnvironmentError(key);
             }
             return value;
         } catch {
-            const value = await this.task.getPrompt().askInput(
-                {
-                    status: `Missing env key ${key}`,
-                    title: `Missing environment variable '${key}'`,
-                    message: (options?.description ? `${options?.description}\n\n` : "") + "Please provide a value:",
-                    defaultValue: options.defaultValue,
-                    hint: options.hint ? options.hint : "Enter value…",
-                }
-            );
+            const value = await this.task.getPrompt().askInput({
+                status: `Missing env key ${key}`,
+                title: `Missing environment variable '${key}'`,
+                message: (options?.description ? `${options?.description}\n\n` : "") + "Please provide a value:",
+                defaultValue: options.defaultValue,
+                hint: options.hint ? options.hint : "Enter value…",
+            });
 
             await this.saveToEnvFile(key, value);
             process.env[key] = value;
@@ -48,17 +46,12 @@ export class Env {
         }
     }
 
-
-    public async getVariablesWithWizard(
-        config: SetupWizardConfig,
-    ): Promise<Record<string, string>> {
-        const missing = config.fields.filter(f => !process.env[f.envVar]);
+    public async getVariablesWithWizard(config: SetupWizardConfig): Promise<Record<string, string>> {
+        const missing = config.fields.filter((f) => !process.env[f.envVar]);
 
         if (missing.length > 0) {
             const values = await this.task.getPrompt().askSetupWizard(config);
-            const nonEmpty = Object.fromEntries(
-                Object.entries(values).filter(([, v]) => v.trim()),
-            );
+            const nonEmpty = Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim()));
             try {
                 if (config.envSection && Object.keys(nonEmpty).length > 0) {
                     await saveEnvVarsGroup(nonEmpty, config.envSection);
@@ -78,9 +71,7 @@ export class Env {
             return values;
         }
 
-        return Object.fromEntries(
-            config.fields.map(f => [f.envVar, process.env[f.envVar]!]),
-        );
+        return Object.fromEntries(config.fields.map((f) => [f.envVar, process.env[f.envVar]!]));
     }
 
     private async saveToEnvFile(key: string, value: string): Promise<void> {

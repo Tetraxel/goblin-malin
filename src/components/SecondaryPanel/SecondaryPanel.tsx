@@ -9,58 +9,42 @@ import { Task } from "../../base/task/task";
 import { FlowBase } from "../../base/flow/flow-base";
 
 interface SecondaryPanelProps {
-  tasks: Task[];
-  width: number;
-  flow: FlowBase | undefined;
+    tasks: Task[];
+    width: number;
+    flow: FlowBase | undefined;
 }
 
-export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({
-  tasks,
-  width,
-}) => {
-  const { focusState } = useFocusContext();
-  const { primaryMode, subTab } = focusState.secondaryPanel;
-  const height = focusState.layout.secondaryPanelHeight;
-  const contentHeight = Math.max(1, height - 1);
+export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) => {
+    const { focusState } = useFocusContext();
+    const { primaryMode, subTab } = focusState.secondaryPanel;
+    const height = focusState.layout.secondaryPanelHeight;
+    const contentHeight = Math.max(1, height - 1);
 
-  const selectedTask = tasks[focusState.taskList.selectedTaskIndex] ?? null;
+    const selectedTask = tasks[focusState.taskList.selectedTaskIndex] ?? null;
 
-  return (
-    <Box flexDirection="column" height={height} overflow="hidden">
-      <TabBar
-        width={width}
-        tabs={[
-          {
-            key: "3",
-            label:
-              primaryMode === "metadata"
-                ? "Metadata Sources"
-                : "Download Sources",
-          },
-          { key: "5", label: "Logs" },
-        ]}
-        activeTabKey={subTab === "sources" ? "3" : "5"}
-      />
+    return (
+        <Box flexDirection="column" height={height} overflow="hidden">
+            <TabBar
+                width={width}
+                tabs={[
+                    {
+                        key: "3",
+                        label: primaryMode === "metadata" ? "Metadata Sources" : "Download Sources",
+                    },
+                    { key: "5", label: "Logs" },
+                ]}
+                activeTabKey={subTab === "sources" ? "3" : "5"}
+            />
 
-      {subTab === "sources" && primaryMode === "metadata" && (
-        <MetadataPanel
-          selectedTask={selectedTask}
-          width={width}
-          height={contentHeight}
-        />
-      )}
+            {subTab === "sources" && primaryMode === "metadata" && (
+                <MetadataPanel selectedTask={selectedTask} width={width} height={contentHeight} />
+            )}
 
-      {subTab === "sources" && primaryMode === "download" && (
-        <DownloadPanel
-          selectedTask={selectedTask}
-          width={width}
-          height={contentHeight}
-        />
-      )}
+            {subTab === "sources" && primaryMode === "download" && (
+                <DownloadPanel selectedTask={selectedTask} width={width} height={contentHeight} />
+            )}
 
-      {subTab === "logs" && (
-        <LogPanel tasks={tasks} height={contentHeight} />
-      )}
-    </Box>
-  );
+            {subTab === "logs" && <LogPanel tasks={tasks} height={contentHeight} />}
+        </Box>
+    );
 };

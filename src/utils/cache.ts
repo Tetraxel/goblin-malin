@@ -1,8 +1,8 @@
-import { AsyncLocalStorage } from 'async_hooks';
-import { create } from 'flat-cache';
-import * as fs from 'fs';
-import { globalLogger } from '../base/logger/logger';
-import { getCacheDir } from './appPaths';
+import { AsyncLocalStorage } from "async_hooks";
+import { create } from "flat-cache";
+import * as fs from "fs";
+import { globalLogger } from "../base/logger/logger";
+import { getCacheDir } from "./appPaths";
 
 const skipCacheStorage = new AsyncLocalStorage<boolean>();
 
@@ -11,7 +11,7 @@ export function withSkipCache<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 // Global cache instance — path captured once at startup, consistent with clearCache
-const CACHE_ID = 'api-cache'
+const CACHE_ID = "api-cache";
 const cacheDir = getCacheDir();
 export const cache = create({
     cacheId: CACHE_ID,
@@ -31,11 +31,10 @@ export function clearCache(): void {
     cache.clear();
     try {
         fs.rmSync(cacheDir, { recursive: true, force: true });
-    }
-    catch {
+    } catch {
         /* empty */
     }
-    globalLogger.info('Cache cleared');
+    globalLogger.info("Cache cleared");
 }
 
 export function runWithoutCache<T>(fn: () => Promise<T>): Promise<T> {
@@ -49,11 +48,7 @@ interface CacheOptions {
 
 // Method decorator to handle both @Cached and @Cached()
 export function Cached(options: CacheOptions = {}) {
-    return function (
-        target: object,
-        propertyKey: string,
-        descriptor: PropertyDescriptor
-    ): PropertyDescriptor {
+    return function (target: object, propertyKey: string, descriptor: PropertyDescriptor): PropertyDescriptor {
         const originalMethod = descriptor.value;
         const className = target.constructor.name;
 
@@ -76,11 +71,11 @@ export function Cached(options: CacheOptions = {}) {
 
             // Call original method and cache result
             const result = await originalMethod.apply(this, args);
-            globalLogger.debug(`Cache saved for "${cacheKey}"`)
+            globalLogger.debug(`Cache saved for "${cacheKey}"`);
             cache.set(cacheKey, result, options.ttl);
 
             if (result === undefined || result === null || result === "")
-                globalLogger.warn(`Cached a value "${result}" that may be an error case`)
+                globalLogger.warn(`Cached a value "${result}" that may be an error case`);
 
             return result;
         };

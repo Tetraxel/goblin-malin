@@ -1,8 +1,8 @@
-import { ServiceBase } from '../../base/service-base';
-import { Logger } from '../../base/logger/logger';
-import { TrackMetadata } from './types';
-import { DownloadTask } from './utils/downloadTask';
-import { ParsedUrl } from '../../base/urlParser';
+import { ServiceBase } from "../../base/service-base";
+import { Logger } from "../../base/logger/logger";
+import { TrackMetadata } from "./types";
+import { DownloadTask } from "./utils/downloadTask";
+import { ParsedUrl } from "../../base/urlParser";
 
 /**
  * Abstract base class for metadata providers.
@@ -14,11 +14,11 @@ export abstract class MetadataService extends ServiceBase {
     }
 
     static parseUrl(_url: string): ParsedUrl | null {
-        throw new Error('Method not implemented!');
+        throw new Error("Method not implemented!");
     }
 
-    getType(url: string): 'track' | undefined {
-        return (this.constructor as typeof MetadataService).parseUrl?.(url)?.type === 'track' ? 'track' : undefined;
+    getType(url: string): "track" | undefined {
+        return (this.constructor as typeof MetadataService).parseUrl?.(url)?.type === "track" ? "track" : undefined;
     }
 
     abstract getTrackMetadata(url: string): Promise<TrackMetadata>;

@@ -1,57 +1,57 @@
-import path from 'path';
-import { getCacheDir } from '../../../../utils/appPaths';
-import { globalLogger } from '../../../../base/logger/logger';
-import { loadJsonFile, saveJsonFile } from '../metadata-providers/songlink/json';
-import { sleep } from '../../../../utils/sleep';
+import path from "path";
+import { getCacheDir } from "../../../../utils/appPaths";
+import { globalLogger } from "../../../../base/logger/logger";
+import { loadJsonFile, saveJsonFile } from "../metadata-providers/songlink/json";
+import { sleep } from "../../../../utils/sleep";
 
 const SONGLINK_API_BASE_URL = "https://api.song.link/v1-alpha.1/links";
-const SONGLINK_RATE_PATH = path.join(getCacheDir(), 'songlink_rate.json');
+const SONGLINK_RATE_PATH = path.join(getCacheDir(), "songlink_rate.json");
 const SONGLINK_RATE_LIMIT = 10; // requests
 const SONGLINK_RATE_WINDOW_MS = 60_000; // per 60 seconds
 
 // All possible platform identifiers
 export type Platform =
-    | 'spotify'
-    | 'itunes'
-    | 'appleMusic'
-    | 'youtube'
-    | 'youtubeMusic'
-    | 'google'
-    | 'googleStore'
-    | 'pandora'
-    | 'deezer'
-    | 'tidal'
-    | 'amazonStore'
-    | 'amazonMusic'
-    | 'soundcloud'
-    | 'napster'
-    | 'yandex'
-    | 'spinrilla'
-    | 'audius'
-    | 'audiomack'
-    | 'anghami'
-    | 'boomplay'
-    | 'bandcamp';
+    | "spotify"
+    | "itunes"
+    | "appleMusic"
+    | "youtube"
+    | "youtubeMusic"
+    | "google"
+    | "googleStore"
+    | "pandora"
+    | "deezer"
+    | "tidal"
+    | "amazonStore"
+    | "amazonMusic"
+    | "soundcloud"
+    | "napster"
+    | "yandex"
+    | "spinrilla"
+    | "audius"
+    | "audiomack"
+    | "anghami"
+    | "boomplay"
+    | "bandcamp";
 
 // All possible API provider identifiers
 export type APIProvider =
-    | 'spotify'
-    | 'itunes'
-    | 'youtube'
-    | 'google'
-    | 'pandora'
-    | 'deezer'
-    | 'tidal'
-    | 'amazon'
-    | 'soundcloud'
-    | 'napster'
-    | 'yandex'
-    | 'spinrilla'
-    | 'audius'
-    | 'audiomack'
-    | 'anghami'
-    | 'boomplay'
-    | 'bandcamp';
+    | "spotify"
+    | "itunes"
+    | "youtube"
+    | "google"
+    | "pandora"
+    | "deezer"
+    | "tidal"
+    | "amazon"
+    | "soundcloud"
+    | "napster"
+    | "yandex"
+    | "spinrilla"
+    | "audius"
+    | "audiomack"
+    | "anghami"
+    | "boomplay"
+    | "bandcamp";
 
 // Describes a single link object within linksByPlatform
 export type PlatformLink = {
@@ -65,7 +65,7 @@ export type PlatformLink = {
 // Describes a single entity object within entitiesByUniqueId
 export type Entity = {
     id: string;
-    type: 'song' | 'album';
+    type: "song" | "album";
     title?: string;
     artistName?: string;
     thumbnailUrl?: string;
@@ -74,7 +74,6 @@ export type Entity = {
     apiProvider: APIProvider;
     platforms: Platform[];
 };
-
 
 // The main structure of the JSON response from the API
 // Source: https://linktree.notion.site/API-d0ebe08a5e304a55928405eb682f6741
@@ -86,14 +85,13 @@ export type SonglinkResponse = {
     entitiesByUniqueId: Record<string, Entity>;
 };
 
-
 /**
  * Handles raw API communication with the Song.link API.
  * This class is responsible for managing the base URL and
  * enforcing rate limits centrally.
  */
 export class SonglinkClient {
-    constructor() { }
+    constructor() {}
 
     /**
      * Performs a GET request to the Song.link API, automatically handling rate limits.
@@ -115,10 +113,11 @@ export class SonglinkClient {
             }
 
             // 3. Parse and return data
-            return await response.json() as SonglinkResponse;
-
+            return (await response.json()) as SonglinkResponse;
         } catch (error) {
-            globalLogger.error('SonglinkClient failed to fetch data:', { error: error instanceof Error ? error.message : error });
+            globalLogger.error("SonglinkClient failed to fetch data:", {
+                error: error instanceof Error ? error.message : error,
+            });
             return null;
         }
     }
@@ -132,7 +131,7 @@ export class SonglinkClient {
         let rateLog: number[] = await loadJsonFile<number[]>(SONGLINK_RATE_PATH, []);
 
         // Filter out timestamps older than the window
-        rateLog = rateLog.filter(ts => now - ts < SONGLINK_RATE_WINDOW_MS);
+        rateLog = rateLog.filter((ts) => now - ts < SONGLINK_RATE_WINDOW_MS);
 
         if (rateLog.length >= SONGLINK_RATE_LIMIT) {
             const oldest = rateLog[0];
@@ -142,7 +141,7 @@ export class SonglinkClient {
 
             // Re-filter log after waiting
             const now2 = Date.now();
-            rateLog = rateLog.filter(ts => now2 - ts < SONGLINK_RATE_WINDOW_MS);
+            rateLog = rateLog.filter((ts) => now2 - ts < SONGLINK_RATE_WINDOW_MS);
         }
 
         // Log the new request timestamp and save

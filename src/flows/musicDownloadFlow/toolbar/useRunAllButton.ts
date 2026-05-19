@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react';
-import { ToolbarButtonHook } from '../../../components/Toolbar/Toolbar';
-import { FlowBase } from '../../../base/flow/flow-base';
-import { FlowOrchestrator } from '../../../base/flow/flow-orchestrator';
-import { Task } from '../../../base/task/task';
-import { useTheme } from '../../../base/themeContext';
+import { useEffect, useState } from "react";
+import { ToolbarButtonHook } from "../../../components/Toolbar/Toolbar";
+import { FlowBase } from "../../../base/flow/flow-base";
+import { FlowOrchestrator } from "../../../base/flow/flow-orchestrator";
+import { Task } from "../../../base/task/task";
+import { useTheme } from "../../../base/themeContext";
 
-export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({ flow, orchestrator }: {
-    isSelected: boolean,
-    flow: FlowBase,
-    orchestrator: FlowOrchestrator,
+export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({
+    flow,
+    orchestrator,
+}: {
+    isSelected: boolean;
+    flow: FlowBase;
+    orchestrator: FlowOrchestrator;
 }) => {
     const theme = useTheme();
     const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
@@ -16,12 +19,12 @@ export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({ flow, orchestrato
 
     useEffect(() => {
         const unsubscribe = orchestrator.subscribe((orchestrator) => {
-            const tasks = orchestrator.getTasks()
+            const tasks = orchestrator
+                .getTasks()
                 .filter((task) => flow.id === task.getFlowId() && task.finishedAt === undefined);
             setPendingTasks(tasks);
 
-            if (isProcessing && tasks.length === 0)
-                setIsProcessing(false);
+            if (isProcessing && tasks.length === 0) setIsProcessing(false);
         });
 
         return unsubscribe;
@@ -36,7 +39,7 @@ export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({ flow, orchestrato
             enabled: true,
         };
 
-    const taskLabel = pendingTasks.length === 1 ? 'task' : `${pendingTasks.length} tasks`;
+    const taskLabel = pendingTasks.length === 1 ? "task" : `${pendingTasks.length} tasks`;
 
     if (isProcessing)
         return {
@@ -53,6 +56,9 @@ export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({ flow, orchestrato
         color: theme.status.success,
         bold: true,
         enabled: true,
-        onPress: () => { flow.runAll(); setIsProcessing(true); },
+        onPress: () => {
+            flow.runAll();
+            setIsProcessing(true);
+        },
     };
 };

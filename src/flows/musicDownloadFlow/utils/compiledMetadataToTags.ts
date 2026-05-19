@@ -1,14 +1,11 @@
-import { CompiledMetadata } from './compiledMetadata';
-import { Metadata } from '../../../utils/metadata';
+import { CompiledMetadata } from "./compiledMetadata";
+import { Metadata } from "../../../utils/metadata";
 
 export interface TagOptions {
     includeMusicBrainzTags: boolean;
 }
 
-export function compiledMetadataToTags(
-    compiled: CompiledMetadata,
-    options: TagOptions,
-): Metadata {
+export function compiledMetadataToTags(compiled: CompiledMetadata, options: TagOptions): Metadata {
     return {
         trackTitle: compiled.trackName,
         artists: compiled.artists.map((a) => a.name),
@@ -22,11 +19,11 @@ export function compiledMetadataToTags(
         key: compiled.key,
         ...(options.includeMusicBrainzTags
             ? {
-                musicBrainzTrackId: compiled.musicBrainzIds?.recording,
-                musicBrainzAlbumId: compiled.musicBrainzIds?.release,
-                musicBrainzArtistId: compiled.musicBrainzIds?.artist,
-                musicBrainzReleaseGroupId: compiled.musicBrainzIds?.releaseGroup,
-            }
+                  musicBrainzTrackId: compiled.musicBrainzIds?.recording,
+                  musicBrainzAlbumId: compiled.musicBrainzIds?.release,
+                  musicBrainzArtistId: compiled.musicBrainzIds?.artist,
+                  musicBrainzReleaseGroupId: compiled.musicBrainzIds?.releaseGroup,
+              }
             : {}),
     };
 }

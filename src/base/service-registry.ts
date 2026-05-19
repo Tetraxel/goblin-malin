@@ -7,11 +7,14 @@ import { ParsedUrl, urlParserRegistry } from "./urlParser";
 import { ProviderSettingsSchema } from "./providerSettings";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type ServiceFactory<TTask extends Task<any>, TService extends ServiceBase> = (task: TTask, logger: Logger) => TService;
+export type ServiceFactory<TTask extends Task<any>, TService extends ServiceBase> = (
+    task: TTask,
+    logger: Logger
+) => TService;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> = {
-    new(task: TTask, logger: Logger): TService;
+    new (task: TTask, logger: Logger): TService;
     display?: ProviderDisplay;
     parseUrl?: (url: string) => ParsedUrl | null;
     defaultSettings?: ProviderSettingsSchema;
@@ -36,8 +39,11 @@ export class ServiceRegistry<TTask extends Task<any> = Task, TService extends Se
         return this.constructors.get(name);
     }
 
-    public register(name: string, ctorOrFactory: ServiceConstructor<TTask, TService> | ServiceFactory<TTask, TService>): this {
-        if (typeof ctorOrFactory === 'function' && ctorOrFactory.prototype instanceof ServiceBase) {
+    public register(
+        name: string,
+        ctorOrFactory: ServiceConstructor<TTask, TService> | ServiceFactory<TTask, TService>
+    ): this {
+        if (typeof ctorOrFactory === "function" && ctorOrFactory.prototype instanceof ServiceBase) {
             // Class constructor path: derive factory, store constructor, auto-register display
             const ctor = ctorOrFactory as ServiceConstructor<TTask, TService>;
             this.factories.set(name, (task, logger) => new ctor(task, logger));
@@ -58,7 +64,11 @@ export class ServiceRegistry<TTask extends Task<any> = Task, TService extends Se
     }
 
     // Each service will call createScope to get a scope specific to the task, ensuring services are instantiated once per task but with different loggers
-    public createScope(task: TTask, logger: Logger, isEnabled?: (name: string) => boolean): ServiceScope<TTask, TService> {
+    public createScope(
+        task: TTask,
+        logger: Logger,
+        isEnabled?: (name: string) => boolean
+    ): ServiceScope<TTask, TService> {
         return new ServiceScope<TTask, TService>(this.factories, task, logger, isEnabled);
     }
 }

@@ -1,4 +1,4 @@
-declare module 'flac-tagger' {
+declare module "flac-tagger" {
     export type FlacTagMap = Record<string, string[] | string>;
 
     export interface FlacTags {
