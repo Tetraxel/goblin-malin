@@ -1,10 +1,10 @@
-import React from "react";
+﻿import React from "react";
 import { useInput } from "ink";
-import { useFocusContext } from "../contexts/FocusContext";
-import { useToolbarKeyHandler, useTaskListKeyHandler, usePromptKeyHandler, KeyHandler } from "../hooks/useKeyHandlers";
-import { FlowBase } from "../base/flow/flow-base";
-import { Task } from "../base/task/task";
-import { FocusableWindow } from "../hooks/useFocusManager";
+import { useFocusContext } from "#contexts/FocusContext";
+import { useToolbarKeyHandler, useTaskListKeyHandler, usePromptKeyHandler, KeyHandler } from "#hooks/useKeyHandlers";
+import { FlowBase } from "#base/flow/flow-base";
+import { Task } from "#base/task/task";
+import { FocusableWindow } from "#hooks/useFocusManager";
 
 export const InputRouter: React.FC<{
     tasks: Task[];

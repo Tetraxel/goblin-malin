@@ -1,12 +1,12 @@
-import React, { useMemo } from "react";
+﻿import React, { useMemo } from "react";
 import { Box, Text } from "ink";
-import { TaskRow } from "./TaskRow";
-import { Task, TaskSnapshot } from "../../base/task/task";
-import { useFocusContext } from "../../contexts/FocusContext";
-import { FlowBase } from "../../base/flow/flow-base";
-import { Shortcut, ContextualActions, ContextualActionBar } from "../../types/actions";
-import { useTheme } from "../../base/themeContext";
+import { Task, TaskSnapshot } from "#base/task/task";
+import { FlowBase } from "#base/flow/flow-base";
+import { useTheme } from "#base/themeContext";
+import { useFocusContext } from "#contexts/FocusContext";
+import { Shortcut, ContextualActions, ContextualActionBar } from "#types/actions";
 import { ActionBar } from "./ActionBar";
+import { TaskRow } from "./TaskRow";
 
 export type { Shortcut, ContextualActions, ContextualActionBar };
 

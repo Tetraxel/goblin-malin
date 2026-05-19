@@ -1,17 +1,17 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { ToolbarButtonHook } from "./Toolbar/Toolbar";
 import { ColumnDefinition } from "./TaskListPanel/TaskListPanel";
-import { useScreenSize } from "../hooks/useScreenSize";
-import { FocusProvider } from "../contexts/FocusContext";
-import { ToolbarActionsProvider } from "../contexts/ToolbarActionsContext";
-import { ThemeProvider } from "../base/themeContext";
-import { MusicDownloadFlow } from "../flows/musicDownloadFlow/musicDownloadFlow";
-import { FlowOrchestrator } from "../base/flow/flow-orchestrator";
-import { Task, TaskAttributes } from "../base/task/task";
-import { MusicDownloadTaskAttributes } from "../flows/musicDownloadFlow/types";
-import { globalLogger } from "../base/logger/logger";
-import { getInstance } from "../utils/mpvPlayer";
-import { getAssetPath } from "../utils/appPaths";
+import { useScreenSize } from "#hooks/useScreenSize";
+import { FocusProvider } from "#contexts/FocusContext";
+import { ToolbarActionsProvider } from "#contexts/ToolbarActionsContext";
+import { ThemeProvider } from "#base/themeContext";
+import { MusicDownloadFlow } from "#flows/musicDownloadFlow/musicDownloadFlow";
+import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
+import { Task, TaskAttributes } from "#base/task/task";
+import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import { globalLogger } from "#base/logger/logger";
+import { getInstance } from "#utils/mpvPlayer";
+import { getAssetPath } from "#utils/appPaths";
 import { AppInner } from "./AppInner";
 
 export const App: React.FC = () => {

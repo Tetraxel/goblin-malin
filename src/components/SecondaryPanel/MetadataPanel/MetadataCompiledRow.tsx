@@ -1,7 +1,7 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Text } from "ink";
-import { CompiledMetadata } from "../../../flows/musicDownloadFlow/utils/compiledMetadata";
-import { useTheme } from "../../../base/themeContext";
+import { useTheme } from "#base/themeContext";
+import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 
 const COMPILED_PREFIX = "🏆 Compiled Metadata: ";
 

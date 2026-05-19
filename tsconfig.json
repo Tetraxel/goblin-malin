@@ -14,7 +14,29 @@
         "skipLibCheck": true, // Skip type checking of declaration files
         "ignoreDeprecations": "6.0",
         "types": ["node"],
-        "resolveJsonModule": true
+        "resolveJsonModule": true,
+        "paths": {
+            "#base": ["./src/base"],
+            "#base/*": ["./src/base/*"],
+            "#components": ["./src/components"],
+            "#components/*": ["./src/components/*"],
+            "#contexts": ["./src/contexts"],
+            "#contexts/*": ["./src/contexts/*"],
+            "#exceptions": ["./src/exceptions"],
+            "#exceptions/*": ["./src/exceptions/*"],
+            "#flows": ["./src/flows"],
+            "#flows/*": ["./src/flows/*"],
+            "#hooks": ["./src/hooks"],
+            "#hooks/*": ["./src/hooks/*"],
+            "#settings": ["./src/settings"],
+            "#settings/*": ["./src/settings/*"],
+            "#utils": ["./src/utils"],
+            "#utils/*": ["./src/utils/*"],
+            "#assets": ["./src/assets"],
+            "#assets/*": ["./src/assets/*"],
+            "#types": ["./src/types"],
+            "#types/*": ["./src/types/*"]
+        }
     },
     "include": ["src/**/*"], // Only compile files inside the 'src' folder
     "exclude": ["node_modules", "cache"]

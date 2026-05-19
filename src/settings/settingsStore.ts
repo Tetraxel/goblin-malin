@@ -1,10 +1,10 @@
-import * as fs from "fs";
+﻿import * as fs from "fs";
 import * as path from "path";
 import { EventEmitter } from "events";
 import { PROJECT_ROOT } from "../constants";
 import { AppSettings, DEFAULT_APP_SETTINGS } from "./appSettings";
-import { DeepPartial } from "../utils/types";
-import { deepMerge } from "../utils/deepMerge";
+import { DeepPartial } from "#utils/types";
+import { deepMerge } from "#utils/deepMerge";
 
 const CONFIG_DIR = path.join(PROJECT_ROOT, "config");
 const SETTINGS_PATH = path.join(CONFIG_DIR, "settings.json");

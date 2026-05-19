@@ -1,4 +1,4 @@
-import { SettingsStore } from "../../settings/settingsStore";
+﻿import { SettingsStore } from "#settings/settingsStore";
 
 export class FlowSettings<TSettings extends Record<string, unknown>> {
     constructor(

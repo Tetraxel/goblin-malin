@@ -1,11 +1,11 @@
-import {
+﻿import {
     Platform,
     MetadataSourceState,
     MetadataOverrides,
     TrackMetadata,
     StandardArtist,
     StandardAlbum,
-} from "../types";
+} from "#flows/musicDownloadFlow/types";
 
 export type FieldAttribution = Platform | "manual" | "none";
 

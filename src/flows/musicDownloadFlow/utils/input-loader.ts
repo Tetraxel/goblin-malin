@@ -1,8 +1,8 @@
-import * as path from "path";
+﻿import * as path from "path";
 import fs from "fs/promises";
 import { readFileSync } from "fs";
 import { PROJECT_ROOT } from "../../../constants";
-import { globalLogger } from "../../../base/logger/logger";
+import { globalLogger } from "#base/logger/logger";
 
 interface TrackInput {
     trackUrl: string;

@@ -1,7 +1,7 @@
-import { useInput } from "ink";
+﻿import { useInput } from "ink";
 import open from "open";
 import clipboard from "clipboardy";
-import { MetadataSourceState } from "../../../flows/musicDownloadFlow/types";
+import { MetadataSourceState } from "#flows/musicDownloadFlow/types";
 
 interface UseSourceListInputParams {
     sources: MetadataSourceState[];

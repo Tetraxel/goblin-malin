@@ -5,6 +5,27 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "imports": {
+    "#base": "./src/base/index.ts",
+    "#base/*": "./src/base/*.ts",
+    "#components": "./src/components/index.ts",
+    "#components/*": "./src/components/*.ts",
+    "#contexts": "./src/contexts/index.ts",
+    "#contexts/*": "./src/contexts/*.ts",
+    "#exceptions": "./src/exceptions/index.ts",
+    "#exceptions/*": "./src/exceptions/*.ts",
+    "#flows": "./src/flows/index.ts",
+    "#flows/*": "./src/flows/*.ts",
+    "#hooks": "./src/hooks/index.ts",
+    "#hooks/*": "./src/hooks/*.ts",
+    "#settings": "./src/settings/index.ts",
+    "#settings/*": "./src/settings/*.ts",
+    "#utils": "./src/utils/index.ts",
+    "#utils/*": "./src/utils/*.ts",
+    "#assets/*": "./src/assets/*",
+    "#types": "./src/types/index.ts",
+    "#types/*": "./src/types/*.ts"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
-import { useFocusContext } from "../contexts/FocusContext";
-import { inkTransport } from "../base/logger/ink-transport";
-import { LogMetadata } from "../base/logger/types";
-import { useTheme } from "../base/themeContext";
+import { useFocusContext } from "#contexts/FocusContext";
+import { inkTransport } from "#base/logger/ink-transport";
+import { LogMetadata } from "#base/logger/types";
+import { useTheme } from "#base/themeContext";
 
 export const Footer: React.FC = () => {
     const theme = useTheme();

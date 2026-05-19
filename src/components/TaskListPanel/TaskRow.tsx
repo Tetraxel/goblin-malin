@@ -1,10 +1,10 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Text } from "ink";
-import { Task } from "../../base/task/task";
-import { useTask } from "../../hooks/useTask";
+import { Task } from "#base/task/task";
+import { FlowBase } from "#base/flow/flow-base";
+import { useTheme } from "#base/themeContext";
+import { useTask } from "#hooks/useTask";
 import { CalculatedColumn } from "./TaskListPanel";
-import { FlowBase } from "../../base/flow/flow-base";
-import { useTheme } from "../../base/themeContext";
 
 export const TaskRow = React.memo(function TaskRow<TAttributes>({
     taskReference,

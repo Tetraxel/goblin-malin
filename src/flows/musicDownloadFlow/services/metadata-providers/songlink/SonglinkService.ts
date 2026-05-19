@@ -1,11 +1,11 @@
-// import { Cached } from '../../../../../utils/cache';
+﻿// import { ParsedUrl } from '#base/urlParser';
+// import { Logger } from '#base/logger/logger';
+// import { StatusType } from '#base/task/task-status';
+// import { DownloadTask } from '#flows/musicDownloadFlow/utils/downloadTask';
+// import { sleep } from '#utils/sleep';
+// import { Cached } from '#utils/cache';
 // import { MetadataService } from '../../../metadataService';
-// import { ParsedUrl } from '../../../../../base/urlParser';
-// import { StatusType } from '../../../../../base/task/task-status';
-// import { Logger } from '../../../../../base/logger/logger';
 // import { SonglinkClient, SonglinkResponse } from '../../apis/songlink-client';
-// import { sleep } from '../../../../../utils/sleep';
-// import { DownloadTask } from '../../../utils/downloadTask';
 
 // export class SonglinkService extends MetadataService {
 //     private static client: SonglinkClient;

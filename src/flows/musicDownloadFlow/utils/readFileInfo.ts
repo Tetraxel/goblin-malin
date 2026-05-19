@@ -1,6 +1,6 @@
-import { stat } from "fs/promises";
+﻿import { stat } from "fs/promises";
 import { readFlacTags } from "flac-tagger";
-import { FileInfo } from "../types";
+import { FileInfo } from "#flows/musicDownloadFlow/types";
 
 // Read file and return a FileInfo object
 export async function readFileInfo(filePath: string, fallbackDurationMs: number): Promise<FileInfo> {

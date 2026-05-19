@@ -1,15 +1,15 @@
-import { SpotifyApi, Track } from "@spotify/web-api-ts-sdk";
-import { MetadataService } from "../../../metadataService";
-import { ProviderDisplay } from "../../../../../base/providerDisplay";
-import { ProviderSettingsSchema } from "../../../../../base/providerSettings";
-import { SetupWizardConfig } from "../../../../../base/setupWizard";
-import { ParsedUrl } from "../../../../../base/urlParser";
-import { Cached } from "../../../../../utils/cache";
-import { Logger } from "../../../../../base/logger/logger";
-import { StatusType } from "../../../../../base/task/task-status";
-import { StandardTrack, TrackMetadata, TrackUri } from "../../../types";
-import { DownloadTask } from "../../../utils/downloadTask";
+﻿import { SpotifyApi, Track } from "@spotify/web-api-ts-sdk";
+import { ProviderDisplay } from "#base/providerDisplay";
+import { ProviderSettingsSchema } from "#base/providerSettings";
+import { SetupWizardConfig } from "#base/setupWizard";
+import { ParsedUrl } from "#base/urlParser";
+import { Cached } from "#utils/cache";
+import { Logger } from "#base/logger/logger";
+import { StatusType } from "#base/task/task-status";
+import { StandardTrack, TrackMetadata, TrackUri } from "#flows/musicDownloadFlow/types";
+import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { SpotifyCell } from "./SpotifyCell";
+import { MetadataService } from "../../../metadataService";
 
 export type SpotifyTokenResponse = {
     access_token: string;
@@ -80,7 +80,7 @@ export class SpotifyService extends MetadataService {
     static readonly setupWizard: SetupWizardConfig = {
         title: "⚙  Spotify Setup Wizard",
         providerKey: "spotify",
-providerType: "metadata",
+        providerType: "metadata",
         envSection: { name: "SPOTIFY", url: "https://developer.spotify.com/dashboard" },
         description: [
             {

@@ -1,5 +1,5 @@
-import React from "react";
-import { globalLogger } from "../base/logger/logger";
+﻿import React from "react";
+import { globalLogger } from "#base/logger/logger";
 
 export const useWhyDidYouUpdate = (name: string, props: Record<string, unknown>) => {
     const previousProps = React.useRef<Record<string, unknown>>({});

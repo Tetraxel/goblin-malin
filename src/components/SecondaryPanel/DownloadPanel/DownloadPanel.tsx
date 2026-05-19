@@ -1,19 +1,19 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import fs from "fs";
-import { Task, TaskSnapshot } from "../../../base/task/task";
-import { useFocusContext } from "../../../contexts/FocusContext";
-import { MusicDownloadTaskAttributes, TrackDownloadSource } from "../../../flows/musicDownloadFlow/types";
-import { DownloadTask } from "../../../flows/musicDownloadFlow/utils/downloadTask";
-import { StatusType } from "../../../base/task/task-status";
+import path from "path";
+import { useFocusContext } from "#contexts/FocusContext";
+import { Task, TaskSnapshot } from "#base/task/task";
+import { StatusType } from "#base/task/task-status";
+import { useTheme } from "#base/themeContext";
+import { MusicDownloadTaskAttributes, TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { computeCompiledMetadata, CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
+import { getSaveSettings } from "#flows/musicDownloadFlow/saveSettings";
+import { computeOutputFilename } from "#flows/musicDownloadFlow/utils/computeOutputPath";
 import { DownloadSourceTree } from "./DownloadSourceTree/DownloadSourceTree";
 import { DownloadSourceDetail } from "./DownloadSourceDetail/DownloadSourceDetail";
 import { Hint } from "../../Hint";
-import { computeCompiledMetadata, CompiledMetadata } from "../../../flows/musicDownloadFlow/utils/compiledMetadata";
-import { getSaveSettings } from "../../../flows/musicDownloadFlow/saveSettings";
-import { computeOutputFilename } from "../../../flows/musicDownloadFlow/utils/computeOutputPath";
-import path from "path";
-import { useTheme } from "../../../base/themeContext";
 
 const HINT_BAR_HEIGHT = 2;
 

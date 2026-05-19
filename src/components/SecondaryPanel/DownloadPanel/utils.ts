@@ -1,4 +1,4 @@
-import { providerDisplayRegistry } from "../../../base/providerDisplay";
+﻿import { providerDisplayRegistry } from "#base/providerDisplay";
 
 export function getProviderColor(provider: string): string {
     return providerDisplayRegistry.get(provider).color;

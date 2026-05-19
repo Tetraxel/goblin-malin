@@ -1,12 +1,12 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
-import { MetadataSourceState, MetadataOverrides } from "../../../flows/musicDownloadFlow/types";
-import { CompiledMetadata } from "../../../flows/musicDownloadFlow/utils/compiledMetadata";
+import { useTheme } from "#base/themeContext";
+import { MetadataSourceState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
+import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { useSourceListInput } from "./useSourceListInput";
 import { MetadataSourceRow } from "./MetadataSourceRow";
 import { MetadataCompiledRow } from "./MetadataCompiledRow";
-import { useTheme } from "../../../base/themeContext";
 
 interface MetadataSourceListProps {
     sources: MetadataSourceState[];

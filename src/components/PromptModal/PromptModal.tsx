@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { Box, Text } from "ink";
 import TextInput from "ink-text-input";
 import SelectInput from "ink-select-input";
-import { Task } from "../../base/task/task";
-import { PromptType } from "../../base/task/task-prompt";
+import { Task } from "#base/task/task";
+import { PromptType } from "#base/task/task-prompt";
 import { useActivePrompt } from "./useActivePrompt";
-import { useFocusContext } from "../../contexts/FocusContext";
-import { useTheme } from "../../base/themeContext";
+import { useFocusContext } from "#contexts/FocusContext";
+import { useTheme } from "#base/themeContext";
 import { Hint } from "../Hint";
 
 interface PromptModalProps {

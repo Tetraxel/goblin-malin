@@ -1,19 +1,19 @@
-import fs from "fs";
+﻿import fs from "fs";
 import path from "path";
 import { FormatOptions, QualityOptions, YtDlp } from "ytdlp-nodejs";
 import { DownloadService } from "../../../downloadService";
-import { ProviderDisplay } from "../../../../../base/providerDisplay";
-import { ProviderSettingsSchema } from "../../../../../base/providerSettings";
-import { StatusType } from "../../../../../base/task/task-status";
-import { Logger } from "../../../../../base/logger/logger";
-import { getBinDir } from "../../../../../utils/appPaths";
-import { getTempDownloadDir } from "../../../saveSettings";
+import { ProviderDisplay } from "#base/providerDisplay";
+import { ProviderSettingsSchema } from "#base/providerSettings";
+import { StatusType } from "#base/task/task-status";
+import { Logger } from "#base/logger/logger";
+import { getBinDir } from "#utils/appPaths";
+import { ensureFfmpeg } from "#utils/ffmpeg-setup";
+import { APIProvider, TrackMetadata, TrackDownloadSource, LocalFile, FileInfo } from "#flows/musicDownloadFlow/types";
+import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { readFileInfo } from "#flows/musicDownloadFlow/utils/readFileInfo";
 import { ensureYtDlpSetup } from "./ytdlp-setup";
-import { ensureFfmpeg } from "../../../../../utils/ffmpeg-setup";
-import { APIProvider, TrackMetadata, TrackDownloadSource, LocalFile, FileInfo } from "../../../types";
-import { DownloadTask } from "../../../utils/downloadTask";
-import { readFileInfo } from "../../../utils/readFileInfo";
 import { YtDlpCell } from "./YtDlpCell";
+import { getTempDownloadDir } from "../../../saveSettings";
 
 export class YtDlpService extends DownloadService {
     static readonly display: ProviderDisplay = {

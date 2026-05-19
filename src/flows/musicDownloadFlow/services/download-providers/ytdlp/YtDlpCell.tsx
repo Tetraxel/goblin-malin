@@ -1,8 +1,8 @@
-import React from "react";
+﻿import React from "react";
 import path from "path";
 import { Text } from "ink";
-import { ColumnComponent } from "../../../../../components/TaskListPanel/TaskListPanel";
-import { MusicDownloadTaskAttributes } from "../../../types";
+import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
+import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
 export const YtDlpCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, isSelected }) => {
     const downloadSource = task.attributes?.downloadSources.find((d) => d.provider === "ytdlp");

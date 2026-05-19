@@ -1,9 +1,9 @@
-import { Task } from "./task/task";
+﻿import { Task } from "./task/task";
 import { Logger } from "./logger/logger";
-import { EnvironmentError } from "../exceptions/EnvironmentError";
+import { EnvironmentError } from "#exceptions/EnvironmentError";
 import { SetupWizardConfig } from "./setupWizard";
-import { saveEnvVar, saveEnvVarsGroup } from "../utils/envFile";
-import { SettingsStore } from "../settings/settingsStore";
+import { saveEnvVar, saveEnvVarsGroup } from "#utils/envFile";
+import { SettingsStore } from "#settings/settingsStore";
 
 export class Env {
     protected task: Task;

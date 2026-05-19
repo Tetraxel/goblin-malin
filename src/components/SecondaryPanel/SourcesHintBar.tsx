@@ -1,9 +1,9 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Text } from "ink";
-import { MetadataSourceState } from "../../flows/musicDownloadFlow/types";
-import { providerDisplayRegistry } from "../../base/providerDisplay";
+import { MetadataSourceState } from "#flows/musicDownloadFlow/types";
+import { providerDisplayRegistry } from "#base/providerDisplay";
+import { useTheme } from "#base/themeContext";
 import { Hint } from "../Hint";
-import { useTheme } from "../../base/themeContext";
 
 interface SourcesHintBarProps {
     sources: MetadataSourceState[];

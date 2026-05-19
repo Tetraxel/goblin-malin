@@ -1,11 +1,11 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Text } from "ink";
-import { ColumnComponent } from "../../../components/TaskListPanel/TaskListPanel";
-import { StatusAttributes, StatusType } from "../../../base/task/task-status";
-import { AnimatedIcon, Icon } from "../../../components/AnimatedIcon";
-import { MusicDownloadTaskAttributes } from "../types";
-import { useTheme } from "../../../base/themeContext";
-import { Theme } from "../../../base/theme";
+import { Theme } from "#base/theme";
+import { useTheme } from "#base/themeContext";
+import { StatusAttributes, StatusType } from "#base/task/task-status";
+import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
+import { AnimatedIcon, Icon } from "#components/AnimatedIcon";
+import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
 function getStatusIcon(status: StatusType): React.ReactNode {
     switch (status) {

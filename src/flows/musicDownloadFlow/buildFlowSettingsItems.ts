@@ -1,9 +1,9 @@
-import { SettingsItem } from "../../settings/buildSettingsItems";
+﻿import { DeepPartial } from "#utils/types";
+import { ProviderConstructorLike, ProviderSettingsSchema } from "#base/providerSettings";
+import { SetupWizardConfig } from "#base/setupWizard";
+import { providerDisplayRegistry } from "#base/providerDisplay";
+import { SettingsItem } from "#settings/buildSettingsItems";
 import { MusicDownloadFlowSettings } from "./settings";
-import { DeepPartial } from "../../utils/types";
-import { ProviderConstructorLike, ProviderSettingsSchema } from "../../base/providerSettings";
-import { SetupWizardConfig } from "../../base/setupWizard";
-import { providerDisplayRegistry } from "../../base/providerDisplay";
 import { clearTempDownloads } from "./saveSettings";
 
 export type ProviderEntry = {

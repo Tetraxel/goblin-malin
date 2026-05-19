@@ -1,13 +1,13 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import clipboard from "clipboardy";
-import { MetadataSourceState, MetadataOverrides } from "../../../flows/musicDownloadFlow/types";
-import { CompiledMetadata, CompiledMetadataField } from "../../../flows/musicDownloadFlow/utils/compiledMetadata";
-import { FIELDS, navigableFields } from "../../../flows/musicDownloadFlow/utils/metadataFields";
-import { useFocusContext } from "../../../contexts/FocusContext";
+import { MetadataSourceState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
+import { CompiledMetadata, CompiledMetadataField } from "#flows/musicDownloadFlow/utils/compiledMetadata";
+import { FIELDS, navigableFields } from "#flows/musicDownloadFlow/utils/metadataFields";
+import { useFocusContext } from "#contexts/FocusContext";
 import { FieldRow } from "./FieldRow";
-import { providerDisplayRegistry } from "../../../base/providerDisplay";
-import { useTheme } from "../../../base/themeContext";
+import { providerDisplayRegistry } from "#base/providerDisplay";
+import { useTheme } from "#base/themeContext";
 import { Hint } from "../../Hint";
 
 interface MetadataSourceDetailProps {

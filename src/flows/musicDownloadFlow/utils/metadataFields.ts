@@ -1,4 +1,4 @@
-import { MetadataSourceState, StandardArtist } from "../types";
+﻿import { MetadataSourceState, StandardArtist } from "#flows/musicDownloadFlow/types";
 import { CompiledMetadata, CompiledMetadataField } from "./compiledMetadata";
 
 export type FieldDef = {

@@ -1,6 +1,6 @@
-import * as os from "os";
+﻿import * as os from "os";
 import * as path from "path";
-import { ServiceRegistry } from "../../base/service-registry";
+import { ServiceRegistry } from "#base/service-registry";
 
 /** Per-provider runtime values (stored in JSON). Keys match ProviderSettingsSchema fields. */
 export type StoredProviderSettings = Record<string, boolean | string>;

@@ -1,9 +1,9 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Text } from "ink";
-import { MetadataSourceState } from "../../../flows/musicDownloadFlow/types";
-import { providerDisplayRegistry } from "../../../base/providerDisplay";
-import { useTheme } from "../../../base/themeContext";
-import { Theme } from "../../../base/theme";
+import { providerDisplayRegistry } from "#base/providerDisplay";
+import { useTheme } from "#base/themeContext";
+import { Theme } from "#base/theme";
+import { MetadataSourceState } from "#flows/musicDownloadFlow/types";
 
 function getDisplay(apiProvider: string): { label: string; color: string } {
     const display = providerDisplayRegistry.get(apiProvider);

@@ -1,6 +1,6 @@
-import React from "react";
+﻿import React from "react";
 import { Text, Key } from "ink";
-import { Task } from "../base/task/task";
+import { Task } from "#base/task/task";
 
 export type Shortcut = {
     key?: keyof Key;

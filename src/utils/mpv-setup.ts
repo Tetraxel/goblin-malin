@@ -1,10 +1,10 @@
-import * as fs from "fs/promises";
+﻿import * as fs from "fs/promises";
 import { createWriteStream } from "fs";
 import * as path from "path";
 import * as https from "https";
 import { spawn } from "child_process";
 import { getBinDir } from "./appPaths";
-import { globalLogger } from "../base/logger/logger";
+import { globalLogger } from "#base/logger/logger";
 
 // Windows-only auto-download.
 // Linux / macOS: install mpv via your package manager (brew, apt, etc.)

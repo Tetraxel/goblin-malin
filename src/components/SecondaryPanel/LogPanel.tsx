@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import { inkTransport } from "../../base/logger/ink-transport";
-import { LogMetadata } from "../../base/logger/types";
 import { inspect } from "util";
-import { useFocusContext } from "../../contexts/FocusContext";
-import { Task } from "../../base/task/task";
-import { useTheme } from "../../base/themeContext";
+import { useFocusContext } from "#contexts/FocusContext";
+import { inkTransport } from "#base/logger/ink-transport";
+import { LogMetadata } from "#base/logger/types";
+import { Task } from "#base/task/task";
+import { useTheme } from "#base/themeContext";
 
 function formatDetails(details?: Record<string, unknown>): string {
     if (!details || Object.keys(details).length === 0) {

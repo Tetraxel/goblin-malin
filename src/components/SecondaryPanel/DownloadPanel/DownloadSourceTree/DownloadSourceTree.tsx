@@ -1,9 +1,9 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Text, useInput } from "ink";
-import { useTheme } from "../../../../base/themeContext";
-import { TrackDownloadSource, DownloadProvider } from "../../../../flows/musicDownloadFlow/types";
-import { providerDisplayRegistry } from "../../../../base/providerDisplay";
-import { getInstance } from "../../../../utils/mpvPlayer";
+import { useTheme } from "#base/themeContext";
+import { providerDisplayRegistry } from "#base/providerDisplay";
+import { TrackDownloadSource, DownloadProvider } from "#flows/musicDownloadFlow/types";
+import { getInstance } from "#utils/mpvPlayer";
 import { ProviderHeader } from "./ProviderHeader";
 import { MetadataHeader } from "./MetadataHeader";
 import { SourceFileRow } from "./SourceFileRow";

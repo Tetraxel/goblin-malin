@@ -1,6 +1,6 @@
-import path from "path";
+﻿import path from "path";
 import { fileURLToPath } from "url";
-import { SettingsStore } from "../settings/settingsStore";
+import { SettingsStore } from "#settings/settingsStore";
 
 // In dev (tsx), import.meta.url ends in .ts → this file is src/utils/, so ../assets = src/assets/.
 // In prod (tsup bundle), import.meta.url = dist/index.js → dist/ + assets = dist/assets/.

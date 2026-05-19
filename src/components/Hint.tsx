@@ -1,6 +1,6 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Text } from "ink";
-import { useTheme } from "../base/themeContext";
+import { useTheme } from "#base/themeContext";
 
 export function Hint({ label, shortcut, dim }: { label: string; shortcut: string; dim?: boolean }) {
     const theme = useTheme();

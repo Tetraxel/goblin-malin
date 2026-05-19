@@ -1,5 +1,5 @@
-import { CompiledMetadata } from "./compiledMetadata";
-import { Metadata } from "../../../utils/metadata";
+﻿import { CompiledMetadata } from "./compiledMetadata";
+import { Metadata } from "#utils/metadata";
 
 export interface TagOptions {
     includeMusicBrainzTags: boolean;

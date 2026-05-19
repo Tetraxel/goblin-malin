@@ -1,7 +1,7 @@
-// hooks/useActivePrompt.ts
+﻿// hooks/useActivePrompt.ts
 import { useEffect, useState } from "react";
-import { Task } from "../../base/task/task";
-import { TaskPrompt } from "../../base/task/task-prompt";
+import { Task } from "#base/task/task";
+import { TaskPrompt } from "#base/task/task-prompt";
 
 interface ActivePromptResult {
     task: Task | null;

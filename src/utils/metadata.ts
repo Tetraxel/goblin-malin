@@ -1,8 +1,8 @@
-import * as fs from "fs";
+﻿import * as fs from "fs";
 import * as path from "path";
 import NodeId3 from "node-id3";
 import { readFlacTags, writeFlacTags, FlacTagMap, FlacTags } from "flac-tagger";
-import { globalLogger } from "../base/logger/logger";
+import { globalLogger } from "#base/logger/logger";
 
 export type Metadata = {
     trackTitle: string;

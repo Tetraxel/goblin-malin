@@ -1,15 +1,19 @@
-import { FlowOrchestrator } from "../../base/flow/flow-orchestrator";
-import { FlowBase } from "../../base/flow/flow-base";
-import { FlowSettings } from "../../base/flow/flow-settings";
-import { globalLogger, Logger } from "../../base/logger/logger";
-import { DownloadTask } from "./utils/downloadTask";
-import { taskIdFromUrl } from "./utils/taskId";
-import { ToolbarButtonHook } from "../../components/Toolbar/Toolbar";
-import { ColumnDefinition } from "../../components/TaskListPanel/TaskListPanel";
-import { ContextualActionBar, ContextualActions } from "../../types/actions";
-import { runWithoutCache } from "../../utils/cache";
-import clipboard from "clipboardy";
+﻿import clipboard from "clipboardy";
 import open from "open";
+import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
+import { FlowBase } from "#base/flow/flow-base";
+import { FlowSettings } from "#base/flow/flow-settings";
+import { globalLogger, Logger } from "#base/logger/logger";
+import { ServiceRegistry } from "#base/service-registry";
+import { providerDisplayRegistry } from "#base/providerDisplay";
+import { ProviderConstructorLike } from "#base/providerSettings";
+import { SettingsStore } from "#settings/settingsStore";
+import { DeepPartial } from "#utils/types";
+import { SettingsItem } from "#settings/buildSettingsItems";
+import { ToolbarButtonHook } from "#components/Toolbar/Toolbar";
+import { ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
+import { ContextualActionBar, ContextualActions } from "#types/actions";
+import { runWithoutCache } from "#utils/cache";
 import { useExitButton } from "./toolbar/useExitButton";
 import { useRunAllButton } from "./toolbar/useRunAllButton";
 import { useSettingsButton } from "./toolbar/useSettingsButton";
@@ -19,24 +23,20 @@ import { TrackCell } from "./columns/TrackCell";
 import { StatusCell } from "./columns/StatusCell";
 import { ToTagCell } from "./columns/ToTagCell";
 import { ToDownloadCell } from "./columns/ToDownloadCell";
-import { MusicDownloadTaskAttributes } from "./types";
-import { ServiceRegistry } from "../../base/service-registry";
+import { MetadataService } from "./metadataService";
+import { DownloadService } from "./downloadService";
 import { SpotifyService } from "./services/metadata-providers/spotify/SpotifyService";
 import { YoutubeService } from "./services/metadata-providers/youtube/YoutubeService";
 import { YtDlpService } from "./services/download-providers/ytdlp/YtDlpService";
-import { MetadataService } from "./metadataService";
-import { DownloadService } from "./downloadService";
-import { providerDisplayRegistry } from "../../base/providerDisplay";
-import { ProviderConstructorLike } from "../../base/providerSettings";
-import { SettingsStore } from "../../settings/settingsStore";
+import { DownloadTask } from "./utils/downloadTask";
+import { taskIdFromUrl } from "./utils/taskId";
+import { MusicDownloadTaskAttributes } from "./types";
 import {
     MusicDownloadFlowSettings,
     BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS,
     extractProviderDefaults,
 } from "./settings";
 import { buildFlowSettingsItems, ProviderEntry } from "./buildFlowSettingsItems";
-import { DeepPartial } from "../../utils/types";
-import { SettingsItem } from "../../settings/buildSettingsItems";
 
 type Column = ColumnDefinition<MusicDownloadTaskAttributes>;
 
@@ -391,8 +391,8 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                     color: display.color,
                     weight: 20,
                     flexGrow: 0,
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     component:
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         (this.metadataServiceRegistry.getConstructor(key) as any)?.cellComponent ?? GenericProviderCell,
                 };
             });
@@ -411,8 +411,8 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                     color: display.color,
                     weight: 32,
                     flexGrow: 0,
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     component:
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         (this.downloadServiceRegistry.getConstructor(key) as any)?.cellComponent ?? GenericProviderCell,
                 };
             });

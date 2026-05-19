@@ -1,9 +1,9 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Text } from "ink";
-import { TrackDownloadSource } from "../../../../flows/musicDownloadFlow/types";
-import { formatBytes } from "../utils";
+import { useTheme } from "#base/themeContext";
+import { TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import { formatBytes } from "#components/SecondaryPanel/DownloadPanel/utils";
 import { StateBadge } from "../StateBadge";
-import { useTheme } from "../../../../base/themeContext";
 
 interface SourceFileRowProps {
     source: TrackDownloadSource;

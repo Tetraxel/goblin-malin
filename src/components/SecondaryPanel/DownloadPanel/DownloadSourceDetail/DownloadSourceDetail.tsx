@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import * as path from "path";
 import * as fs from "fs";
-import { TrackDownloadSource } from "../../../../flows/musicDownloadFlow/types";
-import { CompiledMetadata } from "../../../../flows/musicDownloadFlow/utils/compiledMetadata";
-import { computeOutputFilename } from "../../../../flows/musicDownloadFlow/utils/computeOutputPath";
-import { getInstance, PlayerStatus } from "../../../../utils/mpvPlayer";
-import { formatBytes, formatDuration, formatDate, tagValue } from "../utils";
+import { providerDisplayRegistry } from "#base/providerDisplay";
+import { useTheme } from "#base/themeContext";
+import { TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
+import { computeOutputFilename } from "#flows/musicDownloadFlow/utils/computeOutputPath";
+import { getInstance, PlayerStatus } from "#utils/mpvPlayer";
+import { formatBytes, formatDuration, formatDate, tagValue } from "#components/SecondaryPanel/DownloadPanel/utils";
 import { PlaybackBar } from "../PlaybackBar";
 import { DiffView } from "./DiffView";
 import { DetailRow } from "./DetailRow";
 import { Hint } from "../../../Hint";
-import { providerDisplayRegistry } from "../../../../base/providerDisplay";
-import { useTheme } from "../../../../base/themeContext";
 
 interface DownloadSourceDetailProps {
     source: TrackDownloadSource | null;

@@ -1,7 +1,7 @@
-import { AsyncLocalStorage } from "async_hooks";
+﻿import { AsyncLocalStorage } from "async_hooks";
 import { create } from "flat-cache";
 import * as fs from "fs";
-import { globalLogger } from "../base/logger/logger";
+import { globalLogger } from "#base/logger/logger";
 import { getCacheDir } from "./appPaths";
 
 const skipCacheStorage = new AsyncLocalStorage<boolean>();

@@ -1,10 +1,10 @@
-import { Logger } from "../logger/logger";
-import { ColumnDefinition } from "../../components/TaskListPanel/TaskListPanel";
-import { ContextualActionBar } from "../../types/actions";
-import { ToolbarButtonHook } from "../../components/Toolbar/Toolbar";
+﻿import { Logger } from "../logger/logger";
+import { ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
+import { ContextualActionBar } from "#types/actions";
+import { ToolbarButtonHook } from "#components/Toolbar/Toolbar";
 import { FlowOrchestrator } from "./flow-orchestrator";
 import { Task } from "../task/task";
-import type { SettingsItem } from "../../settings/buildSettingsItems";
+import type { SettingsItem } from "#settings/buildSettingsItems";
 import type { SetupWizardConfig } from "../setupWizard";
 
 export type FlowSubscriber<TTaskAttributes> = (flow: FlowBase<TTaskAttributes>) => void;

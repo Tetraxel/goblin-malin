@@ -1,6 +1,6 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Text } from "ink";
-import { useTheme } from "../base/themeContext";
+import { useTheme } from "#base/themeContext";
 
 export interface TabDef {
     key: string;

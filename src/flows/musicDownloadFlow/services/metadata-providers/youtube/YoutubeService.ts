@@ -1,14 +1,14 @@
-import YTMusic, { type SongFull, type VideoFull, type ArtistFull, type AlbumFull } from "ytmusic-api";
-import { MetadataService } from "../../../metadataService";
-import { ProviderDisplay } from "../../../../../base/providerDisplay";
-import { ProviderSettingsSchema } from "../../../../../base/providerSettings";
-import { ParsedUrl } from "../../../../../base/urlParser";
-import { StatusType } from "../../../../../base/task/task-status";
-import { Logger } from "../../../../../base/logger/logger";
-import { Cached } from "../../../../../utils/cache";
-import { DownloadTask } from "../../../utils/downloadTask";
-import { StandardTrack, TrackMetadata, TrackUri } from "../../../types";
+﻿import YTMusic, { type SongFull, type VideoFull, type ArtistFull, type AlbumFull } from "ytmusic-api";
+import { Logger } from "#base/logger/logger";
+import { ParsedUrl } from "#base/urlParser";
+import { StatusType } from "#base/task/task-status";
+import { ProviderDisplay } from "#base/providerDisplay";
+import { ProviderSettingsSchema } from "#base/providerSettings";
+import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { StandardTrack, TrackMetadata, TrackUri } from "#flows/musicDownloadFlow/types";
+import { Cached } from "#utils/cache";
 import { YoutubeCell } from "./YoutubeCell";
+import { MetadataService } from "../../../metadataService";
 
 export class YoutubeService extends MetadataService {
     static readonly display: ProviderDisplay = {

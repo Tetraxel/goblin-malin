@@ -1,8 +1,8 @@
-import React from "react";
+﻿import React from "react";
 import { Text } from "ink";
-import { ColumnComponent } from "../../../components/TaskListPanel/TaskListPanel";
-import { MusicDownloadTaskAttributes } from "../types";
-import { computeCompiledMetadata } from "../utils/compiledMetadata";
+import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
+import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import { computeCompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 
 export const ArtistCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, isSelected }) => {
     const sources = task.attributes?.metadataSources ?? [];

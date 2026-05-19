@@ -1,15 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
-import { Task } from "../../base/task/task";
-import { PromptType, SetupWizardPrompt } from "../../base/task/task-prompt";
-import { SetupWizardConfig } from "../../base/setupWizard";
-import { useFocusContext } from "../../contexts/FocusContext";
+import { Task } from "#base/task/task";
+import { PromptType, SetupWizardPrompt } from "#base/task/task-prompt";
+import { providerDisplayRegistry } from "#base/providerDisplay";
+import { SetupWizardConfig } from "#base/setupWizard";
+import { useTheme } from "#base/themeContext";
+import { useFocusContext } from "#contexts/FocusContext";
+import { openUrl } from "#utils/openUrl";
+import { removeEnvVars, saveEnvVar, saveEnvVarsGroup } from "#utils/envFile";
 import { useActiveWizardPrompt } from "./useActiveWizardPrompt";
-import { openUrl } from "../../utils/openUrl";
-import { removeEnvVars, saveEnvVar, saveEnvVarsGroup } from "../../utils/envFile";
-import { providerDisplayRegistry } from "../../base/providerDisplay";
-import { useTheme } from "../../base/themeContext";
 import { Hint } from "../Hint";
 
 type InteractiveItemUnion =

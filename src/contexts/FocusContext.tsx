@@ -1,5 +1,5 @@
-import React, { createContext, useContext, ReactNode } from "react";
-import { useFocusManager } from "../hooks/useFocusManager";
+﻿import React, { createContext, useContext, ReactNode } from "react";
+import { useFocusManager } from "#hooks/useFocusManager";
 
 type FocusContextValue = ReturnType<typeof useFocusManager>;
 

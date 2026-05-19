@@ -1,18 +1,14 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { Box, useInput } from "ink";
-import { Task, TaskSnapshot } from "../../../base/task/task";
-import { useFocusContext } from "../../../contexts/FocusContext";
-import {
-    MusicDownloadTaskAttributes,
-    MetadataSourceState,
-    MetadataOverrides,
-} from "../../../flows/musicDownloadFlow/types";
-import { computeCompiledMetadata } from "../../../flows/musicDownloadFlow/utils/compiledMetadata";
-import { navigableFields } from "../../../flows/musicDownloadFlow/utils/metadataFields";
+import { useTheme } from "#base/themeContext";
+import { Task, TaskSnapshot } from "#base/task/task";
+import { useFocusContext } from "#contexts/FocusContext";
+import { MusicDownloadTaskAttributes, MetadataSourceState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
+import { computeCompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
+import { navigableFields } from "#flows/musicDownloadFlow/utils/metadataFields";
 import { MetadataSourceList } from "./MetadataSourceList";
 import { MetadataDetailPanel } from "./MetadataDetailPanel";
 import { SourcesHintBar } from "../SourcesHintBar";
-import { useTheme } from "../../../base/themeContext";
 
 const HINT_BAR_HEIGHT = 2;
 

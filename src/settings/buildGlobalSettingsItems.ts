@@ -1,8 +1,8 @@
+﻿import { DeepPartial } from "#utils/types";
+import { clearCache } from "#utils/cache";
+import { THEME_KEYS } from "#base/theme";
 import { AppSettings } from "./appSettings";
-import { DeepPartial } from "../utils/types";
 import { SettingsItem } from "./buildSettingsItems";
-import { clearCache } from "../utils/cache";
-import { THEME_KEYS } from "../base/theme";
 
 export function buildGlobalSettingsItems(
     settings: AppSettings,

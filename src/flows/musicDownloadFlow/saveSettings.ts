@@ -1,5 +1,5 @@
-import fs from "fs";
-import { SettingsStore } from "../../settings/settingsStore";
+﻿import fs from "fs";
+import { SettingsStore } from "#settings/settingsStore";
 import { MusicDownloadFlowSettings, BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS } from "./settings";
 
 export interface SaveSettings {

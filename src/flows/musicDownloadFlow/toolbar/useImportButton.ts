@@ -1,7 +1,7 @@
-import { ToolbarButtonHook } from "../../../components/Toolbar/Toolbar";
-import { FlowBase } from "../../../base/flow/flow-base";
-import { useImportActions } from "../../../contexts/ImportActionsContext";
-import { useTheme } from "../../../base/themeContext";
+﻿import { FlowBase } from "#base/flow/flow-base";
+import { useTheme } from "#base/themeContext";
+import { ToolbarButtonHook } from "#components/Toolbar/Toolbar";
+import { useImportActions } from "#contexts/ImportActionsContext";
 
 export const useImportButton: ToolbarButtonHook<FlowBase> = () => {
     const theme = useTheme();

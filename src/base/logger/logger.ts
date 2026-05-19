@@ -1,10 +1,10 @@
-import fs from "fs";
+﻿import fs from "fs";
 import path from "path";
 import chalk from "chalk";
 import winston from "winston";
 import { inkTransport } from "./ink-transport";
 import { LogMetadata, LogLevel, LogDetails } from "./types";
-import { getLogsPath } from "../../utils/appPaths";
+import { getLogsPath } from "#utils/appPaths";
 
 // Capture once at startup; ensure directory exists
 const logsPath = getLogsPath();

@@ -1,11 +1,11 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Text } from "ink";
 import TextInput from "ink-text-input";
-import { FieldAttribution } from "../../../flows/musicDownloadFlow/utils/compiledMetadata";
-import { FieldDef } from "../../../flows/musicDownloadFlow/utils/metadataFields";
-import { providerDisplayRegistry } from "../../../base/providerDisplay";
-import { useTheme } from "../../../base/themeContext";
-import { Theme } from "../../../base/theme";
+import { providerDisplayRegistry } from "#base/providerDisplay";
+import { useTheme } from "#base/themeContext";
+import { Theme } from "#base/theme";
+import { FieldAttribution } from "#flows/musicDownloadFlow/utils/compiledMetadata";
+import { FieldDef } from "#flows/musicDownloadFlow/utils/metadataFields";
 
 function getPlatformColor(apiProvider: string): string {
     return providerDisplayRegistry.get(apiProvider).colorSubtle;

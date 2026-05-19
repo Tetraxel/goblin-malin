@@ -1,9 +1,9 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Text } from "ink";
 import TextInput from "ink-text-input";
-import type { SettingsItem } from "../../settings/buildSettingsItems";
-import { sanitizeInput } from "../../utils/string";
-import { useTheme } from "../../base/themeContext";
+import { useTheme } from "#base/themeContext";
+import type { SettingsItem } from "#settings/buildSettingsItems";
+import { sanitizeInput } from "#utils/string";
 
 interface SettingsItemRowProps {
     item: SettingsItem;

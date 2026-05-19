@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useState } from "react";
+﻿import React, { useCallback, useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import Gradient from "ink-gradient";
 import BigText from "ink-big-text";
-import { useFocusContext } from "../../contexts/FocusContext";
-import { SettingsStore } from "../../settings/settingsStore";
-import { useTheme } from "../../base/themeContext";
+import { useFocusContext } from "#contexts/FocusContext";
+import { SettingsStore } from "#settings/settingsStore";
+import { useTheme } from "#base/themeContext";
 import { Hint } from "../Hint";
 
 const STEPS = [

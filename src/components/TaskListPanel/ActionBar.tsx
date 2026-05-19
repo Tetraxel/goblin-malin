@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
-import { useFocusContext } from "../../contexts/FocusContext";
-import { FlowBase } from "../../base/flow/flow-base";
-import { Task } from "../../base/task/task";
-import { ActionBarRow, getShortcutLiteral } from "../../types/actions";
-import { useTheme } from "../../base/themeContext";
+import { FlowBase } from "#base/flow/flow-base";
+import { Task } from "#base/task/task";
+import { useTheme } from "#base/themeContext";
+import { useFocusContext } from "#contexts/FocusContext";
+import { ActionBarRow, getShortcutLiteral } from "#types/actions";
 import { Hint } from "../Hint";
 
 export const ActionBar: React.FC<{

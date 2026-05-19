@@ -1,7 +1,7 @@
-import React from "react";
+﻿import React from "react";
 import { Text } from "ink";
-import { TrackDownloadSource } from "../../../flows/musicDownloadFlow/types";
-import { useTheme } from "../../../base/themeContext";
+import { useTheme } from "#base/themeContext";
+import { TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 
 export function StateBadge({ source }: { source: TrackDownloadSource }) {
     const theme = useTheme();

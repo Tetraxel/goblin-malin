@@ -1,8 +1,8 @@
-import React from "react";
+﻿import React from "react";
 import { Box, type DOMElement } from "ink";
 import { type ComponentPropsWithoutRef, forwardRef } from "react";
 
-import { useScreenSize } from "../hooks/useScreenSize";
+import { useScreenSize } from "#hooks/useScreenSize";
 
 export type BoxProps = ComponentPropsWithoutRef<typeof Box>;
 

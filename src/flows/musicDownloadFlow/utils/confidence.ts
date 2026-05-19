@@ -1,4 +1,4 @@
-import { TrackMetadata } from "../types";
+﻿import { TrackMetadata } from "#flows/musicDownloadFlow/types";
 
 function normalize(s: string): string {
     return s

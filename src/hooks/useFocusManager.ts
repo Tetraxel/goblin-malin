@@ -1,7 +1,7 @@
-import { useState, useCallback, useMemo } from "react";
+﻿import { useState, useCallback, useMemo } from "react";
 import { useScreenSize } from "./useScreenSize";
-import { FlowBase } from "../base/flow/flow-base";
-import { SetupWizardConfig } from "../base/setupWizard";
+import { FlowBase } from "#base/flow/flow-base";
+import { SetupWizardConfig } from "#base/setupWizard";
 
 // Fixed rows that never change regardless of terminal size.
 // toolbarRows = top separator + toolbar content + bottom separator.

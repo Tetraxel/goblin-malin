@@ -1,15 +1,15 @@
-// import slsk from 'slsk-client';
+﻿// import slsk from 'slsk-client';
 // import type { SlskFile, SoulseekClient } from 'slsk-client';
 // import fs from 'fs/promises';
 // import path from 'path';
-// import { Cached } from '../../../../../utils/cache';
+// import { Cached } from '#utils/cache';
 // import { DownloadService } from '../../../downloadService';
-// import { ProviderDisplay } from '../../../../../base/providerDisplay';
-// import { ProviderSettingsSchema } from '../../../../../base/providerSettings';
-// import { Logger } from '../../../../../base/logger/logger';
+// import { ProviderDisplay } from '#base/providerDisplay';
+// import { ProviderSettingsSchema } from '#base/providerSettings';
+// import { Logger } from '#base/logger/logger';
 // import { PROJECT_ROOT } from '../../../../../constants';
-// import { StatusType } from '../../../../../base/task/task-status';
-// import { DownloadTask } from '../../../utils/downloadTask';
+// import { StatusType } from '#base/task/task-status';
+// import { DownloadTask } from '#flows/musicDownloadFlow/utils/downloadTask';
 
 // const MAX_PREFERRED_SIZE = 50; // Files bigger than 50MB are less interesting
 // const DOWNLOAD_DIR = path.join(PROJECT_ROOT, 'soulseek-download');
