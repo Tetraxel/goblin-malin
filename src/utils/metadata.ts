@@ -32,8 +32,8 @@ export async function cleanAndTagFlac(filePath: string, metadata: Metadata) {
         } else {
             globalLogger.info('File did not contain any ID3 tags to remove.');
         }
-    } catch (err: Error | any) {
-        globalLogger.error(`Error cleaning file: ${err.message}. Stopping.`);
+    } catch (err) {
+        globalLogger.error(`Error cleaning file: ${(err as Error).message}. Stopping.`);
         return;
     }
 
@@ -89,8 +89,8 @@ export async function moveFile(srcPath: string, destPath: string): Promise<void>
     await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
     try {
         await fs.promises.rename(srcPath, destPath);
-    } catch (err: any) {
-        if (err.code === 'EXDEV') {
+    } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'EXDEV') {
             // Cross-device / cross-partition: fall back to copy + delete
             await fs.promises.copyFile(srcPath, destPath);
             await fs.promises.unlink(srcPath);

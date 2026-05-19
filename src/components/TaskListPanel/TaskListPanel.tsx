@@ -27,6 +27,7 @@ export type ColumnComponent<TAttributes> = ({
   flow: FlowBase;
 }) => React.ReactNode;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ColumnDefinition<TAttributes = any> = {
   id: string;
   label: string;
@@ -37,6 +38,7 @@ export type ColumnDefinition<TAttributes = any> = {
   component: ColumnComponent<TAttributes>;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type CalculatedColumn<TAttributes = any> =
   ColumnDefinition<TAttributes> & {
     width: number;
@@ -107,6 +109,7 @@ export function calculateColumnWidths<TAttributes>(
 
 export const TaskListPanel: React.FC<{
   columns: ColumnDefinition[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tasks: Task<any>[];
   width: number;
   flow: FlowBase;

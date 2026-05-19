@@ -103,6 +103,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         onChange: (patch: Record<string, unknown>) => void,
         onOpenWizard?: (config: import('../../base/setupWizard').SetupWizardConfig, onDisable?: () => void) => void,
     ): SettingsItem[] {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const toEntries = (registry: ServiceRegistry<any, any>): ProviderEntry[] =>
             Array.from(registry.getFactories().keys())
                 .map(key => ({ key, ctor: registry.getConstructor(key) as ProviderConstructorLike }));
@@ -386,6 +387,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                     color: display.color,
                     weight: 20,
                     flexGrow: 0,
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     component: (this.metadataServiceRegistry.getConstructor(key) as any)?.cellComponent ?? GenericProviderCell,
                 };
             });
@@ -404,6 +406,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                     color: display.color,
                     weight: 32,
                     flexGrow: 0,
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     component: (this.downloadServiceRegistry.getConstructor(key) as any)?.cellComponent ?? GenericProviderCell,
                 };
             });

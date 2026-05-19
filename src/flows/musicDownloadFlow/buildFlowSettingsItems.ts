@@ -12,7 +12,7 @@ export type ProviderEntry = {
 };
 
 function schemaOf(ctor: ProviderConstructorLike): ProviderSettingsSchema {
-  return (ctor as any).defaultSettings ?? { enabled: { label: 'Enable', defaultValue: true, kind: 'checkbox' } };
+  return ctor.defaultSettings ?? { enabled: { label: 'Enable', defaultValue: true, kind: 'checkbox' } };
 }
 
 function hasMissingCredentials(ctor: ProviderConstructorLike): boolean {

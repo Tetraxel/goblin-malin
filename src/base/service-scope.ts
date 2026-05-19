@@ -4,6 +4,7 @@ import { ServiceFactory } from "./service-registry";
 import { ServiceBase } from "./service-base";
 
 // A scope ensures each service is instantiated only once per task but with different logger for each task
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class ServiceScope<TTask extends Task<any>, TService extends ServiceBase> {
     private factories: Map<string, ServiceFactory<TTask, TService>>;
     private instances = new Map<string, TService>();

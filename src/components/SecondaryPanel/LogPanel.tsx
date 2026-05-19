@@ -28,8 +28,8 @@ function formatDetails(details?: Record<string, unknown>): string {
 
 function getLogString(log: LogMetadata): string {
   const level = `[${log.level.toUpperCase()}]`;
-  const flow = log.metadata?.flow ? ` [${log.metadata.flow}]` : "";
-  const service = log.metadata?.service ? ` [${log.metadata.service}]` : "";
+  const flow = log.flow ? ` [${log.flow}]` : "";
+  const service = log.service ? ` [${log.service}]` : "";
   const message = ` ${log.message}`;
   const details = formatDetails(log.details);
 

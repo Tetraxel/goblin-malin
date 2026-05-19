@@ -10,6 +10,7 @@ import type { SetupWizardConfig } from "../setupWizard";
 export type FlowSubscriber<TTaskAttributes> = (flow: FlowBase<TTaskAttributes>) => void;
 export type FlowSubscribers<TTaskAttributes> = Set<FlowSubscriber<TTaskAttributes>>;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class FlowBase<TaskAttributes = any> {
     public readonly id: string = "";
     public readonly displayName: string = "";

@@ -1,7 +1,6 @@
 import * as os from 'os';
 import * as path from 'path';
 import { ServiceRegistry } from '../../base/service-registry';
-import { ProviderSettingsSchema } from '../../base/providerSettings';
 
 /** Per-provider runtime values (stored in JSON). Keys match ProviderSettingsSchema fields. */
 export type StoredProviderSettings = Record<string, boolean | string>;
@@ -23,10 +22,11 @@ export type MusicDownloadFlowSettings = {
   };
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function extractProviderDefaults(registry: ServiceRegistry<any, any>): Record<string, StoredProviderSettings> {
   const result: Record<string, StoredProviderSettings> = {};
   for (const key of registry.getFactories().keys()) {
-    const schema = (registry.getConstructor(key) as any)?.defaultSettings as ProviderSettingsSchema | undefined;
+    const schema = registry.getConstructor(key)?.defaultSettings;
     result[key] = schema
       ? Object.fromEntries(Object.entries(schema).map(([k, v]) => [k, v.defaultValue])) as StoredProviderSettings
       : { enabled: true };

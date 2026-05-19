@@ -49,7 +49,7 @@ export interface SetupWizardPrompt extends BasePrompt {
 
 export type UserPrompt = ConfirmPrompt | SelectPrompt | InputPrompt | SetupWizardPrompt;
 
-export interface PendingPrompt<T = any> {
+export interface PendingPrompt<T = unknown> {
     prompt: UserPrompt;
     resolve: (value: T) => void;
     reject: (error: Error) => void;
@@ -122,7 +122,7 @@ export class TaskPrompt {
 
             this.current = {
                 prompt,
-                resolve: resolve as (value: any) => void,
+                resolve: resolve as (value: unknown) => void,
                 reject,
             };
 
@@ -142,7 +142,7 @@ export class TaskPrompt {
         return new Promise<T>((resolve, reject) => {
             this.current = {
                 prompt,
-                resolve: resolve as (value: any) => void,
+                resolve: resolve as (value: unknown) => void,
                 reject,
             };
 

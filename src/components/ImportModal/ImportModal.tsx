@@ -161,7 +161,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
               return (
                 <Box key={idx} flexDirection="row">
                   <Box width={12} minWidth={12}>
-                    <Text color={color as any} bold>
+                    <Text color={color} bold>
                       [{label}]
                     </Text>
                   </Box>

@@ -305,7 +305,7 @@ export class YoutubeService extends MetadataService {
 
             this.status.clear();
             return metadata;
-        } catch (error: any) {
+        } catch (error) {
             this.logger.error(`Error searching YouTube Music for: ${sourceTrackMetadata.trackName}`, { error });
             this.status.set({
                 type: StatusType.Error,

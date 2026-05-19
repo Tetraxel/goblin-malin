@@ -38,7 +38,7 @@ export function MetadataHeader({ source }: MetadataHeaderProps) {
       {parts.map((part, idx) => (
         <Box key={idx} flexDirection="row" flexShrink={0}>
           {idx > 0 && <Text color={theme.text.secondary}>{" > "}</Text>}
-          <Text color={platformColor as any} wrap="truncate-end">
+          <Text color={platformColor} wrap="truncate-end">
             {part}
           </Text>
         </Box>

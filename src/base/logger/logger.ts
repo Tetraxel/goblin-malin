@@ -11,7 +11,7 @@ const logsPath = getLogsPath();
 fs.mkdirSync(path.dirname(logsPath), { recursive: true });
 fs.writeFileSync(logsPath, '');
 
-function getString(obj: any): string {
+function getString(obj: unknown): string {
     if (typeof obj === 'string') {
         return obj
     } else if (obj instanceof Error) {
@@ -71,7 +71,7 @@ export class Logger {
             this.metadata = { ...this.metadata, ...metadata }
     }
 
-    private log(level: LogLevel, message: any, details: LogDetails = {}) {
+    private log(level: LogLevel, message: unknown, details: LogDetails = {}) {
         const service = this.metadata?.service
         const prefix = service ? `[${service}] ` : ''
         const formattedMessage = prefix + setLogColor(level, getString(message))
@@ -97,19 +97,19 @@ export class Logger {
     }
 
 
-    public info(message: any, details?: LogDetails) {
+    public info(message: unknown, details?: LogDetails) {
         this.log(LogLevel.INFO, message, details)
     }
 
-    public warn(message: any, details?: LogDetails) {
+    public warn(message: unknown, details?: LogDetails) {
         this.log(LogLevel.WARN, message, details)
     }
 
-    public error(message: any, details?: LogDetails) {
+    public error(message: unknown, details?: LogDetails) {
         this.log(LogLevel.ERROR, message, details)
     }
 
-    public debug(message: any, details?: LogDetails) {
+    public debug(message: unknown, details?: LogDetails) {
         this.log(LogLevel.DEBUG, message, details)
     }
 

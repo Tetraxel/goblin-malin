@@ -25,7 +25,7 @@ export function DetailRow({
       </Box>
       <Box flexGrow={1}>
         <Text
-          color={(valueColor as any) ?? theme.text.primary}
+          color={valueColor ?? theme.text.primary}
           dimColor={dim || value === "—"}
           wrap="truncate-end"
         >

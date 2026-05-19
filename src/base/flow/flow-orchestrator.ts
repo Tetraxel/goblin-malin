@@ -69,6 +69,7 @@ export class FlowOrchestrator {
         this.notifySubscribers();
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     addTasks(tasks: Task<any>[]): void {
         // check that none of the tasks are already in the queue
         for (const task of tasks) {
@@ -95,6 +96,7 @@ export class FlowOrchestrator {
         return this.tasks.filter((task) => task.running)
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public async processTask(task: Task<any>): Promise<void> {
         // Clean attributes in case the task is restarted
         return task.start()

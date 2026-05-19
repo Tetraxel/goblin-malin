@@ -78,7 +78,7 @@ export const SourcesHintBar: React.FC<SourcesHintBarProps> = ({
                   {" > "}
                 </Text>
               )}
-              <Text color={part.color as any} dimColor={dim}>
+              <Text color={part.color} dimColor={dim}>
                 {part.label}
               </Text>
             </React.Fragment>

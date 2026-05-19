@@ -50,14 +50,14 @@ interface CacheOptions {
 // Method decorator to handle both @Cached and @Cached()
 export function Cached(options: CacheOptions = {}) {
     return function (
-        target: any,
+        target: object,
         propertyKey: string,
         descriptor: PropertyDescriptor
     ): PropertyDescriptor {
         const originalMethod = descriptor.value;
         const className = target.constructor.name;
 
-        descriptor.value = async function (...args: any[]) {
+        descriptor.value = async function (...args: unknown[]) {
             // Generate cache key
             const cacheKey = `${className}:${propertyKey}:${JSON.stringify(args)}`;
 

@@ -4,18 +4,23 @@ import { ServiceScope } from "./service-scope";
 import { Task } from "./task/task";
 import { ProviderDisplay, providerDisplayRegistry } from "./providerDisplay";
 import { ParsedUrl, urlParserRegistry } from "./urlParser";
+import { ProviderSettingsSchema } from "./providerSettings";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ServiceFactory<TTask extends Task<any>, TService extends ServiceBase> = (task: TTask, logger: Logger) => TService;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> = {
     new(task: TTask, logger: Logger): TService;
     display?: ProviderDisplay;
     parseUrl?: (url: string) => ParsedUrl | null;
+    defaultSettings?: ProviderSettingsSchema;
 };
 
 // Central registry for services, allowing dynamic registration and scoped instantiation
 // For example, user can enable/disable certain services
-export class ServiceRegistry<TTask extends Task<any>, TService extends ServiceBase> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export class ServiceRegistry<TTask extends Task<any> = Task, TService extends ServiceBase = ServiceBase> {
     private factories = new Map<string, ServiceFactory<TTask, TService>>();
     private constructors = new Map<string, ServiceConstructor<TTask, TService>>();
 

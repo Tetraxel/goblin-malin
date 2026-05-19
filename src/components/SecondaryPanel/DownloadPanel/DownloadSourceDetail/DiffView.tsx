@@ -79,9 +79,9 @@ export function DiffView({
     <Box flexDirection="column" width={width} height={height} overflow="hidden">
       <Box flexDirection="row" paddingX={1} height={1} flexShrink={0}>
         <Text color={theme.diff.base}>┌── </Text>
-        <Text color={oldProviderColor as any}>{oldProvider}</Text>
+        <Text color={oldProviderColor}>{oldProvider}</Text>
         <Text color={theme.diff.base}> → </Text>
-        <Text color={newProviderColor as any}>{newProvider}</Text>
+        <Text color={newProviderColor}>{newProvider}</Text>
         <Text color={theme.diff.base}>
           {"─".repeat(
             Math.max(0, innerW - oldProvider.length - newProvider.length - 10),

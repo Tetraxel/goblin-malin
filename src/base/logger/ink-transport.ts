@@ -6,7 +6,7 @@ export class InkTransport extends Transport {
     private pending: LogEntry[] = [];
     private subscribers: Set<(logs: LogEntry[]) => void> = new Set();
 
-    constructor(opts: any) {
+    constructor(opts: Record<string, unknown>) {
         super(opts)
     }
 

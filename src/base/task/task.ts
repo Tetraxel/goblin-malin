@@ -11,7 +11,7 @@ export interface DownloadTaskData {
 
 export type TaskSubscriber<TTAttributes> = (task: Task<TTAttributes>) => void;
 export type TaskSubscribers<TTAttributes> = Set<TaskSubscriber<TTAttributes>>;
-export type TaskAttributes = Record<string, any>
+export type TaskAttributes = Record<string, unknown>
 export type TaskSnapshot<TTAttributes = TaskAttributes> = {
     id: string;
     initialInput: string | undefined;

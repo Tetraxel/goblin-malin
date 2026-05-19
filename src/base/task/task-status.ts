@@ -18,7 +18,7 @@ export interface StatusAttributes {
     stepNumber?: number;
     progress?: number;
     startTime?: Date | null;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
 }
 
 const DEFAULT_ATTRIBUTES: StatusAttributes = {

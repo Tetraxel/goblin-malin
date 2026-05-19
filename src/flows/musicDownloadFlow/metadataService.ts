@@ -18,7 +18,7 @@ export abstract class MetadataService extends ServiceBase {
     }
 
     getType(url: string): 'track' | undefined {
-        return (this.constructor as any).parseUrl?.(url)?.type === 'track' ? 'track' : undefined;
+        return (this.constructor as typeof MetadataService).parseUrl?.(url)?.type === 'track' ? 'track' : undefined;
     }
 
     abstract getTrackMetadata(url: string): Promise<TrackMetadata>;

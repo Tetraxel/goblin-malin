@@ -147,7 +147,7 @@ export const MetadataSourceRow: React.FC<SourceRowProps> = ({
               </Text>
             )}
             <Text
-              color={prefixColor as any}
+              color={prefixColor}
               dimColor={isDimmed}
               strikethrough={isDimmed}
               wrap="truncate-end"

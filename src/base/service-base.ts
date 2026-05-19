@@ -11,8 +11,9 @@ export abstract class ServiceBase extends EventEmitter {
     protected env: Env;
     protected status: TaskStatus;
 
-    private static _executionLocks: Map<string, Promise<any>> = new Map();
+    private static _executionLocks: Map<string, Promise<unknown>> = new Map();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     constructor(id: string, task: Task<any>, logger: Logger) {
         super();
         this.id = id;

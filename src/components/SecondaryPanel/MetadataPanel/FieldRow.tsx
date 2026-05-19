@@ -102,7 +102,7 @@ export const FieldRow: React.FC<FieldRowProps> = ({
 
       {isCompiled && !isEditing && !editError && (
         <Box minWidth={badge.text.length + 1} paddingLeft={1} flexShrink={0}>
-          <Text color={badge.color as any} dimColor italic={badge.italic}>
+          <Text color={badge.color} dimColor italic={badge.italic}>
             {badge.text}
           </Text>
         </Box>

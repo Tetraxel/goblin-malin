@@ -18,6 +18,7 @@ export type ContextualActions = {
   multiSelectAllowed?: boolean;
   multiSelectOnly?: boolean;
   onClick: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onClickBatch?: (tasks: Task<any>[]) => void;
 };
 

@@ -42,16 +42,16 @@ export const withFullScreen: WithFullScreen = (node, options) => {
 };
 
 export function start(): void {
-  console.log = (...args: any[]) => globalLogger.info(args.join(" "));
-  console.error = (...args: any[]) => globalLogger.error(args.join(" "));
-  console.warn = (...args: any[]) => globalLogger.warn(args.join(" "));
+  console.log = (...args: unknown[]) => globalLogger.info(args.join(" "));
+  console.error = (...args: unknown[]) => globalLogger.error(args.join(" "));
+  console.warn = (...args: unknown[]) => globalLogger.warn(args.join(" "));
 
   process.on("unhandledRejection", (reason, promise) => {
     globalLogger.error("Unhandled Rejection", { promise, reason });
   });
 
   try {
-    if (process.stdin && (process.stdin as any).isTTY) {
+    if (process.stdin && process.stdin.isTTY) {
       process.stdin.setEncoding("utf8");
       process.stdin.resume();
     }

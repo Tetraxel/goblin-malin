@@ -8,7 +8,7 @@ export enum LogLevel {
 }
 
 export type LogDetails = {
-    [key: string]: any
+    [key: string]: unknown
 }
 
 export interface LogMetadata {
@@ -18,7 +18,8 @@ export interface LogMetadata {
     message: string
     service?: string
     flow?: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     task?: Task<any>
     details?: LogDetails // will be printed in the terminal
-    [key: string]: any // Allow additional context fields
+    [key: string]: unknown // Allow additional context fields
 }

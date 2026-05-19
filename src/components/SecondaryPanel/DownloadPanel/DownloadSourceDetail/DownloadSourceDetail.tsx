@@ -322,7 +322,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
             {sourceParts.map((part, idx) => (
               <React.Fragment key={idx}>
                 {idx > 0 && <Text color={theme.text.secondary}>{" > "}</Text>}
-                <Text color={dlProvider.color as any}>{part}</Text>
+                <Text color={dlProvider.color}>{part}</Text>
               </React.Fragment>
             ))}
           </Box>

@@ -34,4 +34,5 @@ Only two metadata services are registered: `spotify` and `youtube`. Only one dow
 ```bash
 yarn run dev  # start the TUI (use this)
 yarn run type-check  # Check typescript errors
+yarn run lint  # Check eslint errors
 ```

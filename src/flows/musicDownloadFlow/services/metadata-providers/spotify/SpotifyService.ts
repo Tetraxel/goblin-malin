@@ -152,7 +152,7 @@ export class SpotifyService extends MetadataService {
 
             this.status.clear();
             return trackData;
-        } catch (error: any) {
+        } catch (error) {
             this.logger.error(`Error fetching Spotify track info for ID ${trackId}:`, { error });
             this.status.set({
                 type: StatusType.Error,
@@ -290,7 +290,7 @@ export class SpotifyService extends MetadataService {
 
             this.status.clear();
             return metadata;
-        } catch (error: any) {
+        } catch (error) {
             this.logger.error(`Error searching Spotify for: ${sourceTrackMetadata.trackName}`, { error });
             this.status.set({
                 type: StatusType.Error,

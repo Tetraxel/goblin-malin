@@ -145,7 +145,7 @@ export class MpvPlayer extends EventEmitter {
           }
         };
         sock.once("error", onError);
-        sock.connect(this.socketPath as any, () => {
+        sock.connect(this.socketPath, () => {
           sock.removeListener("error", onError);
           this.socket = sock;
           sock.on("error", (err) => this.emit("error", err));
