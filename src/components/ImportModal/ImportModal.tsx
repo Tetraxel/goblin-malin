@@ -55,11 +55,11 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   const theme = useTheme();
   const { focusState, switchWindow, switchBack } = useFocusContext();
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
-
-  useEffect(() => {
-    if (!pendingImport) return;
+  const [prevPendingImport, setPrevPendingImport] = useState(pendingImport);
+  if (prevPendingImport !== pendingImport) {
+    setPrevPendingImport(pendingImport);
     setSelectedIndex(0);
-  }, [pendingImport]);
+  }
 
   // Take focus while the modal is rendered; restore on unmount
   useEffect(() => {

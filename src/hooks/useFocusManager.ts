@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useScreenSize } from './useScreenSize';
 import { FlowBase } from '../base/flow/flow-base';
 import { SetupWizardConfig } from '../base/setupWizard';
@@ -91,6 +91,17 @@ export const useFocusManager = ({
 }) => {
   const { height: terminalHeight, width: terminalWidth } = useScreenSize();
 
+  // Stores the user's explicit task-list height; clamped in the layout memo on resize.
+  const [manualTaskListHeight, setManualTaskListHeight] = useState(
+    () => initLayout(terminalHeight).taskListHeight,
+  );
+
+  const layout = useMemo(() => {
+    const contentHeight = computeContentHeight(terminalHeight);
+    const taskListHeight = Math.max(5, Math.min(manualTaskListHeight, contentHeight - 5));
+    return { taskListHeight, secondaryPanelHeight: contentHeight - taskListHeight, contentHeight };
+  }, [terminalHeight, manualTaskListHeight]);
+
   const [focusState, setFocusState] = useState<FocusState>(() => ({
     activeWindow: 'toolbar',
     previousWindow: undefined,
@@ -133,22 +144,6 @@ export const useFocusManager = ({
     isEditingField: false,
   }));
 
-  useEffect(() => {
-    setFocusState((prev) => {
-      const contentHeight = computeContentHeight(terminalHeight);
-      const prevContent = prev.layout.contentHeight || contentHeight;
-      const ratio = prev.layout.taskListHeight / prevContent;
-      const taskListHeight = Math.max(5, Math.min(Math.round(contentHeight * ratio), contentHeight - 5));
-      const secondaryPanelHeight = contentHeight - taskListHeight;
-      return {
-        ...prev,
-        taskList: { ...prev.taskList, width: terminalWidth },
-        logPanel: { ...prev.logPanel, width: terminalWidth },
-        layout: { taskListHeight, secondaryPanelHeight, contentHeight },
-      };
-    });
-  }, [terminalHeight, terminalWidth]);
-
   const switchWindow = useCallback((window: FocusableWindow) => {
     setFocusState((prev) => ({
       ...prev,
@@ -190,24 +185,8 @@ export const useFocusManager = ({
   }, []);
 
   const resizePanels = useCallback((direction: 'grow' | 'shrink') => {
-    setFocusState((prev) => {
-      const delta = direction === 'grow' ? 2 : -2;
-      const newTaskListHeight = Math.max(
-        5,
-        Math.min(
-          prev.layout.taskListHeight + delta,
-          prev.layout.contentHeight - 5,
-        ),
-      );
-      return {
-        ...prev,
-        layout: {
-          ...prev.layout,
-          taskListHeight: newTaskListHeight,
-          secondaryPanelHeight: prev.layout.contentHeight - newTaskListHeight,
-        },
-      };
-    });
+    const delta = direction === 'grow' ? 2 : -2;
+    setManualTaskListHeight((prev) => prev + delta);
   }, []);
 
   const setPrimaryMode = useCallback((mode: 'metadata' | 'download') => {
@@ -367,8 +346,15 @@ export const useFocusManager = ({
     }));
   }, []);
 
+  const derivedFocusState: FocusState = {
+    ...focusState,
+    layout,
+    taskList: { ...focusState.taskList, width: terminalWidth },
+    logPanel: { ...focusState.logPanel, width: terminalWidth },
+  };
+
   return {
-    focusState,
+    focusState: derivedFocusState,
     switchWindow,
     switchBack,
     handleTabPress,

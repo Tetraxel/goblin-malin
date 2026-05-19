@@ -80,17 +80,19 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [editingField, setEditingField] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!config) return;
-    setFocusedIndex(0);
-    setEditingField(null);
-    setFieldValues(
-      Object.fromEntries(
-        config.fields.map((f) => [f.envVar, process.env[f.envVar] ?? ""]),
-      ),
-    );
-  }, [config]);
+  const [prevConfig, setPrevConfig] = useState(config);
+  if (prevConfig !== config) {
+    setPrevConfig(config);
+    if (config) {
+      setFocusedIndex(0);
+      setEditingField(null);
+      setFieldValues(
+        Object.fromEntries(
+          config.fields.map((f) => [f.envVar, process.env[f.envVar] ?? ""]),
+        ),
+      );
+    }
+  }
 
   const interactiveItems = useMemo(
     () => (config ? buildInteractiveItems(config) : []),

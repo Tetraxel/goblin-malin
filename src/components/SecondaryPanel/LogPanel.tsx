@@ -68,13 +68,16 @@ export const LogPanel = ({
     focusState.secondaryPanel.subTab === "logs";
 
   // Reset scroll when task filter changes or when panel loses focus
-  useEffect(() => {
+  const [prevSelectedTask, setPrevSelectedTask] = useState(selectedTask);
+  const [prevIsActive, setPrevIsActive] = useState(isActive);
+  if (prevSelectedTask !== selectedTask) {
+    setPrevSelectedTask(selectedTask);
     setScrollOffset(0);
-  }, [selectedTask]);
-
-  useEffect(() => {
+  }
+  if (prevIsActive !== isActive) {
+    setPrevIsActive(isActive);
     if (!isActive) setScrollOffset(0);
-  }, [isActive]);
+  }
 
   const filteredLogs = logs.filter(
     (log) => !selectedTask || !log.task || selectedTask === log.task,

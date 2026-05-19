@@ -26,20 +26,18 @@ export const App: React.FC = () => {
 
   const [tasks, setTasks] = useState<Task<TaskAttributes>[]>([]);
   const { height: terminalHeight, width: terminalWidth } = useScreenSize();
-  const [activeFlowId, setActiveFlowId] = useState<string | undefined>();
+  const orchestrator = FlowOrchestrator.getInstance();
+  const [activeFlowId, setActiveFlowId] = useState<string | undefined>(() => {
+    orchestrator.registerFlow(MusicDownloadFlow, true);
+    return orchestrator.getEnabledFlows()?.[0].id;
+  });
   const [toolbarButtons, setToolbarButtons] = useState<ToolbarButtonHook[]>([]);
   const [columns, setColumns] = useState<
     ColumnDefinition<MusicDownloadTaskAttributes>[]
   >([]);
-  const orchestrator = FlowOrchestrator.getInstance();
   const currentFlow = activeFlowId
     ? orchestrator.getFlow(activeFlowId)
     : undefined;
-
-  useEffect(() => {
-    orchestrator.registerFlow(MusicDownloadFlow, true);
-    setActiveFlowId(orchestrator.getEnabledFlows()?.[0].id);
-  }, [orchestrator]);
 
   // [!] This is important to allow dynamic updates of buttons and columns when the flow changes
   useEffect(() => {

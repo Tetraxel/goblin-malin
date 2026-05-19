@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { useFocusContext } from "../../contexts/FocusContext";
@@ -50,17 +50,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Reset to fresh settings when the modal opens, but NOT when returning from the wizard
   // (wizard's onDisable may have updated flowPatch which we want to preserve)
-  useEffect(() => {
-    if (!isActive) return;
-    if (focusState.returningFromWindow === "setupWizardModal") return;
-    setAppDraft(SettingsStore.getInstance().getAppSettings());
-    setFlowPatch({});
-    setSelectedIndex(0);
-    setEditingIndex(null);
-    setEditValue("");
-    setSearchQuery("");
-    setModalFocus("search");
-  }, [isActive, focusState.returningFromWindow]);
+  const [prevIsActive, setPrevIsActive] = useState(isActive);
+  const [prevReturningFrom, setPrevReturningFrom] = useState(focusState.returningFromWindow);
+  if (prevIsActive !== isActive || prevReturningFrom !== focusState.returningFromWindow) {
+    setPrevIsActive(isActive);
+    setPrevReturningFrom(focusState.returningFromWindow);
+    if (isActive && focusState.returningFromWindow !== "setupWizardModal") {
+      setAppDraft(SettingsStore.getInstance().getAppSettings());
+      setFlowPatch({});
+      setSelectedIndex(0);
+      setEditingIndex(null);
+      setEditValue("");
+      setSearchQuery("");
+      setModalFocus("search");
+    }
+  }
 
   const allItems = useMemo((): SettingsItem[] => {
     const globalItems = buildGlobalSettingsItems(appDraft, (patch) =>
@@ -86,12 +90,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     [allItems, searchQuery],
   );
 
-  // Keep selectedIndex in bounds when the list shrinks
-  useEffect(() => {
-    setSelectedIndex((prev) =>
-      Math.min(prev, Math.max(0, filteredItems.length - 1)),
-    );
-  }, [filteredItems.length]);
+  // Clamp selectedIndex without an effect — derived during render
+  const safeSelectedIndex = Math.min(selectedIndex, Math.max(0, filteredItems.length - 1));
 
   // ── Global handler: Ctrl+S, Esc, and search→list transition ───────────────
   useInput(
@@ -138,7 +138,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   useInput(
     (input, key) => {
       if (key.upArrow) {
-        let newIdx = selectedIndex - 1;
+        let newIdx = safeSelectedIndex - 1;
         while (newIdx >= 0 && !isInteractive(filteredItems[newIdx])) newIdx--;
         if (newIdx < 0) {
           setModalFocus("search");
@@ -149,7 +149,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       }
 
       if (key.downArrow) {
-        let newIdx = selectedIndex + 1;
+        let newIdx = safeSelectedIndex + 1;
         while (
           newIdx < filteredItems.length &&
           !isInteractive(filteredItems[newIdx])
@@ -159,7 +159,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         return;
       }
 
-      const item = filteredItems[selectedIndex];
+      const item = filteredItems[safeSelectedIndex];
       if (!item || !isInteractive(item)) return;
 
       if ((key.leftArrow || key.rightArrow) && item.kind === "select") {
@@ -178,7 +178,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         }
         if (item.kind === "textInput") {
           setEditValue(item.get());
-          setEditingIndex(selectedIndex);
+          setEditingIndex(safeSelectedIndex);
           return;
         }
         if (item.kind === "action") {
@@ -206,7 +206,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   }
   const totalRows = cumRows;
 
-  const selectedRowStart = rowStarts[selectedIndex] ?? 0;
+  const selectedRowStart = rowStarts[safeSelectedIndex] ?? 0;
   const scrollRowOffset = Math.max(
     0,
     Math.min(
@@ -295,7 +295,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <Box flexDirection="column" overflow="hidden" flexGrow={1}>
           {visibleItems.map(({ item, idx }) => {
             const itemIsSelected =
-              idx === selectedIndex && modalFocus === "list";
+              idx === safeSelectedIndex && modalFocus === "list";
             const itemIsEditing = editingIndex === idx;
             return (
               <SettingsItemRow

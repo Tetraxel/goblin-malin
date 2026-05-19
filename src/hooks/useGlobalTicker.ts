@@ -37,10 +37,7 @@ export function useGlobalTicker(interval: number): number {
         // 2. Subscribe this component's setTick function
         entry.listeners.add(setTick);
 
-        // 3. Sync immediately to the current global tick (in case we mounted late)
-        setTick(entry.tick);
-
-        // 4. Cleanup on unmount
+        // 3. Cleanup on unmount
         return () => {
             entry.listeners.delete(setTick);
 

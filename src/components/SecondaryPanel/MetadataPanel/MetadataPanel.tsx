@@ -50,12 +50,14 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
     () =>
       typedTask?.get() as TaskSnapshot<MusicDownloadTaskAttributes> | undefined,
   );
+  const [prevTypedTask, setPrevTypedTask] = useState(typedTask);
+  if (prevTypedTask !== typedTask) {
+    setPrevTypedTask(typedTask);
+    setSnapshot(typedTask?.get() as TaskSnapshot<MusicDownloadTaskAttributes> | undefined);
+  }
 
   useEffect(() => {
-    if (!typedTask) {
-      setSnapshot(undefined);
-      return;
-    }
+    if (!typedTask) return;
     return (typedTask as Task<MusicDownloadTaskAttributes>).subscribe((t) => {
       setSnapshot(t.get() as TaskSnapshot<MusicDownloadTaskAttributes>);
     });
