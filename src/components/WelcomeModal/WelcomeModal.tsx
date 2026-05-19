@@ -41,7 +41,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
     if (settings.general.showWelcomeTutorial) {
       switchWindow("welcomeModal");
     }
-  }, []);
+  }, [switchWindow]);
 
   const handleClose = useCallback(() => {
     if (dontShowAgain) {

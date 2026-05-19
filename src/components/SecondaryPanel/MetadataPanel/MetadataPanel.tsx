@@ -59,7 +59,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
     return (typedTask as Task<MusicDownloadTaskAttributes>).subscribe((t) => {
       setSnapshot(t.get() as TaskSnapshot<MusicDownloadTaskAttributes>);
     });
-  }, [typedTask?.id]);
+  }, [typedTask]);
 
   const sources: MetadataSourceState[] =
     snapshot?.attributes?.metadataSources ?? [];

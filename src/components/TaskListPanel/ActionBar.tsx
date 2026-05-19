@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
 import { useFocusContext } from "../../contexts/FocusContext";
 import { FlowBase } from "../../base/flow/flow-base";
@@ -18,28 +18,20 @@ export const ActionBar: React.FC<{
   const multiCount = focusState.taskList.selectedTaskIds.size;
   const selectedTask = tasks[selectedIndex];
 
-  const [taskVersion, setTaskVersion] = useState(0);
+  const [, setTaskVersion] = useState(0);
   useEffect(() => {
     if (!selectedTask) return;
     return selectedTask.subscribe(() => setTaskVersion((v) => v + 1));
-  }, [selectedTask?.getId()]);
+  }, [selectedTask]);
 
-  const bar = useMemo(() => {
-    if (!isTaskListActive || !flow || !selectedTask) return null;
-    return flow.getContextualActionBar(selectedTask, {
-      columnIndex: focusState.taskList.selectedColumnIndex,
-      taskIndex: selectedIndex,
-      taskCount: tasks.length,
-    });
-  }, [
-    isTaskListActive,
-    flow,
-    selectedTask,
-    selectedIndex,
-    tasks.length,
-    focusState.taskList.selectedColumnIndex,
-    taskVersion,
-  ]);
+  const bar =
+    isTaskListActive && flow && selectedTask
+      ? flow.getContextualActionBar(selectedTask, {
+          columnIndex: focusState.taskList.selectedColumnIndex,
+          taskIndex: selectedIndex,
+          taskCount: tasks.length,
+        })
+      : null;
 
   const rowCount = bar?.rows.length ?? 1;
 

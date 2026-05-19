@@ -62,7 +62,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({
     return (typedTask as Task<MusicDownloadTaskAttributes>).subscribe((t) => {
       setSnapshot(t.get() as TaskSnapshot<MusicDownloadTaskAttributes>);
     });
-  }, [typedTask?.id]);
+  }, [typedTask]);
 
   const downloadSources: TrackDownloadSource[] =
     snapshot?.attributes?.downloadSources ?? [];

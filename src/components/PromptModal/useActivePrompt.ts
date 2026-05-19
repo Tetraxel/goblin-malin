@@ -25,9 +25,12 @@ export const useActivePrompt = (tasks: Task[]): ActivePromptResult => {
 
     useEffect(() => {
         const updateActivePrompt = () => {
-            // Only change the active prompt if there is no current active prompt
-            if (!activePrompt.task?.getPrompt().getCurrentPrompt())
-                setActivePrompt(getFirstPendingPrompt(tasks));
+            setActivePrompt(prev => {
+                // Only change the active prompt if there is no current active prompt
+                if (!prev.task?.getPrompt().getCurrentPrompt())
+                    return getFirstPendingPrompt(tasks);
+                return prev;
+            });
         };
 
         // Subscribe to all tasks

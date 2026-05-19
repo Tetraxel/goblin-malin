@@ -75,7 +75,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({
     if (autoConfig) {
       switchWindow("setupWizardModal");
     }
-  }, [autoConfig]);
+  }, [autoConfig, switchWindow]);
 
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
@@ -149,7 +149,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({
   const handleDisable = useCallback(() => {
     focusState.wizardOnDisable?.();
     switchBack();
-  }, [focusState.wizardOnDisable, switchBack]);
+  }, [focusState, switchBack]);
 
   useInput(
     (input, key) => {

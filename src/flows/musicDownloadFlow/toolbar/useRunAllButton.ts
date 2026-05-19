@@ -25,7 +25,7 @@ export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({ flow, orchestrato
         });
 
         return unsubscribe;
-    }, [orchestrator]);
+    }, [orchestrator, flow.id, isProcessing]);
 
     if (pendingTasks.length === 0)
         return {

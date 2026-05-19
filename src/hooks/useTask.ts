@@ -21,7 +21,7 @@ export const useTask = <TAttributes>(task: Task<TAttributes>) => {
 
         // Cleanup: unsubscribe when component unmounts or task changes
         return unsubscribe;
-    }, [task.id]); // Re-subscribe if the task instance changes
+    }, [task]); // Re-subscribe if the task instance changes
 
     return taskSnapshot
     // return taskSnapshot as ReturnType<Task<Attributes>['get']>;

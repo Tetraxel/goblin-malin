@@ -32,7 +32,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({
     } else {
       switchBack();
     }
-  }, [prompt]);
+  }, [prompt, switchBack, switchWindow]);
 
   const handleInputSubmit = (value: string) => {
     if (!task || !prompt) return;

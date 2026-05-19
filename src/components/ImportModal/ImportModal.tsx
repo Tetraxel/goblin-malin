@@ -68,7 +68,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     return () => {
       switchBack();
     };
-  }, [pendingImport !== null]);
+  }, [pendingImport, switchBack, switchWindow]);
 
   const isActive =
     pendingImport !== null && focusState.activeWindow === "importModal";
