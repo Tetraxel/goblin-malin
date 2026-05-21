@@ -20,6 +20,9 @@ export type MusicDownloadFlowSettings = {
         outputTemporaryDir: string;
         providers: Record<string, StoredProviderSettings>;
     };
+    discovery: {
+        providers: Record<string, StoredProviderSettings>;
+    };
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,6 +55,9 @@ export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSetting
         autoRelocateMissingFiles: false,
         outputDir: MEDIA_OUTPUT_DIR,
         outputTemporaryDir: path.join(MEDIA_OUTPUT_DIR, "tmp"),
+        providers: {},
+    },
+    discovery: {
         providers: {},
     },
 };

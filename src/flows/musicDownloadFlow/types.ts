@@ -86,7 +86,8 @@ export type Platform =
     | "audiomack"
     | "anghami"
     | "boomplay"
-    | "bandcamp";
+    | "bandcamp"
+    | "songlink";
 
 export type APIProvider =
     | "musicBrainz"
@@ -106,7 +107,8 @@ export type APIProvider =
     | "audiomack"
     | "anghami"
     | "boomplay"
-    | "bandcamp";
+    | "bandcamp"
+    | "songlink";
 
 export type TrackUri<PlatformString extends string = string> = `${Uppercase<PlatformString>}::TRACK::${string}`;
 
@@ -126,6 +128,7 @@ export type BaseTrackMetadata = {
     apiProvider: APIProvider;
     fetchedAt: Date;
     type: "track";
+    fetchedVia?: "songlink"; // stub from SongLink — partial data, will be enriched
     bpm?: number;
     key?: string;
     genres?: string[];
@@ -179,6 +182,11 @@ export type TidalTrackMetadata = BaseTrackMetadata & {
     uri: TrackUri<"tidal">; // "TIDAL::TRACK::4rye8ZgoRgbQPfgBqxjfqG"
 };
 
+export type SonglinkTrackMetadata = BaseTrackMetadata & {
+    platform: "songlink";
+    apiProvider: "songlink";
+};
+
 export type TrackMetadata =
     | MusicBrainzTrackMetadata
     | SpotifyTrackMetadata
@@ -187,7 +195,8 @@ export type TrackMetadata =
     | YoutubeTrackMetadata
     | YoutubeMusicTrackMetadata
     | SoundcloudTrackMetadata
-    | TidalTrackMetadata;
+    | TidalTrackMetadata
+    | SonglinkTrackMetadata;
 
 export type MetadataSourceState = {
     metadata: TrackMetadata;

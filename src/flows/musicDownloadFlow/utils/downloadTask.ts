@@ -16,11 +16,13 @@ import { computeCompiledMetadata } from "./compiledMetadata";
 import { compiledMetadataToTags } from "./compiledMetadataToTags";
 import { computeOutputPath } from "./computeOutputPath";
 import { MetadataService } from "../metadataService";
+import { DiscoveryMetadataService } from "../discoveryMetadataService";
 import { DownloadService } from "../downloadService";
 import { getSaveSettings } from "../saveSettings";
 
 export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
     private metadataServices: ServiceScope<DownloadTask, MetadataService>;
+    private discoveryServices: ServiceScope<DownloadTask, DiscoveryMetadataService>;
     private downloadServices: ServiceScope<DownloadTask, DownloadService>;
 
     constructor({
@@ -30,8 +32,10 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         flowId,
         logger,
         metadataServiceRegistry,
+        discoveryServiceRegistry,
         downloadServiceRegistry,
         isMetadataEnabled,
+        isDiscoveryEnabled,
         isDownloadEnabled,
     }: {
         id: string;
@@ -40,13 +44,16 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         flowId: string;
         logger: Logger;
         metadataServiceRegistry: ServiceRegistry<DownloadTask, MetadataService>;
+        discoveryServiceRegistry: ServiceRegistry<DownloadTask, DiscoveryMetadataService>;
         downloadServiceRegistry: ServiceRegistry<DownloadTask, DownloadService>;
         isMetadataEnabled: (key: string) => boolean;
+        isDiscoveryEnabled: (key: string) => boolean;
         isDownloadEnabled: (key: string) => boolean;
     }) {
         super({ id, initialInput, attributes, flowId, logger });
 
         this.metadataServices = metadataServiceRegistry.createScope(this, this.logger, isMetadataEnabled);
+        this.discoveryServices = discoveryServiceRegistry.createScope(this, this.logger, isDiscoveryEnabled);
         this.downloadServices = downloadServiceRegistry.createScope(this, this.logger, isDownloadEnabled);
     }
 
@@ -72,8 +79,13 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
 
         // Update existing source
         if (existingSourceIndex !== -1) {
+            const existing = currentMetadataSources[existingSourceIndex];
+            // Don't overwrite a full native source with a SongLink stub
+            if (!isPrimary && existing.metadata.fetchedVia === undefined && metadata.fetchedVia === "songlink") {
+                return;
+            }
             currentMetadataSources[existingSourceIndex] = {
-                ...currentMetadataSources[existingSourceIndex],
+                ...existing,
                 metadata,
                 isPrimarySource: isPrimary,
                 confidence,
@@ -166,14 +178,18 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         });
 
         try {
-            const services = this.metadataServices.getAllServices();
+            // Native metadata services first, discovery services (SongLink) as catch-all fallback
+            const allFetchServices: Array<{ id: string; getType(url: string): "track" | undefined; getTrackMetadata(url: string): Promise<TrackMetadata> }> = [
+                ...this.metadataServices.getAllServices(),
+                ...this.discoveryServices.getAllServices(),
+            ];
 
-            for (const service of services) {
+            for (const service of allFetchServices) {
                 try {
                     // Check if this service can handle the URL
                     const type = service.getType(url);
                     if (type === "track") {
-                        this.logger.debug(`Fetching metadata using ${service.constructor.name}`);
+                        this.logger.debug(`Fetching metadata using ${service.id}`);
 
                         const metadata = await service.getTrackMetadata(url);
                         this.addMetadataSource(metadata, true);
@@ -181,7 +197,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
                         break;
                     }
                 } catch (error) {
-                    this.logger.warn(`Failed to fetch metadata from ${service.constructor.name}:`, { error });
+                    this.logger.warn(`Failed to fetch metadata from ${service.id}:`, { error });
                 }
             }
 
@@ -197,16 +213,14 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
     }
 
     // Search metadata from all other providers using the primary metadata as source of truth
-    // (e.g. using track name, artist name, isrc, etc) to find the best matching metadata
     async startMetadataDiscovering(): Promise<void> {
-        // Get the primary metadata source to use for searching
         const primarySource = this.getPrimaryMetadata();
 
         if (!primarySource || !primarySource.metadata) {
             throw new Error("No primary metadata source available for metadata discovering");
         }
 
-        this.logger.info(`Discovering metadata from all other sources using primary metadata`);
+        this.logger.info("Discovering metadata from all other sources using primary metadata");
         this.updateAttributes({
             metadataSources: [primarySource],
             metadataDiscoveringInProgress: true,
@@ -214,23 +228,53 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         });
 
         try {
-            const services = this.metadataServices.getAllServices();
-            for (const service of services) {
+            // Phase 1 — Discovery: call DiscoveryMetadataService.discoverTracks() to get stubs
+            const discoveredStubs: TrackMetadata[] = [];
+            for (const discoveryService of this.discoveryServices.getAllServices()) {
+                try {
+                    this.logger.debug(`Discovering tracks via ${discoveryService.id}`);
+                    const stubs = await discoveryService.discoverTracks(primarySource.metadata);
+                    for (const stub of stubs) {
+                        if (stub.platform === primarySource.metadata.platform) continue;
+                        if (discoveredStubs.some((s) => s.url === stub.url)) continue;
+                        discoveredStubs.push(stub);
+                        this.addMetadataSource(stub, false);
+                    }
+                    this.logger.info(`Discovered ${stubs.length} stub(s) via ${discoveryService.id}`);
+                } catch (error) {
+                    this.logger.warn(`Discovery failed for ${discoveryService.id}:`, { error });
+                }
+            }
+
+            // Phase 2 — Enrichment: replace stubs with full native metadata where possible
+            const metadataServices = this.metadataServices.getAllServices();
+            for (const stub of discoveredStubs) {
+                for (const service of metadataServices) {
+                    try {
+                        const enriched = await service.enrichTrack(stub);
+                        if (enriched) {
+                            this.addMetadataSource(enriched, false);
+                            this.logger.info(`Enriched ${stub.apiProvider} stub via ${service.id}`);
+                            break;
+                        }
+                    } catch (error) {
+                        this.logger.warn(`Enrichment via ${service.id} failed for ${stub.apiProvider}:`, { error });
+                    }
+                }
+            }
+
+            // Phase 3 — searchTrack: existing text-based search (unchanged)
+            for (const service of metadataServices) {
                 try {
                     this.logger.debug(`Searching for track using ${service.id}`);
-
-                    // Use isrc, track name, artist name, etc to improve search results
                     const metadata = await service.searchTrack(primarySource.metadata);
 
-                    // Skip if discovered metadata is the same as the primary source
                     if (
                         primarySource &&
                         (metadata.platform === primarySource.metadata.platform ||
                             metadata.apiProvider === primarySource.metadata.apiProvider)
                     ) {
-                        this.logger.debug(
-                            `Skipping discovered metadata from ${service.id}: conflicts with primary source`
-                        );
+                        this.logger.debug(`Skipping search result from ${service.id}: conflicts with primary source`);
                         continue;
                     }
 
@@ -238,7 +282,6 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
                     this.logger.info(`Successfully discovered metadata from ${metadata.apiProvider}`);
                 } catch (error) {
                     this.logger.warn(`Failed to discover metadata from ${service.constructor.name}:`, { error });
-                    // Continue to next service on failure
                 }
             }
         } finally {

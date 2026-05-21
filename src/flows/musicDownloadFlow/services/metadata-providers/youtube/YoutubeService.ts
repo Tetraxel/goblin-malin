@@ -247,6 +247,16 @@ export class YoutubeService extends MetadataService {
         return metadata;
     }
 
+    async enrichTrack(stub: TrackMetadata): Promise<TrackMetadata | null> {
+        if (stub.fetchedVia !== "songlink") return null;
+        if (stub.apiProvider !== "youtube") return null;
+        try {
+            return await this.getTrackMetadata(stub.url);
+        } catch {
+            return null;
+        }
+    }
+
     async searchTrack(sourceTrackMetadata: TrackMetadata): Promise<TrackMetadata> {
         const artist = sourceTrackMetadata.artists?.[0]?.name;
         const trackName = sourceTrackMetadata.trackName;

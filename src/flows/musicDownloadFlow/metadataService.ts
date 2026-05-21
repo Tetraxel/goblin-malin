@@ -23,4 +23,13 @@ export abstract class MetadataService extends ServiceBase {
 
     abstract getTrackMetadata(url: string): Promise<TrackMetadata>;
     abstract searchTrack(sourceTrackMetadata: TrackMetadata): Promise<TrackMetadata>;
+
+    /**
+     * Attempt to replace a SongLink stub with full native metadata.
+     * Returns null if this service cannot or should not enrich the stub.
+     * Override in concrete services that support it.
+     */
+    async enrichTrack(_stub: TrackMetadata): Promise<TrackMetadata | null> {
+        return null;
+    }
 }

@@ -24,9 +24,11 @@ import { StatusCell } from "./columns/StatusCell";
 import { ToTagCell } from "./columns/ToTagCell";
 import { ToDownloadCell } from "./columns/ToDownloadCell";
 import { MetadataService } from "./metadataService";
+import { DiscoveryMetadataService } from "./discoveryMetadataService";
 import { DownloadService } from "./downloadService";
 import { SpotifyService } from "./services/metadata-providers/spotify/SpotifyService";
 import { YoutubeService } from "./services/metadata-providers/youtube/YoutubeService";
+import { SonglinkService } from "./services/metadata-providers/songlink/SonglinkService";
 import { YtDlpService } from "./services/download-providers/ytdlp/YtDlpService";
 import { DownloadTask } from "./utils/downloadTask";
 import { taskIdFromUrl } from "./utils/taskId";
@@ -58,6 +60,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
     protected maxConcurrentTasks = 2;
     protected displayMode: "metadata" | "download" = "metadata";
     protected metadataServiceRegistry = new ServiceRegistry<DownloadTask, MetadataService>();
+    protected discoveryServiceRegistry = new ServiceRegistry<DownloadTask, DiscoveryMetadataService>();
     protected downloadServiceRegistry = new ServiceRegistry<DownloadTask, DownloadService>();
     protected settings = new FlowSettings<MusicDownloadFlowSettings>("music-downloader", () =>
         this.computeDefaultSettings()
@@ -84,6 +87,10 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             download: {
                 ...BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS.download,
                 providers: extractProviderDefaults(this.downloadServiceRegistry),
+            },
+            discovery: {
+                ...BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS.discovery,
+                providers: extractProviderDefaults(this.discoveryServiceRegistry),
             },
         };
     }
@@ -132,6 +139,10 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         this.metadataServiceRegistry.register("spotify", SpotifyService);
         this.metadataServiceRegistry.register("youtube", YoutubeService);
         // this.metadataServiceRegistry.register('musicbrainz', MusicBrainzService);
+
+        // Use factory to avoid registering SongLink's catch-all parseUrl in urlParserRegistry
+        this.discoveryServiceRegistry.register("songlink", (task, logger) => new SonglinkService(task, logger));
+        providerDisplayRegistry.register("songlink", SonglinkService.display);
 
         this.downloadServiceRegistry.register("ytdlp", YtDlpService);
         // this.downloadServiceRegistry.register('soulseek', SoulseekService);
@@ -184,8 +195,10 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                     flowId: this.id,
                     logger: this.logger,
                     metadataServiceRegistry: this.metadataServiceRegistry,
+                    discoveryServiceRegistry: this.discoveryServiceRegistry,
                     downloadServiceRegistry: this.downloadServiceRegistry,
                     isMetadataEnabled: (key) => this.settings.get().metadata.providers[key]?.enabled !== false,
+                    isDiscoveryEnabled: (key) => this.settings.get().discovery.providers[key]?.enabled !== false,
                     isDownloadEnabled: (key) => this.settings.get().download.providers[key]?.enabled !== false,
                 })
         );
