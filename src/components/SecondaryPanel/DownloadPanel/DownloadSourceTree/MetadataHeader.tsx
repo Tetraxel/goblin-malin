@@ -27,7 +27,7 @@ export function MetadataHeader({ source }: MetadataHeaderProps) {
     const parts = [platformLabel, type, m.id].filter(Boolean);
 
     return (
-        <Box paddingLeft={2} flexDirection="row" overflow="hidden" flexShrink={0}>
+        <Box marginLeft={2} flexDirection="row" overflow="hidden" flexShrink={0}>
             <Box paddingRight={1} flexDirection="row" flexShrink={0}>
                 <Text color={theme.text.secondary}>{"└─ used"}</Text>
             </Box>

@@ -39,6 +39,10 @@ export class ServiceRegistry<TTask extends Task<any> = Task, TService extends Se
         return this.constructors.get(name);
     }
 
+    public getAllConstructors(): Map<string, ServiceConstructor<TTask, TService>> {
+        return new Map(this.constructors);
+    }
+
     public register(
         name: string,
         ctorOrFactory: ServiceConstructor<TTask, TService> | ServiceFactory<TTask, TService>

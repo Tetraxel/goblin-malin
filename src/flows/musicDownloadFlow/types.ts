@@ -106,7 +106,8 @@ export type APIProvider =
     | "audiomack"
     | "anghami"
     | "boomplay"
-    | "bandcamp";
+    | "bandcamp"
+    | "songlink";
 
 export type TrackUri<PlatformString extends string = string> = `${Uppercase<PlatformString>}::TRACK::${string}`;
 
@@ -124,6 +125,9 @@ export type BaseTrackMetadata = {
     album?: StandardAlbum;
     platform: Platform;
     apiProvider: APIProvider;
+    // If set and different from apiProvider, this metadata was fetched by the indicated service
+    // (e.g. Songlink discovered the track, real enrichment not yet done)
+    fetchedBy?: APIProvider;
     fetchedAt: Date;
     type: "track";
     bpm?: number;
@@ -189,13 +193,51 @@ export type TrackMetadata =
     | SoundcloudTrackMetadata
     | TidalTrackMetadata;
 
-export type MetadataSourceState = {
+//----------------------//
+//  SEARCH & DISCOVERY  //
+//----------------------//
+
+// Which fields of the source metadata were used to find a result
+export type SearchKey =
+    | "url"
+    | "isrc"
+    | "trackName"
+    | "artistName"
+    | "trackName+artistName"
+    | "trackName+artistName+isrc";
+
+// One path that led to a given URI being discovered
+export type DiscoverySource = {
+    discoveredBy: string; // service key: "spotify", "songlink", "youtube"
+    fromUri: string; // source URI used as input: "SPOTIFY::TRACK::abcd"
+    searchKeys: SearchKey[]; // which fields drove this search
+};
+
+// One result within a platform group
+export type MetadataResultState = {
     metadata: TrackMetadata;
-    isPrimarySource: boolean;
-    rank: number; // 0 = highest priority; lower = considered first
-    isFavorited: boolean; // pinned as preferred for this provider (max one per provider)
-    isRejected: boolean; // user marked as wrong match; excluded from compiled output
-    confidence?: number; // 0–100, field-match score vs the primary source; undefined if not computed
+    isPrimaryInput: boolean; // true only for the user's original URL input
+    isFavorited: boolean; // max 1 per group
+    isRejected: boolean;
+    rank: number; // within-group ordering (lower = higher priority)
+    confidence?: number; // 0–100 vs primary input metadata
+    discoverySources: DiscoverySource[]; // empty for the primary input result
+    fetchState?: "loading" | "error";
+    fetchError?: string;
+};
+
+// A group of results for one platform
+export type MetadataGroupState = {
+    platform: Platform;
+    serviceKey: string; // "spotify", "youtube"
+    rank: number; // cross-group ordering (lower = higher priority)
+    results: MetadataResultState[];
+};
+
+// Return type for MetadataService.searchTrack
+export type SearchTrackResult = {
+    metadata: TrackMetadata;
+    searchKeys: SearchKey[]; // which fields of the source metadata drove this search
 };
 
 export type MetadataOverrides = Partial<{
@@ -263,7 +305,7 @@ export type TrackDownloadTask = {
     toTag?: boolean;
     toDownload?: boolean;
     userInput: UserInput;
-    metadataSources: MetadataSourceState[];
+    metadataGroups: MetadataGroupState[];
     metadataOverride: MetadataOverrides;
     downloadSources: TrackDownloadSource[];
     parentAlbumDownloadTask?: AlbumDownloadTask;
@@ -274,7 +316,7 @@ export type TracksDownloadTask = {
     toTag?: boolean;
     toDownload?: boolean;
     userInput: UserInput;
-    metadataSources: MetadataSourceState[];
+    metadataGroups: MetadataGroupState[];
     metadataOverride: MetadataOverrides;
     downloadSources: TrackDownloadSource[];
     tracks: TrackDownloadTask[];

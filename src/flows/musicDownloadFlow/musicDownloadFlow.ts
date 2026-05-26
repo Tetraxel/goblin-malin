@@ -24,9 +24,11 @@ import { StatusCell } from "./columns/StatusCell";
 import { ToTagCell } from "./columns/ToTagCell";
 import { ToDownloadCell } from "./columns/ToDownloadCell";
 import { MetadataService } from "./metadataService";
+import { DiscoveryMetadataService } from "./discoveryMetadataService";
 import { DownloadService } from "./downloadService";
 import { SpotifyService } from "./services/metadata-providers/spotify/SpotifyService";
 import { YoutubeService } from "./services/metadata-providers/youtube/YoutubeService";
+import { SonglinkService } from "./services/metadata-providers/songlink/SonglinkService";
 import { YtDlpService } from "./services/download-providers/ytdlp/YtDlpService";
 import { DownloadTask } from "./utils/downloadTask";
 import { taskIdFromUrl } from "./utils/taskId";
@@ -39,6 +41,11 @@ import {
 import { buildFlowSettingsItems, ProviderEntry } from "./buildFlowSettingsItems";
 
 type Column = ColumnDefinition<MusicDownloadTaskAttributes>;
+
+// Suppress the re-throw from @SafeAction — logging is already handled by the decorator.
+const fire = (p: Promise<void>): void => {
+    p.catch(() => {});
+};
 
 function toOpenableUri(url: string): string {
     const m = url.match(/open\.spotify\.com\/(track|album|artist|playlist)\/([A-Za-z0-9]+)/);
@@ -58,6 +65,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
     protected maxConcurrentTasks = 2;
     protected displayMode: "metadata" | "download" = "metadata";
     protected metadataServiceRegistry = new ServiceRegistry<DownloadTask, MetadataService>();
+    protected discoveryServiceRegistry = new ServiceRegistry<DownloadTask, DiscoveryMetadataService>();
     protected downloadServiceRegistry = new ServiceRegistry<DownloadTask, DownloadService>();
     protected settings = new FlowSettings<MusicDownloadFlowSettings>("music-downloader", () =>
         this.computeDefaultSettings()
@@ -80,6 +88,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             metadata: {
                 ...BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS.metadata,
                 providers: extractProviderDefaults(this.metadataServiceRegistry),
+                discoveryProviders: extractProviderDefaults(this.discoveryServiceRegistry),
             },
             download: {
                 ...BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS.download,
@@ -103,7 +112,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
     ): SettingsItem[] {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const toEntries = (registry: ServiceRegistry<any, any>): ProviderEntry[] =>
-            Array.from(registry.getFactories().keys()).map((key) => ({
+            Array.from(registry.getAllConstructors().keys()).map((key) => ({
                 key,
                 ctor: registry.getConstructor(key) as ProviderConstructorLike,
             }));
@@ -112,6 +121,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             flowSettings as MusicDownloadFlowSettings,
             toEntries(this.metadataServiceRegistry),
             toEntries(this.downloadServiceRegistry),
+            toEntries(this.discoveryServiceRegistry),
             onChange as (patch: DeepPartial<MusicDownloadFlowSettings>) => void,
             onOpenWizard
         );
@@ -133,14 +143,16 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         this.metadataServiceRegistry.register("youtube", YoutubeService);
         // this.metadataServiceRegistry.register('musicbrainz', MusicBrainzService);
 
+        this.discoveryServiceRegistry.register("songlink", SonglinkService);
+
         this.downloadServiceRegistry.register("ytdlp", YtDlpService);
         // this.downloadServiceRegistry.register('soulseek', SoulseekService);
 
         SettingsStore.getInstance().onSettingsChanged(() => this.notifyTaskSubscribers());
 
-        const defaultTasks = this.createTasksFromUrls([DEFAULT_TEST_URL], { toTag: true, toDownload: true });
-        this.orchestrator.addTasks(defaultTasks);
-        this.logger.info(`Imported default test URL: ${DEFAULT_TEST_URL}`);
+        // const defaultTasks = this.createTasksFromUrls([DEFAULT_TEST_URL], { toTag: true, toDownload: true });
+        // this.orchestrator.addTasks(defaultTasks);
+        // this.logger.info(`Imported default test URL: ${DEFAULT_TEST_URL}`);
     }
 
     // ── FlowBase overrides ───────────────────────────────────────────────────
@@ -175,7 +187,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                     attributes: {
                         state: "pending",
                         userInput: { type: "url", url },
-                        metadataSources: [],
+                        metadataGroups: [],
                         metadataOverride: {},
                         downloadSources: [],
                         toTag,
@@ -184,15 +196,18 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                     flowId: this.id,
                     logger: this.logger,
                     metadataServiceRegistry: this.metadataServiceRegistry,
+                    discoveryServiceRegistry: this.discoveryServiceRegistry,
                     downloadServiceRegistry: this.downloadServiceRegistry,
-                    isMetadataEnabled: (key) => this.settings.get().metadata.providers[key]?.enabled !== false,
-                    isDownloadEnabled: (key) => this.settings.get().download.providers[key]?.enabled !== false,
+                    isMetadataServiceEnabled: (key) => this.settings.get().metadata.providers[key]?.enabled !== false,
+                    isDiscoveryServiceEnabled: (key) =>
+                        this.settings.get().metadata.discoveryProviders[key]?.enabled !== false,
+                    isDownloadServiceEnabled: (key) => this.settings.get().download.providers[key]?.enabled !== false,
                 })
         );
     }
 
     async restartTask(task: DownloadTask): Promise<void> {
-        task.updateAttributes({ state: "pending", metadataSources: [], metadataOverride: {}, downloadSources: [] });
+        task.updateAttributes({ state: "pending", metadataGroups: [], metadataOverride: {}, downloadSources: [] });
         this.orchestrator.processTask(task);
     }
 
@@ -220,7 +235,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 shortcuts: [{ input: "r" }],
                 label: hasBeenRun ? "Restart" : "Start",
                 description: hasBeenRun ? "Restart this task from scratch" : "Start this task",
-                onClick: () => (hasBeenRun ? task.restart() : task.start()),
+                onClick: () => fire(hasBeenRun ? task.restart() : task.start()),
             },
         ];
         if (hasBeenRun) {
@@ -228,33 +243,28 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 shortcuts: [{ input: "R", shift: true }],
                 label: "Restart (no cache)",
                 description: "Restart from scratch, bypassing cached results",
-                onClick: () => runWithoutCache(() => task.restart()),
+                onClick: () => fire(runWithoutCache(() => task.restart())),
             });
         }
         if (attrs?.primaryMetadataFetched) {
-            // taskActions.push({
-            //     shortcuts: [{ input: "f" }],
-            //     label: "Re-fetch primary metadata",
-            //     onClick: () => task.startPrimaryMetadataFetching(),
-            // });
             taskActions.push({
                 shortcuts: [{ input: "f" }],
                 label: "Re-fetch primary metadata (no cache)",
-                onClick: () => runWithoutCache(() => task.startPrimaryMetadataFetching()),
+                onClick: () => fire(runWithoutCache(() => task.startPrimaryMetadataFetching())),
             });
         }
         if (attrs?.metadataDiscovered) {
             taskActions.push({
                 shortcuts: [{ input: "d" }],
                 label: "Re-discover metadata providers",
-                onClick: () => task.startMetadataDiscovering(),
+                onClick: () => fire(task.startMetadataDiscovering()),
             });
         }
         if (attrs?.downloadsFetched) {
             taskActions.push({
                 shortcuts: [{ input: "w" }],
                 label: "Re-download all sources",
-                onClick: () => task.startDownloads(),
+                onClick: () => fire(task.startDownloads()),
             });
         }
 
@@ -299,7 +309,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         }
 
         if (column.id === "artist") {
-            const primary = attrs?.metadataSources.find((s) => s.isPrimarySource);
+            const primary = attrs?.metadataGroups.flatMap((g) => g.results).find((r) => r.isPrimaryInput);
             columnActions.push({
                 shortcuts: [{ input: "c", ctrl: true }],
                 label: "Copy artist",
@@ -308,7 +318,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         }
 
         if (column.id === "track") {
-            const primary = attrs?.metadataSources.find((s) => s.isPrimarySource);
+            const primary = attrs?.metadataGroups.flatMap((g) => g.results).find((r) => r.isPrimaryInput);
             columnActions.push({
                 shortcuts: [{ input: "c", ctrl: true }],
                 label: "Copy track title",
@@ -321,9 +331,8 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             const display = providerDisplayRegistry.get(serviceKey);
             columnLabel = display.label;
             columnColor = display.color;
-            const source = attrs?.metadataSources.find(
-                (s) => s.metadata.platform === serviceKey || s.metadata.apiProvider === serviceKey
-            );
+            const group = attrs?.metadataGroups.find((g) => g.serviceKey === serviceKey);
+            const source = group?.results.find((r) => !r.isRejected) ?? group?.results[0];
             const url = source?.metadata.url ?? "";
             if (url) {
                 columnActions.push({
@@ -342,9 +351,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             columnActions.push({
                 shortcuts: [{ input: "s" }],
                 label: "Re-search",
-                onClick: () => {
-                    task.startSingleProviderSearch(serviceKey);
-                },
+                onClick: () => fire(task.startSingleProviderSearch(serviceKey)),
             });
         }
 

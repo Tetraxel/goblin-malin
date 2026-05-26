@@ -1,16 +1,19 @@
-﻿import { useInput } from "ink";
+import { useInput } from "ink";
 import open from "open";
 import clipboard from "clipboardy";
-import { MetadataSourceState } from "#flows/musicDownloadFlow/types";
+import { MetadataGroupState } from "#flows/musicDownloadFlow/types";
+import { CursorPosition } from "#hooks/useFocusManager";
 
 interface UseSourceListInputParams {
-    sources: MetadataSourceState[];
-    sortedSources: MetadataSourceState[];
-    selectedIndex: number;
+    groups: MetadataGroupState[];
+    sortedGroups: MetadataGroupState[];
+    cursor: CursorPosition;
     isActive: boolean;
-    onSelectSource: (index: number) => void;
+    onCursorChange: (cursor: CursorPosition) => void;
     onInnerFocusSwitch: () => void;
-    onSourcesChange: (sources: MetadataSourceState[]) => void;
+    onGroupsChange: (groups: MetadataGroupState[]) => void;
+    onToggleDiscoverySources: () => void;
+    onRefetchResult: (groupIndex: number, resultIndex: number) => void;
 }
 
 function toOpenableUri(url: string): string {
@@ -19,86 +22,157 @@ function toOpenableUri(url: string): string {
     return url;
 }
 
+// Flat traversal order: compiled → group[0] header → result[0][0] → result[0][1] → … → group[1] header → …
+type FlatItem =
+    | { kind: "compiled" }
+    | { kind: "group"; groupIndex: number }
+    | { kind: "result"; groupIndex: number; resultIndex: number };
+
+function buildFlatOrder(sortedGroups: MetadataGroupState[]): FlatItem[] {
+    const items: FlatItem[] = [{ kind: "compiled" }];
+    for (let gi = 0; gi < sortedGroups.length; gi++) {
+        items.push({ kind: "group", groupIndex: gi });
+        const sortedResults = [...sortedGroups[gi].results].sort((a, b) => a.rank - b.rank);
+        for (let ri = 0; ri < sortedResults.length; ri++) {
+            items.push({ kind: "result", groupIndex: gi, resultIndex: ri });
+        }
+    }
+    return items;
+}
+
+function flatItemToCursor(item: FlatItem): CursorPosition {
+    if (item.kind === "compiled") return { type: "compiled" };
+    if (item.kind === "group") return { type: "group", groupIndex: item.groupIndex };
+    return { type: "result", groupIndex: item.groupIndex, resultIndex: item.resultIndex };
+}
+
+function cursorToFlatIndex(cursor: CursorPosition, items: FlatItem[]): number {
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (cursor.type === "compiled" && item.kind === "compiled") return i;
+        if (cursor.type === "group" && item.kind === "group" && item.groupIndex === cursor.groupIndex) return i;
+        if (
+            cursor.type === "result" &&
+            item.kind === "result" &&
+            item.groupIndex === cursor.groupIndex &&
+            item.resultIndex === cursor.resultIndex
+        )
+            return i;
+    }
+    return 0;
+}
+
 export function useSourceListInput({
-    sources,
-    sortedSources,
-    selectedIndex,
+    groups,
+    sortedGroups,
+    cursor,
     isActive,
-    onSelectSource,
+    onCursorChange,
     onInnerFocusSwitch,
-    onSourcesChange,
+    onGroupsChange,
+    onToggleDiscoverySources,
+    onRefetchResult,
 }: UseSourceListInputParams) {
     useInput(
         (input, key) => {
+            const flatItems = buildFlatOrder(sortedGroups);
+            const currentFlatIdx = cursorToFlatIndex(cursor, flatItems);
+
             if (key.upArrow) {
                 if (key.shift) {
-                    // [Shift+↑] — move up in rank (swap with source above)
-                    if (selectedIndex < 0) return;
-                    const source = sources[selectedIndex];
-                    const sortedIdx = sortedSources.indexOf(source);
-                    if (sortedIdx <= 0) return;
-                    const above = sortedSources[sortedIdx - 1];
-                    const updated = sources.map((s) => {
-                        if (s === source) return { ...s, rank: above.rank };
-                        if (s === above) return { ...s, rank: source.rank };
-                        return s;
-                    });
-                    onSourcesChange(updated);
+                    // Shift+↑: swap rank with item above, cursor follows
+                    if (cursor.type === "group") {
+                        const gi = cursor.groupIndex;
+                        if (gi <= 0) return;
+                        const above = sortedGroups[gi - 1];
+                        const current = sortedGroups[gi];
+                        const updated = groups.map((g) => {
+                            if (g === current) return { ...g, rank: above.rank };
+                            if (g === above) return { ...g, rank: current.rank };
+                            return g;
+                        });
+                        onGroupsChange(updated);
+                        onCursorChange({ type: "group", groupIndex: gi - 1 });
+                    } else if (cursor.type === "result") {
+                        const { groupIndex: gi, resultIndex: ri } = cursor;
+                        const group = sortedGroups[gi];
+                        const sortedResults = [...group.results].sort((a, b) => a.rank - b.rank);
+                        if (ri <= 0) return;
+                        const above = sortedResults[ri - 1];
+                        const current = sortedResults[ri];
+                        const origGroup = groups.find((g) => g === group || g.serviceKey === group.serviceKey);
+                        if (!origGroup) return;
+                        const updatedResults = origGroup.results.map((r) => {
+                            if (r === current) return { ...r, rank: above.rank };
+                            if (r === above) return { ...r, rank: current.rank };
+                            return r;
+                        });
+                        onGroupsChange(groups.map((g) => (g === origGroup ? { ...g, results: updatedResults } : g)));
+                        onCursorChange({ type: "result", groupIndex: gi, resultIndex: ri - 1 });
+                    }
                     return;
                 }
-                if (selectedIndex === -1) return;
-                const sortedIdx = sortedSources.findIndex((s) => sources.indexOf(s) === selectedIndex);
-                if (sortedIdx <= 0) {
-                    onSelectSource(-1);
-                } else {
-                    onSelectSource(sources.indexOf(sortedSources[sortedIdx - 1]));
+                if (currentFlatIdx > 0) {
+                    onCursorChange(flatItemToCursor(flatItems[currentFlatIdx - 1]));
                 }
                 return;
             }
 
             if (key.downArrow) {
                 if (key.shift) {
-                    // [Shift+↓] — move down in rank (swap with source below)
-                    if (selectedIndex < 0) return;
-                    const source = sources[selectedIndex];
-                    const sortedIdx = sortedSources.indexOf(source);
-                    if (sortedIdx >= sortedSources.length - 1) return;
-                    const below = sortedSources[sortedIdx + 1];
-                    const updated = sources.map((s) => {
-                        if (s === source) return { ...s, rank: below.rank };
-                        if (s === below) return { ...s, rank: source.rank };
-                        return s;
-                    });
-                    onSourcesChange(updated);
+                    // Shift+↓: swap rank with item below, cursor follows
+                    if (cursor.type === "group") {
+                        const gi = cursor.groupIndex;
+                        if (gi >= sortedGroups.length - 1) return;
+                        const below = sortedGroups[gi + 1];
+                        const current = sortedGroups[gi];
+                        const updated = groups.map((g) => {
+                            if (g === current) return { ...g, rank: below.rank };
+                            if (g === below) return { ...g, rank: current.rank };
+                            return g;
+                        });
+                        onGroupsChange(updated);
+                        onCursorChange({ type: "group", groupIndex: gi + 1 });
+                    } else if (cursor.type === "result") {
+                        const { groupIndex: gi, resultIndex: ri } = cursor;
+                        const group = sortedGroups[gi];
+                        const sortedResults = [...group.results].sort((a, b) => a.rank - b.rank);
+                        if (ri >= sortedResults.length - 1) return;
+                        const below = sortedResults[ri + 1];
+                        const current = sortedResults[ri];
+                        const origGroup = groups.find((g) => g.serviceKey === group.serviceKey);
+                        if (!origGroup) return;
+                        const updatedResults = origGroup.results.map((r) => {
+                            if (r === current) return { ...r, rank: below.rank };
+                            if (r === below) return { ...r, rank: current.rank };
+                            return r;
+                        });
+                        onGroupsChange(groups.map((g) => (g === origGroup ? { ...g, results: updatedResults } : g)));
+                        onCursorChange({ type: "result", groupIndex: gi, resultIndex: ri + 1 });
+                    }
                     return;
                 }
-                if (selectedIndex === -1) {
-                    if (sortedSources.length > 0) onSelectSource(sources.indexOf(sortedSources[0]));
-                } else {
-                    const sortedIdx = sortedSources.findIndex((s) => sources.indexOf(s) === selectedIndex);
-                    if (sortedIdx < sortedSources.length - 1) {
-                        onSelectSource(sources.indexOf(sortedSources[sortedIdx + 1]));
-                    }
+                if (currentFlatIdx < flatItems.length - 1) {
+                    onCursorChange(flatItemToCursor(flatItems[currentFlatIdx + 1]));
                 }
                 return;
             }
 
-            // Guard: plain → only (Shift+→ is reserved for panel resize)
             if (key.rightArrow && !key.shift) {
                 onInnerFocusSwitch();
                 return;
             }
 
-            // [Enter] — open source URL (Spotify → desktop app via spotify: URI)
-            if (key.return && selectedIndex >= 0) {
-                const url = sources[selectedIndex]?.metadata.url;
+            // [Enter] — open URL of focused result
+            if (key.return && cursor.type === "result") {
+                const url = sortedGroups[cursor.groupIndex]?.results[cursor.resultIndex]?.metadata.url;
                 if (url) open(toOpenableUri(url)).catch(() => {});
                 return;
             }
 
-            // [Ctrl+C] — copy source URL to clipboard
-            if (key.ctrl && input === "c" && selectedIndex >= 0) {
-                const url = sources[selectedIndex]?.metadata.url;
+            // [Ctrl+C] — copy URL of focused result
+            if (key.ctrl && input === "c" && cursor.type === "result") {
+                const url = sortedGroups[cursor.groupIndex]?.results[cursor.resultIndex]?.metadata.url;
                 if (url)
                     try {
                         clipboard.writeSync(url);
@@ -108,40 +182,67 @@ export function useSourceListInput({
                 return;
             }
 
-            // [F] — favorite/unfavorite
-            if (input === "f" || input === "F") {
-                if (selectedIndex < 0) return;
-                const source = sources[selectedIndex];
-                if (!source) return;
-                const newFavorite = !source.isFavorited;
-                const currentPlatform = source.metadata.platform;
-                const updated = sources.map((s, i) => {
-                    if (s.metadata.platform === currentPlatform) {
-                        return {
-                            ...s,
-                            isRejected: false,
-                            isFavorited: i === selectedIndex ? newFavorite : false,
-                        };
-                    }
-                    return s;
-                });
-                onSourcesChange(updated);
+            // [F] — favorite/unfavorite focused result
+            if ((input === "f" || input === "F") && cursor.type === "result") {
+                const { groupIndex: gi, resultIndex: ri } = cursor;
+                const group = sortedGroups[gi];
+                if (!group) return;
+                const sortedResults = [...group.results].sort((a, b) => a.rank - b.rank);
+                const result = sortedResults[ri];
+                if (!result) return;
+                const newFav = !result.isFavorited;
+                const origGroup = groups.find((g) => g.serviceKey === group.serviceKey);
+                if (!origGroup) return;
+                const updatedResults = origGroup.results.map((r) => ({
+                    ...r,
+                    isFavorited: r === result ? newFav : false,
+                    isRejected: r === result && newFav ? false : r.isRejected,
+                }));
+                onGroupsChange(groups.map((g) => (g === origGroup ? { ...g, results: updatedResults } : g)));
                 return;
             }
 
             // [Del] — reject/unreject
             if (key.delete) {
-                if (selectedIndex < 0) return;
-                const source = sources[selectedIndex];
-                if (!source) return;
-                const isRejected = !source.isRejected;
-                const updated = [...sources];
-                updated[selectedIndex] = {
-                    ...source,
-                    isRejected,
-                    isFavorited: isRejected ? false : source.isFavorited,
-                };
-                onSourcesChange(updated);
+                if (cursor.type === "result") {
+                    const { groupIndex: gi, resultIndex: ri } = cursor;
+                    const group = sortedGroups[gi];
+                    const sortedResults = [...group.results].sort((a, b) => a.rank - b.rank);
+                    const result = sortedResults[ri];
+                    if (!result) return;
+                    const origGroup = groups.find((g) => g.serviceKey === group.serviceKey);
+                    if (!origGroup) return;
+                    const newRejected = !result.isRejected;
+                    const updatedResults = origGroup.results.map((r) =>
+                        r === result
+                            ? { ...r, isRejected: newRejected, isFavorited: newRejected ? false : r.isFavorited }
+                            : r
+                    );
+                    onGroupsChange(groups.map((g) => (g === origGroup ? { ...g, results: updatedResults } : g)));
+                } else if (cursor.type === "group") {
+                    const group = sortedGroups[cursor.groupIndex];
+                    const origGroup = groups.find((g) => g.serviceKey === group.serviceKey);
+                    if (!origGroup) return;
+                    const allRejected = origGroup.results.every((r) => r.isRejected);
+                    const updatedResults = origGroup.results.map((r) => ({
+                        ...r,
+                        isRejected: !allRejected,
+                        isFavorited: !allRejected ? false : r.isFavorited,
+                    }));
+                    onGroupsChange(groups.map((g) => (g === origGroup ? { ...g, results: updatedResults } : g)));
+                }
+                return;
+            }
+
+            // [E] — toggle discovery source lines
+            if (input === "e" || input === "E") {
+                onToggleDiscoverySources();
+                return;
+            }
+
+            // [R] — refetch focused result
+            if ((input === "r" || input === "R") && !key.shift && cursor.type === "result") {
+                onRefetchResult(cursor.groupIndex, cursor.resultIndex);
                 return;
             }
         },

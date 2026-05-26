@@ -2,6 +2,7 @@
 import { Box, Text } from "ink";
 import { useTheme } from "#base/themeContext";
 import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
+import { formatDuration } from "../utils";
 
 const COMPILED_PREFIX = "🏆 Compiled Metadata: ";
 
@@ -25,11 +26,21 @@ export const MetadataCompiledRow: React.FC<CompiledRowProps> = ({
     const bg = isSelected ? focusColorBg : undefined;
     const artist = compiled.artists[0]?.name ?? "";
     const title = compiled.trackName ?? "";
-    const trackInfo = artist ? `${artist} - ${title}` : title;
+    const duration = compiled.duration ? formatDuration(compiled.duration) : "";
+    const durationPart = duration ? ` (${duration})` : "";
+    const trackInfo = artist ? `${artist} - ${title}${durationPart}` : `${title}${durationPart}`;
     const suffixText = overrideCount > 0 ? ` (${overrideCount} edit${overrideCount === 1 ? "" : "s"})` : "";
 
     return (
-        <Box flexDirection="row" flexGrow={1} width={width} minWidth={width} overflow="hidden" backgroundColor={bg}>
+        <Box
+            flexDirection="row"
+            height={1}
+            flexShrink={0}
+            width={width}
+            minWidth={width}
+            overflow="hidden"
+            backgroundColor={bg}
+        >
             <Box width={3} minWidth={3}>
                 <Text color={isSelected && isActive ? theme.text.active : theme.text.secondary}>
                     {isSelected && isActive ? "☛ " : "  "}

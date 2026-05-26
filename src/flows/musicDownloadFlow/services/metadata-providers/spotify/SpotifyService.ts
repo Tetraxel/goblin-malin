@@ -6,7 +6,7 @@ import { ParsedUrl } from "#base/urlParser";
 import { Cached } from "#utils/cache";
 import { Logger } from "#base/logger/logger";
 import { StatusType } from "#base/task/task-status";
-import { StandardTrack, TrackMetadata, TrackUri } from "#flows/musicDownloadFlow/types";
+import { StandardTrack, TrackMetadata, TrackUri, SearchTrackResult } from "#flows/musicDownloadFlow/types";
 import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { SpotifyCell } from "./SpotifyCell";
 import { MetadataService } from "../../../metadataService";
@@ -245,7 +245,7 @@ export class SpotifyService extends MetadataService {
         return metadata;
     }
 
-    async searchTrack(sourceTrackMetadata: TrackMetadata): Promise<TrackMetadata> {
+    async searchTrack(sourceTrackMetadata: TrackMetadata): Promise<SearchTrackResult[]> {
         const client = await this.getClient();
 
         const artist = sourceTrackMetadata.artists?.[0]?.name;
@@ -263,9 +263,9 @@ export class SpotifyService extends MetadataService {
         });
 
         try {
+            const hasIsrc = !!sourceTrackMetadata.isrc;
             let query = `${trackName} artist:${artist}`;
-
-            if (sourceTrackMetadata.isrc) query = query.concat(` isrc:${sourceTrackMetadata.isrc}`);
+            if (hasIsrc) query = query.concat(` isrc:${sourceTrackMetadata.isrc}`);
 
             const searchResults = await client.search(
                 query,
@@ -287,13 +287,17 @@ export class SpotifyService extends MetadataService {
                 platform: "spotify",
                 apiProvider: "spotify",
                 uri: `SPOTIFY::TRACK::${spotifyTrack.id}` as TrackUri<"spotify">,
-
                 fetchedAt: new Date(),
                 type: "track",
             };
 
             this.status.clear();
-            return metadata;
+            return [
+                {
+                    metadata,
+                    searchKeys: hasIsrc ? ["trackName+artistName+isrc"] : ["trackName+artistName"],
+                },
+            ];
         } catch (error) {
             this.logger.error(`Error searching Spotify for: ${sourceTrackMetadata.trackName}`, { error });
             this.status.set({

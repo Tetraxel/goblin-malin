@@ -1,7 +1,7 @@
 ﻿import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import clipboard from "clipboardy";
-import { MetadataSourceState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
+import { MetadataResultState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
 import { CompiledMetadata, CompiledMetadataField } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { FIELDS, navigableFields } from "#flows/musicDownloadFlow/utils/metadataFields";
 import { useFocusContext } from "#contexts/FocusContext";
@@ -11,7 +11,7 @@ import { useTheme } from "#base/themeContext";
 import { Hint } from "../../Hint";
 
 interface MetadataSourceDetailProps {
-    source: MetadataSourceState | "compiled";
+    source: MetadataResultState | "compiled";
     compiled: CompiledMetadata;
     overrides: MetadataOverrides;
     selectedFieldIndex: number;
@@ -92,7 +92,7 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
                 if (!field) return;
                 const value = isCompiled
                     ? field.getCompiledValue(compiled)
-                    : field.getSourceValue(source as MetadataSourceState);
+                    : field.getSourceValue(source as MetadataResultState);
                 if (value !== "—")
                     try {
                         clipboard.writeSync(value);
@@ -138,7 +138,7 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
     const borderRight = ` ${"─".repeat(rightD)}┐`;
     const platformColor = isCompiled
         ? theme.text.secondary
-        : getPlatformBrightColor((source as MetadataSourceState).metadata.apiProvider);
+        : getPlatformBrightColor((source as MetadataResultState).metadata.apiProvider);
 
     return (
         <Box flexDirection="column" width={width} flexGrow={1} overflow="hidden">
@@ -165,7 +165,7 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
                             const isFocused = isActive && navigableFields[clampedFieldIdx]?.key === field.key;
                             const value = isCompiled
                                 ? field.getCompiledValue(compiled)
-                                : field.getSourceValue(source as MetadataSourceState);
+                                : field.getSourceValue(source as MetadataResultState);
                             const attr = isCompiled ? compiled.attribution[field.key] : undefined;
                             const isEditing = editingField === field.key;
                             const hasOverride =

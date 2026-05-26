@@ -3,6 +3,11 @@ import { useScreenSize } from "./useScreenSize";
 import { FlowBase } from "#base/flow/flow-base";
 import { SetupWizardConfig } from "#base/setupWizard";
 
+export type CursorPosition =
+    | { type: "compiled" }
+    | { type: "group"; groupIndex: number }
+    | { type: "result"; groupIndex: number; resultIndex: number };
+
 // Fixed rows that never change regardless of terminal size.
 // toolbarRows = top separator + toolbar content + bottom separator.
 // ActionBar is now rendered inside TaskListPanel (not counted here).
@@ -67,7 +72,8 @@ export interface FocusState {
         selectedRowIndex: number;
         scrollOffset: number;
         sourcesPanel: {
-            selectedSourceIndex: number;
+            cursor: CursorPosition;
+            showDiscoverySources: boolean;
             innerFocus: "list" | "detail";
             selectedFieldIndex: number;
         };
@@ -129,7 +135,8 @@ export const useFocusManager = ({
             selectedRowIndex: 0,
             scrollOffset: 0,
             sourcesPanel: {
-                selectedSourceIndex: -1,
+                cursor: { type: "compiled" },
+                showDiscoverySources: false,
                 innerFocus: "list",
                 selectedFieldIndex: 0,
             },
@@ -297,12 +304,22 @@ export const useFocusManager = ({
         }));
     }, []);
 
-    const setSelectedSourceIndex = useCallback((index: number) => {
+    const setCursor = useCallback((cursor: CursorPosition) => {
         setFocusState((prev) => ({
             ...prev,
             secondaryPanel: {
                 ...prev.secondaryPanel,
-                sourcesPanel: { ...prev.secondaryPanel.sourcesPanel, selectedSourceIndex: index },
+                sourcesPanel: { ...prev.secondaryPanel.sourcesPanel, cursor },
+            },
+        }));
+    }, []);
+
+    const setShowDiscoverySources = useCallback((show: boolean) => {
+        setFocusState((prev) => ({
+            ...prev,
+            secondaryPanel: {
+                ...prev.secondaryPanel,
+                sourcesPanel: { ...prev.secondaryPanel.sourcesPanel, showDiscoverySources: show },
             },
         }));
     }, []);
@@ -363,7 +380,8 @@ export const useFocusManager = ({
         toggleTaskSelection,
         selectAllTasks,
         clearSelection,
-        setSelectedSourceIndex,
+        setCursor,
+        setShowDiscoverySources,
         setSourcesInnerFocus,
         setDetailFieldIndex: setSourceDetailFieldIndex,
         setIsEditingField,

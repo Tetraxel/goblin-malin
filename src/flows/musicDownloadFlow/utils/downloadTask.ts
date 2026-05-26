@@ -1,4 +1,4 @@
-﻿import fs from "fs/promises";
+import fs from "fs/promises";
 import { Task } from "#base/task/task";
 import { globalLogger, Logger } from "#base/logger/logger";
 import { ServiceRegistry } from "#base/service-registry";
@@ -8,20 +8,27 @@ import {
     MusicDownloadTaskAttributes,
     TrackMetadata,
     TrackDownloadSource,
-    MetadataSourceState,
+    MetadataGroupState,
+    MetadataResultState,
+    DiscoverySource,
 } from "#flows/musicDownloadFlow/types";
 import { cleanAndTagFlac } from "#utils/metadata";
+import { SafeAction } from "#utils/decorators";
 import { computeConfidenceScore } from "./confidence";
 import { computeCompiledMetadata } from "./compiledMetadata";
 import { compiledMetadataToTags } from "./compiledMetadataToTags";
 import { computeOutputPath } from "./computeOutputPath";
 import { MetadataService } from "../metadataService";
+import { DiscoveryMetadataService } from "../discoveryMetadataService";
 import { DownloadService } from "../downloadService";
 import { getSaveSettings } from "../saveSettings";
 
 export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
     private metadataServices: ServiceScope<DownloadTask, MetadataService>;
+    private discoveryServices: ServiceScope<DownloadTask, DiscoveryMetadataService>;
     private downloadServices: ServiceScope<DownloadTask, DownloadService>;
+    private metadataServiceRegistry: ServiceRegistry<DownloadTask, MetadataService>;
+    private isMetadataServiceEnabled: (key: string) => boolean;
 
     constructor({
         id,
@@ -30,9 +37,11 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         flowId,
         logger,
         metadataServiceRegistry,
+        discoveryServiceRegistry,
         downloadServiceRegistry,
-        isMetadataEnabled,
-        isDownloadEnabled,
+        isMetadataServiceEnabled,
+        isDiscoveryServiceEnabled,
+        isDownloadServiceEnabled,
     }: {
         id: string;
         initialInput?: string;
@@ -40,62 +49,102 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         flowId: string;
         logger: Logger;
         metadataServiceRegistry: ServiceRegistry<DownloadTask, MetadataService>;
+        discoveryServiceRegistry: ServiceRegistry<DownloadTask, DiscoveryMetadataService>;
         downloadServiceRegistry: ServiceRegistry<DownloadTask, DownloadService>;
-        isMetadataEnabled: (key: string) => boolean;
-        isDownloadEnabled: (key: string) => boolean;
+        isMetadataServiceEnabled: (key: string) => boolean;
+        isDiscoveryServiceEnabled: (key: string) => boolean;
+        isDownloadServiceEnabled: (key: string) => boolean;
     }) {
         super({ id, initialInput, attributes, flowId, logger });
 
-        this.metadataServices = metadataServiceRegistry.createScope(this, this.logger, isMetadataEnabled);
-        this.downloadServices = downloadServiceRegistry.createScope(this, this.logger, isDownloadEnabled);
+        this.metadataServiceRegistry = metadataServiceRegistry;
+        this.isMetadataServiceEnabled = isMetadataServiceEnabled;
+        this.metadataServices = metadataServiceRegistry.createScope(this, this.logger, isMetadataServiceEnabled);
+        this.discoveryServices = discoveryServiceRegistry.createScope(this, this.logger, isDiscoveryServiceEnabled);
+        this.downloadServices = downloadServiceRegistry.createScope(this, this.logger, isDownloadServiceEnabled);
     }
 
-    private getPrimaryMetadata(): MetadataSourceState | undefined {
-        return this.getAttributes()?.metadataSources.find((s) => s.isPrimarySource);
-    }
+    // ── Internal helpers ─────────────────────────────────────────────────────
 
-    private sortMetadataSourcesByConfidence(sources: MetadataSourceState[]): MetadataSourceState[] {
-        return [...sources].sort((a, b) => (a.isPrimarySource ? -1 : (b.confidence ?? 0) - (a.confidence ?? 0)));
-    }
-
-    private addMetadataSource(metadata: TrackMetadata, isPrimary: boolean): void {
-        let currentMetadataSources = this.getAttributes()?.metadataSources ?? [];
-        // Keep only one primary source: if the metadata inserted is primary, remove the old one
-        if (isPrimary) currentMetadataSources = currentMetadataSources.filter((s) => !s.isPrimarySource);
-
-        const primary = this.getPrimaryMetadata()?.metadata;
-        const confidence = isPrimary || !primary ? 100 : computeConfidenceScore(metadata, primary);
-
-        const existingSourceIndex = currentMetadataSources.findIndex(
-            (source) => source.metadata.platform === metadata.platform
-        );
-
-        // Update existing source
-        if (existingSourceIndex !== -1) {
-            currentMetadataSources[existingSourceIndex] = {
-                ...currentMetadataSources[existingSourceIndex],
-                metadata,
-                isPrimarySource: isPrimary,
-                confidence,
-            };
+    private getPrimaryMetadata(): MetadataResultState | undefined {
+        for (const group of this.getAttributes()?.metadataGroups ?? []) {
+            const primary = group.results.find((r) => r.isPrimaryInput);
+            if (primary) return primary;
         }
-        // Add new source
-        else {
-            const newSource: MetadataSourceState = {
+        return undefined;
+    }
+
+    private addResultToGroup(
+        metadata: TrackMetadata,
+        serviceKey: string,
+        discoverySources: DiscoverySource[],
+        isPrimaryInput = false,
+        fetchState?: "loading" | "error",
+        fetchError?: string
+    ): void {
+        const groups = [...(this.getAttributes()?.metadataGroups ?? [])];
+
+        let groupIdx = groups.findIndex((g) => g.serviceKey === serviceKey);
+        if (groupIdx === -1) {
+            groups.push({
+                platform: metadata.platform,
+                serviceKey,
+                rank: groups.length,
+                results: [],
+            });
+            groupIdx = groups.length - 1;
+        }
+
+        const group: MetadataGroupState = {
+            ...groups[groupIdx],
+            results: [...groups[groupIdx].results],
+        };
+
+        // Upsert by URI within the group
+        const existingIdx = metadata.uri ? group.results.findIndex((r) => r.metadata.uri === metadata.uri) : -1;
+
+        if (existingIdx !== -1) {
+            group.results[existingIdx] = {
+                ...group.results[existingIdx],
+                discoverySources: [...group.results[existingIdx].discoverySources, ...discoverySources],
+            };
+        } else {
+            const primaryMeta = this.getPrimaryMetadata()?.metadata;
+            const confidence =
+                isPrimaryInput || !primaryMeta ? undefined : computeConfidenceScore(metadata, primaryMeta);
+
+            const newResult: MetadataResultState = {
                 metadata,
-                isPrimarySource: isPrimary,
-                rank: currentMetadataSources.length,
+                isPrimaryInput,
                 isFavorited: false,
                 isRejected: false,
+                rank: group.results.length,
                 confidence,
+                discoverySources,
+                fetchState,
+                fetchError,
             };
-            currentMetadataSources = [...currentMetadataSources, newSource];
+            group.results.push(newResult);
         }
 
-        const sorted = this.sortMetadataSourcesByConfidence(currentMetadataSources);
-        this.updateAttributes({ metadataSources: sorted });
+        groups[groupIdx] = group;
+        this.updateAttributes({ metadataGroups: groups });
     }
 
+    private updateResultInGroup(groupIndex: number, resultIndex: number, patch: Partial<MetadataResultState>): void {
+        const groups = [...(this.getAttributes()?.metadataGroups ?? [])];
+        const group = groups[groupIndex];
+        if (!group) return;
+        const results = [...group.results];
+        if (!results[resultIndex]) return;
+        results[resultIndex] = { ...results[resultIndex], ...patch };
+        groups[groupIndex] = { ...group, results };
+        this.updateAttributes({ metadataGroups: groups });
+    }
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    @SafeAction("Start task")
     async start(): Promise<void> {
         try {
             if (this.getAttributes()?.state !== "pending") {
@@ -111,7 +160,6 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
                 if (!this.getPrimaryMetadata()) {
                     await this.startPrimaryMetadataFetching();
                 }
-
                 await this.startMetadataDiscovering();
             }
 
@@ -123,71 +171,130 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             this.updateAttributes({ state: "failed" });
             throw error;
         }
-
-        // Old implementation
-
-        // // Step 1: Determine source and fetch metadata
-        // const track = await this.fetchTrackMetadata();
-
-        // this.logger.info(`Fetched track metadata ${track.artists[0]?.name} - ${track.trackName} (${(track?.duration ?? 0) / 1000}s)`);
-
-        // // Step 2: Download the track
-        // const localTrackPath = await this.downloadTrack(track);
-        // if (!localTrackPath)
-        //     throw new Error("No candidate url for download")
-        // track.localRelativePath = path.relative(PROJECT_ROOT, localTrackPath);
-        // this.setAttributes({ track });
-
-        // // Step 3: Musicbrainz
-        // await this.fetchMusicBrainz(track)
-
-        // // Step 4: Mark as complete
-        // this.logger.info(`Successfully completed ${this.getInitialInput()}`)
-        // this.status.set({
-        //     type: StatusType.Success,
-        //     message: "Completed",
-        //     progress: 100,
-        // });
     }
 
+    // ── Primary metadata ──────────────────────────────────────────────────────
+
+    @SafeAction("Re-fetch primary metadata")
     async startPrimaryMetadataFetching(): Promise<void> {
         const url = this.getAttributes()?.userInput.url;
-
-        if (!url) {
-            throw new Error("No user input URL provided");
-        }
+        if (!url) throw new Error("No user input URL provided");
 
         this.logger.info(`Fetching primary metadata for URL: ${url}`);
-        const nonPrimarySources = (this.getAttributes()?.metadataSources ?? []).filter((s) => !s.isPrimarySource);
+
+        // Remove previous primary results from all groups.
+        // Keep the primary group even when it becomes empty — preserves its rank so addResultToGroup
+        // can find it by serviceKey and won't append it at the end with a new rank.
+        const currentGroups = this.getAttributes()?.metadataGroups ?? [];
+        const primaryGroupKey = currentGroups.find((g) => g.results.some((r) => r.isPrimaryInput))?.serviceKey;
+        const nonPrimaryGroups = currentGroups
+            .map((g) => ({ ...g, results: g.results.filter((r) => !r.isPrimaryInput) }))
+            .filter((g) => g.results.length > 0 || g.serviceKey === primaryGroupKey);
+
         this.updateAttributes({
-            metadataSources: nonPrimarySources,
+            metadataGroups: nonPrimaryGroups,
             primaryMetadataInProgress: true,
             primaryMetadataFetched: false,
         });
 
         try {
-            const services = this.metadataServices.getAllServices();
+            // Step 1: Find which MetadataService recognizes the URL (including disabled ones)
+            const allConstructors = this.metadataServiceRegistry.getAllConstructors();
+            let recognizingServiceKey: string | undefined;
+            let recognizedPlatform: string | undefined;
 
-            for (const service of services) {
+            for (const [key, constructor] of allConstructors) {
+                const parsed = constructor.parseUrl?.(url);
+                if (parsed?.type === "track") {
+                    recognizingServiceKey = key;
+                    recognizedPlatform = parsed.platform;
+                    break;
+                }
+            }
+
+            if (!recognizingServiceKey || !recognizedPlatform) {
+                this.status.update({ type: StatusType.Error, message: "Primary metadata unavailable" });
+                throw new Error(`No metadata service recognized the URL: ${url}`);
+            }
+
+            // Step 2: If the recognizing service is enabled, try fetching
+            let fetchedViaService = false;
+            if (this.isMetadataServiceEnabled(recognizingServiceKey)) {
                 try {
-                    // Check if this service can handle the URL
-                    const type = service.getType(url);
-                    if (type === "track") {
-                        this.logger.debug(`Fetching metadata using ${service.constructor.name}`);
-
-                        const metadata = await service.getTrackMetadata(url);
-                        this.addMetadataSource(metadata, true);
-                        this.logger.info(`Successfully fetched primary metadata from ${metadata.apiProvider}`);
-                        break;
-                    }
+                    const service = this.metadataServices.get(recognizingServiceKey);
+                    this.logger.debug(`Fetching primary metadata using ${recognizingServiceKey}`);
+                    const metadata = await service.getTrackMetadata(url);
+                    this.addResultToGroup(metadata, recognizingServiceKey, [], true);
+                    fetchedViaService = true;
+                    this.logger.info(`Successfully fetched primary metadata from ${metadata.apiProvider}`);
                 } catch (error) {
-                    this.logger.warn(`Failed to fetch metadata from ${service.constructor.name}:`, { error });
+                    this.logger.warn(`Primary fetch failed for ${recognizingServiceKey}, trying discovery fallback`, {
+                        error,
+                    });
+                }
+            }
+
+            // Step 3: If disabled or all enabled services failed → try discovery services
+            if (!fetchedViaService) {
+                const stubMetadata = {
+                    id: "",
+                    trackName: "",
+                    artists: [],
+                    url,
+                    platform: recognizedPlatform,
+                    apiProvider: recognizedPlatform,
+                    fetchedAt: new Date(),
+                    type: "track" as const,
+                } as unknown as TrackMetadata;
+
+                for (const discoveryService of this.discoveryServices.getAllServices()) {
+                    try {
+                        const discovered = await discoveryService.discoverFromUri(stubMetadata);
+                        const match = discovered.find((m) => m.platform === recognizedPlatform);
+                        if (!match) continue;
+
+                        // Add as loading primary result
+                        this.addResultToGroup(match, recognizingServiceKey, [], true, "loading");
+
+                        // Attempt enrichment
+                        const groups = this.getAttributes()?.metadataGroups ?? [];
+                        const gIdx = groups.findIndex((g) => g.serviceKey === recognizingServiceKey);
+                        const rIdx = groups[gIdx]?.results.findIndex((r) => r.isPrimaryInput) ?? -1;
+
+                        if (this.isMetadataServiceEnabled(recognizingServiceKey) && match.url) {
+                            try {
+                                const service = this.metadataServices.get(recognizingServiceKey);
+                                const enriched = await service.getTrackMetadata(match.url);
+                                if (gIdx >= 0 && rIdx >= 0) {
+                                    this.updateResultInGroup(gIdx, rIdx, {
+                                        metadata: enriched,
+                                        fetchState: undefined,
+                                    });
+                                }
+                            } catch {
+                                if (gIdx >= 0 && rIdx >= 0) {
+                                    this.updateResultInGroup(gIdx, rIdx, {
+                                        fetchState: "error",
+                                        fetchError: "Enrichment failed",
+                                    });
+                                }
+                            }
+                        } else {
+                            if (gIdx >= 0 && rIdx >= 0) {
+                                this.updateResultInGroup(gIdx, rIdx, { fetchState: undefined });
+                            }
+                        }
+
+                        fetchedViaService = true;
+                        break;
+                    } catch (error) {
+                        this.logger.warn(`Discovery fallback failed via ${discoveryService.id}`, { error });
+                    }
                 }
             }
 
             if (!this.getPrimaryMetadata()) {
                 this.status.update({ type: StatusType.Error, message: "Primary metadata unavailable" });
-                this.logger.error(`No metadata service could fetch primary metadata for the URL: ${url}`);
                 throw new Error(`No metadata service could fetch metadata for the URL: ${url}`);
             }
         } finally {
@@ -196,49 +303,137 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         this.updateAttributes({ primaryMetadataFetched: true });
     }
 
-    // Search metadata from all other providers using the primary metadata as source of truth
-    // (e.g. using track name, artist name, isrc, etc) to find the best matching metadata
+    // ── Discovery ─────────────────────────────────────────────────────────────
+
+    @SafeAction("Re-discover metadata providers")
     async startMetadataDiscovering(): Promise<void> {
-        // Get the primary metadata source to use for searching
-        const primarySource = this.getPrimaryMetadata();
+        const primaryResult = this.getPrimaryMetadata();
+        if (!primaryResult) throw new Error("No primary metadata source available for metadata discovering");
 
-        if (!primarySource || !primarySource.metadata) {
-            throw new Error("No primary metadata source available for metadata discovering");
-        }
+        const primaryMetadata = primaryResult.metadata;
+        const primaryUri = primaryMetadata.uri ?? primaryMetadata.url;
 
-        this.logger.info(`Discovering metadata from all other sources using primary metadata`);
+        this.logger.info(`Discovering metadata from all other sources`);
         this.updateAttributes({
-            metadataSources: [primarySource],
+            // Keep all groups and their order, only remove previously discovered (non-primary) results
+            metadataGroups: (this.getAttributes()?.metadataGroups ?? []).map((g) => ({
+                ...g,
+                results: g.results.filter((r) => r.isPrimaryInput),
+            })),
             metadataDiscoveringInProgress: true,
             metadataDiscovered: false,
         });
 
         try {
+            // Phase A — MetadataService.searchTrack (like Spotify, Youtube, etc.)
             const services = this.metadataServices.getAllServices();
             for (const service of services) {
+                // Skip the service that owns the primary metadata
+                if (
+                    primaryMetadata.platform === service.id.toLowerCase() ||
+                    primaryMetadata.apiProvider === service.id.toLowerCase()
+                )
+                    continue;
+
+                // Find the registry key for this service
+                const serviceKey = this.findServiceKey(service.id);
+                if (!serviceKey) continue;
+
+                // Skip primary service by registry key
+                const primaryGroup = (this.getAttributes()?.metadataGroups ?? []).find((g) =>
+                    g.results.some((r) => r.isPrimaryInput)
+                );
+                if (primaryGroup && primaryGroup.serviceKey === serviceKey) continue;
+
                 try {
-                    this.logger.debug(`Searching for track using ${service.id}`);
+                    this.logger.debug(`Searching for track using ${serviceKey}`);
+                    const results = await service.searchTrack(primaryMetadata);
 
-                    // Use isrc, track name, artist name, etc to improve search results
-                    const metadata = await service.searchTrack(primarySource.metadata);
-
-                    // Skip if discovered metadata is the same as the primary source
-                    if (
-                        primarySource &&
-                        (metadata.platform === primarySource.metadata.platform ||
-                            metadata.apiProvider === primarySource.metadata.apiProvider)
-                    ) {
-                        this.logger.debug(
-                            `Skipping discovered metadata from ${service.id}: conflicts with primary source`
-                        );
-                        continue;
+                    for (const result of results) {
+                        this.addResultToGroup(result.metadata, serviceKey, [
+                            {
+                                discoveredBy: serviceKey,
+                                fromUri: primaryUri,
+                                searchKeys: result.searchKeys,
+                            },
+                        ]);
                     }
-
-                    this.addMetadataSource(metadata, false);
-                    this.logger.info(`Successfully discovered metadata from ${metadata.apiProvider}`);
+                    this.logger.info(`Phase A: found ${results.length} result(s) from ${serviceKey}`);
                 } catch (error) {
-                    this.logger.warn(`Failed to discover metadata from ${service.constructor.name}:`, { error });
-                    // Continue to next service on failure
+                    this.logger.warn(`Phase A search failed for ${serviceKey}`, { error });
+                }
+            }
+
+            // Phase B — DiscoveryMetadataService.discoverFromUri (like Songlink)
+            for (const discoveryService of this.discoveryServices.getAllServices()) {
+                try {
+                    const allDiscovered = await discoveryService.discoverFromUri(primaryMetadata);
+                    // Exclude the primary platform — it's already handled
+                    const discovered = allDiscovered.filter((m) => m.platform !== primaryMetadata.platform);
+
+                    for (const rudimentary of discovered) {
+                        const targetServiceKey = this.findServiceKeyForPlatform(rudimentary.platform);
+                        if (!targetServiceKey) continue;
+
+                        // Check dedup: same URI already in group from Phase A?
+                        const existingGroup = (this.getAttributes()?.metadataGroups ?? []).find(
+                            (g) => g.serviceKey === targetServiceKey
+                        );
+                        const existingResult =
+                            rudimentary.uri && existingGroup
+                                ? existingGroup.results.find((r) => r.metadata.uri === rudimentary.uri)
+                                : undefined;
+
+                        const discoverySource: DiscoverySource = {
+                            discoveredBy: "songlink",
+                            fromUri: primaryUri,
+                            searchKeys: ["url"],
+                        };
+
+                        if (existingResult) {
+                            // Append discovery source to existing result
+                            const gIdx = (this.getAttributes()?.metadataGroups ?? []).findIndex(
+                                (g) => g.serviceKey === targetServiceKey
+                            );
+                            const rIdx =
+                                (this.getAttributes()?.metadataGroups ?? [])[gIdx]?.results.findIndex(
+                                    (r) => r.metadata.uri === rudimentary.uri
+                                ) ?? -1;
+                            if (gIdx >= 0 && rIdx >= 0) {
+                                const current = this.getAttributes()!.metadataGroups[gIdx].results[rIdx];
+                                this.updateResultInGroup(gIdx, rIdx, {
+                                    discoverySources: [...current.discoverySources, discoverySource],
+                                });
+                            }
+                        } else {
+                            // Try enrichment
+                            let finalMetadata = rudimentary;
+                            let fetchState: "error" | undefined;
+                            let fetchError: string | undefined;
+
+                            if (this.isMetadataServiceEnabled(targetServiceKey) && rudimentary.url) {
+                                try {
+                                    const service = this.metadataServices.get(targetServiceKey);
+                                    finalMetadata = await service.getTrackMetadata(rudimentary.url);
+                                } catch {
+                                    fetchState = "error";
+                                    fetchError = "Enrichment failed";
+                                    finalMetadata = rudimentary;
+                                }
+                            }
+
+                            this.addResultToGroup(
+                                finalMetadata,
+                                targetServiceKey,
+                                [discoverySource],
+                                false,
+                                fetchState,
+                                fetchError
+                            );
+                        }
+                    }
+                } catch (error) {
+                    this.logger.warn(`Phase B discovery failed for ${discoveryService.id}`, { error });
                 }
             }
         } finally {
@@ -247,27 +442,84 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         this.updateAttributes({ metadataDiscovered: true });
     }
 
-    // Allow re-searching metadata from a specific provider (e.g. after user has marked a metadata source as rejected or not favorited)
+    // Find registry key by matching service instance id (service.id = constructor name)
+    private findServiceKey(serviceId: string): string | undefined {
+        for (const [key] of this.metadataServiceRegistry.getAllConstructors()) {
+            const service = this.metadataServices.get(key);
+            if (service.id === serviceId) return key;
+        }
+        return undefined;
+    }
+
+    // Find registry key whose service handles the given platform
+    private findServiceKeyForPlatform(platform: string): string | undefined {
+        for (const [key] of this.metadataServiceRegistry.getAllConstructors()) {
+            if (key === platform) return key;
+            // youtubeMusic → youtube service
+            if (platform === "youtubeMusic" && key === "youtube") return key;
+        }
+        return undefined;
+    }
+
+    // ── Re-search / Re-fetch ─────────────────────────────────────────────────
+
     async startSingleProviderSearch(serviceKey: string): Promise<void> {
         const primaryMetadata = this.getPrimaryMetadata()?.metadata;
         if (!primaryMetadata) {
             this.logger.warn("No primary metadata available for re-search");
             return;
         }
+        const primaryUri = primaryMetadata.uri ?? primaryMetadata.url;
         try {
             const service = this.metadataServices.get(serviceKey);
-            const metadata = await service.searchTrack(primaryMetadata);
-            this.addMetadataSource(metadata, false);
+            const results = await service.searchTrack(primaryMetadata!);
+            for (const result of results) {
+                this.addResultToGroup(result.metadata, serviceKey, [
+                    { discoveredBy: serviceKey, fromUri: primaryUri, searchKeys: result.searchKeys },
+                ]);
+            }
             this.logger.info(`Re-search completed for ${serviceKey}`);
         } catch (error) {
-            this.logger.warn(`Failed to re-search ${serviceKey}:`, { error });
+            this.logger.warn(
+                `Failed to re-search ${serviceKey}: ${error instanceof Error ? error.message : String(error)}`
+            );
         }
     }
 
+    async refetchResult(groupIndex: number, resultIndex: number): Promise<void> {
+        const groups = this.getAttributes()?.metadataGroups ?? [];
+        const result = groups[groupIndex]?.results[resultIndex];
+        if (!result) return;
+
+        const serviceKey = groups[groupIndex].serviceKey;
+        const url = result.metadata.url;
+        if (!url || !this.isMetadataServiceEnabled(serviceKey)) return;
+
+        this.updateResultInGroup(groupIndex, resultIndex, { fetchState: "loading", fetchError: undefined });
+
+        try {
+            const service = this.metadataServices.get(serviceKey);
+            const enriched = await service.getTrackMetadata(url);
+            this.updateResultInGroup(groupIndex, resultIndex, {
+                metadata: enriched,
+                fetchState: undefined,
+                fetchError: undefined,
+            });
+        } catch (error) {
+            this.updateResultInGroup(groupIndex, resultIndex, {
+                fetchState: "error",
+                fetchError: error instanceof Error ? error.message : "Refetch failed",
+            });
+        }
+    }
+
+    // ── Misc mutations ────────────────────────────────────────────────────────
+
+    @SafeAction("Restart task")
     async restart(): Promise<void> {
         this.updateAttributes({
             state: "pending",
-            metadataSources: [],
+            metadataGroups: [],
             metadataOverride: {},
             downloadSources: [],
             primaryMetadataFetched: false,
@@ -329,7 +581,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         const settings = getSaveSettings();
         globalLogger.info("Saving track with settings:", { settings });
 
-        const compiled = computeCompiledMetadata(attrs!.metadataSources, attrs!.metadataOverride);
+        const compiled = computeCompiledMetadata(attrs!.metadataGroups, attrs!.metadataOverride);
         const tags = compiledMetadataToTags(compiled, {
             includeMusicBrainzTags: settings.includeMusicBrainzTags,
         });
@@ -385,15 +637,16 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         }
     }
 
+    @SafeAction("Start downloads")
     async startDownloads(): Promise<void> {
-        const metadataSources = this.getAttributes()?.metadataSources;
+        const metadataGroups = this.getAttributes()?.metadataGroups;
 
-        if (!metadataSources || metadataSources.length === 0) {
-            this.logger.warn("No metadata sources available for download");
-            throw new Error("No metadata sources available for download");
+        if (!metadataGroups || metadataGroups.length === 0) {
+            this.logger.warn("No metadata groups available for download");
+            throw new Error("No metadata groups available for download");
         }
 
-        this.logger.info(`Starting downloads with ${metadataSources.length} metadata sources`);
+        this.logger.info(`Starting downloads with ${metadataGroups.length} metadata groups`);
         this.updateAttributes({ downloadSources: [], downloadsFetched: false });
 
         const downloadServices = this.downloadServices.getAllServices();
@@ -401,24 +654,32 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
 
         for (const downloadService of downloadServices) {
             try {
-                // Find the first compatible metadata source for this download service
-                // TODO: trying multiple metadata sources for the same download service to compare audio files
-                const compatibleSource = metadataSources.find((source) => downloadService.canDownload(source.metadata));
+                // Find first compatible metadata across groups (sorted by group rank, then result rank)
+                let compatibleMetadata: TrackMetadata | undefined;
+                for (const group of [...metadataGroups].sort((a, b) => a.rank - b.rank)) {
+                    for (const result of [...group.results].sort((a, b) => a.rank - b.rank)) {
+                        if (
+                            !result.isRejected &&
+                            result.fetchState !== "loading" &&
+                            downloadService.canDownload(result.metadata)
+                        ) {
+                            compatibleMetadata = result.metadata;
+                            break;
+                        }
+                    }
+                    if (compatibleMetadata) break;
+                }
 
-                if (!compatibleSource) {
-                    this.logger.warn(
-                        `No compatible metadata source found for ${downloadService.id}. Compatible providers: ${downloadService.compatibleMetadataProviders.join(", ")}`
-                    );
+                if (!compatibleMetadata) {
+                    this.logger.warn(`No compatible metadata found for ${downloadService.id}`);
                     continue;
                 }
 
-                const compatibleMetadata = compatibleSource.metadata;
                 this.logger.info(`Downloading using ${downloadService.id} from ${compatibleMetadata.apiProvider}`);
 
                 // Download the track
                 const downloadSource = await downloadService.downloadTrack(compatibleMetadata);
                 downloadSources.push(downloadSource);
-
                 this.logger.info(`Successfully downloaded using ${downloadService.id}`);
             } catch (error) {
                 this.logger.warn(`Failed to download using ${downloadService.id}:`, { error });
@@ -444,47 +705,4 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             );
         }
     }
-
-    // ------- OLD IMPLEMENTATION BELOW - TO BE REWORKED -------
-
-    // private async fetchMusicBrainz(track: StandardTrack): Promise<void> {
-    //     const artist = track.artists?.[0]
-    //     const album = track.album
-    //     if (!artist)
-    //         return
-    //     const MB_CHARS = '()_-'
-    //     const artistName = replaceAll(artist.name, MB_CHARS, '');
-    //     const trackName = replaceAll(track.trackName, MB_CHARS, ' ');
-    //     const albumName = album?.albumName;
-    //     const trackDuration: number | undefined = track.duration ?? undefined
-
-    //     const musicBrainzReleases = await this.musicBrainzService.searchTracks(artistName, trackName, albumName, trackDuration);
-    //     // await saveJsonFile('samples/musicBrainzReleases.json', musicBrainzReleases);
-    //     track.musicBrainzRecording = musicBrainzReleases[0] ?? null;
-    //     this.setAttributes({ track });
-    // }
-
-    // // Search on Soulseek
-    // private async searchSoulseek(metadata: SongMetadata): Promise<any> {
-    //     return await this.soulseekService.searchMusic({
-    //         query: {
-    //             artistName: metadata.artist,
-    //             trackTitle: metadata.title,
-    //             albumName: undefined,
-    //             extension: undefined,
-    //             durationMs: undefined,
-    //         },
-    //         waitTimeMs: 3000,
-    //     });
-    // }
-
-    // // Download from Soulseek
-    // private async downloadFromSoulseek(item: DownloadItem, results: any): Promise<void> {
-    //     const { SoulseekService } = await import('./api/soulseek');
-    //     const soulseek = SoulseekService.getInstance();
-
-    //     await soulseek.download(results.file, (progress) => {
-    //         this.updateItem(item.id, { progress });
-    //     });
-    // }
 }

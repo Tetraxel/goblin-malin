@@ -26,6 +26,7 @@ function providerItems(
     stored: Record<string, boolean | string>,
     onChange: (patch: DeepPartial<MusicDownloadFlowSettings>) => void,
     section: "metadata" | "download",
+    providerSubKey: string,
     onOpenWizard: (config: SetupWizardConfig, onDisable?: () => void) => void
 ): SettingsItem[] {
     const display = providerDisplayRegistry.get(key);
@@ -48,7 +49,7 @@ function providerItems(
             run: () =>
                 onOpenWizard(wizard, () =>
                     onChange({
-                        [section]: { providers: { [key]: { enabled: false } } },
+                        [section]: { [providerSubKey]: { [key]: { enabled: false } } },
                     } as DeepPartial<MusicDownloadFlowSettings>)
                 ),
         });
@@ -64,7 +65,7 @@ function providerItems(
                 get: () => current,
                 set: (v) =>
                     onChange({
-                        [section]: { providers: { [key]: { [settingKey]: v } } },
+                        [section]: { [providerSubKey]: { [key]: { [settingKey]: v } } },
                     } as DeepPartial<MusicDownloadFlowSettings>),
             });
         } else if (def.kind === "textInput") {
@@ -76,7 +77,7 @@ function providerItems(
                 get: () => current,
                 set: (v) =>
                     onChange({
-                        [section]: { providers: { [key]: { [settingKey]: v } } },
+                        [section]: { [providerSubKey]: { [key]: { [settingKey]: v } } },
                     } as DeepPartial<MusicDownloadFlowSettings>),
             });
         }
@@ -89,6 +90,7 @@ export function buildFlowSettingsItems(
     flowSettings: MusicDownloadFlowSettings,
     metadataProviders: ProviderEntry[],
     downloadProviders: ProviderEntry[],
+    discoveryProviders: ProviderEntry[],
     onChange: (patch: DeepPartial<MusicDownloadFlowSettings>) => void,
     onOpenWizard: (config: SetupWizardConfig, onDisable?: () => void) => void = () => {}
 ): SettingsItem[] {
@@ -121,6 +123,24 @@ export function buildFlowSettingsItems(
                     flowSettings.metadata.providers[key] ?? {},
                     onChange,
                     "metadata",
+                    "providers",
+                    onOpenWizard
+                )
+            );
+        }
+    }
+
+    if (discoveryProviders.length > 0) {
+        items.push({ kind: "subHeader", label: "Discovery providers" });
+        for (const { key, ctor } of discoveryProviders) {
+            items.push(
+                ...providerItems(
+                    key,
+                    ctor,
+                    flowSettings.metadata.discoveryProviders[key] ?? {},
+                    onChange,
+                    "metadata",
+                    "discoveryProviders",
                     onOpenWizard
                 )
             );
@@ -188,6 +208,7 @@ export function buildFlowSettingsItems(
                     flowSettings.download.providers[key] ?? {},
                     onChange,
                     "download",
+                    "providers",
                     onOpenWizard
                 )
             );

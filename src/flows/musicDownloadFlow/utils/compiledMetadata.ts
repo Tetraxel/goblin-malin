@@ -1,6 +1,7 @@
-﻿import {
+import {
     Platform,
-    MetadataSourceState,
+    MetadataGroupState,
+    MetadataResultState,
     MetadataOverrides,
     TrackMetadata,
     StandardArtist,
@@ -49,8 +50,19 @@ function extractYear(releaseDate: string | undefined): number | undefined {
     return isNaN(year) ? undefined : year;
 }
 
+// From each group, pick one representative result for compilation:
+// - favorited non-rejected result if present
+// - otherwise first non-rejected, non-loading result by rank
+export function pickGroupRepresentative(group: MetadataGroupState): MetadataResultState | undefined {
+    const candidates = [...group.results]
+        .sort((a, b) => a.rank - b.rank)
+        .filter((r) => !r.isRejected && r.fetchState !== "loading");
+
+    return candidates.find((r) => r.isFavorited) ?? candidates[0];
+}
+
 function pickFirst<T>(
-    sorted: MetadataSourceState[],
+    sorted: MetadataResultState[],
     getter: (m: TrackMetadata) => T | undefined | null
 ): { value: T | undefined; platform: Platform | undefined } {
     for (const s of sorted) {
@@ -62,15 +74,12 @@ function pickFirst<T>(
     return { value: undefined, platform: undefined };
 }
 
-export function computeCompiledMetadata(
-    sources: MetadataSourceState[],
-    overrides: MetadataOverrides
-): CompiledMetadata {
-    // 1. Filter out rejected sources
-    const active = sources.filter((s) => !s.isRejected);
-
-    // 2. Sort by rank ascending (lower rank = higher priority)
-    const sorted = [...active].sort((a, b) => a.rank - b.rank);
+export function computeCompiledMetadata(groups: MetadataGroupState[], overrides: MetadataOverrides): CompiledMetadata {
+    // Build a flat sorted list of representative results, one per group, sorted by group rank
+    const sorted = [...groups]
+        .sort((a, b) => a.rank - b.rank)
+        .map(pickGroupRepresentative)
+        .filter((r): r is MetadataResultState => r !== undefined);
 
     const attribution: Partial<Record<CompiledMetadataField, FieldAttribution>> = {};
 
@@ -96,7 +105,6 @@ export function computeCompiledMetadata(
     if (keyR.platform) attribution.key = keyR.platform;
     if (genresR.platform) attribution.genres = genresR.platform;
 
-    // 3. Build compiled result from sources
     const compiled: CompiledMetadata = {
         trackName: trackNameR.value ?? "",
         artists: artistsR.value ?? [],
@@ -111,7 +119,7 @@ export function computeCompiledMetadata(
         attribution,
     };
 
-    // 4. Apply overrides on top
+    // Apply overrides on top
     if (overrides.trackName !== undefined) {
         compiled.trackName = overrides.trackName;
         attribution.trackName = "manual";

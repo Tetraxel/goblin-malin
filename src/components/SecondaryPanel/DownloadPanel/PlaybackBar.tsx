@@ -1,7 +1,7 @@
 ﻿import React from "react";
 import { Box, Text } from "ink";
 import { useTheme } from "#base/themeContext";
-import { formatDuration } from "./utils";
+import { formatDuration } from "../utils";
 
 interface PlaybackBarProps {
     positionMs: number;

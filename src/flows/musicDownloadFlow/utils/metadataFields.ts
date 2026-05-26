@@ -1,10 +1,10 @@
-﻿import { MetadataSourceState, StandardArtist } from "#flows/musicDownloadFlow/types";
+﻿import { MetadataResultState, StandardArtist } from "#flows/musicDownloadFlow/types";
 import { CompiledMetadata, CompiledMetadataField } from "./compiledMetadata";
 
 export type FieldDef = {
     key: CompiledMetadataField;
     label: string;
-    getSourceValue: (s: MetadataSourceState) => string;
+    getSourceValue: (s: MetadataResultState) => string;
     getCompiledValue: (c: CompiledMetadata) => string;
     editable: boolean;
     parseValue?: (input: string) => unknown;

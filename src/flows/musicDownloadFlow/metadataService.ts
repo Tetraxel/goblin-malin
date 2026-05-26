@@ -1,7 +1,7 @@
 ﻿import { ServiceBase } from "#base/service-base";
 import { Logger } from "#base/logger/logger";
 import { ParsedUrl } from "#base/urlParser";
-import { TrackMetadata } from "./types";
+import { TrackMetadata, SearchTrackResult } from "./types";
 import { DownloadTask } from "./utils/downloadTask";
 
 /**
@@ -22,5 +22,5 @@ export abstract class MetadataService extends ServiceBase {
     }
 
     abstract getTrackMetadata(url: string): Promise<TrackMetadata>;
-    abstract searchTrack(sourceTrackMetadata: TrackMetadata): Promise<TrackMetadata>;
+    abstract searchTrack(sourceTrackMetadata: TrackMetadata): Promise<SearchTrackResult[]>;
 }

@@ -4,7 +4,7 @@
 
 - **What this is:** A keyboard-driven terminal UI (Ink/React) for downloading and tagging music tracks from streaming platforms.
 - **Current state:** Working POC for one pipeline — Spotify URL → YouTube search → yt-dlp download.
-  - Run the local script [TREE.ps1](TREE.ps1) to get the full project tree
+    - Run the local script [TREE.ps1](TREE.ps1) to get the full project tree
 - **Target state:** See [README.md](README.md) and [docs/designs/](docs/designs/) (screenshots contain the most detail).
 
 ## Key documents
@@ -35,4 +35,28 @@ Only two metadata services are registered: `spotify` and `youtube`. Only one dow
 yarn run dev  # start the TUI (use this)
 yarn run type-check  # Check typescript errors
 yarn run lint  # Check eslint errors
+```
+
+## Tips for common mistakes
+
+### Box shrinking
+
+By default, `Box` from `ink` are shrinking with if there is no enough space **by default**.
+Often it's better to specify explictly `flexShrink={0}`.
+
+```
+import { Box, Text } from "ink";
+<Box flexDirection="row" flexShrink={0}>
+```
+
+### Multiple Box with `overflow="hidden"`
+
+When multiple boxes have overflow, it make the child text overflow, even above parents.
+
+```
+<Box overflow="hidden">
+  <Box overflow="hidden">
+    <Text>Content</Text>
+  </Box>
+</Box>
 ```

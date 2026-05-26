@@ -1,74 +1,74 @@
-﻿// import { ParsedUrl } from '#base/urlParser';
-// import { Logger } from '#base/logger/logger';
-// import { StatusType } from '#base/task/task-status';
-// import { DownloadTask } from '#flows/musicDownloadFlow/utils/downloadTask';
-// import { sleep } from '#utils/sleep';
-// import { Cached } from '#utils/cache';
-// import { MetadataService } from '../../../metadataService';
-// import { SonglinkClient, SonglinkResponse } from '../../apis/songlink-client';
+import { Logger } from "#base/logger/logger";
+import { ProviderDisplay } from "#base/providerDisplay";
+import { ProviderSettingsSchema } from "#base/providerSettings";
+import { StatusType } from "#base/task/task-status";
+import { Cached } from "#utils/cache";
+import { TrackMetadata } from "#flows/musicDownloadFlow/types";
+import { DiscoveryMetadataService } from "#flows/musicDownloadFlow/discoveryMetadataService";
+import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { SonglinkClient } from "../../apis/songlink-client";
+import { extractTracksFromSonglinkResponse } from "./convertSonglinkToTrack";
 
-// export class SonglinkService extends MetadataService {
-//     private static client: SonglinkClient;
+export class SonglinkService extends DiscoveryMetadataService {
+    static readonly display: ProviderDisplay = {
+        label: "Songlink",
+        acronym: "SONGLINK",
+        color: "#f76c1b",
+        colorSubtle: "#7a3000",
+        colorBright: "#ff8c3a",
+    };
+    static readonly defaultSettings: ProviderSettingsSchema = {
+        enabled: { label: "Enable", defaultValue: true, kind: "checkbox" },
+    };
 
-//     constructor(task: DownloadTask, logger: Logger) {
-//         super('Songlink', task, logger)
-//     }
+    private static client: SonglinkClient;
 
-//     static parseUrl(_url: string): ParsedUrl | null { return null; }
+    constructor(task: DownloadTask, logger: Logger) {
+        super("SonglinkService", task, logger);
+    }
 
-//     private async getClient(): Promise<SonglinkClient> {
-//         return await this.runExclusive('init', async () => {
-//             if (!SonglinkService.client) {
-//                 SonglinkService.client = new SonglinkClient();
-//             }
-//             return SonglinkService.client;
-//         });
-//     }
+    private getClient(): SonglinkClient {
+        if (!SonglinkService.client) {
+            SonglinkService.client = new SonglinkClient();
+        }
+        return SonglinkService.client;
+    }
 
-//     @Cached()
-//     async getSonglinkData(url: string): Promise<SonglinkResponse | null> {
-//         const client = await this.getClient()
+    @Cached()
+    async discoverFromUri(sourceMetadata: TrackMetadata): Promise<TrackMetadata[]> {
+        const url = sourceMetadata.url;
+        if (!url) return [];
 
-//         try {
-//             this.logger.info(
-//                 `Get Songlink track info: "${url}"`
-//             );
-//             this.status.set({
-//                 type: StatusType.Processing,
-//                 message: "Get Songlink track info",
-//                 timeTracking: true,
-//                 progress: 0,
-//             });
+        this.logger.info(`Discovering tracks via Songlink for: ${url}`);
+        this.status.set({
+            type: StatusType.Processing,
+            message: "Discovering via Songlink",
+            timeTracking: true,
+            progress: 0,
+        });
 
-//             // Prepare request
-//             const queryParams = new URLSearchParams({
-//                 url,
-//                 userCountry: 'FR',
-//                 songIfSingle: 'true'
-//             });
+        try {
+            const client = this.getClient();
+            const queryParams = new URLSearchParams({
+                url,
+                userCountry: "FR",
+                songIfSingle: "true",
+            });
 
-//             // Fetch from client
-//             this.status.update({ progress: 20 });
-//             const data = await client.get(queryParams);
+            const data = await client.get(queryParams);
 
-//             if (!data) {
-//                 throw new Error('Failed to fetch data from Songlink client.');
-//             }
+            if (!data) {
+                throw new Error("Songlink returned no data");
+            }
 
-//             this.logger.info("Successfully fetched Songlink data")
-//             this.status.update({ progress: 100 });
-//             return data;
-//         } catch (error) {
-//             this.logger.error(
-//                 `Error fetching Songlink track data ${url}`,
-//                 { error }
-//             );
-//             this.status.set({
-//                 type: StatusType.Error,
-//                 message: "Error fetching Songlink track",
-//             });
+            this.status.update({ progress: 100 });
+            this.status.clear();
 
-//             throw error;
-//         }
-//     }
-// }
+            return extractTracksFromSonglinkResponse(data);
+        } catch (error) {
+            this.logger.error(`Error discovering via Songlink for: ${url}`, { error });
+            this.status.set({ type: StatusType.Error, message: "Error discovering via Songlink" });
+            throw error;
+        }
+    }
+}

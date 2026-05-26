@@ -25,10 +25,11 @@ interface DownloadPanelProps {
 
 export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, width, height }) => {
     const theme = useTheme();
-    const { focusState, setSelectedSourceIndex, setSourcesInnerFocus } = useFocusContext();
+    const { focusState, setSourcesInnerFocus } = useFocusContext();
 
     const { sourcesPanel } = focusState.secondaryPanel;
-    const { selectedSourceIndex, innerFocus } = sourcesPanel;
+    const { innerFocus } = sourcesPanel;
+    const [selectedSourceIndex, setSelectedSourceIndex] = useState(0);
 
     const isPanelActive =
         focusState.activeWindow === "secondaryPanel" && focusState.secondaryPanel.subTab === "sources";
@@ -56,7 +57,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     const savedSource: TrackDownloadSource | null = downloadSources.find((s) => s.savedFile != null) ?? null;
 
     const compiled: CompiledMetadata | null = snapshot?.attributes
-        ? computeCompiledMetadata(snapshot.attributes.metadataSources, snapshot.attributes.metadataOverride)
+        ? computeCompiledMetadata(snapshot.attributes.metadataGroups, snapshot.attributes.metadataOverride)
         : null;
 
     const { outputDir } = getSaveSettings();

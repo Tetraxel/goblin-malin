@@ -9,14 +9,6 @@ export function formatBytes(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function formatDuration(ms: number | undefined): string {
-    if (!ms) return "—";
-    const totalSec = Math.round(ms / 1000);
-    const m = Math.floor(totalSec / 60);
-    const s = totalSec % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
 export function formatDate(d: Date): string {
     return d.toISOString().slice(0, 16).replace("T", " ");
 }

@@ -8,11 +8,12 @@ import { TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { computeOutputFilename } from "#flows/musicDownloadFlow/utils/computeOutputPath";
 import { getInstance, PlayerStatus } from "#utils/mpvPlayer";
-import { formatBytes, formatDuration, formatDate, tagValue } from "#components/SecondaryPanel/DownloadPanel/utils";
+import { formatBytes, formatDate, tagValue } from "#components/SecondaryPanel/DownloadPanel/utils";
 import { PlaybackBar } from "../PlaybackBar";
 import { DiffView } from "./DiffView";
 import { DetailRow } from "./DetailRow";
 import { Hint } from "../../../Hint";
+import { formatDuration } from "../../utils";
 
 interface DownloadSourceDetailProps {
     source: TrackDownloadSource | null;

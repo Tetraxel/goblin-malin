@@ -1,16 +1,14 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Box, useInput } from "ink";
 import { useTheme } from "#base/themeContext";
 import { Task, TaskSnapshot } from "#base/task/task";
 import { useFocusContext } from "#contexts/FocusContext";
-import { MusicDownloadTaskAttributes, MetadataSourceState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
-import { computeCompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
+import { MusicDownloadTaskAttributes, MetadataGroupState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
+import { computeCompiledMetadata, pickGroupRepresentative } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { navigableFields } from "#flows/musicDownloadFlow/utils/metadataFields";
 import { MetadataSourceList } from "./MetadataSourceList";
 import { MetadataDetailPanel } from "./MetadataDetailPanel";
 import { SourcesHintBar } from "../SourcesHintBar";
-
-const HINT_BAR_HEIGHT = 2;
 
 interface MetadataPanelProps {
     selectedTask: Task | null;
@@ -20,10 +18,11 @@ interface MetadataPanelProps {
 
 export const MetadataPanel: React.FC<MetadataPanelProps> = ({ selectedTask, width, height }) => {
     const theme = useTheme();
-    const { focusState, setSelectedSourceIndex, setSourcesInnerFocus, setDetailFieldIndex } = useFocusContext();
+    const { focusState, setCursor, setShowDiscoverySources, setSourcesInnerFocus, setDetailFieldIndex } =
+        useFocusContext();
 
     const { sourcesPanel } = focusState.secondaryPanel;
-    const { selectedSourceIndex, innerFocus, selectedFieldIndex } = sourcesPanel;
+    const { cursor, showDiscoverySources, innerFocus, selectedFieldIndex } = sourcesPanel;
 
     const isPanelActive =
         focusState.activeWindow === "secondaryPanel" && focusState.secondaryPanel.subTab === "sources";
@@ -46,14 +45,15 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ selectedTask, widt
         });
     }, [typedTask]);
 
-    const sources: MetadataSourceState[] = snapshot?.attributes?.metadataSources ?? [];
+    const groups: MetadataGroupState[] = snapshot?.attributes?.metadataGroups ?? [];
     const overrides: MetadataOverrides = snapshot?.attributes?.metadataOverride ?? {};
-    const compiled = computeCompiledMetadata(sources, overrides);
+    const compiled = computeCompiledMetadata(groups, overrides);
 
     const [splitRatio, setSplitRatio] = useState(0.6);
     const leftWidth = Math.floor(width * splitRatio) - 4;
     const rightWidth = width - leftWidth - 4;
-    const listHeight = height - HINT_BAR_HEIGHT;
+    const hintBarHeight = cursor.type === "result" ? 3 : 2;
+    const listHeight = height - hintBarHeight;
 
     useInput(
         (_, key) => {
@@ -86,21 +86,32 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ selectedTask, widt
                 setDetailFieldIndex(Math.min(navigableFields.length - 1, selectedFieldIndex + 1));
             }
         },
-        {
-            isActive: isPanelActive && innerFocus === "detail" && !focusState.isEditingField,
-        }
+        { isActive: isPanelActive && innerFocus === "detail" && !focusState.isEditingField }
     );
 
-    function handleSourcesChange(updated: MetadataSourceState[]) {
-        typedTask?.updateAttributes({ metadataSources: updated });
+    function handleGroupsChange(updated: MetadataGroupState[]) {
+        typedTask?.updateAttributes({ metadataGroups: updated });
     }
 
     function handleOverrideChange(updated: MetadataOverrides) {
         typedTask?.updateAttributes({ metadataOverride: updated });
     }
 
-    const selectedSource =
-        selectedSourceIndex === -1 ? ("compiled" as const) : (sources[selectedSourceIndex] ?? ("compiled" as const));
+    function handleRefetchResult(groupIndex: number, resultIndex: number) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (typedTask as any)?.refetchResult?.(groupIndex, resultIndex);
+    }
+
+    // Resolve the selected result for the detail panel
+    const sortedGroups = [...groups].sort((a, b) => a.rank - b.rank);
+    const selectedResult =
+        cursor.type === "result"
+            ? sortedGroups[cursor.groupIndex]?.results.sort((a, b) => a.rank - b.rank)[cursor.resultIndex]
+            : cursor.type === "group"
+              ? sortedGroups[cursor.groupIndex]
+                  ? pickGroupRepresentative(sortedGroups[cursor.groupIndex])
+                  : undefined
+              : undefined;
 
     return (
         <Box
@@ -116,21 +127,24 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ selectedTask, widt
         >
             <Box flexDirection="row" flexGrow={1} overflow="hidden">
                 <MetadataSourceList
-                    sources={sources}
+                    groups={groups}
                     compiled={compiled}
                     overrides={overrides}
-                    selectedIndex={selectedSourceIndex}
+                    cursor={cursor}
+                    showDiscoverySources={showDiscoverySources}
                     isActive={isPanelActive && innerFocus === "list"}
                     width={leftWidth}
                     height={listHeight}
-                    onSelectSource={setSelectedSourceIndex}
+                    onCursorChange={setCursor}
                     onInnerFocusSwitch={() => setSourcesInnerFocus("detail")}
-                    onSourcesChange={handleSourcesChange}
+                    onGroupsChange={handleGroupsChange}
+                    onToggleDiscoverySources={() => setShowDiscoverySources(!showDiscoverySources)}
+                    onRefetchResult={handleRefetchResult}
                     isFetchingPrimarySource={snapshot?.attributes?.primaryMetadataInProgress ?? false}
                     isDiscovering={snapshot?.attributes?.metadataDiscoveringInProgress ?? false}
                 />
                 <MetadataDetailPanel
-                    source={selectedSource}
+                    source={selectedResult ?? "compiled"}
                     compiled={compiled}
                     overrides={overrides}
                     selectedFieldIndex={selectedFieldIndex}
@@ -142,8 +156,8 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ selectedTask, widt
                 />
             </Box>
             <SourcesHintBar
-                sources={sources}
-                selectedIndex={selectedSourceIndex}
+                groups={groups}
+                cursor={cursor}
                 innerFocus={innerFocus}
                 isActive={isPanelActive}
                 width={width - 2}

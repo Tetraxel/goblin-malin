@@ -1,118 +1,183 @@
-﻿import React from "react";
+import React from "react";
 import { Box, Text } from "ink";
-import { MetadataSourceState } from "#flows/musicDownloadFlow/types";
+import { MetadataGroupState } from "#flows/musicDownloadFlow/types";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
+import { CursorPosition } from "#hooks/useFocusManager";
 import { Hint } from "../Hint";
+import { Uri } from "./MetadataPanel/Uri";
 
 interface SourcesHintBarProps {
-    sources: MetadataSourceState[];
-    selectedIndex: number;
+    groups: MetadataGroupState[];
+    cursor: CursorPosition;
     innerFocus: "list" | "detail";
     isActive: boolean;
     width: number;
 }
 
-function getDisplay(apiProvider: string): { label: string; color: string } {
-    const display = providerDisplayRegistry.get(apiProvider);
-    return { label: display.label, color: display.color };
-}
-
-function truncate(s: string, maxLen: number): string {
-    return s.length > maxLen ? s.slice(0, maxLen - 1) + "…" : s;
-}
-
-export const SourcesHintBar: React.FC<SourcesHintBarProps> = ({
-    sources,
-    selectedIndex,
-    innerFocus,
-    isActive,
-    width,
-}) => {
+export const SourcesHintBar: React.FC<SourcesHintBarProps> = ({ groups, cursor, innerFocus, isActive, width }) => {
     const theme = useTheme();
     const dim = !isActive || innerFocus !== "list";
-    const isCompiled = selectedIndex === -1;
-    const selectedSource = isCompiled ? null : (sources[selectedIndex] ?? null);
+    const sortedGroups = [...groups].sort((a, b) => a.rank - b.rank);
 
-    let row1Parts: { label: string; color: string }[] = [];
-    if (!isCompiled && selectedSource) {
-        const m = selectedSource.metadata;
-        const display = getDisplay(m.apiProvider);
-        const type = m.type ? m.type.charAt(0).toUpperCase() + m.type.slice(1) : "Track";
-        const id = m.id ? truncate(m.id, 14) : "";
-        row1Parts = [display.label, type, id].filter(Boolean).map((label) => ({ label, color: display.color }));
+    if (cursor.type === "compiled") {
+        return (
+            <Box
+                flexDirection="column"
+                width={width}
+                overflow="hidden"
+                marginLeft={1}
+                alignItems="flex-end"
+                justifyContent="flex-end"
+                flexShrink={0}
+            >
+                <Box flexDirection="row" width={width} overflow="hidden" flexShrink={0}>
+                    <Box marginRight={1} flexShrink={0}>
+                        <Text color={theme.text.active} dimColor={dim} bold>
+                            Compiled Metadata
+                        </Text>
+                    </Box>
+                    <Box marginRight={2} flexShrink={0}>
+                        <Text color={theme.text.active} dimColor={dim}>
+                            {" >>>"}
+                        </Text>
+                    </Box>
+                </Box>
+                <Box flexDirection="row" width={width} overflow="hidden" flexShrink={0}>
+                    <Box marginRight={1} flexShrink={0}>
+                        <Text color={theme.text.active} dimColor={dim} bold>
+                            Metadata Panel
+                        </Text>
+                    </Box>
+                    <Box marginRight={2} flexShrink={0}>
+                        <Text color={theme.text.active} dimColor={dim}>
+                            {" >>>"}
+                        </Text>
+                    </Box>
+                    <Hint label="Shrink" shortcut="Shift+←" dim={dim} />
+                    <Hint label="Expand" shortcut="Shift+→" dim={dim} />
+                    <Hint label="Toggle search details" shortcut="E" dim={dim} />
+                </Box>
+            </Box>
+        );
     }
 
-    const sortedSources = [...sources].sort((a, b) => a.rank - b.rank);
-    let row2Left = "";
-    if (isCompiled) {
-        row2Left = "Compiled Metadata";
-    } else if (selectedSource) {
-        const pos = sortedSources.indexOf(selectedSource) + 1;
-        row2Left = `Source ${pos}/${sources.length}`;
+    if (cursor.type === "group") {
+        const group = sortedGroups[cursor.groupIndex];
+        const display = group ? providerDisplayRegistry.get(group.serviceKey) : null;
+        const platformLabel = display?.label ?? "";
+        return (
+            <Box
+                flexDirection="column"
+                width={width}
+                overflow="hidden"
+                marginLeft={1}
+                alignItems="flex-end"
+                justifyContent="flex-end"
+                flexShrink={0}
+            >
+                <Box flexDirection="row" width={width} overflow="hidden" flexShrink={0}>
+                    <Box marginRight={1} flexShrink={0}>
+                        <Text color={display?.color ?? theme.text.active} dimColor={dim} bold>
+                            {platformLabel}
+                        </Text>
+                    </Box>
+                    <Box marginRight={2} flexShrink={0}>
+                        <Text color={theme.text.active} dimColor={dim}>
+                            {" >>>"}
+                        </Text>
+                    </Box>
+                    <Hint label="Reject all" shortcut="Del" dim={dim} />
+                    <Hint label="Move up" shortcut="Shift+↑" dim={dim} />
+                    <Hint label="Move down" shortcut="Shift+↓" dim={dim} />
+                </Box>
+                <Box flexDirection="row" width={width} overflow="hidden" flexShrink={0}>
+                    <Box marginRight={1} flexShrink={0}>
+                        <Text color={theme.text.active} dimColor={dim} bold>
+                            Metadata Panel
+                        </Text>
+                    </Box>
+                    <Box marginRight={2} flexShrink={0}>
+                        <Text color={theme.text.active} dimColor={dim}>
+                            {" >>>"}
+                        </Text>
+                    </Box>
+                    <Hint label="Shrink" shortcut="Shift+←" dim={dim} />
+                    <Hint label="Expand" shortcut="Shift+→" dim={dim} />
+                    <Hint label="Toggle search details" shortcut="E" dim={dim} />
+                </Box>
+            </Box>
+        );
     }
 
-    const showSourceActions = !isCompiled && !!selectedSource;
-    const isRejected = selectedSource?.isRejected ?? false;
+    // cursor.type === "result"
+    const { groupIndex: gi, resultIndex: ri } = cursor;
+    const group = sortedGroups[gi];
+    const result = group ? [...group.results].sort((a, b) => a.rank - b.rank)[ri] : undefined;
+    const m = result?.metadata;
+    const uri = m ? (m.uri ?? `${m.platform.toUpperCase()}::TRACK::${m.id}`) : "";
+    const pos = ri + 1;
+    const total = group?.results.length ?? 0;
+    const isRejected = result?.isRejected ?? false;
+    const isFav = result?.isFavorited ?? false;
 
     return (
         <Box
             flexDirection="column"
             width={width}
-            minHeight={1}
             overflow="hidden"
             marginLeft={1}
             alignItems="flex-end"
             justifyContent="flex-end"
+            flexShrink={0}
         >
-            <Box flexDirection="row" width={width} overflow="hidden">
-                <Box marginRight={1} flexDirection="row">
-                    {row1Parts.map((part, i) => (
-                        <React.Fragment key={i}>
-                            {i > 0 && (
-                                <Text color={theme.text.active} dimColor={dim}>
-                                    {" > "}
-                                </Text>
-                            )}
-                            <Text color={part.color} dimColor={dim}>
-                                {part.label}
-                            </Text>
-                        </React.Fragment>
-                    ))}
-                </Box>
-                {!isCompiled && row1Parts.length > 0 && (
+            <Box flexDirection="row" width={width} overflow="hidden" flexShrink={0}>
+                {m && uri && (
+                    <Box flexShrink={0} marginRight={1}>
+                        <Uri uri={uri} platform={m.platform} dimmed={dim} />
+                    </Box>
+                )}
+                {m && (
                     <>
-                        <Box marginRight={2}>
+                        <Box marginRight={2} flexShrink={0}>
                             <Text color={theme.text.active} dimColor={dim}>
-                                {">>>"}
+                                {" >>>"}
                             </Text>
                         </Box>
                         <Hint label="Open link" shortcut="Enter" dim={dim} />
                         <Hint label="Copy link" shortcut="Ctrl+C" dim={dim} />
-                        <Hint label="Download" shortcut="D" dim={dim} />
                     </>
                 )}
             </Box>
-
-            <Box flexDirection="row" width={width} overflow="hidden">
-                <Box marginRight={1}>
-                    <Text color={theme.text.active} dimColor={dim} bold>
-                        {row2Left}
+            <Box flexDirection="row" width={width} overflow="hidden" flexShrink={0}>
+                <Box marginLeft={1} marginRight={1} flexShrink={0}>
+                    <Text color={theme.text.active} dimColor={dim} bold>{`Source ${pos}/${total}`}</Text>
+                </Box>
+                <Box marginRight={2} flexShrink={0}>
+                    <Text color={theme.text.active} dimColor={dim}>
+                        {" >>>"}
                     </Text>
                 </Box>
-                {showSourceActions && (
-                    <>
-                        <Box marginRight={2}>
-                            <Text color={theme.text.active} dimColor={dim}>
-                                {">>>"}
-                            </Text>
-                        </Box>
-                        <Hint label={selectedSource?.isFavorited ? "Unfavorite" : "Favorite"} shortcut="F" dim={dim} />
-                        <Hint label={isRejected ? "Unreject" : "Reject source"} shortcut="Del" dim={dim} />
-                        <Hint label="Move up" shortcut="Shift+↑" dim={dim} />
-                        <Hint label="Move down" shortcut="Shift+↓" dim={dim} />
-                    </>
-                )}
+                <Hint label={isFav ? "Unfavorite" : "Set as favorite"} shortcut="F" dim={dim} />
+                <Hint label={isRejected ? "Unreject" : "Reject"} shortcut="Del" dim={dim} />
+                <Hint label="Move up" shortcut="Shift+↑" dim={dim} />
+                <Hint label="Move down" shortcut="Shift+↓" dim={dim} />
+                <Hint label="Refetch" shortcut="R" dim={dim} />
+            </Box>
+            <Box flexDirection="row" width={width} overflow="hidden" flexShrink={0}>
+                <Box marginLeft={1} marginRight={1} flexShrink={0}>
+                    <Text color={theme.text.active} dimColor={dim} bold>
+                        Metadata Panel
+                    </Text>
+                </Box>
+                <Box marginRight={2} flexShrink={0}>
+                    <Text color={theme.text.active} dimColor={dim}>
+                        {" >>>"}
+                    </Text>
+                </Box>
+                <Hint label="Shrink" shortcut="Shift+←" dim={dim} />
+                <Hint label="Expand" shortcut="Shift+→" dim={dim} />
+                <Hint label="Toggle search details" shortcut="E" dim={dim} />
             </Box>
         </Box>
     );

@@ -3,15 +3,11 @@ import * as path from "path";
 import { Box, Text } from "ink";
 import { TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
-import {
-    formatBytes,
-    formatDuration,
-    formatDate,
-    getProviderColor,
-} from "#components/SecondaryPanel/DownloadPanel/utils";
+import { formatBytes, formatDate, getProviderColor } from "#components/SecondaryPanel/DownloadPanel/utils";
 import { useTheme } from "#base/themeContext";
 import { DiffRow } from "./DiffRow";
 import { Hint } from "../../../Hint";
+import { formatDuration } from "../../utils";
 
 interface DiffViewProps {
     savedSource: TrackDownloadSource;

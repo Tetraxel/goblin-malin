@@ -1,24 +1,29 @@
-﻿import React from "react";
+import React from "react";
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 import { useTheme } from "#base/themeContext";
-import { MetadataSourceState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
+import { MetadataGroupState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
 import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
+import { CursorPosition } from "#hooks/useFocusManager";
 import { useSourceListInput } from "./useSourceListInput";
-import { MetadataSourceRow } from "./MetadataSourceRow";
+import { MetadataGroupHeader } from "./MetadataGroupHeader";
+import { MetadataResultRow } from "./MetadataResultRow";
 import { MetadataCompiledRow } from "./MetadataCompiledRow";
 
 interface MetadataSourceListProps {
-    sources: MetadataSourceState[];
+    groups: MetadataGroupState[];
     compiled: CompiledMetadata;
     overrides: MetadataOverrides;
-    selectedIndex: number; // -1 = compiled row, 0+ = source index
+    cursor: CursorPosition;
+    showDiscoverySources: boolean;
     isActive: boolean;
     width: number;
     height: number;
-    onSelectSource: (index: number) => void;
-    onInnerFocusSwitch: () => void; // called when → is pressed to move to detail
-    onSourcesChange: (sources: MetadataSourceState[]) => void;
+    onCursorChange: (cursor: CursorPosition) => void;
+    onInnerFocusSwitch: () => void;
+    onGroupsChange: (groups: MetadataGroupState[]) => void;
+    onToggleDiscoverySources: () => void;
+    onRefetchResult: (groupIndex: number, resultIndex: number) => void;
     isFetchingPrimarySource?: boolean;
     isDiscovering?: boolean;
 }
@@ -32,72 +37,85 @@ const getLoadingText = (isFetchingPrimarySource: boolean, isDiscovering: boolean
 };
 
 export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
-    sources,
+    groups,
     compiled,
     overrides,
-    selectedIndex,
+    cursor,
+    showDiscoverySources,
     isActive,
     width,
     height,
-    onSelectSource,
+    onCursorChange,
     onInnerFocusSwitch,
-    onSourcesChange,
+    onGroupsChange,
+    onToggleDiscoverySources,
+    onRefetchResult,
     isFetchingPrimarySource = false,
     isDiscovering = false,
 }) => {
     const theme = useTheme();
-    const sortedSources = [...sources].sort((a, b) => a.rank - b.rank);
+    const sortedGroups = [...groups].sort((a, b) => a.rank - b.rank);
 
     useSourceListInput({
-        sources,
-        sortedSources,
-        selectedIndex,
+        groups,
+        sortedGroups,
+        cursor,
         isActive,
-        onSelectSource,
+        onCursorChange,
         onInnerFocusSwitch,
-        onSourcesChange,
+        onGroupsChange,
+        onToggleDiscoverySources,
+        onRefetchResult,
     });
 
     const overrideCount = Object.keys(overrides).filter(
         (k) => overrides[k as keyof MetadataOverrides] !== undefined
     ).length;
 
-    // height - 1: one row for the header; minus 1 more when a spinner row is shown
-    const maxSourceRows = height - 2 - (isDiscovering ? 1 : 0);
-    const visibleSources = sortedSources.slice(0, maxSourceRows);
-
     return (
         <Box flexDirection="column" width={width} height={height} overflow="hidden">
-            <Box flexDirection="row" height={1} overflow="hidden">
+            <Box flexDirection="row" height={1} marginBottom={1} overflow="hidden">
                 <Text color="gray" italic wrap="truncate-end">
                     {" " + HEADER_LINE}
                 </Text>
             </Box>
-            <Box flexDirection="row" height={1} overflow="hidden" />
-            <Box flexDirection="row">
+            <Box flexDirection="column" flexGrow={1} gap={1} overflow="hidden">
+                {/* Compiled row */}
                 <MetadataCompiledRow
                     compiled={compiled}
                     overrideCount={overrideCount}
-                    isSelected={selectedIndex === -1}
+                    isSelected={cursor.type === "compiled"}
                     isActive={isActive}
                     width={width}
                 />
-            </Box>
-            <Box flexDirection="row" overflow="hidden">
-                <Box flexDirection="column" overflow="hidden">
-                    {visibleSources.map((source) => {
-                        const originalIndex = sources.indexOf(source);
-                        return (
-                            <MetadataSourceRow
-                                key={originalIndex}
-                                source={source}
-                                isSelected={selectedIndex === originalIndex}
+                {/* Groups */}
+                {sortedGroups.map((group, gIdx) => {
+                    const sortedResults = [...group.results].sort((a, b) => a.rank - b.rank);
+                    return (
+                        <Box key={group.serviceKey} flexDirection="column" overflow="hidden">
+                            <MetadataGroupHeader
+                                group={group}
+                                isSelected={cursor.type === "group" && cursor.groupIndex === gIdx}
                                 isActive={isActive}
-                                width={width}
                             />
-                        );
-                    })}
-                </Box>
+                            {sortedResults.map((result, rIdx) => (
+                                <MetadataResultRow
+                                    key={rIdx}
+                                    result={result}
+                                    serviceKey={group.serviceKey}
+                                    isSelected={
+                                        cursor.type === "result" &&
+                                        cursor.groupIndex === gIdx &&
+                                        cursor.resultIndex === rIdx
+                                    }
+                                    isActive={isActive}
+                                    width={width}
+                                    showDiscoverySources={showDiscoverySources}
+                                />
+                            ))}
+                        </Box>
+                    );
+                })}
             </Box>
             {(isFetchingPrimarySource || isDiscovering) && (
                 <Box flexDirection="row" height={1} paddingLeft={3} flexShrink={0}>
@@ -106,11 +124,7 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
                             <Spinner type="dots" />
                         </Text>
                     </Box>
-                    <Box flexDirection="row" flexShrink={0}>
-                        <Text color={theme.text.secondary}>
-                            {getLoadingText(isFetchingPrimarySource, isDiscovering)}
-                        </Text>
-                    </Box>
+                    <Text color={theme.text.secondary}>{getLoadingText(isFetchingPrimarySource, isDiscovering)}</Text>
                 </Box>
             )}
         </Box>

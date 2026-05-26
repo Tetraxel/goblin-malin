@@ -5,7 +5,7 @@ import { StatusType } from "#base/task/task-status";
 import { ProviderDisplay } from "#base/providerDisplay";
 import { ProviderSettingsSchema } from "#base/providerSettings";
 import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
-import { StandardTrack, TrackMetadata, TrackUri } from "#flows/musicDownloadFlow/types";
+import { StandardTrack, TrackMetadata, TrackUri, SearchTrackResult } from "#flows/musicDownloadFlow/types";
 import { Cached } from "#utils/cache";
 import { YoutubeCell } from "./YoutubeCell";
 import { MetadataService } from "../../../metadataService";
@@ -247,7 +247,7 @@ export class YoutubeService extends MetadataService {
         return metadata;
     }
 
-    async searchTrack(sourceTrackMetadata: TrackMetadata): Promise<TrackMetadata> {
+    async searchTrack(sourceTrackMetadata: TrackMetadata): Promise<SearchTrackResult[]> {
         const artist = sourceTrackMetadata.artists?.[0]?.name;
         const trackName = sourceTrackMetadata.trackName;
 
@@ -277,7 +277,7 @@ export class YoutubeService extends MetadataService {
             const firstResult = results[0];
             const song = await this.getSong(firstResult.videoId);
 
-            // Convert to TrackMetadata
+            // Convert to standard format
             const standardTrack: StandardTrack = {
                 id: song.videoId,
                 isrc: undefined,
@@ -307,13 +307,12 @@ export class YoutubeService extends MetadataService {
                 platform: "youtube",
                 apiProvider: "youtube",
                 uri: `YOUTUBE::TRACK::${song.videoId}` as TrackUri<"youtube">,
-
                 fetchedAt: new Date(),
                 type: "track",
             };
 
             this.status.clear();
-            return metadata;
+            return [{ metadata, searchKeys: ["trackName+artistName"] }];
         } catch (error) {
             this.logger.error(`Error searching YouTube Music for: ${sourceTrackMetadata.trackName}`, { error });
             this.status.set({

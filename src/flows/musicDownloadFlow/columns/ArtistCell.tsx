@@ -5,9 +5,9 @@ import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import { computeCompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 
 export const ArtistCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, isSelected }) => {
-    const sources = task.attributes?.metadataSources ?? [];
+    const groups = task.attributes?.metadataGroups ?? [];
     const overrides = task.attributes?.metadataOverride ?? {};
-    const compiled = computeCompiledMetadata(sources, overrides);
+    const compiled = computeCompiledMetadata(groups, overrides);
     const artist = compiled.artists[0]?.name ?? "";
 
     return (

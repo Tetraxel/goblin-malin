@@ -10,6 +10,7 @@ export type MusicDownloadFlowSettings = {
         autoFetchOnImport: boolean;
         autoChooseBestSource: boolean;
         providers: Record<string, StoredProviderSettings>;
+        discoveryProviders: Record<string, StoredProviderSettings>;
     };
     download: {
         autoChooseBestSource: boolean;
@@ -44,6 +45,7 @@ export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSetting
         autoFetchOnImport: false,
         autoChooseBestSource: false,
         providers: {},
+        discoveryProviders: {},
     },
     download: {
         autoChooseBestSource: false,
