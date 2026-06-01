@@ -11,9 +11,10 @@ interface MetadataUriProps {
     fetchState?: "loading" | "error";
     dimmed?: boolean;
     fetchedBy?: string;
+    noPaddingX?: boolean;
 }
 
-export const Uri: React.FC<MetadataUriProps> = ({ uri, platform, fetchState, dimmed, fetchedBy }) => {
+export const Uri: React.FC<MetadataUriProps> = ({ uri, platform, fetchState, dimmed, fetchedBy, noPaddingX }) => {
     const theme = useTheme();
     const parts = uri.split("::");
     const display = providerDisplayRegistry.get(platform);
@@ -45,7 +46,13 @@ export const Uri: React.FC<MetadataUriProps> = ({ uri, platform, fetchState, dim
     const fetchedByDisplay = fetchedBy ? providerDisplayRegistry.get(fetchedBy) : null;
 
     return (
-        <Box flexDirection="row" flexShrink={0} height={1} paddingX={1} backgroundColor={darken(display.color, 0.2)}>
+        <Box
+            flexDirection="row"
+            flexShrink={0}
+            height={1}
+            paddingX={noPaddingX ? 0 : 1}
+            backgroundColor={darken(display.color, 0.2)}
+        >
             {parts.map((part, i) => (
                 <React.Fragment key={i}>
                     {i > 0 && (

@@ -106,7 +106,12 @@ export function useSourceListInput({
                     left: {
                         type: "node" as const,
                         renderNode: (dimmed: boolean) =>
-                            React.createElement(Uri, { uri, platform: focusedResult.metadata.platform, dimmed }),
+                            React.createElement(Uri, {
+                                uri,
+                                platform: focusedResult.metadata.platform,
+                                dimmed,
+                                noPaddingX: true,
+                            }),
                         nodeKey: uri,
                     },
                     shortcutIds: ["sourceList.enter", "sourceList.copy"],
