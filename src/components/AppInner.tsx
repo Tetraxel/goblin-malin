@@ -10,6 +10,7 @@ import { WelcomeModal } from "./WelcomeModal/WelcomeModal";
 import { Toolbar, ToolbarButtonHook } from "./Toolbar/Toolbar";
 import { ColumnDefinition, TaskListPanel } from "./TaskListPanel/TaskListPanel";
 import { SecondaryPanel } from "./SecondaryPanel/SecondaryPanel";
+import { ShortcutDispatcher } from "./ShortcutDispatcher";
 import { InputRouter } from "./InputRouter";
 import { ImportActionsProvider } from "#contexts/ImportActionsContext";
 import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
@@ -45,8 +46,10 @@ export const AppInner: React.FC<{
 
     return (
         <ImportActionsProvider openImportFlow={openImportFlow}>
-            {/* InputRouter: single root useInput — must be inside FocusProvider */}
-            <InputRouter tasks={filteredTasks} flow={currentFlow} openImportFlow={openImportFlow} />
+            {/* ShortcutDispatcher: the single useInput in the app */}
+            <ShortcutDispatcher />
+            {/* InputRouter: registers global + window-specific shortcuts */}
+            <InputRouter tasks={filteredTasks} flow={currentFlow} />
 
             <Box flexDirection="column" height={terminalHeight} backgroundColor={theme.ui.background}>
                 {currentFlow && (

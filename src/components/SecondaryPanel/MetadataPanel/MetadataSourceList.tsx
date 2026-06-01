@@ -116,17 +116,19 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
                         </Box>
                     );
                 })}
-            </Box>
-            {(isFetchingPrimarySource || isDiscovering) && (
-                <Box flexDirection="row" height={1} paddingLeft={3} flexShrink={0}>
-                    <Box flexDirection="row" paddingRight={1} flexShrink={0}>
+                {(isFetchingPrimarySource || isDiscovering) && (
+                    <Box flexDirection="row" height={1} paddingLeft={3} flexShrink={0}>
+                        <Box flexDirection="row" paddingRight={1} flexShrink={0}>
+                            <Text color={theme.text.secondary}>
+                                <Spinner type="dots" />
+                            </Text>
+                        </Box>
                         <Text color={theme.text.secondary}>
-                            <Spinner type="dots" />
+                            {getLoadingText(isFetchingPrimarySource, isDiscovering)}
                         </Text>
                     </Box>
-                    <Text color={theme.text.secondary}>{getLoadingText(isFetchingPrimarySource, isDiscovering)}</Text>
-                </Box>
-            )}
+                )}
+            </Box>
         </Box>
     );
 };

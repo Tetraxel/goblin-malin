@@ -1,5 +1,6 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
+import { useShortcuts } from "#hooks/useShortcuts";
 import TextInput from "ink-text-input";
 import { Task } from "#base/task/task";
 import { PromptType, SetupWizardPrompt } from "#base/task/task-prompt";
@@ -127,47 +128,71 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
         switchBack();
     }, [focusState, switchBack]);
 
-    useInput(
-        (input, key) => {
-            if (editingField) {
-                if (key.escape) setEditingField(null);
-                if (key.ctrl && input === "s") {
-                    setEditingField(null);
+    useShortcuts({
+        id: "setupWizardModal",
+        isActive,
+        exclusive: true,
+        priority: 300,
+        shortcuts: [
+            {
+                id: "setupWizardModal.submit",
+                defaultShortcut: { input: "s", ctrl: true },
+                label: "Submit",
+                handler: () => {
+                    if (editingField) setEditingField(null);
                     handleSubmit();
-                }
-                return;
-            }
-
-            if (key.ctrl && input === "s") {
-                handleSubmit();
-                return;
-            }
-            if (key.escape) {
-                handleCancel();
-                return;
-            }
-            if (input === "d" || input === "D") {
-                handleDisable();
-                return;
-            }
-            if (key.upArrow) {
-                setFocusedIndex((prev) => Math.max(0, prev - 1));
-                return;
-            }
-            if (key.downArrow) {
-                setFocusedIndex((prev) => Math.min(interactiveItems.length - 1, prev + 1));
-                return;
-            }
-
-            if (key.return) {
-                const item = interactiveItems[focusedIndex];
-                if (!item) return;
-                if (item.kind === "link") openUrl(item.url);
-                else if (item.kind === "field") setEditingField(item.envVar);
-            }
-        },
-        { isActive }
-    );
+                },
+            },
+            {
+                id: "setupWizardModal.escape",
+                defaultShortcut: { key: "escape" },
+                label: "Cancel",
+                handler: () => {
+                    if (editingField) {
+                        setEditingField(null);
+                        return;
+                    }
+                    handleCancel();
+                },
+            },
+            {
+                id: "setupWizardModal.disable",
+                defaultShortcut: { input: "d" },
+                label: "Disable service",
+                handler: () => {
+                    if (!editingField) handleDisable();
+                },
+            },
+            {
+                id: "setupWizardModal.up",
+                defaultShortcut: { key: "upArrow" },
+                label: "Up",
+                handler: () => {
+                    if (!editingField) setFocusedIndex((prev) => Math.max(0, prev - 1));
+                },
+            },
+            {
+                id: "setupWizardModal.down",
+                defaultShortcut: { key: "downArrow" },
+                label: "Down",
+                handler: () => {
+                    if (!editingField) setFocusedIndex((prev) => Math.min(interactiveItems.length - 1, prev + 1));
+                },
+            },
+            {
+                id: "setupWizardModal.enter",
+                defaultShortcut: { key: "return" },
+                label: "Open/Edit",
+                handler: () => {
+                    if (editingField) return;
+                    const item = interactiveItems[focusedIndex];
+                    if (!item) return;
+                    if (item.kind === "link") openUrl(item.url);
+                    else if (item.kind === "field") setEditingField(item.envVar);
+                },
+            },
+        ],
+    });
 
     if (!isActive || !config) return null;
 

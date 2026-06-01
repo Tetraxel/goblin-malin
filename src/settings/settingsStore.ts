@@ -12,6 +12,7 @@ const SETTINGS_PATH = path.join(CONFIG_DIR, "settings.json");
 /** Shape of the full JSON file on disk. */
 type StoredSettings = {
     general: AppSettings["general"];
+    keybindings: AppSettings["keybindings"];
     flows: Record<string, Record<string, unknown>>;
 };
 
@@ -30,7 +31,7 @@ export class SettingsStore {
             const raw = fs.readFileSync(SETTINGS_PATH, "utf-8");
             return JSON.parse(raw) as StoredSettings;
         } catch {
-            return { general: DEFAULT_APP_SETTINGS.general, flows: {} };
+            return { general: DEFAULT_APP_SETTINGS.general, keybindings: {}, flows: {} };
         }
     }
 
@@ -52,12 +53,27 @@ export class SettingsStore {
 
     getAppSettings(): AppSettings {
         const s = this.getCached();
-        return deepMerge(DEFAULT_APP_SETTINGS, { general: s.general } as DeepPartial<AppSettings>);
+        return deepMerge(DEFAULT_APP_SETTINGS, {
+            general: s.general,
+            keybindings: s.keybindings ?? {},
+        } as DeepPartial<AppSettings>);
     }
 
     writeAppSettings(settings: AppSettings): void {
         const current = this.getCached();
-        this.writeToDisk({ ...current, general: settings.general });
+        this.writeToDisk({ ...current, general: settings.general, keybindings: settings.keybindings ?? {} });
+    }
+
+    /** Save a single key binding override. */
+    setKeybinding(actionId: string, shortcut: import("#types/actions").Shortcut | null): void {
+        const current = this.getAppSettings();
+        const keybindings = { ...current.keybindings };
+        if (shortcut === null) {
+            delete keybindings[actionId];
+        } else {
+            keybindings[actionId] = shortcut;
+        }
+        this.writeAppSettings({ ...current, keybindings });
     }
 
     // ── Flow settings ──────────────────────────────────────────────────────────

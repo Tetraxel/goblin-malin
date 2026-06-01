@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box } from "ink";
 import fs from "fs";
 import path from "path";
 import { useFocusContext } from "#contexts/FocusContext";
@@ -13,7 +13,8 @@ import { getSaveSettings } from "#flows/musicDownloadFlow/saveSettings";
 import { computeOutputFilename } from "#flows/musicDownloadFlow/utils/computeOutputPath";
 import { DownloadSourceTree } from "./DownloadSourceTree/DownloadSourceTree";
 import { DownloadSourceDetail } from "./DownloadSourceDetail/DownloadSourceDetail";
-import { Hint } from "../../Hint";
+import { DynamicHintBar } from "#components/DynamicHintBar/DynamicHintBar";
+import { useShortcuts } from "#hooks/useShortcuts";
 
 const HINT_BAR_HEIGHT = 2;
 
@@ -92,19 +93,32 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
           ? (downloadSources.find((s) => s.selected) ?? savedSource)
           : null;
 
-    // Shift+arrows resize the split only when list is focused (detail owns shift+arrows for seek)
-    useInput(
-        (_, key) => {
-            if (!isPanelActive || focusState.isEditingField) return;
-            if (key.shift && key.leftArrow && innerFocus === "list") {
-                setSplitRatio((prev) => Math.max(0.2, prev - 0.04));
-            }
-            if (key.shift && key.rightArrow && innerFocus === "list") {
-                setSplitRatio((prev) => Math.min(0.75, prev + 0.04));
-            }
-        },
-        { isActive: isPanelActive }
-    );
+    useShortcuts({
+        id: "downloadPanel",
+        isActive: isPanelActive && innerFocus === "list" && !focusState.isEditingField,
+        priority: 100,
+        shortcuts: [
+            {
+                id: "downloadPanel.shrink",
+                defaultShortcut: { key: "leftArrow", shift: true },
+                label: "Shrink",
+                handler: () => setSplitRatio((prev) => Math.max(0.2, prev - 0.04)),
+            },
+            {
+                id: "downloadPanel.expand",
+                defaultShortcut: { key: "rightArrow", shift: true },
+                label: "Expand",
+                handler: () => setSplitRatio((prev) => Math.min(0.75, prev + 0.04)),
+            },
+        ],
+        hintLines: [
+            {
+                id: "downloadPanel.line.panel",
+                left: { type: "text", value: "Download Panel", bold: true },
+                shortcutIds: ["downloadPanel.shrink", "downloadPanel.expand"],
+            },
+        ],
+    });
 
     function handleRequestSelect(idx: number) {
         const hasSaved = downloadSources.some((s) => s.savedFile != null);
@@ -181,8 +195,6 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     }
 
     const selectedSource = downloadNavIndex >= 0 ? (downloadSources[downloadNavIndex] ?? null) : null;
-    const canPlaySelected = selectedSource?.localFile?.state === "found";
-    const dimHints = !isPanelActive || innerFocus !== "list";
 
     return (
         <Box
@@ -227,34 +239,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                     onSave={handleSave}
                 />
             </Box>
-            <Box
-                flexDirection="column"
-                width={width - 2}
-                overflow="hidden"
-                marginLeft={1}
-                alignItems="flex-end"
-                justifyContent="flex-end"
-            >
-                <Box flexDirection="row" width={width - 2} flexShrink={0} overflow="hidden">
-                    {selectedSource && (
-                        <Box marginRight={1} flexShrink={0}>
-                            <Text color={theme.text.active} dimColor={dimHints} bold>
-                                Source {downloadNavIndex + 1}/{downloadSources.length}
-                            </Text>
-                        </Box>
-                    )}
-                    {selectedSource && (
-                        <Box marginRight={2} flexShrink={0}>
-                            <Text color={theme.text.active} dimColor={dimHints}>
-                                {">>>"}
-                            </Text>
-                        </Box>
-                    )}
-                    <Hint label="Select" shortcut="Enter" dim={dimHints} />
-                    <Hint label={selectedSource?.isRejected ? " Unreject" : " Reject"} shortcut="Del" dim={dimHints} />
-                    {canPlaySelected && <Hint label="Play/Pause" shortcut="Space" dim={dimHints} />}
-                </Box>
-            </Box>
+            <DynamicHintBar width={width - 2} isActive={isPanelActive && innerFocus === "list"} />
         </Box>
     );
 };

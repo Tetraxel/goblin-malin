@@ -1,21 +1,25 @@
-﻿import React, { useMemo, useState } from "react";
-import { Box, Text, useInput } from "ink";
-import TextInput from "ink-text-input";
+import React, { useMemo, useState } from "react";
+import { Box, Text } from "ink";
+import { useShortcuts } from "#hooks/useShortcuts";
 import { FlowBase } from "#base/flow/flow-base";
 import { useTheme } from "#base/themeContext";
 import { useFocusContext } from "#contexts/FocusContext";
 import { SettingsStore } from "#settings/settingsStore";
 import { AppSettings } from "#settings/appSettings";
 import { buildGlobalSettingsItems } from "#settings/buildGlobalSettingsItems";
-import { filterSettingsItems, isInteractive, itemRowHeight, SettingsItem } from "#settings/buildSettingsItems";
+import { filterSettingsItems, isInteractive, SettingsItem } from "#settings/buildSettingsItems";
 import { deepMerge } from "#utils/deepMerge";
 import { DeepPartial } from "#utils/types";
-import { SettingsItemRow } from "./SettingsItemRow";
+import { shortcutRegistry } from "#base/shortcuts/ShortcutRegistry";
+import { ShortcutsTab, buildShortcutsTabItems, buildShortcutFromKey } from "./ShortcutsTab";
+import { SettingsTab } from "./SettingsTab";
 import { Hint } from "../Hint";
 
-// Rows consumed by modal chrome: borders(2) + paddingY(2) + title(1) + marginTop(1)
-// + search-border(2) + search-row(1) + marginTop(1) + marginTop(1) + footer(1) = 14
-const MODAL_OVERHEAD = 14;
+// Rows consumed by modal chrome: marginY(6) + borders(2) + paddingY(2) + title(1) + marginTop(1) + marginTop(1) + footer(1) = 14
+// Search bars live inside each tab component and subtract their own SEARCH_H from the height budget.
+const MODAL_OVERHEAD = 10;
+
+type ActiveTab = "settings" | "shortcuts";
 
 interface SettingsModalProps {
     terminalHeight: number;
@@ -29,7 +33,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
     const isActive = focusState.activeWindow === "settingsModal";
 
     const [appDraft, setAppDraft] = useState<AppSettings>(() => SettingsStore.getInstance().getAppSettings());
-    // Stores only pending changes; merged onto live settings when building items or saving
     const [flowPatch, setFlowPatch] = useState<Record<string, unknown>>({});
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -37,8 +40,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
     const [searchQuery, setSearchQuery] = useState("");
     const [modalFocus, setModalFocus] = useState<"search" | "list">("search");
 
-    // Reset to fresh settings when the modal opens, but NOT when returning from the wizard
-    // (wizard's onDisable may have updated flowPatch which we want to preserve)
+    const [activeTab, setActiveTab] = useState<ActiveTab>("settings");
+    const [shortcutsSelectedIndex, setShortcutsSelectedIndex] = useState(0);
+    const [shortcutsSearchQuery, setShortcutsSearchQuery] = useState("");
+    const [shortcutsModalFocus, setShortcutsModalFocus] = useState<"search" | "list">("search");
+    const [rebindingId, setRebindingId] = useState<string | null>(null);
+
+    // Reset to fresh settings when the modal opens, but NOT when returning from the wizard.
     const [prevIsActive, setPrevIsActive] = useState(isActive);
     const [prevReturningFrom, setPrevReturningFrom] = useState(focusState.returningFromWindow);
     if (prevIsActive !== isActive || prevReturningFrom !== focusState.returningFromWindow) {
@@ -52,6 +60,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
             setEditValue("");
             setSearchQuery("");
             setModalFocus("search");
+            setActiveTab("settings");
+            setShortcutsSelectedIndex(0);
+            setShortcutsSearchQuery("");
+            setShortcutsModalFocus("search");
+            setRebindingId(null);
+            shortcutRegistry.disableRebind();
         }
     }
 
@@ -59,7 +73,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
         const globalItems = buildGlobalSettingsItems(appDraft, (patch) =>
             setAppDraft((prev) => deepMerge(prev, patch as DeepPartial<AppSettings>))
         );
-        // Always merge patch onto the live settings so buildFlowSettingsItems gets a complete object
         const fullFlowSettings = deepMerge(
             (currentFlow?.getFlowSettings?.() ?? {}) as Record<string, unknown>,
             flowPatch
@@ -75,139 +88,221 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
     }, [appDraft, flowPatch, currentFlow, focusState.returningFromWindow]);
 
     const filteredItems = useMemo(() => filterSettingsItems(allItems, searchQuery), [allItems, searchQuery]);
-
-    // Clamp selectedIndex without an effect — derived during render
     const safeSelectedIndex = Math.min(selectedIndex, Math.max(0, filteredItems.length - 1));
 
-    // ── Global handler: Ctrl+S, Esc, and search→list transition ───────────────
-    useInput(
-        (input, key) => {
-            if (key.ctrl && input === "s") {
-                SettingsStore.getInstance().writeAppSettings(appDraft);
-                if (currentFlow?.saveFlowSettings) {
-                    const fullFlowSettings = deepMerge(
-                        (currentFlow.getFlowSettings?.() ?? {}) as Record<string, unknown>,
-                        flowPatch
-                    );
-                    currentFlow.saveFlowSettings(fullFlowSettings);
-                }
-                switchBack();
-                return;
-            }
-
+    function startRebind(id: string) {
+        setRebindingId(id);
+        shortcutRegistry.enableRebind((input, key) => {
             if (key.escape) {
-                if (editingIndex !== null) {
-                    setEditingIndex(null);
-                    return;
-                }
-                if (searchQuery) {
-                    setSearchQuery("");
-                    setModalFocus("search");
-                    return;
-                }
-                switchBack(); // discard patch
+                setRebindingId(null);
+                shortcutRegistry.disableRebind();
                 return;
             }
-
-            // Move from search bar down into the list
-            if (modalFocus === "search" && (key.downArrow || key.return)) {
-                const first = filteredItems.findIndex(isInteractive);
-                setSelectedIndex(first >= 0 ? first : 0);
-                setModalFocus("list");
-                return;
+            const newShortcut = buildShortcutFromKey(input, key);
+            if (newShortcut) {
+                SettingsStore.getInstance().setKeybinding(id, newShortcut);
+                setAppDraft(SettingsStore.getInstance().getAppSettings());
             }
-        },
-        { isActive }
-    );
+            setRebindingId(null);
+            shortcutRegistry.disableRebind();
+        });
+    }
 
-    // ── List navigation (active only when list is focused and not editing) ─────
-    useInput(
-        (input, key) => {
-            if (key.upArrow) {
-                let newIdx = safeSelectedIndex - 1;
-                while (newIdx >= 0 && !isInteractive(filteredItems[newIdx])) newIdx--;
-                if (newIdx < 0) {
-                    setModalFocus("search");
-                    return;
-                }
-                setSelectedIndex(newIdx);
-                return;
-            }
+    useShortcuts({
+        id: "settingsModal",
+        isActive,
+        exclusive: true,
+        priority: 300,
+        shortcuts: [
+            {
+                id: "settingsModal.save",
+                defaultShortcut: { input: "s", ctrl: true },
+                label: "Save & Exit",
+                handler: () => {
+                    if (rebindingId) return;
+                    SettingsStore.getInstance().writeAppSettings(appDraft);
+                    if (currentFlow?.saveFlowSettings) {
+                        const fullFlowSettings = deepMerge(
+                            (currentFlow.getFlowSettings?.() ?? {}) as Record<string, unknown>,
+                            flowPatch
+                        );
+                        currentFlow.saveFlowSettings(fullFlowSettings);
+                    }
+                    switchBack();
+                },
+            },
+            {
+                id: "settingsModal.escape",
+                defaultShortcut: { key: "escape" },
+                label: "Discard",
+                handler: () => {
+                    if (editingIndex !== null) {
+                        setEditingIndex(null);
+                        return;
+                    }
+                    if (shortcutsSearchQuery && activeTab === "shortcuts") {
+                        setShortcutsSearchQuery("");
+                        setShortcutsModalFocus("search");
+                        return;
+                    }
+                    if (searchQuery && activeTab === "settings") {
+                        setSearchQuery("");
+                        setModalFocus("search");
+                        return;
+                    }
+                    switchBack();
+                },
+            },
+            {
+                id: "settingsModal.switchTab",
+                defaultShortcut: { key: "tab" },
+                label: "Switch tab",
+                handler: () => {
+                    if (rebindingId || editingIndex !== null) return;
+                    setActiveTab((t) => (t === "settings" ? "shortcuts" : "settings"));
+                },
+            },
+            {
+                id: "settingsModal.up",
+                defaultShortcut: { key: "upArrow" },
+                label: "Up",
+                handler: () => {
+                    if (rebindingId) return;
+                    if (activeTab === "shortcuts") {
+                        if (shortcutsModalFocus === "list") {
+                            if (shortcutsSelectedIndex <= 0) {
+                                setShortcutsModalFocus("search");
+                            } else {
+                                setShortcutsSelectedIndex((prev) => prev - 1);
+                            }
+                        }
+                        return;
+                    }
+                    if (modalFocus !== "list" || editingIndex !== null) return;
+                    let newIdx = safeSelectedIndex - 1;
+                    while (newIdx >= 0 && !isInteractive(filteredItems[newIdx])) newIdx--;
+                    if (newIdx < 0) {
+                        setModalFocus("search");
+                        return;
+                    }
+                    setSelectedIndex(newIdx);
+                },
+            },
+            {
+                id: "settingsModal.down",
+                defaultShortcut: { key: "downArrow" },
+                label: "Down",
+                handler: () => {
+                    if (rebindingId) return;
+                    if (activeTab === "shortcuts") {
+                        if (shortcutsModalFocus === "search") {
+                            setShortcutsModalFocus("list");
+                            setShortcutsSelectedIndex(0);
+                        } else {
+                            const items = buildShortcutsTabItems(shortcutsSearchQuery);
+                            setShortcutsSelectedIndex((prev) => Math.min(items.length - 1, prev + 1));
+                        }
+                        return;
+                    }
+                    if (modalFocus === "search") {
+                        const first = filteredItems.findIndex(isInteractive);
+                        setSelectedIndex(first >= 0 ? first : 0);
+                        setModalFocus("list");
+                        return;
+                    }
+                    if (editingIndex !== null) return;
+                    let newIdx = safeSelectedIndex + 1;
+                    while (newIdx < filteredItems.length && !isInteractive(filteredItems[newIdx])) newIdx++;
+                    if (newIdx < filteredItems.length) setSelectedIndex(newIdx);
+                },
+            },
+            {
+                id: "settingsModal.enter",
+                defaultShortcut: { key: "return" },
+                label: "Interact",
+                handler: () => {
+                    if (rebindingId) return;
+                    if (activeTab === "shortcuts") {
+                        if (shortcutsModalFocus === "search") {
+                            setShortcutsModalFocus("list");
+                            setShortcutsSelectedIndex(0);
+                            return;
+                        }
+                        const items = buildShortcutsTabItems(shortcutsSearchQuery);
+                        const item = items[shortcutsSelectedIndex];
+                        if (item) startRebind(item.id);
+                        return;
+                    }
+                    if (modalFocus === "search") {
+                        const first = filteredItems.findIndex(isInteractive);
+                        setSelectedIndex(first >= 0 ? first : 0);
+                        setModalFocus("list");
+                        return;
+                    }
+                    if (editingIndex !== null) return;
+                    const item = filteredItems[safeSelectedIndex];
+                    if (!item || !isInteractive(item)) return;
+                    if (item.kind === "checkbox") {
+                        item.set(!item.get());
+                        return;
+                    }
+                    if (item.kind === "textInput") {
+                        setEditValue(item.get());
+                        setEditingIndex(safeSelectedIndex);
+                        return;
+                    }
+                    if (item.kind === "action") {
+                        item.run();
+                        return;
+                    }
+                },
+            },
+            {
+                id: "settingsModal.left",
+                defaultShortcut: { key: "leftArrow" },
+                label: "Previous",
+                handler: () => {
+                    if (activeTab !== "settings" || modalFocus !== "list" || editingIndex !== null) return;
+                    const item = filteredItems[safeSelectedIndex];
+                    if (!item || !isInteractive(item) || item.kind !== "select") return;
+                    const curr = item.options.indexOf(item.get());
+                    item.set(item.options[(curr - 1 + item.options.length) % item.options.length]);
+                },
+            },
+            {
+                id: "settingsModal.right",
+                defaultShortcut: { key: "rightArrow" },
+                label: "Next",
+                handler: () => {
+                    if (activeTab !== "settings" || modalFocus !== "list" || editingIndex !== null) return;
+                    const item = filteredItems[safeSelectedIndex];
+                    if (!item || !isInteractive(item) || item.kind !== "select") return;
+                    const curr = item.options.indexOf(item.get());
+                    item.set(item.options[(curr + 1) % item.options.length]);
+                },
+            },
+            {
+                id: "settingsModal.resetBinding",
+                defaultShortcut: { key: "delete" },
+                label: "Reset binding",
+                handler: () => {
+                    if (activeTab !== "shortcuts" || rebindingId) return;
+                    const items = buildShortcutsTabItems(shortcutsSearchQuery);
+                    const item = items[shortcutsSelectedIndex];
+                    if (item) {
+                        SettingsStore.getInstance().setKeybinding(item.id, null);
+                        setAppDraft(SettingsStore.getInstance().getAppSettings());
+                    }
+                },
+            },
+        ],
+    });
 
-            if (key.downArrow) {
-                let newIdx = safeSelectedIndex + 1;
-                while (newIdx < filteredItems.length && !isInteractive(filteredItems[newIdx])) newIdx++;
-                if (newIdx < filteredItems.length) setSelectedIndex(newIdx);
-                return;
-            }
-
-            const item = filteredItems[safeSelectedIndex];
-            if (!item || !isInteractive(item)) return;
-
-            if ((key.leftArrow || key.rightArrow) && item.kind === "select") {
-                const curr = item.options.indexOf(item.get());
-                const next = key.rightArrow
-                    ? (curr + 1) % item.options.length
-                    : (curr - 1 + item.options.length) % item.options.length;
-                item.set(item.options[next]);
-                return;
-            }
-
-            if (key.return) {
-                if (item.kind === "checkbox") {
-                    item.set(!item.get());
-                    return;
-                }
-                if (item.kind === "textInput") {
-                    setEditValue(item.get());
-                    setEditingIndex(safeSelectedIndex);
-                    return;
-                }
-                if (item.kind === "action") {
-                    item.run();
-                    return;
-                }
-            }
-        },
-        { isActive: isActive && modalFocus === "list" && editingIndex === null }
-    );
-
-    // Always render the component tree so hooks are stable; return null when inactive
     if (!isActive) return null;
 
     const modalWidth = Math.min(90, Math.max(60, terminalWidth - 6));
     const innerWidth = modalWidth - 6;
     const listHeight = Math.max(3, terminalHeight - MODAL_OVERHEAD);
-
-    // Height-aware scroll: sectionHeader/subHeader each render 2 visual rows
-    const rowStarts: number[] = [];
-    let cumRows = 0;
-    for (const item of filteredItems) {
-        rowStarts.push(cumRows);
-        cumRows += itemRowHeight(item);
-    }
-    const totalRows = cumRows;
-
-    const selectedRowStart = rowStarts[safeSelectedIndex] ?? 0;
-    const scrollRowOffset = Math.max(
-        0,
-        Math.min(selectedRowStart - Math.floor(listHeight / 2), Math.max(0, totalRows - listHeight))
-    );
-
-    const rawStart = rowStarts.findIndex((r) => r >= scrollRowOffset);
-    const visibleStart = rawStart < 0 ? 0 : rawStart;
-
-    const visibleItems: { item: SettingsItem; idx: number }[] = [];
-    let visibleRows = 0;
-    for (let i = visibleStart; i < filteredItems.length; i++) {
-        const h = itemRowHeight(filteredItems[i]);
-        if (visibleRows + h > listHeight) break;
-        visibleItems.push({ item: filteredItems[i], idx: i });
-        visibleRows += h;
-    }
-
-    const searchBorderColor =
-        modalFocus === "search" && editingIndex === null ? theme.action.primary : theme.text.secondary;
 
     return (
         <Box
@@ -232,99 +327,110 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                 flexGrow={1}
                 flexShrink={0}
             >
-                {/* Title */}
-                <Box justifyContent="space-between">
+                {/* Title + tab bar */}
+                <Box justifyContent="space-between" flexShrink={0}>
                     <Text bold color={theme.action.primary}>
                         SETTINGS
                     </Text>
-                    {searchQuery ? (
-                        <Text dimColor>
-                            Filtering: {filteredItems.length} result
-                            {filteredItems.length !== 1 ? "s" : ""}
+                    <Box flexDirection="row">
+                        <Text
+                            bold={activeTab === "settings"}
+                            color={activeTab === "settings" ? theme.text.active : theme.text.muted}
+                        >
+                            Settings
                         </Text>
-                    ) : null}
-                </Box>
-
-                {/* Search bar */}
-                <Box
-                    marginTop={1}
-                    borderStyle="single"
-                    borderColor={searchBorderColor}
-                    borderBackgroundColor={theme.ui.background}
-                    paddingX={1}
-                    height={3}
-                >
-                    <Text
-                        dimColor={modalFocus !== "search"}
-                        color={modalFocus === "search" ? theme.action.primary : undefined}
-                    >
-                        {"⌕ "}
-                    </Text>
-                    <TextInput
-                        value={searchQuery}
-                        onChange={setSearchQuery}
-                        placeholder="Search settings…"
-                        focus={modalFocus === "search" && isActive && editingIndex === null}
-                    />
-                </Box>
-
-                {/* Item list */}
-                <Box flexDirection="column" overflow="hidden" flexGrow={1}>
-                    {visibleItems.map(({ item, idx }) => {
-                        const itemIsSelected = idx === safeSelectedIndex && modalFocus === "list";
-                        const itemIsEditing = editingIndex === idx;
-                        return (
-                            <SettingsItemRow
-                                key={idx}
-                                item={item}
-                                isSelected={itemIsSelected}
-                                isEditing={itemIsEditing}
-                                editValue={editValue}
-                                onEditChange={setEditValue}
-                                onEditSubmit={(v) => {
-                                    if (item.kind === "textInput") item.set(v);
-                                    setEditingIndex(null);
-                                }}
-                                innerWidth={innerWidth}
-                            />
-                        );
-                    })}
-                    {filteredItems.length === 0 && (
-                        <Text italic dimColor>
-                            {" "}
-                            No settings match &quot;{searchQuery}&quot;
+                        <Text dimColor>{" │ "}</Text>
+                        <Text
+                            bold={activeTab === "shortcuts"}
+                            color={activeTab === "shortcuts" ? theme.text.active : theme.text.muted}
+                        >
+                            Shortcuts
                         </Text>
-                    )}
-                    <Box flexDirection="column" overflow="hidden">
-                        <Box flexDirection="row" flexShrink={0} flexGrow={1}></Box>
-                        <Box flexDirection="row" flexShrink={1} flexGrow={0} alignSelf="flex-end">
-                            {totalRows > listHeight && (
-                                <Text dimColor>
-                                    {"  "}↕ {visibleStart + 1}–{visibleStart + visibleItems.length} of{" "}
-                                    {filteredItems.length}
-                                </Text>
-                            )}
-                        </Box>
+                        <Text dimColor>{"  [Tab]"}</Text>
                     </Box>
                 </Box>
 
-                {/* Footer */}
-                <Box marginTop={1} flexDirection="row">
-                    {modalFocus === "search" ? (
-                        <>
-                            <Hint label="Go to list" shortcut="↓/Enter" />
-                            <Hint label="Save & Exit" shortcut="Ctrl+S" />
-                            <Hint label="Discard" shortcut="Esc" />
-                        </>
-                    ) : (
-                        <>
-                            <Hint label="Navigate" shortcut="↑↓" />
-                            <Hint label="Interact" shortcut="Enter" />
-                            <Hint label="Save & Exit" shortcut="Ctrl+S" />
-                            <Hint label="Discard" shortcut="Esc" />
-                        </>
-                    )}
-                </Box>
+                {activeTab === "settings" ? (
+                    <>
+                        <Box flexGrow={1} overflow="hidden">
+                            <SettingsTab
+                                isActive={isActive}
+                                items={filteredItems}
+                                selectedIndex={safeSelectedIndex}
+                                editingIndex={editingIndex}
+                                editValue={editValue}
+                                searchQuery={searchQuery}
+                                searchFocused={modalFocus === "search"}
+                                width={innerWidth}
+                                height={listHeight}
+                                onSearchChange={setSearchQuery}
+                                onEditChange={setEditValue}
+                                onEditSubmit={(item, v) => {
+                                    if (item.kind === "textInput") item.set(v);
+                                    setEditingIndex(null);
+                                }}
+                            />
+                        </Box>
+
+                        {/* Settings footer */}
+                        <Box marginTop={1} flexDirection="row" flexShrink={0}>
+                            {modalFocus === "search" ? (
+                                <>
+                                    <Hint label="Go to list" shortcut="↓/Enter" />
+                                    <Hint label="Save & Exit" shortcut="Ctrl+S" />
+                                    <Hint label="Discard" shortcut="Esc" />
+                                </>
+                            ) : (
+                                <>
+                                    <Hint label="Navigate" shortcut="↑↓" />
+                                    <Hint label="Interact" shortcut="Enter" />
+                                    <Hint label="Save & Exit" shortcut="Ctrl+S" />
+                                    <Hint label="Discard" shortcut="Esc" />
+                                </>
+                            )}
+                        </Box>
+                    </>
+                ) : (
+                    <>
+                        {/* Shortcuts tab */}
+                        <Box flexGrow={1} overflow="hidden">
+                            <ShortcutsTab
+                                isActive={isActive}
+                                selectedIndex={shortcutsSelectedIndex}
+                                rebindingId={rebindingId}
+                                width={innerWidth}
+                                height={listHeight}
+                                searchQuery={shortcutsSearchQuery}
+                                searchFocused={shortcutsModalFocus === "search"}
+                                onSearchChange={(v) => {
+                                    setShortcutsSearchQuery(v);
+                                    setShortcutsSelectedIndex(0);
+                                }}
+                            />
+                        </Box>
+
+                        {/* Shortcuts footer */}
+                        <Box marginTop={1} flexDirection="row" flexShrink={0}>
+                            {rebindingId ? (
+                                <Hint label="Cancel" shortcut="Esc" />
+                            ) : shortcutsModalFocus === "search" ? (
+                                <>
+                                    <Hint label="Go to list" shortcut="↓/Enter" />
+                                    <Hint label="Save & Exit" shortcut="Ctrl+S" />
+                                    <Hint label="Discard" shortcut="Esc" />
+                                </>
+                            ) : (
+                                <>
+                                    <Hint label="Navigate" shortcut="↑↓" />
+                                    <Hint label="Rebind" shortcut="Enter" />
+                                    <Hint label="Reset" shortcut="Del" />
+                                    <Hint label="Save & Exit" shortcut="Ctrl+S" />
+                                    <Hint label="Discard" shortcut="Esc" />
+                                </>
+                            )}
+                        </Box>
+                    </>
+                )}
             </Box>
         </Box>
     );

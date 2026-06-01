@@ -17,4 +17,5 @@ These are not task lists — each project is a self-contained scope of work. Ind
 | P9 — Color Theme Unification                   | [p9/tasks.md](p9/tasks.md)   |
 | P10 — Setup Wizard per Provider                | [p10/tasks.md](p10/tasks.md) |
 | P11 — Songlink and new metadata structure      | [p11/tasks.md](p11/tasks.md) |
-| P12 — Session management                       | NOT WRITTEN                  |
+| P12 — Global Input System                      | [p12/tasks.md](p12/tasks.md) |
+| P13 — Session management                       | NOT WRITTEN                  |

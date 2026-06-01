@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useState } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
+import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusContext } from "#contexts/FocusContext";
 import { DetectedUrl, SupportedPlatform } from "./detectUrls";
 import { providerDisplayRegistry } from "#base/providerDisplay";
@@ -72,33 +73,56 @@ export const ImportModal: React.FC<ImportModalProps> = ({
 
     const isActive = pendingImport !== null && focusState.activeWindow === "importModal";
 
-    useInput(
-        (_input, key) => {
-            if (!pendingImport) return;
-
-            if (key.escape) {
-                onCancel();
-                return;
-            }
-
-            if (key.return) {
-                const opt = OPTIONS[selectedIndex];
-                onConfirm({ fetchMetadata: opt.fetchMetadata, download: opt.download });
-                return;
-            }
-
-            if (key.upArrow || (key.tab && key.shift)) {
-                setSelectedIndex((prev) => (prev - 1 + OPTIONS.length) % OPTIONS.length);
-                return;
-            }
-
-            if (key.downArrow || key.tab) {
-                setSelectedIndex((prev) => (prev + 1) % OPTIONS.length);
-                return;
-            }
-        },
-        { isActive }
-    );
+    useShortcuts({
+        id: "importModal",
+        isActive,
+        exclusive: true,
+        priority: 300,
+        shortcuts: [
+            {
+                id: "importModal.cancel",
+                defaultShortcut: { key: "escape" },
+                label: "Cancel",
+                handler: () => {
+                    if (pendingImport) onCancel();
+                },
+            },
+            {
+                id: "importModal.confirm",
+                defaultShortcut: { key: "return" },
+                label: "Confirm",
+                handler: () => {
+                    if (!pendingImport) return;
+                    const opt = OPTIONS[selectedIndex];
+                    if (opt) onConfirm({ fetchMetadata: opt.fetchMetadata, download: opt.download });
+                },
+            },
+            {
+                id: "importModal.up",
+                defaultShortcut: { key: "upArrow" },
+                label: "Up",
+                handler: () => setSelectedIndex((prev) => (prev - 1 + OPTIONS.length) % OPTIONS.length),
+            },
+            {
+                id: "importModal.upTab",
+                defaultShortcut: { key: "tab", shift: true },
+                label: "Up",
+                handler: () => setSelectedIndex((prev) => (prev - 1 + OPTIONS.length) % OPTIONS.length),
+            },
+            {
+                id: "importModal.down",
+                defaultShortcut: { key: "downArrow" },
+                label: "Down",
+                handler: () => setSelectedIndex((prev) => (prev + 1) % OPTIONS.length),
+            },
+            {
+                id: "importModal.downTab",
+                defaultShortcut: { key: "tab" },
+                label: "Down",
+                handler: () => setSelectedIndex((prev) => (prev + 1) % OPTIONS.length),
+            },
+        ],
+    });
 
     if (!pendingImport) return null;
 

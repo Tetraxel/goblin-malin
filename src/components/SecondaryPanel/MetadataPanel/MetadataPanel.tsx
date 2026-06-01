@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box, useInput } from "ink";
+import { Box } from "ink";
 import { useTheme } from "#base/themeContext";
 import { Task, TaskSnapshot } from "#base/task/task";
 import { useFocusContext } from "#contexts/FocusContext";
@@ -8,7 +8,8 @@ import { computeCompiledMetadata, pickGroupRepresentative } from "#flows/musicDo
 import { navigableFields } from "#flows/musicDownloadFlow/utils/metadataFields";
 import { MetadataSourceList } from "./MetadataSourceList";
 import { MetadataDetailPanel } from "./MetadataDetailPanel";
-import { SourcesHintBar } from "../SourcesHintBar";
+import { DynamicHintBar } from "#components/DynamicHintBar/DynamicHintBar";
+import { useShortcuts } from "#hooks/useShortcuts";
 
 interface MetadataPanelProps {
     selectedTask: Task | null;
@@ -52,42 +53,77 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ selectedTask, widt
     const [splitRatio, setSplitRatio] = useState(0.6);
     const leftWidth = Math.floor(width * splitRatio) - 4;
     const rightWidth = width - leftWidth - 4;
-    const hintBarHeight = cursor.type === "result" ? 3 : 2;
-    const listHeight = height - hintBarHeight;
 
-    useInput(
-        (_, key) => {
-            if (!isPanelActive || focusState.isEditingField) return;
-            if (key.shift && key.leftArrow) {
-                setSplitRatio((prev) => Math.max(0.2, prev - 0.04));
-                return;
-            }
-            if (key.shift && key.rightArrow) {
-                setSplitRatio((prev) => Math.min(0.75, prev + 0.04));
-                return;
-            }
-            if (!key.shift && key.rightArrow && innerFocus === "list") {
-                setSourcesInnerFocus("detail");
-            }
-            if (!key.shift && key.leftArrow && innerFocus === "detail") {
-                setSourcesInnerFocus("list");
-            }
-        },
-        { isActive: isPanelActive }
-    );
+    // Panel-level shortcuts: resize + focus switch, shown as the lowest-priority hint line.
+    useShortcuts({
+        id: "metadataPanel",
+        isActive: isPanelActive,
+        priority: 100,
+        shortcuts: [
+            {
+                id: "metadataPanel.shrink",
+                defaultShortcut: { key: "leftArrow", shift: true },
+                label: "Shrink",
+                handler: () => setSplitRatio((prev) => Math.max(0.2, prev - 0.04)),
+            },
+            {
+                id: "metadataPanel.expand",
+                defaultShortcut: { key: "rightArrow", shift: true },
+                label: "Expand",
+                handler: () => setSplitRatio((prev) => Math.min(0.75, prev + 0.04)),
+            },
+            {
+                id: "metadataPanel.focusDetail",
+                defaultShortcut: { key: "rightArrow" },
+                label: "Details",
+                handler: () => {
+                    if (innerFocus === "list") setSourcesInnerFocus("detail");
+                },
+            },
+            {
+                id: "metadataPanel.focusList",
+                defaultShortcut: { key: "leftArrow" },
+                label: "List",
+                handler: () => {
+                    if (innerFocus === "detail") setSourcesInnerFocus("list");
+                },
+            },
+            {
+                id: "metadataPanel.toggleDiscovery",
+                defaultShortcut: { input: "e" },
+                label: "Toggle search details",
+                handler: () => setShowDiscoverySources(!showDiscoverySources),
+            },
+        ],
+        hintLines: [
+            {
+                id: "metadataPanel.line.panel",
+                left: { type: "text", value: "Metadata Panel", bold: true },
+                shortcutIds: ["metadataPanel.shrink", "metadataPanel.expand", "metadataPanel.toggleDiscovery"],
+            },
+        ],
+    });
 
-    useInput(
-        (_, key) => {
-            if (!isPanelActive || innerFocus !== "detail") return;
-            if (key.upArrow) {
-                setDetailFieldIndex(Math.max(0, selectedFieldIndex - 1));
-            }
-            if (key.downArrow) {
-                setDetailFieldIndex(Math.min(navigableFields.length - 1, selectedFieldIndex + 1));
-            }
-        },
-        { isActive: isPanelActive && innerFocus === "detail" && !focusState.isEditingField }
-    );
+    // Detail-panel navigation shortcuts (only active when detail is focused).
+    useShortcuts({
+        id: "metadataPanelDetail",
+        isActive: isPanelActive && innerFocus === "detail" && !focusState.isEditingField,
+        priority: 120,
+        shortcuts: [
+            {
+                id: "metadataPanelDetail.up",
+                defaultShortcut: { key: "upArrow" },
+                label: "Up",
+                handler: () => setDetailFieldIndex(Math.max(0, selectedFieldIndex - 1)),
+            },
+            {
+                id: "metadataPanelDetail.down",
+                defaultShortcut: { key: "downArrow" },
+                label: "Down",
+                handler: () => setDetailFieldIndex(Math.min(navigableFields.length - 1, selectedFieldIndex + 1)),
+            },
+        ],
+    });
 
     function handleGroupsChange(updated: MetadataGroupState[]) {
         typedTask?.updateAttributes({ metadataGroups: updated });
@@ -102,7 +138,6 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ selectedTask, widt
         (typedTask as any)?.refetchResult?.(groupIndex, resultIndex);
     }
 
-    // Resolve the selected result for the detail panel
     const sortedGroups = [...groups].sort((a, b) => a.rank - b.rank);
     const selectedResult =
         cursor.type === "result"
@@ -112,6 +147,11 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ selectedTask, widt
                   ? pickGroupRepresentative(sortedGroups[cursor.groupIndex])
                   : undefined
               : undefined;
+
+    // DynamicHintBar height = number of active hint lines from registry.
+    // sourceList contributes 1–2 lines, metadataPanel contributes 1 line.
+    const hintBarHeight = cursor.type === "result" ? 3 : 2;
+    const listHeight = height - hintBarHeight;
 
     return (
         <Box
@@ -155,13 +195,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ selectedTask, widt
                     onInnerFocusSwitch={() => setSourcesInnerFocus("list")}
                 />
             </Box>
-            <SourcesHintBar
-                groups={groups}
-                cursor={cursor}
-                innerFocus={innerFocus}
-                isActive={isPanelActive}
-                width={width - 2}
-            />
+            <DynamicHintBar width={width - 2} isActive={isPanelActive} />
         </Box>
     );
 };

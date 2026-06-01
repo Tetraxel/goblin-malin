@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useState } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
+import { useShortcuts } from "#hooks/useShortcuts";
 import { inspect } from "util";
 import { useFocusContext } from "#contexts/FocusContext";
 import { inkTransport } from "#base/logger/ink-transport";
@@ -73,17 +74,32 @@ export const LogPanel = ({ tasks, height: heightProp }: { tasks: Task[]; height?
     // When scrolled (indicator row visible), only height-1 rows are available for logs
     const maxOffset = Math.max(0, filteredLogs.length - (height - 1));
 
-    useInput(
-        (_input, key) => {
-            if (key.upArrow) {
-                setScrollOffset((prev) => Math.min(prev + 1, maxOffset));
-            }
-            if (key.downArrow) {
-                setScrollOffset((prev) => Math.max(0, prev - 1));
-            }
-        },
-        { isActive }
-    );
+    useShortcuts({
+        id: "logPanel",
+        isActive,
+        priority: 150,
+        shortcuts: [
+            {
+                id: "logPanel.up",
+                defaultShortcut: { key: "upArrow" },
+                label: "Scroll up",
+                handler: () => setScrollOffset((prev) => Math.min(prev + 1, maxOffset)),
+            },
+            {
+                id: "logPanel.down",
+                defaultShortcut: { key: "downArrow" },
+                label: "Scroll down",
+                handler: () => setScrollOffset((prev) => Math.max(0, prev - 1)),
+            },
+        ],
+        hintLines: [
+            {
+                id: "logPanel.line.scroll",
+                left: { type: "text", value: "Logs", bold: true },
+                shortcutIds: ["logPanel.up", "logPanel.down"],
+            },
+        ],
+    });
 
     const clampedOffset = Math.min(scrollOffset, maxOffset);
     const showBottomIndicator = clampedOffset > 0;

@@ -1,9 +1,10 @@
 ﻿import React from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import { useTheme } from "#base/themeContext";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { TrackDownloadSource, DownloadProvider } from "#flows/musicDownloadFlow/types";
 import { getInstance } from "#utils/mpvPlayer";
+import { useShortcuts } from "#hooks/useShortcuts";
 import { ProviderHeader } from "./ProviderHeader";
 import { MetadataHeader } from "./MetadataHeader";
 import { SourceFileRow } from "./SourceFileRow";
@@ -79,50 +80,95 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
         .filter((item): item is Extract<TreeItem, { type: "file-row" }> => item.type === "file-row")
         .map((item) => item.sourceIndex);
 
-    useInput(
-        (input, key) => {
-            if (key.upArrow) {
-                const pos = selectableIndices.indexOf(selectedSourceIndex);
-                if (pos > 0) onSelectSource(selectableIndices[pos - 1]);
-                return;
-            }
-            if (key.downArrow) {
-                const pos = selectableIndices.indexOf(selectedSourceIndex);
-                if (pos === -1 && selectableIndices.length > 0) {
-                    onSelectSource(selectableIndices[0]);
-                } else if (pos < selectableIndices.length - 1) {
-                    onSelectSource(selectableIndices[pos + 1]);
-                }
-                return;
-            }
-            if (key.rightArrow && !key.shift) {
-                onInnerFocusSwitch();
-                return;
-            }
-            if (key.return && selectedSourceIndex >= 0) {
-                onRequestSelect(selectedSourceIndex);
-                return;
-            }
-            if (key.delete && selectedSourceIndex >= 0) {
-                onRejectSource(selectedSourceIndex);
-                return;
-            }
-            if (input === " " && !key.ctrl && !key.meta) {
-                const source = sources[selectedSourceIndex];
-                if (source?.localFile?.state !== "found") return;
-                const filePath = source.localFile.path;
-                const player = getInstance();
-                const status = player.getStatus();
-                if (status.filePath === filePath && (status.isPlaying || status.isPaused)) {
-                    player.togglePause().catch(() => {});
-                } else {
-                    player.play(filePath).catch(() => {});
-                }
-                return;
-            }
-        },
-        { isActive }
-    );
+    const canPlay = sources[selectedSourceIndex]?.localFile?.state === "found";
+
+    useShortcuts({
+        id: "downloadSourceTree",
+        isActive,
+        priority: 150,
+        shortcuts: [
+            {
+                id: "downloadSourceTree.up",
+                defaultShortcut: { key: "upArrow" },
+                label: "Up",
+                handler: () => {
+                    const pos = selectableIndices.indexOf(selectedSourceIndex);
+                    if (pos > 0) onSelectSource(selectableIndices[pos - 1]);
+                },
+            },
+            {
+                id: "downloadSourceTree.down",
+                defaultShortcut: { key: "downArrow" },
+                label: "Down",
+                handler: () => {
+                    const pos = selectableIndices.indexOf(selectedSourceIndex);
+                    if (pos === -1 && selectableIndices.length > 0) {
+                        onSelectSource(selectableIndices[0]);
+                    } else if (pos < selectableIndices.length - 1) {
+                        onSelectSource(selectableIndices[pos + 1]);
+                    }
+                },
+            },
+            {
+                id: "downloadSourceTree.focusDetail",
+                defaultShortcut: { key: "rightArrow" },
+                label: "Details",
+                handler: () => onInnerFocusSwitch(),
+            },
+            {
+                id: "downloadSourceTree.select",
+                defaultShortcut: { key: "return" },
+                label: "Select",
+                handler: () => {
+                    if (selectedSourceIndex >= 0) onRequestSelect(selectedSourceIndex);
+                },
+            },
+            {
+                id: "downloadSourceTree.reject",
+                defaultShortcut: { key: "delete" },
+                label: "Reject",
+                handler: () => {
+                    if (selectedSourceIndex >= 0) onRejectSource(selectedSourceIndex);
+                },
+            },
+            {
+                id: "downloadSourceTree.playPause",
+                defaultShortcut: { input: " " },
+                label: "Play/Pause",
+                handler: () => {
+                    if (!canPlay) return;
+                    const source = sources[selectedSourceIndex];
+                    if (!source?.localFile?.path) return;
+                    const filePath = source.localFile.path;
+                    const player = getInstance();
+                    const status = player.getStatus();
+                    if (status.filePath === filePath && (status.isPlaying || status.isPaused)) {
+                        player.togglePause().catch(() => {});
+                    } else {
+                        player.play(filePath).catch(() => {});
+                    }
+                },
+            },
+        ],
+        hintLines: [
+            {
+                id: "downloadSourceTree.line.sources",
+                left:
+                    selectedSourceIndex >= 0 && sources.length > 0
+                        ? {
+                              type: "text" as const,
+                              value: `Source ${selectedSourceIndex + 1}/${sources.length}`,
+                              bold: true,
+                          }
+                        : { type: "text" as const, value: "Download Sources", bold: true },
+                shortcutIds: [
+                    "downloadSourceTree.select",
+                    "downloadSourceTree.reject",
+                    ...(canPlay ? ["downloadSourceTree.playPause"] : []),
+                ],
+            },
+        ],
+    });
 
     if (sources.length === 0) {
         return (

@@ -1,5 +1,6 @@
 ﻿import React, { useCallback, useEffect, useState } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
+import { useShortcuts } from "#hooks/useShortcuts";
 import Gradient from "ink-gradient";
 import BigText from "ink-big-text";
 import { useFocusContext } from "#contexts/FocusContext";
@@ -52,18 +53,26 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ terminalHeight, term
         switchBack();
     }, [dontShowAgain, switchBack]);
 
-    useInput(
-        (input, key) => {
-            if (key.escape) {
-                handleClose();
-                return;
-            }
-            if (key.return) {
-                setDontShowAgain((prev) => !prev);
-            }
-        },
-        { isActive }
-    );
+    useShortcuts({
+        id: "welcomeModal",
+        isActive,
+        exclusive: true,
+        priority: 300,
+        shortcuts: [
+            {
+                id: "welcomeModal.close",
+                defaultShortcut: { key: "escape" },
+                label: "Close",
+                handler: handleClose,
+            },
+            {
+                id: "welcomeModal.toggle",
+                defaultShortcut: { key: "return" },
+                label: "Toggle",
+                handler: () => setDontShowAgain((prev) => !prev),
+            },
+        ],
+    });
 
     if (!isActive) return null;
 

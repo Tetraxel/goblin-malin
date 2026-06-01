@@ -1,109 +1,217 @@
-﻿import { Key } from "ink";
 import { useFocusContext } from "#contexts/FocusContext";
 import { useToolbarActionsRef } from "#contexts/ToolbarActionsContext";
 import { FlowBase } from "#base/flow/flow-base";
 import { Task } from "#base/task/task";
 import { PromptType } from "#base/task/task-prompt";
 import { useActivePrompt } from "#components/PromptModal/useActivePrompt";
-import { matchesShortcut } from "#types/actions";
+import { useShortcuts, ShortcutDef } from "#hooks/useShortcuts";
+import { globalLogger } from "#base/logger/logger";
 
-export type KeyHandler = (input: string, key: Key) => void;
+// ── Toolbar ───────────────────────────────────────────────────────────────────
 
-export function useToolbarKeyHandler(): KeyHandler {
+export function useToolbarShortcuts(): void {
     const { focusState, moveToolbarSelection } = useFocusContext();
     const actionsRef = useToolbarActionsRef();
-    return (_input: string, key: Key) => {
-        if (key.leftArrow) moveToolbarSelection("left");
-        if (key.rightArrow) moveToolbarSelection("right");
-        if (key.downArrow) moveToolbarSelection("down");
-        if (key.return) {
-            actionsRef.current[focusState.toolbar.selectedButtonIndex]?.();
-        }
-    };
+    const isActive = focusState.activeWindow === "toolbar";
+
+    useShortcuts({
+        id: "toolbar",
+        isActive,
+        priority: 150,
+        shortcuts: [
+            {
+                id: "toolbar.left",
+                defaultShortcut: { key: "leftArrow" },
+                label: "Previous",
+                handler: () => moveToolbarSelection("left"),
+            },
+            {
+                id: "toolbar.right",
+                defaultShortcut: { key: "rightArrow" },
+                label: "Next",
+                handler: () => moveToolbarSelection("right"),
+            },
+            {
+                id: "toolbar.down",
+                defaultShortcut: { key: "downArrow" },
+                label: "Focus tasks",
+                handler: () => moveToolbarSelection("down"),
+            },
+            {
+                id: "toolbar.enter",
+                defaultShortcut: { key: "return" },
+                label: "Activate",
+                handler: () => actionsRef.current[focusState.toolbar.selectedButtonIndex]?.(),
+            },
+        ],
+    });
 }
 
-export function useTaskListKeyHandler(tasks: Task[], flow: FlowBase | undefined): KeyHandler {
+// ── Task list ─────────────────────────────────────────────────────────────────
+
+export function useTaskListShortcuts(tasks: Task[], flow: FlowBase | undefined): void {
     const { focusState, moveTaskSelection, resizePanels, toggleTaskSelection, selectAllTasks, clearSelection } =
         useFocusContext();
+    const isActive = focusState.activeWindow === "taskList";
 
-    return (input: string, key: Key) => {
-        if (key.upArrow) {
-            if (key.shift) resizePanels("shrink");
-            else moveTaskSelection("up");
-        }
-        if (key.downArrow) {
-            if (key.shift) resizePanels("grow");
-            else moveTaskSelection("down");
-        }
-        if (key.leftArrow) moveTaskSelection("left");
-        if (key.rightArrow) moveTaskSelection("right");
+    const selectedTask = tasks[focusState.taskList.selectedTaskIndex];
+    const multiCount = focusState.taskList.selectedTaskIds.size;
 
-        // Ctrl+A: toggle select all
-        if (key.ctrl && input === "a") {
-            selectAllTasks(tasks.map((t) => t.getId()));
-            return;
-        }
+    // Derive contextual action shortcuts from the flow's action bar for the current task/column.
+    // Computed inline (no memo) so the action bar is always fresh — task internal state (status,
+    // column values) changes without changing the task object reference, which would fool useMemo.
+    const contextualShortcuts: ShortcutDef[] = (() => {
+        if (!flow || !selectedTask) return [];
+        const bar = flow.getContextualActionBar(selectedTask, {
+            columnIndex: focusState.taskList.selectedColumnIndex,
+        });
+        if (!bar) return [];
 
-        // Esc: clear multi-selection
-        if (key.escape) {
-            clearSelection();
-            return;
-        }
-
-        // Contextual actions take priority (includes Space if a column action is bound to it)
-        if (flow) {
-            const selectedTask = tasks[focusState.taskList.selectedTaskIndex];
-            if (selectedTask) {
-                const bar = flow.getContextualActionBar(selectedTask, {
-                    columnIndex: focusState.taskList.selectedColumnIndex,
-                });
-                if (bar) {
-                    const multiCount = focusState.taskList.selectedTaskIds.size;
-                    const allActions = bar.rows.flatMap((r) => r.actions);
-                    const matchingAction = allActions.find((action) => {
-                        if (multiCount > 1 && !action.multiSelectAllowed) return false;
-                        if (multiCount <= 1 && action.multiSelectOnly) return false;
-                        return action.shortcuts.some((s) => matchesShortcut(s, input, key));
-                    });
-                    if (matchingAction) {
-                        if (multiCount > 1 && matchingAction.onClickBatch) {
-                            const selectedTasks = tasks.filter((t) =>
-                                focusState.taskList.selectedTaskIds.has(t.getId())
-                            );
-                            matchingAction.onClickBatch(selectedTasks);
-                        } else {
-                            matchingAction.onClick();
+        const defs: ShortcutDef[] = [];
+        for (const action of bar.rows.flatMap((r) => r.actions)) {
+            for (let i = 0; i < action.shortcuts.length; i++) {
+                const shortcut = action.shortcuts[i];
+                const slug = action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                const suffix = action.shortcuts.length > 1 ? `.${i}` : "";
+                defs.push({
+                    id: `taskList.contextual.${slug}${suffix}`,
+                    defaultShortcut: shortcut,
+                    label: action.label,
+                    handler: () => {
+                        try {
+                            if (multiCount > 1 && action.multiSelectAllowed && action.onClickBatch) {
+                                const selected = tasks.filter((t) =>
+                                    focusState.taskList.selectedTaskIds.has(t.getId())
+                                );
+                                action.onClickBatch(selected);
+                            } else if (
+                                !(multiCount > 1 && !action.multiSelectAllowed) &&
+                                !(multiCount <= 1 && action.multiSelectOnly)
+                            ) {
+                                action.onClick();
+                            }
+                        } catch (err) {
+                            globalLogger.error(err instanceof Error ? err.message : String(err));
                         }
-
-                        return;
-                    }
-                }
+                    },
+                });
             }
         }
+        return defs;
+    })();
 
-        // Space: multi-select toggle (fallback when no column action is bound to Space)
-        if (input === " ") {
-            const task = tasks[focusState.taskList.selectedTaskIndex];
-            if (task) toggleTaskSelection(task.getId());
-        }
-    };
+    useShortcuts({
+        id: "taskList",
+        isActive,
+        priority: 150,
+        shortcuts: [
+            {
+                id: "taskList.up",
+                defaultShortcut: { key: "upArrow" },
+                label: "Up",
+                handler: () => moveTaskSelection("up"),
+            },
+            {
+                id: "taskList.down",
+                defaultShortcut: { key: "downArrow" },
+                label: "Down",
+                handler: () => moveTaskSelection("down"),
+            },
+            {
+                id: "taskList.shrink",
+                defaultShortcut: { key: "upArrow", shift: true },
+                label: "Shrink panel",
+                handler: () => resizePanels("shrink"),
+            },
+            {
+                id: "taskList.grow",
+                defaultShortcut: { key: "downArrow", shift: true },
+                label: "Grow panel",
+                handler: () => resizePanels("grow"),
+            },
+            {
+                id: "taskList.left",
+                defaultShortcut: { key: "leftArrow" },
+                label: "Left column",
+                handler: () => moveTaskSelection("left"),
+            },
+            {
+                id: "taskList.right",
+                defaultShortcut: { key: "rightArrow" },
+                label: "Right column",
+                handler: () => moveTaskSelection("right"),
+            },
+            {
+                id: "taskList.selectAll",
+                defaultShortcut: { input: "a", ctrl: true },
+                label: "Select all",
+                handler: () => selectAllTasks(tasks.map((t) => t.getId())),
+            },
+            {
+                id: "taskList.clearSelection",
+                defaultShortcut: { key: "escape" },
+                label: "Clear selection",
+                handler: () => clearSelection(),
+            },
+            {
+                id: "taskList.multiSelect",
+                defaultShortcut: { input: " " },
+                label: "Multi-select",
+                handler: () => {
+                    const task = tasks[focusState.taskList.selectedTaskIndex];
+                    if (task) toggleTaskSelection(task.getId());
+                },
+            },
+            ...contextualShortcuts,
+        ],
+    });
 }
 
-export function usePromptKeyHandler(tasks: Task[]): KeyHandler {
+// ── Prompt ────────────────────────────────────────────────────────────────────
+
+export function usePromptShortcuts(tasks: Task[]): void {
     const { task, prompt } = useActivePrompt(tasks);
+    const { focusState } = useFocusContext();
+    const isActive = focusState.activeWindow === "prompt";
 
-    return (input: string, key: Key) => {
-        if (!task || !prompt) return;
-        const currentPrompt = prompt.getCurrentPrompt();
-
-        if (key.escape) {
-            prompt.cancelPrompt(new Error("User cancelled"));
-            return;
-        }
-
-        if (currentPrompt?.type === PromptType.Confirm) {
-            if (input.toLowerCase() === "y") prompt.resolvePrompt(true);
-            else if (input.toLowerCase() === "n") prompt.resolvePrompt(false);
-        }
-    };
+    useShortcuts({
+        id: "prompt",
+        isActive,
+        priority: 200,
+        exclusive: true,
+        shortcuts: [
+            {
+                id: "prompt.cancel",
+                defaultShortcut: { key: "escape" },
+                label: "Cancel",
+                handler: () => {
+                    if (task && prompt) prompt.cancelPrompt(new Error("User cancelled"));
+                },
+            },
+            {
+                id: "prompt.yes",
+                defaultShortcut: { input: "y" },
+                label: "Yes",
+                handler: () => {
+                    if (!task || !prompt) return;
+                    const current = prompt.getCurrentPrompt();
+                    if (current?.type === PromptType.Confirm) prompt.resolvePrompt(true);
+                },
+            },
+            {
+                id: "prompt.no",
+                defaultShortcut: { input: "n" },
+                label: "No",
+                handler: () => {
+                    if (!task || !prompt) return;
+                    const current = prompt.getCurrentPrompt();
+                    if (current?.type === PromptType.Confirm) prompt.resolvePrompt(false);
+                },
+            },
+        ],
+    });
 }
+
+// ── Legacy KeyHandler type (kept for any remaining callers) ───────────────────
+
+export type KeyHandler = (input: string, key: import("ink").Key) => void;

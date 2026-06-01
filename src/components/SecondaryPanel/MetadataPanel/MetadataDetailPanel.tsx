@@ -1,14 +1,14 @@
-﻿import React, { useState } from "react";
-import { Box, Text, useInput } from "ink";
+import React, { useState } from "react";
+import { Box, Text } from "ink";
 import clipboard from "clipboardy";
 import { MetadataResultState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
 import { CompiledMetadata, CompiledMetadataField } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { FIELDS, navigableFields } from "#flows/musicDownloadFlow/utils/metadataFields";
 import { useFocusContext } from "#contexts/FocusContext";
+import { useShortcuts } from "#hooks/useShortcuts";
 import { FieldRow } from "./FieldRow";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
-import { Hint } from "../../Hint";
 
 interface MetadataSourceDetailProps {
     source: MetadataResultState | "compiled";
@@ -58,52 +58,86 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
     const isCompiled = source === "compiled";
     const clampedFieldIdx = Math.min(selectedFieldIndex, navigableFields.length - 1);
 
-    useInput(
-        (input, key) => {
-            if (editingField !== null) {
-                if (key.escape) stopEditing();
-                return;
-            }
-
-            if (key.leftArrow && !key.shift) {
-                onInnerFocusSwitch();
-                return;
-            }
-
-            if (key.return && isCompiled) {
-                const field = navigableFields[clampedFieldIdx];
-                if (!field) return;
-                const currentValue = field.getCompiledValue(compiled);
-                startEditing(field.key, currentValue === "—" ? "" : currentValue);
-                return;
-            }
-
-            if (key.delete && isCompiled) {
-                const field = navigableFields[clampedFieldIdx];
-                if (!field) return;
-                const updated = { ...overrides };
-                delete (updated as Record<string, unknown>)[field.key];
-                onOverrideChange(updated);
-                return;
-            }
-
-            if (key.ctrl && input === "c") {
-                const field = navigableFields[clampedFieldIdx];
-                if (!field) return;
-                const value = isCompiled
-                    ? field.getCompiledValue(compiled)
-                    : field.getSourceValue(source as MetadataResultState);
-                if (value !== "—")
-                    try {
-                        clipboard.writeSync(value);
-                    } catch {
-                        /* ignored */
-                    }
-                return;
-            }
-        },
-        { isActive }
-    );
+    useShortcuts({
+        id: "metadataDetail",
+        isActive,
+        priority: 200,
+        shortcuts: [
+            {
+                id: "metadataDetail.back",
+                defaultShortcut: { key: "leftArrow" },
+                label: "Back",
+                handler: () => {
+                    if (editingField === null) onInnerFocusSwitch();
+                },
+            },
+            {
+                id: "metadataDetail.cancelEdit",
+                defaultShortcut: { key: "escape" },
+                label: "Cancel",
+                handler: () => {
+                    if (editingField !== null) stopEditing();
+                },
+            },
+            {
+                id: "metadataDetail.edit",
+                defaultShortcut: { key: "return" },
+                label: "Edit",
+                handler: () => {
+                    if (editingField !== null || !isCompiled) return;
+                    const field = navigableFields[clampedFieldIdx];
+                    if (!field) return;
+                    const currentValue = field.getCompiledValue(compiled);
+                    startEditing(field.key, currentValue === "—" ? "" : currentValue);
+                },
+            },
+            {
+                id: "metadataDetail.clear",
+                defaultShortcut: { key: "delete" },
+                label: "Clear override",
+                handler: () => {
+                    if (editingField !== null || !isCompiled) return;
+                    const field = navigableFields[clampedFieldIdx];
+                    if (!field) return;
+                    const updated = { ...overrides };
+                    delete (updated as Record<string, unknown>)[field.key];
+                    onOverrideChange(updated);
+                },
+            },
+            {
+                id: "metadataDetail.copy",
+                defaultShortcut: { input: "c", ctrl: true },
+                label: "Copy",
+                handler: () => {
+                    const field = navigableFields[clampedFieldIdx];
+                    if (!field) return;
+                    const value = isCompiled
+                        ? field.getCompiledValue(compiled)
+                        : field.getSourceValue(source as MetadataResultState);
+                    if (value !== "—")
+                        try {
+                            clipboard.writeSync(value);
+                        } catch {
+                            /* ignored */
+                        }
+                },
+            },
+        ],
+        hintLines: isActive
+            ? [
+                  {
+                      id: "metadataDetail.line.actions",
+                      left: { type: "text", value: "Field", bold: true },
+                      shortcutIds:
+                          editingField !== null
+                              ? ["metadataDetail.cancelEdit"]
+                              : isCompiled
+                                ? ["metadataDetail.edit", "metadataDetail.copy"]
+                                : ["metadataDetail.copy"],
+                  },
+              ]
+            : [],
+    });
 
     function handleEditSubmit(value: string) {
         if (!editingField) return;
@@ -187,22 +221,6 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
                                 />
                             );
                         })}
-                    </Box>
-                </Box>
-
-                <Box flexDirection="column" height={1} minHeight={1} overflow="hidden">
-                    <Box flexDirection="row" paddingX={1} overflow="hidden" flexGrow={1}>
-                        {editingField !== null ? (
-                            <>
-                                <Hint label="Confirm" shortcut="Enter" />
-                                <Hint label="Cancel" shortcut="Esc" />
-                            </>
-                        ) : (
-                            <>
-                                {isActive && isCompiled && <Hint label="Update" shortcut="Enter" />}
-                                {isActive && <Hint label="Copy" shortcut="Ctrl+C" />}
-                            </>
-                        )}
                     </Box>
                 </Box>
             </Box>

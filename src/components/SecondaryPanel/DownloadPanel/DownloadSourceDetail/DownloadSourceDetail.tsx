@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import * as path from "path";
 import * as fs from "fs";
 import { providerDisplayRegistry } from "#base/providerDisplay";
@@ -9,10 +9,10 @@ import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadat
 import { computeOutputFilename } from "#flows/musicDownloadFlow/utils/computeOutputPath";
 import { getInstance, PlayerStatus } from "#utils/mpvPlayer";
 import { formatBytes, formatDate, tagValue } from "#components/SecondaryPanel/DownloadPanel/utils";
+import { useShortcuts } from "#hooks/useShortcuts";
 import { PlaybackBar } from "../PlaybackBar";
 import { DiffView } from "./DiffView";
 import { DetailRow } from "./DetailRow";
-import { Hint } from "../../../Hint";
 import { formatDuration } from "../../utils";
 
 interface DownloadSourceDetailProps {
@@ -127,67 +127,115 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
         };
     }, [currentFilePath]);
 
-    useInput(
-        (input, key) => {
-            if (isDiffMode) {
-                if (key.return) {
-                    onConfirmDiff();
-                    return;
-                }
-                if (key.escape) {
-                    onCancelDiff();
-                    return;
-                }
-                return;
-            }
+    const canPlay = source?.localFile?.state === "found";
+    const fileNotFoundNow = source?.localFile?.state === "not_found";
 
-            if (key.leftArrow && !key.shift) {
-                onInnerFocusSwitch();
-                return;
-            }
-
-            if (input === " " && !key.ctrl && !key.meta) {
-                const player = getInstance();
-                const status = player.getStatus();
-                if (status.filePath === currentFilePath && (status.isPlaying || status.isPaused)) {
-                    player.togglePause().catch(() => {});
-                } else if (currentFilePath && source?.localFile?.state === "found") {
-                    player.play(currentFilePath).catch(() => {});
-                }
-                return;
-            }
-
-            if (key.leftArrow && key.shift) {
-                const player = getInstance();
-                const status = player.getStatus();
-                if (status.filePath === currentFilePath && (status.isPlaying || status.isPaused)) {
-                    player.seekMs(Math.max(0, status.positionMs - 5000)).catch(() => {});
-                }
-                return;
-            }
-
-            if (key.rightArrow && key.shift) {
-                const player = getInstance();
-                const status = player.getStatus();
-                if (status.filePath === currentFilePath && (status.isPlaying || status.isPaused)) {
-                    player.seekMs(Math.min(status.durationMs, status.positionMs + 5000)).catch(() => {});
-                }
-                return;
-            }
-
-            if (key.ctrl && input === "f") {
-                if (source?.localFile?.state === "not_found") onRelocateFile();
-                return;
-            }
-
-            if (key.return) {
-                const canSave = source?.localFile?.state === "found" && !isSaving;
-                if (canSave) onSave();
-                return;
-            }
-        },
-        { isActive }
-    );
+    useShortcuts({
+        id: "downloadSourceDetail",
+        isActive,
+        priority: 200,
+        shortcuts: [
+            {
+                id: "downloadSourceDetail.confirm",
+                defaultShortcut: { key: "return" },
+                label: isDiffMode ? "Confirm" : canPlay && !isSaving ? (source?.savedFile ? "Update" : "Save") : "Save",
+                handler: () => {
+                    if (isDiffMode) {
+                        onConfirmDiff();
+                        return;
+                    }
+                    if (canPlay && !isSaving) onSave();
+                },
+            },
+            {
+                id: "downloadSourceDetail.cancel",
+                defaultShortcut: { key: "escape" },
+                label: "Cancel",
+                handler: () => {
+                    if (isDiffMode) onCancelDiff();
+                },
+            },
+            {
+                id: "downloadSourceDetail.back",
+                defaultShortcut: { key: "leftArrow" },
+                label: "Back",
+                handler: () => {
+                    if (!isDiffMode) onInnerFocusSwitch();
+                },
+            },
+            {
+                id: "downloadSourceDetail.playPause",
+                defaultShortcut: { input: " " },
+                label: isPlaying ? "Pause" : isPaused ? "Resume" : "Play",
+                handler: () => {
+                    if (isDiffMode) return;
+                    const player = getInstance();
+                    const status = player.getStatus();
+                    if (status.filePath === currentFilePath && (status.isPlaying || status.isPaused)) {
+                        player.togglePause().catch(() => {});
+                    } else if (currentFilePath && canPlay) {
+                        player.play(currentFilePath).catch(() => {});
+                    }
+                },
+            },
+            {
+                id: "downloadSourceDetail.seekBack",
+                defaultShortcut: { key: "leftArrow", shift: true },
+                label: "Seek -5s",
+                handler: () => {
+                    if (isDiffMode) return;
+                    const player = getInstance();
+                    const status = player.getStatus();
+                    if (status.filePath === currentFilePath && (status.isPlaying || status.isPaused)) {
+                        player.seekMs(Math.max(0, status.positionMs - 5000)).catch(() => {});
+                    }
+                },
+            },
+            {
+                id: "downloadSourceDetail.seekFwd",
+                defaultShortcut: { key: "rightArrow", shift: true },
+                label: "Seek +5s",
+                handler: () => {
+                    if (isDiffMode) return;
+                    const player = getInstance();
+                    const status = player.getStatus();
+                    if (status.filePath === currentFilePath && (status.isPlaying || status.isPaused)) {
+                        player.seekMs(Math.min(status.durationMs, status.positionMs + 5000)).catch(() => {});
+                    }
+                },
+            },
+            {
+                id: "downloadSourceDetail.relocate",
+                defaultShortcut: { input: "f", ctrl: true },
+                label: "Relocate",
+                handler: () => {
+                    if (!isDiffMode && fileNotFoundNow) onRelocateFile();
+                },
+            },
+        ],
+        hintLines: isDiffMode
+            ? [
+                  {
+                      id: "downloadSourceDetail.line.diff",
+                      left: { type: "text", value: "Diff", bold: true },
+                      shortcutIds: ["downloadSourceDetail.confirm", "downloadSourceDetail.cancel"],
+                  },
+              ]
+            : [
+                  {
+                      id: "downloadSourceDetail.line.actions",
+                      left: { type: "text", value: "Download", bold: true },
+                      shortcutIds: [
+                          ...(canPlay ? ["downloadSourceDetail.playPause"] : []),
+                          ...(isPlaying || isPaused
+                              ? ["downloadSourceDetail.seekBack", "downloadSourceDetail.seekFwd"]
+                              : []),
+                          ...(fileNotFoundNow ? ["downloadSourceDetail.relocate"] : []),
+                          ...(canPlay && !isSaving ? ["downloadSourceDetail.confirm"] : []),
+                      ],
+                  },
+              ],
+    });
 
     if (isDiffMode && savedSource && pendingSource) {
         return (
@@ -231,7 +279,6 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     const otherTagKeys = Object.keys(embeddedTags)
         .map((k) => k.toUpperCase())
         .filter((k) => !PRIORITY_TAGS.includes(k));
-    const canPlay = source.localFile?.state === "found";
 
     const dlProvider = providerDisplayRegistry.get(source.provider);
     const metaPlatform = providerDisplayRegistry.get(source.track.apiProvider);
@@ -353,20 +400,6 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                             <DetailRow label="Saved at" value={formatDate(source.savedFile.savedAt)} />
                         </Box>
                     )}
-                </Box>
-
-                <Box flexDirection="column" height={1} minHeight={1} overflow="hidden">
-                    <Box flexDirection="row" paddingX={1} overflow="hidden" flexGrow={1}>
-                        {isActive && canPlay && (
-                            <Hint label={isPaused ? "Resume" : isPlaying ? "Pause" : " Play"} shortcut="Space" />
-                        )}
-                        {isActive && canPlay && (isPlaying || isPaused) && <Hint label="Seek 5s" shortcut="⇧←/⇧→" />}
-                        {isActive && fileNotFound && <Hint label="Relocate" shortcut="Ctrl+F" />}
-                        {isActive && canPlay && !isSaving && (
-                            <Hint label={source?.savedFile ? "Update" : "Save"} shortcut="Enter" />
-                        )}
-                        {isActive && isSaving && <Hint label="Saving…" shortcut="" />}
-                    </Box>
                 </Box>
             </Box>
         </Box>

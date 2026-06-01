@@ -1,4 +1,5 @@
 import { PROJECT_ROOT } from "../constants";
+import { Shortcut } from "#types/actions";
 
 export type AppSettings = {
     general: {
@@ -8,6 +9,8 @@ export type AppSettings = {
         theme: string;
         showWelcomeTutorial: boolean;
     };
+    /** User-remapped key bindings. Keys are shortcut action IDs, values override defaults. */
+    keybindings: Record<string, Shortcut>;
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -18,4 +21,5 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
         theme: "dark",
         showWelcomeTutorial: true,
     },
+    keybindings: {},
 };

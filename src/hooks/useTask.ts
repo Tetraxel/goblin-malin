@@ -14,7 +14,6 @@ export const useTask = <TAttributes>(task: Task<TAttributes>) => {
         globalLogger.info(`Subscribing to task ${task.getId()} updates...`);
         // Subscribe to task changes
         const unsubscribe = task.subscribe((updatedTask) => {
-            globalLogger.info(`Task ${updatedTask.id} updated, updating snapshot...`);
             // Update the snapshot, which triggers a re-render
             setTaskSnapshot(updatedTask.get());
         });

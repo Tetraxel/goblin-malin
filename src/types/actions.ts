@@ -48,15 +48,24 @@ export function getShortcutLiteral(shortcuts: Shortcut[]): string {
 }
 
 export function matchesShortcut(shortcut: Shortcut, input: string, key: Key): boolean {
-    if (shortcut.ctrl !== undefined && shortcut.ctrl !== key.ctrl) return false;
-    if (shortcut.shift !== undefined && shortcut.shift !== key.shift) return false;
-    if (shortcut.meta !== undefined && shortcut.meta !== key.meta) return false;
-
     if (shortcut.input !== undefined) {
+        // For character input, ctrl/meta must match; shift is optional.
+        // When shift is unspecified, match case-insensitively so { input: "f" } fires on both f and Shift+F.
+        if (shortcut.ctrl !== undefined && shortcut.ctrl !== key.ctrl) return false;
+        if (shortcut.meta !== undefined && shortcut.meta !== key.meta) return false;
+        if (shortcut.shift === undefined) {
+            return shortcut.input.toLowerCase() === input.toLowerCase();
+        }
+        if (shortcut.shift !== key.shift) return false;
         return shortcut.input === input;
     }
 
     if (shortcut.key) {
+        // For named keys, unspecified modifiers default to false — Shift+Left must not
+        // accidentally trigger a plain { key: "leftArrow" } handler registered at higher priority.
+        if ((shortcut.shift ?? false) !== key.shift) return false;
+        if ((shortcut.ctrl ?? false) !== key.ctrl) return false;
+        if ((shortcut.meta ?? false) !== key.meta) return false;
         const k = shortcut.key;
         return Boolean(
             (k === "upArrow" && key.upArrow) ||
