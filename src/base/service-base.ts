@@ -47,9 +47,7 @@ export abstract class ServiceBase extends EventEmitter {
         // Create and store the promise IMMEDIATELY (atomic-like operation)
         const promise = (async () => {
             try {
-                const result = await operation();
-                this.logger.info(`Returning result coming from the promise: ${result}`);
-                return result;
+                return await operation();
             } catch (error) {
                 this.logger.error(`runExclusive ${error}`);
                 throw error;
