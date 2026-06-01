@@ -75,8 +75,19 @@ class ShortcutRegistryClass {
         for (const entry of shortcuts) {
             const prev = this.knownStubs.get(entry.id);
             const literal = getShortcutLiteral([entry.defaultShortcut]);
-            if (!prev || prev.label !== entry.label || prev.contextId !== contextId || getShortcutLiteral([prev.defaultShortcut]) !== literal) {
-                this.knownStubs.set(entry.id, { id: entry.id, label: entry.label, defaultShortcut: entry.defaultShortcut, contextId, priority });
+            if (
+                !prev ||
+                prev.label !== entry.label ||
+                prev.contextId !== contextId ||
+                getShortcutLiteral([prev.defaultShortcut]) !== literal
+            ) {
+                this.knownStubs.set(entry.id, {
+                    id: entry.id,
+                    label: entry.label,
+                    defaultShortcut: entry.defaultShortcut,
+                    contextId,
+                    priority,
+                });
                 dirty = true;
             }
         }

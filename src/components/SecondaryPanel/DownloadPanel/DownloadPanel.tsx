@@ -33,7 +33,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     const [selectedSourceIndex, setSelectedSourceIndex] = useState(0);
 
     const isPanelActive =
-        focusState.activeWindow === "secondaryPanel" && focusState.secondaryPanel.subTab === "sources";
+        focusState.activeWindow === "secondaryPanel" && focusState.secondaryPanel.subTab === "downloadSources";
 
     const typedTask = selectedTask as Task<MusicDownloadTaskAttributes> | null;
 

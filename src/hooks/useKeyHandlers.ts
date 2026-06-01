@@ -71,7 +71,10 @@ export function useTaskListShortcuts(tasks: Task[], flow: FlowBase | undefined):
         for (const action of bar.rows.flatMap((r) => r.actions)) {
             for (let i = 0; i < action.shortcuts.length; i++) {
                 const shortcut = action.shortcuts[i];
-                const slug = action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+                const slug = action.label
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, "-")
+                    .replace(/^-|-$/g, "");
                 const suffix = action.shortcuts.length > 1 ? `.${i}` : "";
                 defs.push({
                     id: `taskList.contextual.${slug}${suffix}`,

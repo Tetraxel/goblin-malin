@@ -25,7 +25,7 @@ export const InputRouter: React.FC<{
 
     const isDetailFocused =
         focusState.activeWindow === "secondaryPanel" &&
-        focusState.secondaryPanel.subTab === "sources" &&
+        focusState.secondaryPanel.subTab !== "logs" &&
         focusState.secondaryPanel.sourcesPanel.innerFocus === "detail";
 
     // Global shortcuts — active on the main screen, not while editing a field.
@@ -70,8 +70,14 @@ export const InputRouter: React.FC<{
             {
                 id: "global.tab3",
                 defaultShortcut: { input: "3" },
-                label: "Sources tab",
-                handler: () => setSecondaryTab("sources"),
+                label: "Metadata Sources tab",
+                handler: () => setSecondaryTab("metadataSources"),
+            },
+            {
+                id: "global.tab4",
+                defaultShortcut: { input: "4" },
+                label: "Download Sources tab",
+                handler: () => setSecondaryTab("downloadSources"),
             },
             {
                 id: "global.tab5",

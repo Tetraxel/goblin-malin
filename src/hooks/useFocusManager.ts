@@ -68,7 +68,7 @@ export interface FocusState {
     prompt: Record<string, never>;
     secondaryPanel: {
         primaryMode: "metadata" | "download";
-        subTab: "sources" | "logs";
+        subTab: "metadataSources" | "downloadSources" | "logs";
         selectedRowIndex: number;
         scrollOffset: number;
         sourcesPanel: {
@@ -131,7 +131,7 @@ export const useFocusManager = ({
         prompt: {},
         secondaryPanel: {
             primaryMode: "metadata",
-            subTab: "sources",
+            subTab: "metadataSources",
             selectedRowIndex: 0,
             scrollOffset: 0,
             sourcesPanel: {
@@ -195,16 +195,26 @@ export const useFocusManager = ({
     }, []);
 
     const setPrimaryMode = useCallback((mode: "metadata" | "download") => {
-        setFocusState((prev) => ({
-            ...prev,
-            secondaryPanel: {
-                ...prev.secondaryPanel,
-                primaryMode: mode,
-            },
-        }));
+        setFocusState((prev) => {
+            const currentSubTab = prev.secondaryPanel.subTab;
+            const newSubTab =
+                currentSubTab === "logs"
+                    ? "logs"
+                    : mode === "metadata"
+                      ? "metadataSources"
+                      : "downloadSources";
+            return {
+                ...prev,
+                secondaryPanel: {
+                    ...prev.secondaryPanel,
+                    primaryMode: mode,
+                    subTab: newSubTab,
+                },
+            };
+        });
     }, []);
 
-    const setSecondaryTab = useCallback((tab: "sources" | "logs") => {
+    const setSecondaryTab = useCallback((tab: "metadataSources" | "downloadSources" | "logs") => {
         setFocusState((prev) => ({
             ...prev,
             secondaryPanel: {

@@ -16,31 +16,31 @@ interface SecondaryPanelProps {
 
 export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) => {
     const { focusState } = useFocusContext();
-    const { primaryMode, subTab } = focusState.secondaryPanel;
+    const { subTab } = focusState.secondaryPanel;
     const height = focusState.layout.secondaryPanelHeight;
     const contentHeight = Math.max(1, height - 1);
 
     const selectedTask = tasks[focusState.taskList.selectedTaskIndex] ?? null;
+
+    const activeTabKey = subTab === "metadataSources" ? "3" : subTab === "downloadSources" ? "4" : "5";
 
     return (
         <Box flexDirection="column" height={height} overflow="hidden">
             <TabBar
                 width={width}
                 tabs={[
-                    {
-                        key: "3",
-                        label: primaryMode === "metadata" ? "Metadata Sources" : "Download Sources",
-                    },
+                    { key: "3", label: "Metadata Sources" },
+                    { key: "4", label: "Download Sources" },
                     { key: "5", label: "Logs" },
                 ]}
-                activeTabKey={subTab === "sources" ? "3" : "5"}
+                activeTabKey={activeTabKey}
             />
 
-            {subTab === "sources" && primaryMode === "metadata" && (
+            {subTab === "metadataSources" && (
                 <MetadataPanel selectedTask={selectedTask} width={width} height={contentHeight} />
             )}
 
-            {subTab === "sources" && primaryMode === "download" && (
+            {subTab === "downloadSources" && (
                 <DownloadPanel selectedTask={selectedTask} width={width} height={contentHeight} />
             )}
 

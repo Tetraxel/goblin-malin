@@ -26,7 +26,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ selectedTask, widt
     const { cursor, showDiscoverySources, innerFocus, selectedFieldIndex } = sourcesPanel;
 
     const isPanelActive =
-        focusState.activeWindow === "secondaryPanel" && focusState.secondaryPanel.subTab === "sources";
+        focusState.activeWindow === "secondaryPanel" && focusState.secondaryPanel.subTab === "metadataSources";
 
     const typedTask = selectedTask as Task<MusicDownloadTaskAttributes> | null;
 

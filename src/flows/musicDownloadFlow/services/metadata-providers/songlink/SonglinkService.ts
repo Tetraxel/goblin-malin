@@ -64,7 +64,24 @@ export class SonglinkService extends DiscoveryMetadataService {
             this.status.update({ progress: 100 });
             this.status.clear();
 
-            return extractTracksFromSonglinkResponse(data);
+            const tracks = extractTracksFromSonglinkResponse(data);
+
+            // TEMP: inject a fake YouTube track for UI testing
+            const fakeYoutube: TrackMetadata = {
+                id: "dQw4w9WgXcQ",
+                trackName: sourceMetadata.trackName,
+                artists: sourceMetadata.artists,
+                url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                uri: "YOUTUBE::TRACK::dQw4w9WgXcQ" as TrackMetadata["uri"],
+                platform: "youtube",
+                apiProvider: "youtube",
+                fetchedBy: "songlink",
+                fetchedAt: new Date(),
+                type: "track",
+            } as unknown as TrackMetadata;
+            tracks.push(fakeYoutube);
+
+            return tracks;
         } catch (error) {
             this.logger.error(`Error discovering via Songlink for: ${url}`, { error });
             this.status.set({ type: StatusType.Error, message: "Error discovering via Songlink" });
