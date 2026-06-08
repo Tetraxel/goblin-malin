@@ -73,8 +73,8 @@ export const StatusCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task,
     const iconComponent = getStatusIcon(task.status.type);
 
     return (
-        <Box overflow="hidden">
-            <Box marginRight={2}>{iconComponent}</Box>
+        <Box flexGrow={1}>
+            {/* <Box marginRight={1} flexShrink={0}>{iconComponent}</Box> */}
             <Text color={statusColor} wrap="truncate-end" underline={isSelected}>
                 {statusText}
             </Text>

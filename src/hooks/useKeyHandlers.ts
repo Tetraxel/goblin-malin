@@ -170,6 +170,44 @@ export function useTaskListShortcuts(tasks: Task[], flow: FlowBase | undefined):
     });
 }
 
+// ── Task list header ──────────────────────────────────────────────────────────
+
+export function useTaskHeaderShortcuts(
+    isColumnResizable: boolean,
+    columnLabel: string,
+    onResize: (direction: "left" | "right") => void
+): void {
+    const { focusState } = useFocusContext();
+    const isActive = focusState.activeWindow === "taskList" && focusState.taskList.isHeaderFocused && isColumnResizable;
+
+    useShortcuts({
+        id: "taskListHeader",
+        isActive,
+        priority: 160,
+        shortcuts: [
+            {
+                id: "taskListHeader.narrowColumn",
+                defaultShortcut: { key: "leftArrow", shift: true },
+                label: "Narrow column",
+                handler: () => onResize("left"),
+            },
+            {
+                id: "taskListHeader.widenColumn",
+                defaultShortcut: { key: "rightArrow", shift: true },
+                label: "Widen column",
+                handler: () => onResize("right"),
+            },
+        ],
+        hintLines: [
+            {
+                id: "taskListHeader.resizeHints",
+                left: { type: "text", value: `Column ${columnLabel}`, bold: true },
+                shortcutIds: ["taskListHeader.narrowColumn", "taskListHeader.widenColumn"],
+            },
+        ],
+    });
+}
+
 // ── Prompt ────────────────────────────────────────────────────────────────────
 
 export function usePromptShortcuts(tasks: Task[]): void {

@@ -366,8 +366,8 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
     //!\ Always return all columns to maintain consistent hook count !
     public getColumns(): Column[] {
         const checkboxColumns: Column[] = [
-            { id: "toTag", label: "TAG?", weight: 1, flexGrow: 0, component: ToTagCell },
-            { id: "toDownload", label: "DL?", weight: 1, flexGrow: 0, component: ToDownloadCell },
+            { id: "toTag", label: "TAG?", weight: 0, flexGrow: 0, resizable: false, component: ToTagCell },
+            { id: "toDownload", label: "DL?", weight: 0, flexGrow: 0, resizable: false, component: ToDownloadCell },
         ];
         const trackColumns: Column[] = [
             {
@@ -381,7 +381,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             { id: "track", label: "TRACK", weight: 30, flexGrow: 0, component: TrackCell },
         ];
         const statusColumns: Column[] = [
-            { id: "status", label: "STATUS", weight: 28, minWidth: 20, flexGrow: 0, component: StatusCell },
+            { id: "status", label: "STATUS", weight: 28, flexGrow: 0, component: StatusCell },
         ];
 
         let columns: Column[] = [...checkboxColumns, ...trackColumns];
@@ -426,6 +426,16 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             columns = columns.concat(downloadServiceColumns);
         }
 
-        return [...columns, ...statusColumns];
+        const allColumns = [...columns, ...statusColumns];
+        const storedRatios = this.settings.get().ui.columnRatios;
+        return allColumns.map((col) =>
+            storedRatios[col.id] !== undefined ? { ...col, widthRatio: storedRatios[col.id] } : col
+        );
+    }
+
+    public override setColumnRatios(ratios: Record<string, number>): void {
+        const current = this.settings.get();
+        this.settings.save({ ...current, ui: { ...current.ui, columnRatios: ratios } });
+        this.notifyTaskSubscribers();
     }
 }

@@ -21,6 +21,9 @@ export type MusicDownloadFlowSettings = {
         outputTemporaryDir: string;
         providers: Record<string, StoredProviderSettings>;
     };
+    ui: {
+        columnRatios: Record<string, number>; // columnId → fraction of available width (0–1)
+    };
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,5 +58,8 @@ export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSetting
         outputDir: MEDIA_OUTPUT_DIR,
         outputTemporaryDir: path.join(MEDIA_OUTPUT_DIR, "tmp"),
         providers: {},
+    },
+    ui: {
+        columnRatios: {},
     },
 };

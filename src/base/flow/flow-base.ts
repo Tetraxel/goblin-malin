@@ -95,6 +95,7 @@ export class FlowBase<TaskAttributes = any> {
     public getColumns(): ColumnDefinition<TaskAttributes>[] {
         throw Error("Not implemented");
     }
+    public setColumnRatios(_ratios: Record<string, number>): void {}
 
     // Optional settings interface — flows that support settings implement these
     public getFlowSettings?(): Record<string, unknown>;

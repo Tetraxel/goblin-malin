@@ -52,6 +52,7 @@ export interface FocusState {
         selectedColumnIndex: number;
         selectedTaskIds: Set<string>;
         width: number;
+        isHeaderFocused: boolean;
     };
     logPanel: {
         selectedLogIndex: number;
@@ -119,6 +120,7 @@ export const useFocusManager = ({
             selectedColumnIndex: 0,
             selectedTaskIds: new Set<string>(),
             width: terminalWidth,
+            isHeaderFocused: false,
         },
         logPanel: {
             selectedLogIndex: 0,
@@ -178,7 +180,12 @@ export const useFocusManager = ({
             const windows: FocusableWindow[] = ["toolbar", "taskList", "secondaryPanel"];
             const currentIndex = windows.indexOf(prev.activeWindow);
             const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % windows.length;
-            return { ...prev, activeWindow: windows[nextIndex] };
+            const nextWindow = windows[nextIndex];
+            return {
+                ...prev,
+                activeWindow: nextWindow,
+                taskList: nextWindow === "taskList" ? { ...prev.taskList, isHeaderFocused: false } : prev.taskList,
+            };
         });
     }, []);
 
@@ -198,11 +205,7 @@ export const useFocusManager = ({
         setFocusState((prev) => {
             const currentSubTab = prev.secondaryPanel.subTab;
             const newSubTab =
-                currentSubTab === "logs"
-                    ? "logs"
-                    : mode === "metadata"
-                      ? "metadataSources"
-                      : "downloadSources";
+                currentSubTab === "logs" ? "logs" : mode === "metadata" ? "metadataSources" : "downloadSources";
             return {
                 ...prev,
                 secondaryPanel: {
@@ -228,11 +231,10 @@ export const useFocusManager = ({
         (direction: "left" | "right" | "down") => {
             setFocusState((prev) => {
                 if (direction === "down") {
-                    if (taskCount === 0) return prev;
                     return {
                         ...prev,
                         activeWindow: "taskList",
-                        taskList: { ...prev.taskList, selectedTaskIndex: 0, selectedColumnIndex: 0 },
+                        taskList: { ...prev.taskList, isHeaderFocused: true },
                     };
                 }
                 const newIndex =
@@ -245,32 +247,41 @@ export const useFocusManager = ({
                 };
             });
         },
-        [taskCount, toolbarButtonCount]
+        [toolbarButtonCount]
     );
 
     const moveTaskSelection = useCallback(
         (direction: "up" | "down" | "left" | "right") => {
             setFocusState((prev) => {
                 if (direction === "up" || direction === "down") {
-                    const newIndex =
-                        direction === "up" ? prev.taskList.selectedTaskIndex - 1 : prev.taskList.selectedTaskIndex + 1;
-
-                    if (newIndex < 0) {
+                    if (direction === "up") {
+                        if (prev.taskList.isHeaderFocused) {
+                            return {
+                                ...prev,
+                                activeWindow: "toolbar",
+                                taskList: { ...prev.taskList, isHeaderFocused: false },
+                                toolbar: { ...prev.toolbar, selectedButtonIndex: 0 },
+                            };
+                        }
+                        if (prev.taskList.selectedTaskIndex === 0) {
+                            return { ...prev, taskList: { ...prev.taskList, isHeaderFocused: true } };
+                        }
                         return {
                             ...prev,
-                            activeWindow: "toolbar",
-                            toolbar: { ...prev.toolbar, selectedButtonIndex: 0 },
+                            taskList: { ...prev.taskList, selectedTaskIndex: prev.taskList.selectedTaskIndex - 1 },
                         };
+                    } else {
+                        if (prev.taskList.isHeaderFocused) {
+                            if (taskCount === 0) return prev;
+                            return {
+                                ...prev,
+                                taskList: { ...prev.taskList, isHeaderFocused: false, selectedTaskIndex: 0 },
+                            };
+                        }
+                        const newIndex = prev.taskList.selectedTaskIndex + 1;
+                        if (newIndex >= taskCount) return prev;
+                        return { ...prev, taskList: { ...prev.taskList, selectedTaskIndex: newIndex } };
                     }
-
-                    if (newIndex >= taskCount) {
-                        return prev;
-                    }
-
-                    return {
-                        ...prev,
-                        taskList: { ...prev.taskList, selectedTaskIndex: newIndex },
-                    };
                 } else {
                     const newColumnIndex =
                         direction === "left"
