@@ -1,8 +1,8 @@
 ﻿import * as path from "path";
 import fs from "fs/promises";
 import { readFileSync } from "fs";
-import { PROJECT_ROOT } from "../../../constants";
 import { globalLogger } from "#base/logger/logger";
+import { SettingsStore } from "#settings/settingsStore";
 
 interface TrackInput {
     trackUrl: string;
@@ -124,7 +124,8 @@ export class InputLoader {
      * @returns {TrackInput[]} An array of parsed TrackInput objects.
      */
     public parseTrackInputFile(filename: string): TrackInput[] {
-        const filePath = path.join(PROJECT_ROOT, filename);
+        const appDataDir = SettingsStore.getInstance().getAppSettings().general.appDataDir;
+        const filePath = path.join(appDataDir, filename);
 
         globalLogger.info(`Reading file from: ${filePath}`);
 

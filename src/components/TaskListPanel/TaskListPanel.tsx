@@ -140,7 +140,7 @@ export const TaskListPanel: React.FC<{
             0
         );
         const ratioAvailableWidth = Math.max(0, resizableWidth - nonRatioResizableMin);
-// Normalize ratios before scaling so their sum is always exactly 1.0 — guards against
+        // Normalize ratios before scaling so their sum is always exactly 1.0 — guards against
         // manually-edited or migrated settings where ratios don't sum to 1.
         const totalRatio = ratioIndices.reduce((s, i) => s + columns[i].widthRatio!, 0);
         const normalize = totalRatio > 0 ? 1 / totalRatio : 1;
@@ -162,7 +162,7 @@ export const TaskListPanel: React.FC<{
             if (exact !== undefined) {
                 const naturalMin = naturalMins[i];
                 const minW = col.minWidth !== undefined ? Math.max(col.minWidth, naturalMin) : naturalMin;
-                                // Cap so that every other column can still reach its natural minimum
+                // Cap so that every other column can still reach its natural minimum
                 const maxWidth = Math.max(minW, availableWidth - (totalNaturalMin - naturalMin));
                 return { ...col, minWidth: Math.min(maxWidth, Math.max(minW, exact)), weight: 0 };
             }
@@ -282,8 +282,6 @@ export const TaskListPanel: React.FC<{
         });
         flow.setColumnRatios(allRatios);
     });
-
-    globalLogger.info(`calculatedColumns ${calculatedColumns.map((column, index) => column.width).join(", ")}`);
 
     return (
         <Box

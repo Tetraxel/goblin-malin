@@ -4,7 +4,7 @@ import { useShortcuts } from "#hooks/useShortcuts";
 import { FlowBase } from "#base/flow/flow-base";
 import { useTheme } from "#base/themeContext";
 import { useFocusContext } from "#contexts/FocusContext";
-import { SettingsStore, getSettingsFilePath } from "#settings/settingsStore";
+import { SettingsStore, SETTINGS_PATH } from "#settings/settingsStore";
 import { AppSettings } from "#settings/appSettings";
 import { buildGlobalSettingsItems } from "#settings/buildGlobalSettingsItems";
 import { filterSettingsItems, isInteractive, SettingsItem } from "#settings/buildSettingsItems";
@@ -432,7 +432,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                     </>
                 )}
                 <Box flexShrink={0}>
-                    <Text dimColor>{getSettingsFilePath()}</Text>
+                    <Text dimColor>{SETTINGS_PATH}</Text>
                 </Box>
             </Box>
         </Box>

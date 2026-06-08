@@ -43,11 +43,10 @@ export function buildGlobalSettingsItems(
             set: (v) => onChange({ general: { showWelcomeTutorial: v } }),
         },
         {
-            kind: "textInput",
+            kind: "readonlyText",
             indent: 0,
-            label: "🗁  App data directory",
-            get: () => settings.general.appDataDir,
-            set: (v) => onChange({ general: { appDataDir: v } }),
+            label: "🗁  App directory",
+            value: settings.general.appDataDir,
         },
         {
             kind: "action",

@@ -113,6 +113,16 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
                 </Box>
             );
 
+        case "readonlyText":
+            return (
+                <Box paddingLeft={item.indent} flexShrink={0}>
+                    <Text>{"  " + item.label}</Text>
+                    <Text italic>{" (read-only)"}</Text>
+                    <Text>{": "}</Text>
+                    <Text color={theme.text.secondary}>{item.value}</Text>
+                </Box>
+            );
+
         default:
             return null;
     }

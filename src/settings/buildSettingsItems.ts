@@ -12,7 +12,8 @@ export type SettingsItem =
           get: () => string;
           set: (v: string) => void;
       }
-    | { kind: "action"; label: string; indent: number; run: () => void };
+    | { kind: "action"; label: string; indent: number; run: () => void }
+    | { kind: "readonlyText"; label: string; indent: number; value: string };
 
 export function isInteractive(item: SettingsItem): boolean {
     return item.kind === "checkbox" || item.kind === "textInput" || item.kind === "select" || item.kind === "action";

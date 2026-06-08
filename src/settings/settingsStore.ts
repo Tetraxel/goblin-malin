@@ -1,15 +1,12 @@
 ﻿import * as fs from "fs";
 import * as path from "path";
 import { EventEmitter } from "events";
-import { PROJECT_ROOT } from "../constants";
+import { DEFAULT_APP_DATA_DIR } from "../constants";
 import { AppSettings, DEFAULT_APP_SETTINGS } from "./appSettings";
 import { DeepPartial } from "#utils/types";
 import { deepMerge } from "#utils/deepMerge";
 
-const CONFIG_DIR = path.join(PROJECT_ROOT, "config");
-const SETTINGS_PATH = path.join(CONFIG_DIR, "settings.json");
-
-export const getSettingsFilePath = () => SETTINGS_PATH;
+export const SETTINGS_PATH = path.join(DEFAULT_APP_DATA_DIR, "settings.json");
 
 /** Shape of the full JSON file on disk. */
 type StoredSettings = {
@@ -38,7 +35,7 @@ export class SettingsStore {
     }
 
     private writeToDisk(settings: StoredSettings): void {
-        fs.mkdirSync(CONFIG_DIR, { recursive: true });
+        fs.mkdirSync(path.dirname(SETTINGS_PATH), { recursive: true });
         const tmp = SETTINGS_PATH + ".tmp";
         fs.writeFileSync(tmp, JSON.stringify(settings, null, 2), "utf-8");
         fs.renameSync(tmp, SETTINGS_PATH);

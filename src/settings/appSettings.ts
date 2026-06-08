@@ -1,4 +1,4 @@
-import { PROJECT_ROOT } from "../constants";
+import { DEFAULT_APP_DATA_DIR } from "../constants";
 import { Shortcut } from "#types/actions";
 
 export type AppSettings = {
@@ -16,7 +16,7 @@ export type AppSettings = {
 export const DEFAULT_APP_SETTINGS: AppSettings = {
     general: {
         reopenLastSession: false,
-        appDataDir: PROJECT_ROOT,
+        appDataDir: DEFAULT_APP_DATA_DIR,
         animationsEnabled: false,
         theme: "dark",
         showWelcomeTutorial: true,

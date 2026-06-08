@@ -2,12 +2,10 @@
 .claude/settings.local.json
 
 ### Specific to this project
-cache/
+data/
 downloads/
-bin/
 samples/
 .tmp.*
-config/settings.json
 
 ### Node js ptoject .gitignore
 
