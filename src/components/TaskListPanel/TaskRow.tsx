@@ -35,13 +35,7 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
           : undefined;
 
     return (
-        <Box
-            key={task.id}
-            paddingX={1}
-            overflowY="hidden"
-            // backgroundColor={backgroundColor}
-            backgroundColor={"#666666"}
-        >
+        <Box key={task.id} paddingX={1} overflowY="hidden" backgroundColor={backgroundColor}>
             <Box width={2} flexShrink={0}>
                 <Text color={isActive ? "white" : isMultiSelected ? "cyan" : "white"}>{indicator}</Text>
             </Box>
@@ -59,6 +53,7 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
                         flexShrink={0}
                         paddingX={1}
                         backgroundColor={isCellActive ? theme.ui.rowActiveBackground : undefined}
+                        overflow="hidden"
                     >
                         <CellComponent
                             task={task}

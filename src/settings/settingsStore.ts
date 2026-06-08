@@ -9,6 +9,8 @@ import { deepMerge } from "#utils/deepMerge";
 const CONFIG_DIR = path.join(PROJECT_ROOT, "config");
 const SETTINGS_PATH = path.join(CONFIG_DIR, "settings.json");
 
+export const getSettingsFilePath = () => SETTINGS_PATH;
+
 /** Shape of the full JSON file on disk. */
 type StoredSettings = {
     general: AppSettings["general"];

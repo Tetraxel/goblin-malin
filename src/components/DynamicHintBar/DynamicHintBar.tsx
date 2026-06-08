@@ -9,7 +9,7 @@ import { useTheme } from "#base/themeContext";
 const HintChip: React.FC<{ entry: ShortcutEntry; dim?: boolean }> = ({ entry, dim }) => {
     const theme = useTheme();
     return (
-        <Box marginRight={2} flexShrink={0}>
+        <Box marginRight={1} flexShrink={0}>
             <Text color={theme.text.active} dimColor={dim} bold>
                 [{getShortcutLiteral([entry.shortcut])}]
             </Text>
@@ -47,9 +47,9 @@ const HintLine: React.FC<{ line: HintLineEntry; contextShortcuts: ShortcutEntry[
             </Box>
 
             {/* Separator */}
-            <Box marginRight={2} flexShrink={0}>
+            <Box marginRight={1} flexShrink={0}>
                 <Text color={theme.text.active} dimColor={dim}>
-                    {" >>>"}
+                    {"›"}
                 </Text>
             </Box>
 
@@ -80,6 +80,8 @@ export const DynamicHintBar: React.FC<DynamicHintBarProps> = ({ width, isActive 
     useEffect(() => {
         return shortcutRegistry.subscribe(forceUpdate);
     }, []);
+
+    if (!isActive) return null;
 
     const contexts: ActiveHintContext[] = shortcutRegistry.getActiveHintContexts();
 

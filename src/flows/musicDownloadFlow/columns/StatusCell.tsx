@@ -7,7 +7,7 @@ import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
 import { AnimatedIcon, Icon } from "#components/AnimatedIcon";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
-function getStatusIcon(status: StatusType): React.ReactNode {
+function getStatusIcon(status: StatusType): React.ReactNode | null {
     switch (status) {
         case StatusType.Pending:
             return <AnimatedIcon icon={Icon.Hourglass} />;
@@ -22,7 +22,7 @@ function getStatusIcon(status: StatusType): React.ReactNode {
         case StatusType.Success:
             return <Text>✅</Text>;
         case StatusType.NoStatus:
-            return <Text>▪</Text>;
+            return null;
         case StatusType.Default:
         case StatusType.Processing:
         default:
@@ -74,7 +74,11 @@ export const StatusCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task,
 
     return (
         <Box flexGrow={1}>
-            {/* <Box marginRight={1} flexShrink={0}>{iconComponent}</Box> */}
+            {iconComponent && (
+                <Box marginRight={1} flexShrink={0}>
+                    {iconComponent}
+                </Box>
+            )}
             <Text color={statusColor} wrap="truncate-end" underline={isSelected}>
                 {statusText}
             </Text>

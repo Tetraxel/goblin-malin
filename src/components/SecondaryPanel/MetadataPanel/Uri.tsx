@@ -54,7 +54,7 @@ export const Uri: React.FC<MetadataUriProps> = ({ uri, platform, fetchState, dim
             backgroundColor={darken(display.color, 0.2)}
         >
             {parts.map((part, i) => (
-                <React.Fragment key={i}>
+                <Box key={i} flexShrink={0}>
                     {i > 0 && (
                         <Text color={theme.text.secondary} dimColor={dimmed} wrap="truncate-end">
                             {"::"}
@@ -63,12 +63,12 @@ export const Uri: React.FC<MetadataUriProps> = ({ uri, platform, fetchState, dim
                     <Text color={display.color} dimColor={dimmed} wrap="truncate-end">
                         {part}
                     </Text>
-                </React.Fragment>
+                </Box>
             ))}
             {fetchedByDisplay && (
-                <>
+                <Box marginLeft={1} flexShrink={0}>
                     <Text color={theme.text.primary} dimColor={dimmed}>
-                        {" ("}
+                        {"("}
                     </Text>
                     <Text color={fetchedByDisplay.color} dimColor={dimmed}>
                         {fetchedByDisplay.label}
@@ -76,7 +76,7 @@ export const Uri: React.FC<MetadataUriProps> = ({ uri, platform, fetchState, dim
                     <Text color={theme.text.primary} dimColor={dimmed}>
                         {")"}
                     </Text>
-                </>
+                </Box>
             )}
         </Box>
     );
