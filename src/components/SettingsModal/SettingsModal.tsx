@@ -332,7 +332,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                     <Text bold color={theme.action.primary}>
                         SETTINGS
                     </Text>
-                    <Box flexDirection="row">
+                    <Box flexDirection="row" flexShrink={0}>
                         <Text
                             bold={activeTab === "settings"}
                             color={activeTab === "settings" ? theme.text.active : theme.text.muted}

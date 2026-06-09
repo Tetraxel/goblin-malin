@@ -3,7 +3,7 @@ import { ProviderDisplay } from "#base/providerDisplay";
 import { ProviderSettingsSchema } from "#base/providerSettings";
 import { StatusType } from "#base/task/task-status";
 import { Cached } from "#utils/cache";
-import { TrackMetadata } from "#flows/musicDownloadFlow/types";
+import type { TrackMetadata } from "#flows/musicDownloadFlow/types";
 import { DiscoveryMetadataService } from "#flows/musicDownloadFlow/discoveryMetadataService";
 import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { SonglinkClient } from "../../apis/songlink-client";

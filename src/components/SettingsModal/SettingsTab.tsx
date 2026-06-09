@@ -87,7 +87,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 />
             </Box>
 
-            <Box flexDirection="column" overflow="hidden" flexGrow={1}>
+            <Box flexDirection="column" overflow="hidden" flexGrow={1} flexShrink={0}>
                 {visibleItems.map(({ item, idx }) => {
                     const itemIsSelected = idx === selectedIndex && !searchFocused;
                     const itemIsEditing = editingIndex === idx;

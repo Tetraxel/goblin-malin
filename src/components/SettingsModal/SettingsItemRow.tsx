@@ -30,7 +30,7 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
     switch (item.kind) {
         case "sectionHeader":
             return (
-                <Box marginTop={1}>
+                <Box marginTop={1} flexShrink={0}>
                     <Text bold color={theme.text.heading}>
                         {item.label.toUpperCase()}
                     </Text>
@@ -39,7 +39,7 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
 
         case "subHeader":
             return (
-                <Box paddingTop={1} paddingLeft={2}>
+                <Box paddingTop={1} paddingLeft={2} flexShrink={0}>
                     <Text dimColor>{item.label}</Text>
                 </Box>
             );
@@ -50,7 +50,7 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
             const warningLen = item.missingCredentials ? WARNING.length : 0;
             const padLen = Math.max(0, innerWidth - item.label.length - PROVIDER_INDENT - 4 - warningLen);
             return (
-                <Box paddingLeft={4}>
+                <Box paddingLeft={4} flexShrink={0}>
                     <Text color={item.color} bold>
                         {item.label}
                     </Text>
@@ -62,7 +62,7 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
 
         case "checkbox":
             return (
-                <Box paddingLeft={item.indent}>
+                <Box paddingLeft={item.indent} flexShrink={0}>
                     <Text color={isSelected ? theme.ui.focusIndicator : undefined} bold={isSelected}>
                         {cursor}
                         {item.get() ? "☑" : "☐"}
@@ -74,7 +74,7 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
         case "textInput": {
             const prefix = cursor + item.label + ": ";
             return (
-                <Box paddingLeft={item.indent}>
+                <Box paddingLeft={item.indent} flexShrink={0}>
                     <Text color={isSelected ? theme.ui.focusIndicator : undefined} bold={isSelected}>
                         {prefix}
                     </Text>
@@ -94,7 +94,7 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
 
         case "select":
             return (
-                <Box paddingLeft={item.indent}>
+                <Box paddingLeft={item.indent} flexShrink={0}>
                     <Text color={isSelected ? theme.ui.focusIndicator : undefined} bold={isSelected}>
                         {cursor}
                         {item.label}:{" "}
@@ -105,7 +105,7 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
 
         case "action":
             return (
-                <Box paddingLeft={item.indent}>
+                <Box paddingLeft={item.indent} flexShrink={0}>
                     <Text color={isSelected ? theme.ui.focusIndicator : undefined} bold={isSelected}>
                         {cursor}
                         {item.label}
