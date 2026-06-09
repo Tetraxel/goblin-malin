@@ -49,13 +49,7 @@ export const Uri: React.FC<MetadataUriProps> = ({ uri, platform, fetchState, dim
     const uriText = lightTheme ? display.colorSubtle : display.color;
 
     return (
-        <Box
-            flexDirection="row"
-            flexShrink={0}
-            height={1}
-            paddingX={noPaddingX ? 0 : 1}
-            backgroundColor={uriBg}
-        >
+        <Box flexDirection="row" flexShrink={0} height={1} paddingX={noPaddingX ? 0 : 1} backgroundColor={uriBg}>
             {parts.map((part, i) => (
                 <Box key={i} flexShrink={0}>
                     {i > 0 && (

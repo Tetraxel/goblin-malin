@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Box, Text } from "ink";
 import { useShortcuts } from "#hooks/useShortcuts";
 import Gradient from "ink-gradient";
@@ -7,6 +7,7 @@ import { useFocusContext } from "#contexts/FocusContext";
 import { SettingsStore } from "#settings/settingsStore";
 import { useTheme } from "#base/themeContext";
 import { Hint } from "../Hint";
+import { WithBackground } from "../WithBackground";
 
 const STEPS = [
     "Paste a track link from Spotify or YouTube",
@@ -77,7 +78,6 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ terminalHeight, term
     if (!isActive) return null;
 
     const modalWidth = Math.min(120, terminalWidth - 8);
-
     const hasSmallScreen = terminalWidth < 120;
 
     return (
@@ -99,22 +99,26 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ terminalHeight, term
                 width={modalWidth}
                 backgroundColor={theme.ui.background}
             >
-                <Box flexDirection="row" flexShrink={0}>
+                <Box flexDirection="row" flexShrink={0} backgroundColor={theme.ui.background}>
                     <Text bold color={theme.ui.modalBorder}>
                         {"Welcome to "}
                     </Text>
 
                     {hasSmallScreen && (
-                        <Text bold color={theme.action.primary}>
-                            Goblin Malin 😉
-                        </Text>
+                        <WithBackground color={theme.ui.background}>
+                            <Gradient name="rainbow">
+                                <Text bold>Goblin Malin 😉</Text>
+                            </Gradient>
+                        </WithBackground>
                     )}
                 </Box>
                 {!hasSmallScreen && (
                     <Box overflow="hidden">
-                        <Gradient name="rainbow">
-                            <BigText text="Goblin Malin" />
-                        </Gradient>
+                        <WithBackground color={theme.ui.background}>
+                            <Gradient name="rainbow">
+                                <BigText text="Goblin Malin" />
+                            </Gradient>
+                        </WithBackground>
                     </Box>
                 )}
 
