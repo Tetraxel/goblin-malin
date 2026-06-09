@@ -89,7 +89,7 @@ export async function ensureMpv(): Promise<string> {
         globalLogger.info(`Downloading ${asset.name}...`);
         await downloadFile(asset.browser_download_url, archivePath);
 
-        globalLogger.info("Extracting mpv.exe...");
+        globalLogger.debug("Extracting mpv.exe...");
         await extract7z(archivePath, getBinDir(), "mpv.exe");
 
         await fs.rename(path.join(getBinDir(), "mpv.exe"), binaryPath);

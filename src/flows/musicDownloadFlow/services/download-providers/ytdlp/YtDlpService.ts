@@ -14,6 +14,7 @@ import { readFileInfo } from "#flows/musicDownloadFlow/utils/readFileInfo";
 import { ensureYtDlpSetup } from "./ytdlp-setup";
 import { YtDlpCell } from "./YtDlpCell";
 import { getTempDownloadDir } from "../../../saveSettings";
+import { generateTempFilename, findExistingTempFile } from "#flows/musicDownloadFlow/utils/tempFile";
 
 export class YtDlpService extends DownloadService {
     static readonly display: ProviderDisplay = {
@@ -70,18 +71,27 @@ export class YtDlpService extends DownloadService {
                 progress: 0,
             });
 
-            // Generate output filename from track metadata
-            const artistName = trackMetadata.artists?.[0]?.name || "Unknown Artist";
-            const outputName = `${artistName} - ${trackMetadata.trackName}`;
-            const uriSlug = trackMetadata.uri?.replace(/::/g, "-").replace(/:/g, "-") ?? "";
             const format = "flac";
-            const filename = uriSlug ? `${outputName} ${uriSlug}.${format}` : `${outputName}.${format}`;
-            const fullPath = path.join(getTempDownloadDir(), filename);
+            const artistName = trackMetadata.artists?.[0]?.name ?? "Unknown Artist";
+            const outputName = `${artistName} - ${trackMetadata.trackName}`;
+
+            const existingPath = findExistingTempFile(
+                YtDlpService.display.label,
+                trackMetadata,
+                format,
+                getTempDownloadDir()
+            );
+            const fullPath =
+                existingPath ??
+                path.join(
+                    getTempDownloadDir(),
+                    generateTempFilename(YtDlpService.display.label, trackMetadata, format)
+                );
 
             // Check if file already exists
             let localFile: LocalFile;
-            if (fs.existsSync(fullPath)) {
-                this.logger.info(`File already exists, skipping download: ${filename}`);
+            if (existingPath) {
+                this.logger.info(`File already exists, skipping download: ${path.basename(fullPath)}`);
                 localFile = {
                     state: "found",
                     path: fullPath,
@@ -99,7 +109,7 @@ export class YtDlpService extends DownloadService {
                 const cookiesPath = path.join(getBinDir(), "cookies.txt");
                 const downloadOptions: FormatOptions<keyof QualityOptions> = {
                     paths: getTempDownloadDir(),
-                    output: filename,
+                    output: path.basename(fullPath),
                     audioFormat: format,
                     extractAudio: true,
                     restrictFilenames: true,
@@ -123,7 +133,7 @@ export class YtDlpService extends DownloadService {
                 const client = await this.getClient();
                 await client.downloadAsync(trackUrl, downloadOptions);
 
-                this.logger.info(`Successfully downloaded: ${filename}`);
+                this.logger.info(`Successfully downloaded: ${path.basename(fullPath)}`);
                 localFile = {
                     state: "found",
                     path: fullPath,
@@ -139,7 +149,7 @@ export class YtDlpService extends DownloadService {
             try {
                 fileInfo = await readFileInfo(fullPath, trackMetadata.duration ?? 0);
             } catch (err) {
-                this.logger.warn(`Failed to read file info for ${filename}`, { error: err });
+                this.logger.warn(`Failed to read file info for ${path.basename(fullPath)}`, { error: err });
             }
 
             const downloadSource: TrackDownloadSource = {

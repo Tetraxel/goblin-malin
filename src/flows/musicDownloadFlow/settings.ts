@@ -40,7 +40,18 @@ export function extractProviderDefaults(registry: ServiceRegistry<any, any>): Re
     return result;
 }
 
-const MEDIA_OUTPUT_DIR = path.join(os.homedir(), "Music", "GoblinMalin");
+function getPlatformDefaultMusicOutputDir(): string {
+    switch (process.platform) {
+        case "win32":
+            return path.join(os.homedir(), "Music", "GoblinMalin");
+        case "darwin":
+            return path.join(os.homedir(), "Music", "GoblinMalin");
+        default:
+            return path.join(process.env.XDG_MUSIC_DIR ?? path.join(os.homedir(), "Music"), "GoblinMalin");
+    }
+}
+
+const MEDIA_OUTPUT_DIR = getPlatformDefaultMusicOutputDir();
 
 /** Flow-level defaults (without provider contributions — those come from registered services). */
 export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSettings = {

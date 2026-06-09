@@ -60,7 +60,7 @@ export async function ensureFfmpeg(): Promise<string> {
         await downloadFile(downloadUrl, zipPath);
 
         // Extract ffmpeg.exe from the ZIP
-        globalLogger.info("Extracting ffmpeg.exe…");
+        globalLogger.debug("Extracting ffmpeg.exe…");
         const zip = new AdmZip(zipPath);
         const zipEntries = zip.getEntries();
 
