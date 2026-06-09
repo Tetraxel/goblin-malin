@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
-import { darken } from "#utils/color";
+import { darken, lighten, isLight } from "#utils/color";
 
 interface MetadataUriProps {
     uri: string;
@@ -44,6 +44,9 @@ export const Uri: React.FC<MetadataUriProps> = ({ uri, platform, fetchState, dim
     }
 
     const fetchedByDisplay = fetchedBy ? providerDisplayRegistry.get(fetchedBy) : null;
+    const lightTheme = isLight(theme.ui.background);
+    const uriBg = lightTheme ? lighten(display.color, 0.8) : darken(display.color, 0.2);
+    const uriText = lightTheme ? display.colorSubtle : display.color;
 
     return (
         <Box
@@ -51,7 +54,7 @@ export const Uri: React.FC<MetadataUriProps> = ({ uri, platform, fetchState, dim
             flexShrink={0}
             height={1}
             paddingX={noPaddingX ? 0 : 1}
-            backgroundColor={darken(display.color, 0.2)}
+            backgroundColor={uriBg}
         >
             {parts.map((part, i) => (
                 <Box key={i} flexShrink={0}>
@@ -60,7 +63,7 @@ export const Uri: React.FC<MetadataUriProps> = ({ uri, platform, fetchState, dim
                             {"::"}
                         </Text>
                     )}
-                    <Text color={display.color} dimColor={dimmed} wrap="truncate-end">
+                    <Text color={uriText} dimColor={dimmed} wrap="truncate-end">
                         {part}
                     </Text>
                 </Box>
@@ -70,7 +73,7 @@ export const Uri: React.FC<MetadataUriProps> = ({ uri, platform, fetchState, dim
                     <Text color={theme.text.primary} dimColor={dimmed}>
                         {"("}
                     </Text>
-                    <Text color={fetchedByDisplay.color} dimColor={dimmed}>
+                    <Text color={lightTheme ? fetchedByDisplay.colorSubtle : fetchedByDisplay.color} dimColor={dimmed}>
                         {fetchedByDisplay.label}
                     </Text>
                     <Text color={theme.text.primary} dimColor={dimmed}>
