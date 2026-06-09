@@ -3,8 +3,6 @@ import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 export const PROJECT_ROOT = path.join(__dirname, "..");
@@ -24,3 +22,5 @@ function getPlatformDefaultDataDir(): string {
 }
 
 export const DEFAULT_APP_DATA_DIR = IS_DEV ? path.join(PROJECT_ROOT, "data") : getPlatformDefaultDataDir();
+
+dotenv.config({ path: path.join(DEFAULT_APP_DATA_DIR, ".env") });

@@ -1,8 +1,9 @@
 import * as fs from "fs/promises";
 import * as path from "path";
+import { DEFAULT_APP_DATA_DIR } from "../constants.js";
 
 export async function saveEnvVar(key: string, value: string): Promise<void> {
-    const envPath = path.resolve(process.cwd(), ".env");
+    const envPath = path.join(DEFAULT_APP_DATA_DIR, ".env");
     const envContent = await fs.readFile(envPath, "utf-8").catch(() => "");
 
     const lines = envContent.split("\n");
@@ -21,7 +22,7 @@ export async function saveEnvVar(key: string, value: string): Promise<void> {
 }
 
 export async function removeEnvVar(key: string): Promise<void> {
-    const envPath = path.resolve(process.cwd(), ".env");
+    const envPath = path.join(DEFAULT_APP_DATA_DIR, ".env");
     const content = await fs.readFile(envPath, "utf-8").catch(() => "");
     const keyPattern = new RegExp(`^${key}=`, "i");
     const lines = content.split("\n").filter((l) => !keyPattern.test(l.trim()));
@@ -33,7 +34,7 @@ export async function removeEnvVar(key: string): Promise<void> {
  * the section header comment when none of the group's vars remain.
  */
 export async function removeEnvVars(keys: string[], group?: { name: string; url?: string }): Promise<void> {
-    const envPath = path.resolve(process.cwd(), ".env");
+    const envPath = path.join(DEFAULT_APP_DATA_DIR, ".env");
     const content = await fs.readFile(envPath, "utf-8").catch(() => "");
     let lines = content.split("\n");
 
@@ -84,7 +85,7 @@ export async function saveEnvVarsGroup(
     vars: Record<string, string>,
     group: { name: string; url?: string }
 ): Promise<void> {
-    const envPath = path.resolve(process.cwd(), ".env");
+    const envPath = path.join(DEFAULT_APP_DATA_DIR, ".env");
     const content = await fs.readFile(envPath, "utf-8").catch(() => "");
     let lines = content.split("\n");
 
