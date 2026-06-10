@@ -37,7 +37,8 @@ export type FocusableWindow =
     | "settingsModal"
     | "importModal"
     | "setupWizardModal"
-    | "welcomeModal";
+    | "welcomeModal"
+    | "updateModal";
 
 export interface FocusState {
     activeWindow: FocusableWindow;
@@ -369,6 +370,15 @@ export const useFocusManager = ({
         setFocusState((prev) => ({ ...prev, isEditingField: editing }));
     }, []);
 
+    const openUpdateModal = useCallback(() => {
+        setFocusState((prev) => ({
+            ...prev,
+            previousWindow: prev.activeWindow,
+            activeWindow: "updateModal",
+            returningFromWindow: undefined,
+        }));
+    }, []);
+
     const openWizard = useCallback((config: SetupWizardConfig, onDisable?: () => void) => {
         setFocusState((prev) => ({
             ...prev,
@@ -407,5 +417,6 @@ export const useFocusManager = ({
         setDetailFieldIndex: setSourceDetailFieldIndex,
         setIsEditingField,
         openWizard,
+        openUpdateModal,
     };
 };

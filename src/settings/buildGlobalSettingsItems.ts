@@ -24,6 +24,20 @@ export function buildGlobalSettingsItems(
         {
             kind: "checkbox",
             indent: 0,
+            label: "Show welcome tutorial on start-up",
+            get: () => settings.general.showWelcomeTutorial,
+            set: (v) => onChange({ general: { showWelcomeTutorial: v } }),
+        },
+        {
+            kind: "checkbox",
+            indent: 0,
+            label: "Check for updates on start-up",
+            get: () => settings.general.checkForUpdates,
+            set: (v) => onChange({ general: { checkForUpdates: v } }),
+        },
+        {
+            kind: "checkbox",
+            indent: 0,
             label: "Re-open last session on start-up",
             get: () => settings.general.reopenLastSession,
             set: (v) => onChange({ general: { reopenLastSession: v } }),
@@ -34,13 +48,6 @@ export function buildGlobalSettingsItems(
             label: "Enable animations",
             get: () => settings.general.animationsEnabled,
             set: (v) => onChange({ general: { animationsEnabled: v } }),
-        },
-        {
-            kind: "checkbox",
-            indent: 0,
-            label: "Show welcome tutorial on start-up",
-            get: () => settings.general.showWelcomeTutorial,
-            set: (v) => onChange({ general: { showWelcomeTutorial: v } }),
         },
         {
             kind: "readonlyText",

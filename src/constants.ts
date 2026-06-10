@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
+import { createRequire } from "module";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,3 +25,14 @@ function getPlatformDefaultDataDir(): string {
 export const DEFAULT_APP_DATA_DIR = IS_DEV ? path.join(PROJECT_ROOT, "data") : getPlatformDefaultDataDir();
 
 dotenv.config({ path: path.join(DEFAULT_APP_DATA_DIR, ".env") });
+
+function resolveAppVersion(): string {
+    try {
+        return __APP_VERSION__;
+    } catch {
+        const _req = createRequire(import.meta.url);
+        return (_req("../package.json") as { version: string }).version;
+    }
+}
+
+export const APP_VERSION = resolveAppVersion();

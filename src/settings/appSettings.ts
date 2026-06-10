@@ -8,6 +8,7 @@ export type AppSettings = {
         animationsEnabled: boolean;
         theme: string;
         showWelcomeTutorial: boolean;
+        checkForUpdates: boolean;
     };
     /** User-remapped key bindings. Keys are shortcut action IDs, values override defaults. */
     keybindings: Record<string, Shortcut>;
@@ -20,6 +21,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
         animationsEnabled: false,
         theme: "dark",
         showWelcomeTutorial: true,
+        checkForUpdates: true,
     },
     keybindings: {},
 };

@@ -21,7 +21,8 @@ export const InputRouter: React.FC<{
         focusState.activeWindow !== "importModal" &&
         focusState.activeWindow !== "settingsModal" &&
         focusState.activeWindow !== "setupWizardModal" &&
-        focusState.activeWindow !== "welcomeModal";
+        focusState.activeWindow !== "welcomeModal" &&
+        focusState.activeWindow !== "updateModal";
 
     const isDetailFocused =
         focusState.activeWindow === "secondaryPanel" &&

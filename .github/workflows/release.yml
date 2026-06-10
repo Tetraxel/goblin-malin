@@ -1,0 +1,36 @@
+name: Release
+
+on:
+    push:
+        tags:
+            - "v*"
+
+jobs:
+    build-and-release:
+        runs-on: windows-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+
+            - name: Enable Corepack
+              run: corepack enable
+
+            - name: Install dependencies
+              run: yarn install --immutable
+
+            - name: Build
+              run: yarn build
+
+            - name: Package executable
+              run: npx @yao-pkg/pkg dist/cli.js --target node22-win-x64 --output goblin-malin-win-x64.exe
+
+            - name: Upload to GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  files: goblin-malin-win-x64.exe
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
