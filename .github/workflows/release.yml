@@ -39,7 +39,7 @@ jobs:
             - name: Upload to GitHub Release
               uses: softprops/action-gh-release@v2
               with:
-                  files: goblin-malin-win-x64.exe
+                  files: releases/windows/goblin-malin-win-x64.exe
                   tag_name: ${{ github.event.inputs.tag || github.ref_name }}
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
