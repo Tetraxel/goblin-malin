@@ -8,6 +8,8 @@ A keyboard-driven terminal UI for downloading and tagging music tracks with meta
 
 ## Installation
 
+[![Windows](https://img.shields.io/badge/-Windows_x64-blue.svg?style=flat&logo=windows&logoColor=%23ffffff&color=%230078d4)](https://github.com/Tetraxel/goblin-malin/releases/latest/download/goblin-malin-win-x64.exe)
+
 ### Running the project as a developer
 
 You can run the project as a developer:
@@ -30,7 +32,7 @@ GoblinMalin.start();
 ## Steps
 
 - Import with `Ctrl+V` URLs from compatible streaming platforms :
-  - `Spotify` (requires Spotify Premium Account)
+  - `Spotify` (requires Spotify Premium Account to have full metadata)
   - `YouTube`
 - System fetches primary metadata from the corresponding URL platform
 - System discovers the same track on other platforms (cross-referencing via ISRC or track/artist name)

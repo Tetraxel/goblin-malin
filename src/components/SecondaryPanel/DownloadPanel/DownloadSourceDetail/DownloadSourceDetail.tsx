@@ -337,7 +337,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
 
                     {fileNotFound ? (
                         <Box flexDirection="column" paddingX={1} paddingY={1}>
-                            <Text color={theme.status.warning}>⚠ File not found</Text>
+                            <Text color={theme.status.warning}> △ File not found</Text>
                             <Text color={theme.text.secondary} dimColor wrap="truncate-end">
                                 Last known: {source.localFile?.path ?? "—"}
                             </Text>

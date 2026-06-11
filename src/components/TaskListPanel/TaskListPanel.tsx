@@ -251,16 +251,16 @@ export const TaskListPanel: React.FC<{
             });
         }
 
-        // Log per-column pixel delta for this resize step
-        const deltaLog = calculatedColumns
-            .filter((_, i) => columns[i]?.resizable !== false)
-            .map((c) => {
-                const newW = c.id === col.id ? newSelectedWidth : (newAdjacentWidths[c.id] ?? c.width);
-                const delta = newW - c.width;
-                return `${c.id}:${delta > 0 ? "+" : ""}${delta}`;
-            })
-            .join(" | ");
-        globalLogger.info(`resize ${direction}: ${deltaLog}`);
+        // // Log per-column pixel delta for this resize step
+        // const deltaLog = calculatedColumns
+        //     .filter((_, i) => columns[i]?.resizable !== false)
+        //     .map((c) => {
+        //         const newW = c.id === col.id ? newSelectedWidth : (newAdjacentWidths[c.id] ?? c.width);
+        //         const delta = newW - c.width;
+        //         return `${c.id}:${delta > 0 ? "+" : ""}${delta}`;
+        //     })
+        //     .join(" | ");
+        // globalLogger.info(`resize ${direction}: ${deltaLog}`);
 
         // Ratios are stored relative to resizableWidth (not availableWidth) so they scale
         // correctly when the terminal is resized — fixed columns keep their natural min.

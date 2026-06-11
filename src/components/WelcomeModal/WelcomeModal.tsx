@@ -96,6 +96,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ terminalHeight, term
                 borderBackgroundColor={theme.ui.background}
                 paddingX={2}
                 paddingY={1}
+                flexShrink={0}
                 width={modalWidth}
                 backgroundColor={theme.ui.background}
             >
@@ -104,30 +105,28 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ terminalHeight, term
                         {"Welcome to "}
                     </Text>
 
-                    {hasSmallScreen && (
-                        <WithBackground color={theme.ui.background}>
-                            <Gradient name="rainbow">
-                                <Text bold>Goblin Malin 😉</Text>
-                            </Gradient>
-                        </WithBackground>
-                    )}
+                    <WithBackground color={theme.ui.background}>
+                        <Gradient name="rainbow">
+                            <Text bold>Goblin Malin 😉</Text>
+                        </Gradient>
+                    </WithBackground>
                 </Box>
-                {!hasSmallScreen && (
-                    <Box overflow="hidden">
+                {/* {!hasSmallScreen && (
+                    <Box overflow="hidden" flexShrink={0}>
                         <WithBackground color={theme.ui.background}>
                             <Gradient name="rainbow">
                                 <BigText text="Goblin Malin" />
                             </Gradient>
                         </WithBackground>
                     </Box>
-                )}
+                )} */}
 
-                <Box flexDirection="column">
+                <Box flexDirection="column" flexShrink={0}>
                     <Text>Paste a Spotify or YouTube link — Goblin Malin handles the rest.</Text>
                     <Text dimColor>{"Here's how it works:"}</Text>
                 </Box>
 
-                <Box flexDirection="column" marginTop={1}>
+                <Box flexDirection="column" marginTop={1} flexShrink={0}>
                     {STEPS.map((step, i) => (
                         <Box key={i} flexDirection="row">
                             <Text color={theme.text.muted}>{`  ${i + 1}. `}</Text>
@@ -136,13 +135,13 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ terminalHeight, term
                     ))}
                 </Box>
 
-                <Box flexDirection="column" marginTop={1}>
+                <Box flexDirection="column" marginTop={1} flexShrink={0}>
                     <Text bold color={theme.text.secondary}>
                         Useful shortcuts:
                     </Text>
                     {SHORTCUTS.map(([shortcut, desc]) => (
-                        <Box key={shortcut} flexDirection="row">
-                            <Box width={12} minWidth={12}>
+                        <Box key={shortcut} flexDirection="row" flexShrink={0}>
+                            <Box width={12} minWidth={12} flexShrink={0}>
                                 <Text bold color={theme.text.active}>
                                     {`  [${shortcut}]`}
                                 </Text>
@@ -152,14 +151,14 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ terminalHeight, term
                     ))}
                 </Box>
 
-                <Box marginTop={1} flexDirection="row" alignItems="center">
+                <Box marginTop={1} flexDirection="row" alignItems="center" flexShrink={0}>
                     <Text color={dontShowAgain ? theme.text.active : theme.text.muted}>
                         {dontShowAgain ? "[x]" : "[ ]"}
                     </Text>
                     <Text dimColor>{" Don't show this again"}</Text>
                 </Box>
 
-                <Box marginTop={1} flexDirection="row">
+                <Box marginTop={1} flexDirection="row" flexShrink={0}>
                     <Hint label="Toggle" shortcut="Enter" />
                     <Hint label="Close" shortcut="Esc" />
                 </Box>

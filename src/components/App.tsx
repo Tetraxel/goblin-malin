@@ -42,7 +42,6 @@ export const App: React.FC = () => {
         globalLogger.debug(`Active flow changed: ${currentFlow?.displayName}`);
         // Subscribe to currentFlow changes to update buttons and columns dynamically
         const unsubscribe = currentFlow.subscribe((_updatedFlow) => {
-            globalLogger.debug(`flow state changed, updating UI...`);
             setToolbarButtons(currentFlow.getToolbarButtons() ?? []);
             setColumns(currentFlow.getColumns() ?? []);
         });
