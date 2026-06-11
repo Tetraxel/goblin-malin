@@ -6,6 +6,10 @@ data/
 downloads/
 samples/
 .tmp.*
+releases/
+sea-bundle.cjs
+sea-prep.blob
+sea-config.json
 
 ### Node js ptoject .gitignore
 

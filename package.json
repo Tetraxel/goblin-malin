@@ -47,6 +47,8 @@
         "lint": "eslint src/",
         "format": "prettier --write src/",
         "format:check": "prettier --check src/",
+        "postinstall": "node scripts/patch-pkg-compat.mjs",
+        "package:win": "node scripts/build-sea.mjs",
         "prepack": "node scripts/patch-readme.mjs",
         "postpack": "git checkout -- README.md",
         "prepublishOnly": "tsup"
@@ -68,6 +70,11 @@
     ],
     "author": "Tetraxel",
     "license": "SEE LICENSE IN LICENSE",
+    "pkg": {
+        "assets": [
+            "node_modules/yoga-layout/dist/binaries/yoga-wasm-base64-esm.js"
+        ]
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/Tetraxel/goblin-malin.git"
@@ -83,9 +90,11 @@
         "@types/ink-text-input": "^2.0.5",
         "@types/node": "^25.6.2",
         "@types/react": "^19.2.14",
+        "@yao-pkg/pkg": "^6.20.0",
         "eslint": "^9.39.4",
         "eslint-plugin-react": "^7.37.5",
         "eslint-plugin-react-hooks": "^7.1.1",
+        "postject": "^1.0.0-alpha.6",
         "prettier": "^3.8.3",
         "ts-node": "^10.9.2",
         "tsup": "^8.0.0",

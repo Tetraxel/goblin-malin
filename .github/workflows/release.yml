@@ -7,6 +7,8 @@ on:
 
 jobs:
     build-and-release:
+        permissions:
+            contents: write
         runs-on: windows-latest
 
         steps:
@@ -26,11 +28,11 @@ jobs:
               run: yarn build
 
             - name: Package executable
-              run: npx @yao-pkg/pkg dist/cli.js --target node22-win-x64 --output goblin-malin-win-x64.exe
+              run: yarn package:win
 
             - name: Upload to GitHub Release
               uses: softprops/action-gh-release@v2
               with:
-                  files: goblin-malin-win-x64.exe
+                  files: releases/windows/goblin-malin-win-x64.exe
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

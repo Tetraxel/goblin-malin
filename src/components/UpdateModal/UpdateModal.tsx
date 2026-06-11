@@ -20,9 +20,28 @@ interface UpdateModalProps {
 
 type DownloadState =
     | { status: "idle" }
-    | { status: "downloading"; progress: number }
+    | { status: "downloading"; progress: number; filename: string }
+    | { status: "extracting"; filename: string }
+    | { status: "installing"; filename: string }
     | { status: "done"; destPath: string }
     | { status: "error"; message: string };
+
+const STEPS = ["Downloading", "Extracting", "Installing"] as const;
+
+function stepIndex(state: DownloadState): number {
+    if (state.status === "downloading") return 0;
+    if (state.status === "extracting") return 1;
+    if (state.status === "installing") return 2;
+    return -1;
+}
+
+function filenameFromUrl(url: string): string {
+    try {
+        return decodeURIComponent(new URL(url).pathname.split("/").pop() ?? url);
+    } catch {
+        return url.split("/").pop() ?? url;
+    }
+}
 
 const OPTIONS = ["Update now", "Open release page"] as const;
 
@@ -61,7 +80,12 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
             switchBack();
             return;
         }
-        if (downloadState.status === "downloading") return;
+        if (
+            downloadState.status === "downloading" ||
+            downloadState.status === "extracting" ||
+            downloadState.status === "installing"
+        )
+            return;
 
         if (selectedIndex === 1) {
             void open(releaseUrl);
@@ -75,9 +99,10 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
             return;
         }
 
-        setDownloadState({ status: "downloading", progress: 0 });
+        const filename = filenameFromUrl(downloadUrl);
+        setDownloadState({ status: "downloading", progress: 0, filename });
 
-        const destPath = path.join(os.homedir(), "Downloads", "goblin-malin-win-x64.exe");
+        const destPath = path.join(os.homedir(), "Downloads", filename);
         const url = downloadUrl;
 
         void (async () => {
@@ -106,7 +131,11 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                     await writeChunk(value);
                     received += value.byteLength;
                     if (mountedRef.current && total > 0) {
-                        setDownloadState({ status: "downloading", progress: Math.round((received / total) * 100) });
+                        setDownloadState({
+                            status: "downloading",
+                            progress: Math.round((received / total) * 100),
+                            filename,
+                        });
                     }
                 }
 
@@ -163,6 +192,11 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
 
     const modalWidth = Math.min(62, terminalWidth - 8);
     const barWidth = modalWidth - 6;
+    const activeStepIdx = stepIndex(downloadState);
+    const isInProgress =
+        downloadState.status === "downloading" ||
+        downloadState.status === "extracting" ||
+        downloadState.status === "installing";
 
     return (
         <Box
@@ -212,10 +246,46 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                     </Box>
                 )}
 
-                {downloadState.status === "downloading" && (
+                {isInProgress && (
                     <Box flexDirection="column" marginTop={1}>
-                        <Text>Downloading... {downloadState.progress}%</Text>
-                        <Text color={theme.status.success}>{renderBar(downloadState.progress, barWidth)}</Text>
+                        <Box flexDirection="row" flexShrink={0}>
+                            {STEPS.map((step, i) => {
+                                const isDone = i < activeStepIdx;
+                                const isCurrent = i === activeStepIdx;
+                                const icon = isDone ? "✓" : isCurrent ? "●" : "○";
+                                const color = isDone
+                                    ? theme.status.success
+                                    : isCurrent
+                                      ? theme.ui.focusIndicator
+                                      : theme.text.muted;
+                                return (
+                                    <Box key={step} flexDirection="row" flexShrink={0}>
+                                        <Text color={color}>
+                                            {icon} {step}
+                                        </Text>
+                                        {i < STEPS.length - 1 && <Text dimColor>  ─  </Text>}
+                                    </Box>
+                                );
+                            })}
+                        </Box>
+                        {"filename" in downloadState && (
+                            <Text color={theme.text.muted} wrap="truncate">
+                                {downloadState.filename}
+                            </Text>
+                        )}
+                        {downloadState.status === "downloading" && (
+                            <>
+                                <Box flexDirection="row" marginTop={1} flexShrink={0}>
+                                    <Text color={theme.ui.focusIndicator}>{renderBar(downloadState.progress, barWidth)}</Text>
+                                </Box>
+                                <Text dimColor>{downloadState.progress}%</Text>
+                            </>
+                        )}
+                        {downloadState.status !== "downloading" && (
+                            <Box flexDirection="row" marginTop={1} flexShrink={0}>
+                                <Text color={theme.status.success}>{renderBar(100, barWidth)}</Text>
+                            </Box>
+                        )}
                     </Box>
                 )}
 
@@ -243,7 +313,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                             <Hint label="Dismiss" shortcut="Esc" />
                         </>
                     )}
-                    {downloadState.status === "downloading" && <Text dimColor>Please wait...</Text>}
+                    {isInProgress && <Text dimColor>Please wait...</Text>}
                     {(downloadState.status === "done" || downloadState.status === "error") && (
                         <Hint label="Close" shortcut="Esc" />
                     )}
