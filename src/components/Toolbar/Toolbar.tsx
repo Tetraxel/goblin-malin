@@ -11,6 +11,7 @@ import { Separator } from "../Separator";
 import { TabBar } from "../TabBar";
 import { UpdateInfo } from "../../updater/updateChecker";
 import { UpdateBadge } from "./UpdateBadge";
+import { APP_VERSION } from "../../constants";
 
 export type ToolbarButtonHook<TFlow = FlowBase> = ({
     isSelected,
@@ -112,12 +113,14 @@ export const Toolbar = ({
                     height={height}
                 >
                     {/* <FlowSelector flows={flows} currentFlow={flow} onFlowChange={onFlowChange} /> */}
-                    {updateInfo && (
+                    {updateInfo ? (
                         <UpdateBadge
                             version={updateInfo.latestVersion}
                             isSelected={isActive && focusState.toolbar.selectedButtonIndex === buttons.length}
                             index={buttons.length}
                         />
+                    ) : (
+                        <Text dimColor>v{APP_VERSION}</Text>
                     )}
                 </Box>
             </Box>
