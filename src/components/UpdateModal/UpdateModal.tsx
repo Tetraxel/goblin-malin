@@ -1,59 +1,29 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Box, Text } from "ink";
-import { createWriteStream } from "fs";
-import os from "os";
-import path from "path";
+import { spawn, exec } from "child_process";
 import open from "open";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusContext } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { Hint } from "../Hint";
 import { APP_VERSION } from "../../constants";
+import { IS_SEA, getInstaller, getUpdateCommand } from "../../updater/installSource";
 
 interface UpdateModalProps {
     latestVersion: string;
     releaseUrl: string;
-    downloadUrl: string | null;
     terminalHeight: number;
     terminalWidth: number;
 }
 
-type DownloadState =
-    | { status: "idle" }
-    | { status: "downloading"; progress: number; filename: string }
-    | { status: "extracting"; filename: string }
-    | { status: "installing"; filename: string }
-    | { status: "done"; destPath: string }
-    | { status: "error"; message: string };
+type PkgUpdateState = "idle" | "running" | "done" | "error";
 
-const STEPS = ["Downloading", "Extracting", "Installing"] as const;
-
-function stepIndex(state: DownloadState): number {
-    if (state.status === "downloading") return 0;
-    if (state.status === "extracting") return 1;
-    if (state.status === "installing") return 2;
-    return -1;
-}
-
-function filenameFromUrl(url: string): string {
-    try {
-        return decodeURIComponent(new URL(url).pathname.split("/").pop() ?? url);
-    } catch {
-        return url.split("/").pop() ?? url;
-    }
-}
-
-const OPTIONS = ["Update now", "Open release page"] as const;
-
-function renderBar(percent: number, width: number): string {
-    const filled = Math.round((percent / 100) * width);
-    return "█".repeat(filled) + "░".repeat(width - filled);
-}
+const installer = getInstaller();
+const updateCommand = getUpdateCommand();
 
 export const UpdateModal: React.FC<UpdateModalProps> = ({
     latestVersion,
     releaseUrl,
-    downloadUrl,
     terminalHeight,
     terminalWidth,
 }) => {
@@ -68,24 +38,39 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
         };
     }, []);
 
+    // npm: 0 = run update command, 1 = open release page
+    // SEA: single option (open release page), selectedIndex unused
     const [selectedIndex, setSelectedIndex] = useState(0);
-    const [downloadState, setDownloadState] = useState<DownloadState>({ status: "idle" });
+    const [pkgStatus, setPkgStatus] = useState<PkgUpdateState>("idle");
+    const [pkgOutput, setPkgOutput] = useState<string[]>([]);
 
     const handleClose = useCallback(() => {
         switchBack();
     }, [switchBack]);
 
     const handleConfirm = useCallback(() => {
-        if (downloadState.status === "done" || downloadState.status === "error") {
+        if (IS_SEA) {
+            // open package is pre-bundled as a shim in SEA builds and may fail silently;
+            // use the platform's native command directly instead.
+            const cmd =
+                process.platform === "win32"
+                    ? `start "" "${releaseUrl}"`
+                    : process.platform === "darwin"
+                      ? `open "${releaseUrl}"`
+                      : `xdg-open "${releaseUrl}"`;
+            exec(cmd);
             switchBack();
             return;
         }
-        if (
-            downloadState.status === "downloading" ||
-            downloadState.status === "extracting" ||
-            downloadState.status === "installing"
-        )
+
+        if (pkgStatus === "done") {
+            process.exit(0);
+        }
+        if (pkgStatus === "error") {
+            switchBack();
             return;
+        }
+        if (pkgStatus === "running") return;
 
         if (selectedIndex === 1) {
             void open(releaseUrl);
@@ -93,63 +78,29 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
             return;
         }
 
-        // "Update now"
-        if (!downloadUrl) {
-            setDownloadState({ status: "error", message: "No executable asset found in this release." });
-            return;
-        }
+        // Run the package manager update command
+        setPkgStatus("running");
+        const [bin, ...args] = updateCommand.split(" ");
+        const proc = spawn(bin, args, { stdio: "pipe", shell: true });
 
-        const filename = filenameFromUrl(downloadUrl);
-        setDownloadState({ status: "downloading", progress: 0, filename });
+        const addLines = (chunk: Buffer) => {
+            const lines = chunk.toString().split("\n").filter(Boolean);
+            setPkgOutput((prev) => [...prev, ...lines].slice(-12));
+        };
+        proc.stdout?.on("data", addLines);
+        proc.stderr?.on("data", addLines);
 
-        const destPath = path.join(os.homedir(), "Downloads", filename);
-        const url = downloadUrl;
+        proc.on("exit", (code) => {
+            if (!mountedRef.current) return;
+            setPkgStatus(code === 0 ? "done" : "error");
+        });
 
-        void (async () => {
-            try {
-                const res = await fetch(url, {
-                    headers: { "User-Agent": "goblin-malin-updater" },
-                    signal: AbortSignal.timeout(300_000),
-                });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                if (!res.body) throw new Error("No response body");
-
-                const total = parseInt(res.headers.get("content-length") ?? "0", 10);
-                let received = 0;
-
-                const writer = createWriteStream(destPath);
-                const reader = res.body.getReader();
-
-                const writeChunk = (chunk: Uint8Array) =>
-                    new Promise<void>((resolve, reject) =>
-                        writer.write(chunk, (err) => (err ? reject(err) : resolve()))
-                    );
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    await writeChunk(value);
-                    received += value.byteLength;
-                    if (mountedRef.current && total > 0) {
-                        setDownloadState({
-                            status: "downloading",
-                            progress: Math.round((received / total) * 100),
-                            filename,
-                        });
-                    }
-                }
-
-                await new Promise<void>((resolve, reject) =>
-                    writer.end((err?: Error | null) => (err ? reject(err) : resolve()))
-                );
-
-                if (mountedRef.current) setDownloadState({ status: "done", destPath });
-            } catch (e) {
-                if (mountedRef.current)
-                    setDownloadState({ status: "error", message: e instanceof Error ? e.message : String(e) });
-            }
-        })();
-    }, [downloadState.status, selectedIndex, releaseUrl, downloadUrl, switchBack]);
+        proc.on("error", (err) => {
+            if (!mountedRef.current) return;
+            setPkgOutput((prev) => [...prev, err.message]);
+            setPkgStatus("error");
+        });
+    }, [pkgStatus, selectedIndex, releaseUrl, switchBack]);
 
     useShortcuts({
         id: "updateModal",
@@ -174,7 +125,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                 defaultShortcut: { key: "upArrow" },
                 label: "",
                 handler: () => {
-                    if (downloadState.status === "idle") setSelectedIndex(0);
+                    if (!IS_SEA && pkgStatus === "idle") setSelectedIndex(0);
                 },
             },
             {
@@ -182,7 +133,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                 defaultShortcut: { key: "downArrow" },
                 label: "",
                 handler: () => {
-                    if (downloadState.status === "idle") setSelectedIndex(1);
+                    if (!IS_SEA && pkgStatus === "idle") setSelectedIndex(1);
                 },
             },
         ],
@@ -191,12 +142,9 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     if (!isActive) return null;
 
     const modalWidth = Math.min(62, terminalWidth - 8);
-    const barWidth = modalWidth - 6;
-    const activeStepIdx = stepIndex(downloadState);
-    const isInProgress =
-        downloadState.status === "downloading" ||
-        downloadState.status === "extracting" ||
-        downloadState.status === "installing";
+    // SEA has no progress states — always "idle" from the modal's perspective
+    const isIdle = IS_SEA || pkgStatus === "idle";
+    const isInProgress = !IS_SEA && pkgStatus === "running";
 
     return (
         <Box
@@ -233,89 +181,83 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                     </Box>
                 </Box>
 
-                {downloadState.status === "idle" && (
+                {isIdle && (
                     <Box flexDirection="column" marginTop={1}>
-                        {OPTIONS.map((label, i) => (
-                            <Box key={label} flexDirection="row">
-                                <Text color={selectedIndex === i ? theme.ui.focusIndicator : theme.text.primary}>
-                                    {selectedIndex === i ? "☛ " : "  "}
-                                    {label}
-                                </Text>
+                        {IS_SEA ? (
+                            <Box flexDirection="row" flexShrink={0}>
+                                <Text color={theme.ui.focusIndicator}>☛ Open release page</Text>
                             </Box>
+                        ) : (
+                            <>
+                                <Box flexDirection="row" flexShrink={0}>
+                                    <Text color={selectedIndex === 0 ? theme.ui.focusIndicator : theme.text.primary}>
+                                        {selectedIndex === 0 ? "☛ " : "  "}
+                                        {"Update with "}
+                                    </Text>
+                                    <Text
+                                        color={selectedIndex === 0 ? theme.ui.focusIndicator : theme.action.primary}
+                                        bold
+                                    >
+                                        {updateCommand}
+                                    </Text>
+                                </Box>
+                                <Box flexDirection="row" flexShrink={0}>
+                                    <Text color={selectedIndex === 1 ? theme.ui.focusIndicator : theme.text.primary}>
+                                        {selectedIndex === 1 ? "☛ " : "  "}
+                                        Open release page
+                                    </Text>
+                                </Box>
+                            </>
+                        )}
+                    </Box>
+                )}
+
+                {/* npm: running */}
+                {!IS_SEA && pkgStatus === "running" && (
+                    <Box flexDirection="column" marginTop={1}>
+                        <Text color={theme.ui.focusIndicator}>Updating via {installer}...</Text>
+                        {pkgOutput.map((line, i) => (
+                            <Text key={i} dimColor wrap="truncate">
+                                {line}
+                            </Text>
                         ))}
                     </Box>
                 )}
 
-                {isInProgress && (
+                {/* npm: done */}
+                {!IS_SEA && pkgStatus === "done" && (
                     <Box flexDirection="column" marginTop={1}>
-                        <Box flexDirection="row" flexShrink={0}>
-                            {STEPS.map((step, i) => {
-                                const isDone = i < activeStepIdx;
-                                const isCurrent = i === activeStepIdx;
-                                const icon = isDone ? "✓" : isCurrent ? "●" : "○";
-                                const color = isDone
-                                    ? theme.status.success
-                                    : isCurrent
-                                      ? theme.ui.focusIndicator
-                                      : theme.text.muted;
-                                return (
-                                    <Box key={step} flexDirection="row" flexShrink={0}>
-                                        <Text color={color}>
-                                            {icon} {step}
-                                        </Text>
-                                        {i < STEPS.length - 1 && <Text dimColor>  ─  </Text>}
-                                    </Box>
-                                );
-                            })}
-                        </Box>
-                        {"filename" in downloadState && (
-                            <Text color={theme.text.muted} wrap="truncate">
-                                {downloadState.filename}
+                        <Text color={theme.status.success}>Updated successfully.</Text>
+                        <Text dimColor>Restart to use v{latestVersion}.</Text>
+                    </Box>
+                )}
+
+                {/* npm: error */}
+                {!IS_SEA && pkgStatus === "error" && (
+                    <Box flexDirection="column" marginTop={1}>
+                        <Text color={theme.status.error}>Update failed.</Text>
+                        {pkgOutput.slice(-3).map((line, i) => (
+                            <Text key={i} color={theme.text.muted} wrap="truncate">
+                                {line}
                             </Text>
-                        )}
-                        {downloadState.status === "downloading" && (
-                            <>
-                                <Box flexDirection="row" marginTop={1} flexShrink={0}>
-                                    <Text color={theme.ui.focusIndicator}>{renderBar(downloadState.progress, barWidth)}</Text>
-                                </Box>
-                                <Text dimColor>{downloadState.progress}%</Text>
-                            </>
-                        )}
-                        {downloadState.status !== "downloading" && (
-                            <Box flexDirection="row" marginTop={1} flexShrink={0}>
-                                <Text color={theme.status.success}>{renderBar(100, barWidth)}</Text>
-                            </Box>
-                        )}
-                    </Box>
-                )}
-
-                {downloadState.status === "done" && (
-                    <Box flexDirection="column" marginTop={1}>
-                        <Text color={theme.status.success}>Downloaded successfully.</Text>
-                        <Text color={theme.text.muted} wrap="truncate">
-                            {downloadState.destPath}
-                        </Text>
-                        <Text dimColor>Replace your current .exe to update, then restart.</Text>
-                    </Box>
-                )}
-
-                {downloadState.status === "error" && (
-                    <Box flexDirection="column" marginTop={1}>
-                        <Text color={theme.status.error}>Download failed: {downloadState.message}</Text>
+                        ))}
                     </Box>
                 )}
 
                 <Box marginTop={1} flexDirection="row">
-                    {downloadState.status === "idle" && (
+                    {isIdle && (
                         <>
-                            <Hint label="Select" shortcut="↑↓" />
+                            {!IS_SEA && <Hint label="Select" shortcut="↑↓" />}
                             <Hint label="Confirm" shortcut="Enter" />
                             <Hint label="Dismiss" shortcut="Esc" />
                         </>
                     )}
                     {isInProgress && <Text dimColor>Please wait...</Text>}
-                    {(downloadState.status === "done" || downloadState.status === "error") && (
-                        <Hint label="Close" shortcut="Esc" />
+                    {!isIdle && !isInProgress && (
+                        <>
+                            {pkgStatus === "done" && <Hint label="Restart" shortcut="Enter" />}
+                            <Hint label="Close" shortcut="Esc" />
+                        </>
                     )}
                 </Box>
             </Box>

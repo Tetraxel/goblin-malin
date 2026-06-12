@@ -1,5 +1,18 @@
 # goblin-malin 😉
 
+- [goblin-malin 😉](#goblin-malin-)
+    - [Installation](#installation)
+        - [Installation with `npm` (RECOMMENDED)](#installation-with-npm-recommended)
+        - [Installation with `yarn`](#installation-with-yarn)
+        - [Installation with `pnpm`](#installation-with-pnpm)
+        - [Installation on Windows](#installation-on-windows)
+    - [Steps](#steps)
+    - [Running the project as a developer](#running-the-project-as-a-developer)
+    - [Launching the app through js code](#launching-the-app-through-js-code)
+    - [Screenshots](#screenshots)
+        - [Metadata view](#metadata-view)
+        - [Download view](#download-view)
+
 > [!CAUTION]
 > **This project is in early, early, early development.**<br>
 > Be aware that the data model can change drastically, making previous versions incompatible with the current one. Use at your own risk 😉
@@ -8,9 +21,49 @@ A keyboard-driven terminal UI for downloading and tagging music tracks with meta
 
 ## Installation
 
+### Installation with `npm` (RECOMMENDED)
+
+1. Install [Node.js](https://nodejs.org/en/download) with `npm`
+2. Install with `npm`
+    ```bash
+    npm install -g goblin-malin
+    goblin-malin # Run application
+    ```
+
+### Installation with `yarn`
+
+```bash
+yarn global add goblin-malin
+```
+
+### Installation with `pnpm`
+
+```bash
+pnpm add -g  goblin-malin
+```
+
+### Installation on Windows
+
 [![Windows](https://img.shields.io/badge/-Windows_x64-blue.svg?style=flat&logo=windows&logoColor=%23ffffff&color=%230078d4)](https://github.com/Tetraxel/goblin-malin/releases/latest/download/goblin-malin-win-x64.exe)
 
-### Running the project as a developer
+```bash
+goblin-malin.exe
+```
+
+## Steps
+
+- Import with `Ctrl+V` URLs from compatible streaming platforms :
+    - `Spotify` (requires Spotify Premium Account to have full metadata)
+    - `YouTube`
+- System fetches primary metadata from the corresponding URL platform
+- System discovers the same track on other platforms (cross-referencing via ISRC or track/artist name)
+- Filters/orders metadata sources by relevance or leaves the default ranking chosen by the system (use `TAB` key to switch the focused window).
+- System downloads matching tracks from available download providers:
+    - `yt-dlp`
+- User selects the best download source and previews the audio
+- User saves the file to the desired folder with embedded tags
+
+## Running the project as a developer
 
 You can run the project as a developer:
 
@@ -19,7 +72,7 @@ You can run the project as a developer:
 3. Install dependencies in the project directory: `yarn install`
 4. Run the application: `yarn run dev`
 
-### Launching the app in js code
+## Launching the app through js code
 
 > Not customizable yet
 
@@ -28,19 +81,6 @@ import GoblinMalin from "goblin-malin";
 
 GoblinMalin.start();
 ```
-
-## Steps
-
-- Import with `Ctrl+V` URLs from compatible streaming platforms :
-  - `Spotify` (requires Spotify Premium Account to have full metadata)
-  - `YouTube`
-- System fetches primary metadata from the corresponding URL platform
-- System discovers the same track on other platforms (cross-referencing via ISRC or track/artist name)
-- Filters/orders metadata sources by relevance or leaves the default ranking chosen by the system (use `TAB` key to switch the focused window).
-- System downloads matching tracks from available download providers:
-  - `yt-dlp`
-- User selects the best download source and previews the audio
-- User saves the file to the desired folder with embedded tags
 
 ## Screenshots
 

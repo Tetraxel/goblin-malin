@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { Box, Text } from "ink";
 import stringWidth from "string-width";
 import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
@@ -9,6 +9,8 @@ import { ToolbarButtonInvoker } from "./ToolbarButtonInvoker";
 import { FlowSelector } from "./FlowSelector";
 import { Separator } from "../Separator";
 import { TabBar } from "../TabBar";
+import { UpdateInfo } from "../../updater/updateChecker";
+import { UpdateBadge } from "./UpdateBadge";
 
 export type ToolbarButtonHook<TFlow = FlowBase> = ({
     isSelected,
@@ -35,6 +37,7 @@ export const Toolbar = ({
     onFlowChange,
     flow,
     orchestrator,
+    updateInfo,
 }: {
     buttons: ToolbarButtonHook[];
     width: number;
@@ -42,6 +45,7 @@ export const Toolbar = ({
     onFlowChange: (flowId: string) => void;
     flow: FlowBase;
     orchestrator: FlowOrchestrator;
+    updateInfo?: UpdateInfo | null;
 }) => {
     const theme = useTheme();
     const { focusState } = useFocusContext();
@@ -107,7 +111,14 @@ export const Toolbar = ({
                     gap={1}
                     height={height}
                 >
-                    <FlowSelector flows={flows} currentFlow={flow} onFlowChange={onFlowChange} />
+                    {/* <FlowSelector flows={flows} currentFlow={flow} onFlowChange={onFlowChange} /> */}
+                    {updateInfo && (
+                        <UpdateBadge
+                            version={updateInfo.latestVersion}
+                            isSelected={isActive && focusState.toolbar.selectedButtonIndex === buttons.length}
+                            index={buttons.length}
+                        />
+                    )}
                 </Box>
             </Box>
             <PrimaryModeTabBar width={width} splitPos={splitPositions[0] ?? 0} />

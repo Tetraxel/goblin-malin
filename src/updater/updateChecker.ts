@@ -1,4 +1,5 @@
 import { APP_VERSION } from "../constants";
+import { IS_SEA } from "./installSource";
 
 export interface UpdateInfo {
     hasUpdate: boolean;
@@ -28,7 +29,7 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
             html_url: string;
             assets: Array<{ name: string; browser_download_url: string }>;
         };
-        const exeAsset = data.assets.find((a) => a.name.endsWith(".exe"));
+        const exeAsset = IS_SEA ? data.assets.find((a) => a.name.endsWith(".exe")) : undefined;
         return {
             hasUpdate: isNewer(APP_VERSION, data.tag_name),
             latestVersion: data.tag_name.replace(/^v/, ""),

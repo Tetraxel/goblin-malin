@@ -37,7 +37,8 @@
     },
     "files": [
         "dist",
-        "README.md"
+        "README.md",
+        "scripts/save-install-source.mjs"
     ],
     "scripts": {
         "dev": "tsx src/cli.ts",
@@ -47,7 +48,7 @@
         "lint": "eslint src/",
         "format": "prettier --write src/",
         "format:check": "prettier --check src/",
-        "postinstall": "node scripts/patch-pkg-compat.mjs",
+        "postinstall": "node scripts/save-install-source.mjs",
         "package:win": "node scripts/build-sea.mjs",
         "prepack": "node scripts/patch-readme.mjs",
         "postpack": "git checkout -- README.md",

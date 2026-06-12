@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ToolbarButtonHook } from "./Toolbar/Toolbar";
 import { ColumnDefinition } from "./TaskListPanel/TaskListPanel";
 import { useScreenSize } from "#hooks/useScreenSize";
@@ -14,6 +14,10 @@ import { globalLogger } from "#base/logger/logger";
 import { getInstance } from "#utils/mpvPlayer";
 import { getAssetPath } from "#utils/appPaths";
 import { AppInner } from "./AppInner";
+import { useSettingsButton } from "./Toolbar/useSettingsButton";
+import { useExitButton } from "./Toolbar/useExitButton";
+import { checkForUpdate, UpdateInfo } from "../updater/updateChecker";
+import { SettingsStore } from "#settings/settingsStore";
 
 export const App: React.FC = () => {
     useEffect(() => {
@@ -36,13 +40,41 @@ export const App: React.FC = () => {
     const [columns, setColumns] = useState<ColumnDefinition<MusicDownloadTaskAttributes>[]>([]);
     const currentFlow = activeFlowId ? orchestrator.getFlow(activeFlowId) : undefined;
 
+    const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+    const [pendingUpdate, setPendingUpdate] = useState<UpdateInfo | null>(null);
+    const isOrchestratorIdle = useCallback((orch: FlowOrchestrator) => orch.getTasksInProgress().length === 0, []);
+
+    useEffect(() => {
+        const settings = SettingsStore.getInstance().getAppSettings();
+        if (!settings.general.checkForUpdates) return;
+        checkForUpdate().then((info) => {
+            if (!info?.hasUpdate) return;
+            if (isOrchestratorIdle(orchestrator)) {
+                setUpdateInfo(info);
+            } else {
+                setPendingUpdate(info);
+            }
+        });
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        if (!pendingUpdate) return;
+        return orchestrator.subscribe((orch) => {
+            if (isOrchestratorIdle(orch)) {
+                setUpdateInfo(pendingUpdate);
+                setPendingUpdate(null);
+            }
+        });
+    }, [pendingUpdate, orchestrator, isOrchestratorIdle]);
+
     // [!] This is important to allow dynamic updates of buttons and columns when the flow changes
     useEffect(() => {
         if (!currentFlow) return;
         globalLogger.debug(`Active flow changed: ${currentFlow?.displayName}`);
         // Subscribe to currentFlow changes to update buttons and columns dynamically
         const unsubscribe = currentFlow.subscribe((_updatedFlow) => {
-            setToolbarButtons(currentFlow.getToolbarButtons() ?? []);
+            const buttons = [...(currentFlow.getToolbarButtons() ?? []), useSettingsButton, useExitButton];
+            setToolbarButtons(buttons);
             setColumns(currentFlow.getColumns() ?? []);
         });
         return unsubscribe;
@@ -64,7 +96,7 @@ export const App: React.FC = () => {
         <ThemeProvider>
             <ShortcutRegistryProvider>
                 <FocusProvider
-                    toolbarButtonCount={toolbarButtons.length}
+                    toolbarButtonCount={toolbarButtons.length + (updateInfo ? 1 : 0)}
                     taskCount={filteredTasks.length}
                     taskColumnCount={columns.length}
                 >
@@ -79,6 +111,7 @@ export const App: React.FC = () => {
                             setActiveFlowId={setActiveFlowId}
                             terminalHeight={terminalHeight}
                             terminalWidth={terminalWidth}
+                            updateInfo={updateInfo}
                         />
                     </ToolbarActionsProvider>
                 </FocusProvider>

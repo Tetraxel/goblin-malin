@@ -14,9 +14,9 @@ import { ToolbarButtonHook } from "#components/Toolbar/Toolbar";
 import { ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
 import { ContextualActionBar, ContextualActions } from "#types/actions";
 import { runWithoutCache } from "#utils/cache";
-import { useExitButton } from "./toolbar/useExitButton";
+import { useExitButton } from "../../components/Toolbar/useExitButton";
 import { useRunAllButton } from "./toolbar/useRunAllButton";
-import { useSettingsButton } from "./toolbar/useSettingsButton";
+import { useSettingsButton } from "../../components/Toolbar/useSettingsButton";
 import { UrlCell } from "./columns/UrlCell";
 import { ArtistCell } from "./columns/ArtistCell";
 import { TrackCell } from "./columns/TrackCell";
@@ -217,7 +217,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
     async stopAll(): Promise<void> {}
 
     public getToolbarButtons(): ToolbarButtonHook[] {
-        return [useRunAllButton, useSettingsButton, useExitButton];
+        return [useRunAllButton];
     }
 
     public getContextualActionBar(
