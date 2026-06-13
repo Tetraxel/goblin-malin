@@ -196,6 +196,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                                     </Text>
                                     <Text
                                         color={selectedIndex === 0 ? theme.ui.focusIndicator : theme.action.primary}
+                                        underline={selectedIndex === 0}
                                         bold
                                     >
                                         {updateCommand}
@@ -255,7 +256,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                     {isInProgress && <Text dimColor>Please wait...</Text>}
                     {!isIdle && !isInProgress && (
                         <>
-                            {pkgStatus === "done" && <Hint label="Restart" shortcut="Enter" />}
+                            {pkgStatus === "done" && <Hint label="Exit" shortcut="Enter" />}
                             <Hint label="Close" shortcut="Esc" />
                         </>
                     )}
