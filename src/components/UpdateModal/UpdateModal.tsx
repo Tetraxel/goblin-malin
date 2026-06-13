@@ -19,7 +19,6 @@ interface UpdateModalProps {
 type PkgUpdateState = "idle" | "running" | "done" | "error";
 
 const installer = getInstaller();
-const updateCommand = getUpdateCommand();
 
 export const UpdateModal: React.FC<UpdateModalProps> = ({
     latestVersion,
@@ -27,6 +26,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     terminalHeight,
     terminalWidth,
 }) => {
+    const updateCommand = getUpdateCommand(latestVersion);
     const theme = useTheme();
     const { focusState, switchBack } = useFocusContext();
     const isActive = focusState.activeWindow === "updateModal";
@@ -100,7 +100,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
             setPkgOutput((prev) => [...prev, err.message]);
             setPkgStatus("error");
         });
-    }, [pkgStatus, selectedIndex, releaseUrl, switchBack]);
+    }, [pkgStatus, selectedIndex, releaseUrl, switchBack, updateCommand]);
 
     useShortcuts({
         id: "updateModal",
