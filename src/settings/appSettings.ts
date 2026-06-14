@@ -1,4 +1,4 @@
-import { DEFAULT_APP_DATA_DIR } from "../constants";
+import { DEFAULT_APP_DATA_DIR } from "#constants";
 import { Shortcut } from "#types/actions";
 
 export type AppSettings = {

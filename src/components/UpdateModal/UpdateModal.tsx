@@ -6,8 +6,8 @@ import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusContext } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { Hint } from "../Hint";
-import { APP_VERSION } from "../../constants";
-import { IS_SEA, getInstaller, getUpdateCommand } from "../../updater/installSource";
+import { APP_VERSION } from "#constants";
+import { IS_SEA, getInstaller, getUpdateCommand } from "#updater/installSource";
 import { globalLogger } from "#base/logger/logger";
 
 interface UpdateModalProps {

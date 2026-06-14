@@ -39,6 +39,13 @@ yarn run lint  # Check eslint errors
 
 ## Tips for common mistakes
 
+Prefer use of import aliases from `package.json`
+
+```ts
+import { APP_VERSION } from "../../constants";
+import { APP_VERSION } from "#constants";
+```
+
 ### Box shrinking
 
 By default, `Box` from `ink` are shrinking with if there is no enough space **by default**.

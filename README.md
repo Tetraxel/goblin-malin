@@ -36,6 +36,19 @@ A keyboard-driven terminal UI for downloading and tagging music tracks with meta
 yarn global add goblin-malin
 ```
 
+<details>
+<summary>Don't forget to add your `yarn` directory to your PATH to have the command `goblin-malin` available in any terminal.</summary>
+
+On windows:
+
+```ps1
+$yarBin = "C:\Users\YOUR_USERNAME\AppData\Local\Yarn\bin"
+$current = [System.Environment]::GetEnvironmentVariable("PATH", "User")
+[System.Environment]::SetEnvironmentVariable("PATH", "$current;$yarBin", "User")
+```
+
+</details>
+
 ### Installation with `pnpm`
 
 ```bash

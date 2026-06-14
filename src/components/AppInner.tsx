@@ -8,7 +8,7 @@ import { SettingsModal } from "./SettingsModal/SettingsModal";
 import { SetupWizardModal } from "./SetupWizardModal/SetupWizardModal";
 import { WelcomeModal } from "./WelcomeModal/WelcomeModal";
 import { UpdateModal } from "./UpdateModal/UpdateModal";
-import { UpdateInfo } from "../updater/updateChecker";
+import { UpdateInfo } from "#updater/updateChecker";
 import { Toolbar, ToolbarButtonHook } from "./Toolbar/Toolbar";
 import { ColumnDefinition, TaskListPanel } from "./TaskListPanel/TaskListPanel";
 import { SecondaryPanel } from "./SecondaryPanel/SecondaryPanel";

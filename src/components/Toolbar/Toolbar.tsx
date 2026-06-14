@@ -9,9 +9,9 @@ import { ToolbarButtonInvoker } from "./ToolbarButtonInvoker";
 import { FlowSelector } from "./FlowSelector";
 import { Separator } from "../Separator";
 import { TabBar } from "../TabBar";
-import { UpdateInfo } from "../../updater/updateChecker";
+import { UpdateInfo } from "#updater/updateChecker";
 import { UpdateBadge } from "./UpdateBadge";
-import { APP_VERSION } from "../../constants";
+import { APP_VERSION } from "#constants";
 
 export type ToolbarButtonHook<TFlow = FlowBase> = ({
     isSelected,

@@ -1,7 +1,7 @@
 import { createRequire } from "module";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { DEFAULT_APP_DATA_DIR } from "../constants";
+import { DEFAULT_APP_DATA_DIR } from "#constants";
 
 const _require = createRequire(import.meta.url);
 

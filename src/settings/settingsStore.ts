@@ -1,7 +1,7 @@
 ﻿import * as fs from "fs";
 import * as path from "path";
 import { EventEmitter } from "events";
-import { DEFAULT_APP_DATA_DIR } from "../constants";
+import { DEFAULT_APP_DATA_DIR } from "#constants";
 import { AppSettings, DEFAULT_APP_SETTINGS } from "./appSettings";
 import { DeepPartial } from "#utils/types";
 import { deepMerge } from "#utils/deepMerge";

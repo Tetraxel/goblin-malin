@@ -16,7 +16,7 @@ import { getAssetPath } from "#utils/appPaths";
 import { AppInner } from "./AppInner";
 import { useSettingsButton } from "./Toolbar/useSettingsButton";
 import { useExitButton } from "./Toolbar/useExitButton";
-import { checkForUpdate, UpdateInfo } from "../updater/updateChecker";
+import { checkForUpdate, UpdateInfo } from "#updater/updateChecker";
 import { SettingsStore } from "#settings/settingsStore";
 
 export const App: React.FC = () => {

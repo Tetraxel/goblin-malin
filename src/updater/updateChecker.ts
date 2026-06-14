@@ -1,4 +1,4 @@
-import { APP_VERSION } from "../constants";
+import { APP_VERSION } from "#constants";
 import { IS_SEA } from "./installSource";
 
 export interface UpdateInfo {
