@@ -1,9 +1,10 @@
-﻿import React from "react";
+﻿import React, { useEffect } from "react";
 import { Box } from "ink";
 import { Footer } from "./Footer";
 import { Separator } from "./Separator";
 import { PromptModal } from "./PromptModal/PromptModal";
 import { ImportModal } from "./ImportModal/ImportModal";
+import { StartModal } from "./StartModal/StartModal";
 import { SettingsModal } from "./SettingsModal/SettingsModal";
 import { SetupWizardModal } from "./SetupWizardModal/SetupWizardModal";
 import { WelcomeModal } from "./WelcomeModal/WelcomeModal";
@@ -20,6 +21,8 @@ import { Task, TaskAttributes } from "#base/task/task";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import { FlowBase } from "#base/flow/flow-base";
 import { useImportFlow } from "./ImportModal/useImportFlow";
+import { useStartFlow } from "./StartModal/useStartFlow";
+import { startOptionsBridge } from "#base/flow/startOptionsBridge";
 import { useTheme } from "#base/themeContext";
 
 export const AppInner: React.FC<{
@@ -47,6 +50,13 @@ export const AppInner: React.FC<{
 }) => {
     const theme = useTheme();
     const { pendingImport, openImportFlow, handleImportConfirm, handleImportCancel } = useImportFlow(currentFlow);
+    const { pendingStart, openStartFlow, handleStartConfirm, handleStartCancel } = useStartFlow();
+
+    // Bridge: let plain-TS flow actions open the start-options modal.
+    useEffect(() => {
+        startOptionsBridge.setOpener(openStartFlow);
+        return () => startOptionsBridge.setOpener(null);
+    }, [openStartFlow]);
 
     return (
         <ImportActionsProvider openImportFlow={openImportFlow}>
@@ -84,6 +94,14 @@ export const AppInner: React.FC<{
                     terminalWidth={terminalWidth}
                     onConfirm={handleImportConfirm}
                     onCancel={handleImportCancel}
+                />
+
+                <StartModal
+                    pendingStart={pendingStart}
+                    terminalHeight={terminalHeight}
+                    terminalWidth={terminalWidth}
+                    onConfirm={handleStartConfirm}
+                    onCancel={handleStartCancel}
                 />
 
                 <SettingsModal

@@ -36,6 +36,7 @@ export type FocusableWindow =
     | "secondaryPanel"
     | "settingsModal"
     | "importModal"
+    | "startModal"
     | "setupWizardModal"
     | "welcomeModal"
     | "updateModal";

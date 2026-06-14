@@ -2,6 +2,7 @@
 import open from "open";
 import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
 import { FlowBase } from "#base/flow/flow-base";
+import { startOptionsBridge } from "#base/flow/startOptionsBridge";
 import { FlowSettings } from "#base/flow/flow-settings";
 import { globalLogger, Logger } from "#base/logger/logger";
 import { ServiceRegistry } from "#base/service-registry";
@@ -230,26 +231,53 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
 
         // ── Task row (bottom) ─────────────────────────────────────────────────
         const hasBeenRun = attrs?.state !== "pending";
+        // Already-run tasks restart without cache; pending tasks start normally.
+        const runTask = (t: DownloadTask) =>
+            t.getAttributes()?.state !== "pending" ? fire(runWithoutCache(() => t.restart())) : fire(t.start());
+        const needsOptions = (t: DownloadTask) => {
+            const a = t.getAttributes();
+            return !a?.toTag && !a?.toDownload;
+        };
         const taskActions: ContextualActions[] = [
             {
                 shortcuts: [{ input: "r" }],
                 label: hasBeenRun ? "Restart" : "Start",
                 description: hasBeenRun ? "Restart this task from scratch" : "Start this task",
-                onClick: () => fire(hasBeenRun ? task.restart() : task.start()),
+                multiSelectAllowed: true,
+                onClick: () => {
+                    if (needsOptions(task)) {
+                        startOptionsBridge.request({
+                            taskCount: 1,
+                            apply: (opts) => {
+                                task.updateAttributes(opts);
+                                runTask(task);
+                            },
+                        });
+                    } else {
+                        runTask(task);
+                    }
+                },
+                onClickBatch: (tasks) => {
+                    const selected = tasks as DownloadTask[];
+                    const needing = selected.filter(needsOptions);
+                    if (needing.length > 0) {
+                        startOptionsBridge.request({
+                            taskCount: selected.length,
+                            apply: (opts) => {
+                                needing.forEach((t) => t.updateAttributes(opts));
+                                selected.forEach(runTask);
+                            },
+                        });
+                    } else {
+                        selected.forEach(runTask);
+                    }
+                },
             },
         ];
-        if (hasBeenRun) {
-            taskActions.push({
-                shortcuts: [{ input: "R", shift: true }],
-                label: "Restart (no cache)",
-                description: "Restart from scratch, bypassing cached results",
-                onClick: () => fire(runWithoutCache(() => task.restart())),
-            });
-        }
         if (attrs?.primaryMetadataFetched) {
             taskActions.push({
                 shortcuts: [{ input: "f" }],
-                label: "Re-fetch primary metadata (no cache)",
+                label: "Re-fetch primary metadata",
                 onClick: () => fire(runWithoutCache(() => task.startPrimaryMetadataFetching())),
             });
         }
@@ -265,6 +293,15 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 shortcuts: [{ input: "w" }],
                 label: "Re-download all sources",
                 onClick: () => fire(task.startDownloads()),
+            });
+        } else if (attrs?.metadataDiscovered) {
+            taskActions.push({
+                shortcuts: [{ input: "w" }],
+                label: "Download sources",
+                onClick: () => {
+                    task.updateAttributes({ toDownload: true });
+                    fire(task.startDownloads());
+                },
             });
         }
 

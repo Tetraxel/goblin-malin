@@ -22,6 +22,13 @@ export type ContextualActions = {
     onClickBatch?: (tasks: Task<any>[]) => void;
 };
 
+// Request handed from a flow action to the React layer to ask the user how a
+// task (or batch) should be started when its TAG?/DL? checkboxes are both off.
+export type StartOptionsRequest = {
+    taskCount: number;
+    apply: (opts: { toTag: boolean; toDownload: boolean }) => void;
+};
+
 export type ActionBarRow = {
     text?: string;
     textColor?: React.ComponentProps<typeof Text>["color"];
