@@ -8,7 +8,13 @@ export function StateBadge({ source }: { source: TrackDownloadSource }) {
     if (source.savedFile) return <Text color={theme.status.locked}>● SAVED</Text>;
     switch (source.state) {
         case "downloading":
-            return <Text color={theme.status.downloading}>DOWNLOADING</Text>;
+            return (
+                <Text color={theme.status.downloading}>
+                    {source.progress != null && source.progress > 0
+                        ? `DOWNLOADING ${Math.round(source.progress)}%`
+                        : "DOWNLOADING"}
+                </Text>
+            );
         case "downloaded":
             return <Text color={theme.status.success}>DOWNLOADED</Text>;
         case "failed":

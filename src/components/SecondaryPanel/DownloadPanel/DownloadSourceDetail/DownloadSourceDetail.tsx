@@ -12,6 +12,7 @@ import { formatBytes, formatDate, tagValue } from "#components/SecondaryPanel/Do
 import { useShortcuts } from "#hooks/useShortcuts";
 import { PlaybackBar } from "../PlaybackBar";
 import { DiffView } from "./DiffView";
+import { DownloadInProgress } from "./DownloadInProgress";
 import { DetailRow } from "./DetailRow";
 import { formatDuration } from "../../utils";
 
@@ -253,6 +254,12 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     }
 
     if (!source) return null;
+
+    // The file isn't on disk yet (still downloading, queued, or failed). Don't show the
+    // "NEW FILE" preview — there's nothing to preview/save. Show the current state instead.
+    if (!source.localFile && !source.savedFile) {
+        return <DownloadInProgress source={source} width={width} height={height} />;
+    }
 
     const isSaved = !!source.savedFile;
     const borderColor = isSaved ? theme.text.primary : theme.status.success;

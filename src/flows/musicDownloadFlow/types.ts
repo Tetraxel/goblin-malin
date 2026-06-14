@@ -289,6 +289,8 @@ export type TrackDownloadSource = {
     isRejected?: boolean;
     fileInfo?: FileInfo;
     savedFile?: SavedFile;
+    /** Download progress 0–100 while `state` is "downloading". */
+    progress?: number;
 };
 
 //----------------------//

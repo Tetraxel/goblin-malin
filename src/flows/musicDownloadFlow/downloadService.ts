@@ -19,9 +19,15 @@ export abstract class DownloadService extends ServiceBase {
     }
 
     /**
-     * Download a track and return download source
+     * Download a track and return the final download source.
      * @param trackMetadata The track metadata to download
-     * @returns Array of track download sources (only one element for now)
+     * @param onUpdate Called with intermediate sources (e.g. "downloading" + progress)
+     *                 so the UI can show progress before the download completes. The
+     *                 returned value is the final, canonical source.
+     * @returns The completed track download source
      */
-    abstract downloadTrack(trackMetadata: TrackMetadata): Promise<TrackDownloadSource>;
+    abstract downloadTrack(
+        trackMetadata: TrackMetadata,
+        onUpdate?: (source: TrackDownloadSource) => void
+    ): Promise<TrackDownloadSource>;
 }

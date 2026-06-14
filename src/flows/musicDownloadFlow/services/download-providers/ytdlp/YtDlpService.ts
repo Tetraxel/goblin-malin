@@ -52,7 +52,10 @@ export class YtDlpService extends DownloadService {
         });
     }
 
-    async downloadTrack(trackMetadata: TrackMetadata): Promise<TrackDownloadSource> {
+    async downloadTrack(
+        trackMetadata: TrackMetadata,
+        onUpdate?: (source: TrackDownloadSource) => void
+    ): Promise<TrackDownloadSource> {
         // Check if this service can handle the track's source
         if (!this.canDownload(trackMetadata)) {
             throw new Error(
@@ -61,6 +64,17 @@ export class YtDlpService extends DownloadService {
         }
 
         const trackUrl = trackMetadata.url;
+
+        // In-progress source emitted right away so the UI shows the download before it completes.
+        const pendingSource: TrackDownloadSource = {
+            state: "downloading",
+            provider: "ytdlp",
+            track: trackMetadata,
+            downloadedAt: new Date(),
+            selected: false,
+            progress: 0,
+        };
+        onUpdate?.(pendingSource);
 
         try {
             this.logger.info(`Downloading track from ${trackMetadata.apiProvider}: ${trackMetadata.trackName}`);
@@ -115,6 +129,7 @@ export class YtDlpService extends DownloadService {
                     restrictFilenames: true,
                     onProgress: (progress) => {
                         this.status.update({ progress: progress.percentage });
+                        onUpdate?.({ ...pendingSource, progress: progress.percentage });
                         this.logger.debug(
                             `Download progress: ${progress.percentage}% ${progress.speed_str} (ETA: ${progress.eta_str})`
                         );
@@ -160,6 +175,7 @@ export class YtDlpService extends DownloadService {
                 downloadedAt: new Date(),
                 selected: true,
                 fileInfo,
+                progress: 100,
             };
             return downloadSource;
         } catch (error) {
@@ -168,6 +184,7 @@ export class YtDlpService extends DownloadService {
                 type: StatusType.Error,
                 message: `Failed to download ${trackMetadata.trackName}`,
             });
+            onUpdate?.({ ...pendingSource, state: "failed" });
             throw error;
         }
     }

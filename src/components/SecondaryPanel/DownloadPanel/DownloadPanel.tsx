@@ -239,7 +239,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                     onSave={handleSave}
                 />
             </Box>
-            <DynamicHintBar width={width - 2} isActive={isPanelActive && innerFocus === "list"} />
+            <DynamicHintBar width={width - 2} isActive={isPanelActive} />
         </Box>
     );
 };

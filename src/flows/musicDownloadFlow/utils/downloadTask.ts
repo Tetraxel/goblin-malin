@@ -677,9 +677,29 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
 
                 this.logger.info(`Downloading using ${downloadService.id} from ${compatibleMetadata.apiProvider}`);
 
+                // Reserve a slot for this service. The service emits intermediate sources
+                // (e.g. "downloading" + progress) via onUpdate so the UI can show the
+                // download in progress before it completes. `selected` is owned by this
+                // task, so it is preserved across intermediate updates.
+                let slotIndex = -1;
+                const onUpdate = (source: TrackDownloadSource) => {
+                    if (slotIndex === -1) {
+                        slotIndex = downloadSources.length;
+                        downloadSources.push(source);
+                    } else {
+                        downloadSources[slotIndex] = { ...source, selected: downloadSources[slotIndex].selected };
+                    }
+                    this.updateAttributes({ downloadSources: [...downloadSources] });
+                };
+
                 // Download the track
-                const downloadSource = await downloadService.downloadTrack(compatibleMetadata);
-                downloadSources.push(downloadSource);
+                const downloadSource = await downloadService.downloadTrack(compatibleMetadata, onUpdate);
+                if (slotIndex === -1) {
+                    downloadSources.push(downloadSource);
+                } else {
+                    downloadSources[slotIndex] = { ...downloadSource, selected: downloadSources[slotIndex].selected };
+                }
+                this.updateAttributes({ downloadSources: [...downloadSources] });
                 this.logger.info(`Successfully downloaded using ${downloadService.id}`);
             } catch (error) {
                 this.logger.warn(`Failed to download using ${downloadService.id}:`, { error });

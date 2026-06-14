@@ -21,6 +21,12 @@ export function SourceFileRow({ source, sourceIndex, isSelected, isActive, width
     const filename = localFile ? `${localFile.name}.${localFile.extension}` : null;
     const sizeText = source.fileInfo ? formatBytes(source.fileInfo.sizeBytes) : "";
 
+    // While the file isn't downloaded yet there's no filename — show the anticipated
+    // track name (dimmed) so the row is recognizable during download. The state badge
+    // on the right communicates progress, so we don't repeat it on the left.
+    const artist = source.track.artists?.[0]?.name ?? "";
+    const trackLabel = artist ? `${artist} - ${source.track.trackName}` : source.track.trackName;
+
     return (
         <Box
             flexDirection="row"
@@ -59,7 +65,13 @@ export function SourceFileRow({ source, sourceIndex, isSelected, isActive, width
                         {filename}
                     </Text>
                 ) : (
-                    <StateBadge source={source} />
+                    <Text
+                        color={source.state === "failed" ? theme.status.error : theme.text.secondary}
+                        dimColor
+                        wrap="truncate-end"
+                    >
+                        {trackLabel}
+                    </Text>
                 )}
             </Box>
             {sizeText !== "" && (
