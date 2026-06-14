@@ -4,7 +4,7 @@ import { useShortcuts } from "#hooks/useShortcuts";
 import { FlowBase } from "#base/flow/flow-base";
 import { useTheme } from "#base/themeContext";
 import { useFocusContext } from "#contexts/FocusContext";
-import { SettingsStore, SETTINGS_PATH } from "#settings/settingsStore";
+import { SettingsStore } from "#settings/settingsStore";
 import { AppSettings } from "#settings/appSettings";
 import { buildGlobalSettingsItems } from "#settings/buildGlobalSettingsItems";
 import { filterSettingsItems, isInteractive, SettingsItem } from "#settings/buildSettingsItems";
@@ -46,6 +46,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
     const [shortcutsModalFocus, setShortcutsModalFocus] = useState<"search" | "list">("search");
     const [rebindingId, setRebindingId] = useState<string | null>(null);
 
+    // Unsaved-changes confirmation when leaving with pending edits.
+    const [confirmExit, setConfirmExit] = useState(false);
+    const [confirmChoice, setConfirmChoice] = useState(0);
+
     // Reset to fresh settings when the modal opens, but NOT when returning from the wizard.
     const [prevIsActive, setPrevIsActive] = useState(isActive);
     const [prevReturningFrom, setPrevReturningFrom] = useState(focusState.returningFromWindow);
@@ -65,6 +69,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
             setShortcutsSearchQuery("");
             setShortcutsModalFocus("search");
             setRebindingId(null);
+            setConfirmExit(false);
+            setConfirmChoice(0);
             shortcutRegistry.disableRebind();
         }
     }
@@ -89,6 +95,51 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
 
     const filteredItems = useMemo(() => filterSettingsItems(allItems, searchQuery), [allItems, searchQuery]);
     const safeSelectedIndex = Math.min(selectedIndex, Math.max(0, filteredItems.length - 1));
+
+    // Pending edits live in `appDraft` (global) and `flowPatch` (flow). Keybinding
+    // changes persist immediately, so they're never part of the unsaved state.
+    const isDirty = useMemo(() => {
+        const saved = SettingsStore.getInstance().getAppSettings();
+        if (JSON.stringify(saved.general) !== JSON.stringify(appDraft.general)) return true;
+        return Object.keys(flowPatch).length > 0;
+    }, [appDraft, flowPatch]);
+
+    const EXIT_CHOICES = ["save", "discard", "cancel"] as const;
+
+    function commitAndExit() {
+        SettingsStore.getInstance().writeAppSettings(appDraft);
+        if (currentFlow?.saveFlowSettings) {
+            const fullFlowSettings = deepMerge(
+                (currentFlow.getFlowSettings?.() ?? {}) as Record<string, unknown>,
+                flowPatch
+            );
+            currentFlow.saveFlowSettings(fullFlowSettings);
+        }
+        setConfirmExit(false);
+        switchBack();
+    }
+
+    /** Exit, prompting to save/discard first if there are unsaved changes. */
+    function requestExit() {
+        if (isDirty) {
+            setConfirmChoice(0);
+            setConfirmExit(true);
+            return;
+        }
+        switchBack();
+    }
+
+    function resolveExitChoice() {
+        const choice = EXIT_CHOICES[confirmChoice];
+        if (choice === "save") {
+            commitAndExit();
+        } else if (choice === "discard") {
+            setConfirmExit(false);
+            switchBack();
+        } else {
+            setConfirmExit(false);
+        }
+    }
 
     function startRebind(id: string) {
         setRebindingId(id);
@@ -120,15 +171,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                 label: "Save & Exit",
                 handler: () => {
                     if (rebindingId) return;
-                    SettingsStore.getInstance().writeAppSettings(appDraft);
-                    if (currentFlow?.saveFlowSettings) {
-                        const fullFlowSettings = deepMerge(
-                            (currentFlow.getFlowSettings?.() ?? {}) as Record<string, unknown>,
-                            flowPatch
-                        );
-                        currentFlow.saveFlowSettings(fullFlowSettings);
-                    }
-                    switchBack();
+                    commitAndExit();
                 },
             },
             {
@@ -136,6 +179,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                 defaultShortcut: { key: "escape" },
                 label: "Discard",
                 handler: () => {
+                    if (confirmExit) {
+                        setConfirmExit(false);
+                        return;
+                    }
                     if (editingIndex !== null) {
                         setEditingIndex(null);
                         return;
@@ -150,7 +197,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                         setModalFocus("search");
                         return;
                     }
-                    switchBack();
+                    requestExit();
                 },
             },
             {
@@ -158,7 +205,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                 defaultShortcut: { key: "tab" },
                 label: "Switch tab",
                 handler: () => {
-                    if (rebindingId || editingIndex !== null) return;
+                    if (confirmExit || rebindingId || editingIndex !== null) return;
                     setActiveTab((t) => (t === "settings" ? "shortcuts" : "settings"));
                 },
             },
@@ -167,7 +214,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                 defaultShortcut: { key: "upArrow" },
                 label: "Up",
                 handler: () => {
-                    if (rebindingId) return;
+                    if (confirmExit || rebindingId) return;
                     if (activeTab === "shortcuts") {
                         if (shortcutsModalFocus === "list") {
                             if (shortcutsSelectedIndex <= 0) {
@@ -193,7 +240,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                 defaultShortcut: { key: "downArrow" },
                 label: "Down",
                 handler: () => {
-                    if (rebindingId) return;
+                    if (confirmExit || rebindingId) return;
                     if (activeTab === "shortcuts") {
                         if (shortcutsModalFocus === "search") {
                             setShortcutsModalFocus("list");
@@ -221,6 +268,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                 defaultShortcut: { key: "return" },
                 label: "Interact",
                 handler: () => {
+                    if (confirmExit) {
+                        resolveExitChoice();
+                        return;
+                    }
                     if (rebindingId) return;
                     if (activeTab === "shortcuts") {
                         if (shortcutsModalFocus === "search") {
@@ -262,6 +313,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                 defaultShortcut: { key: "leftArrow" },
                 label: "Previous",
                 handler: () => {
+                    if (confirmExit) {
+                        setConfirmChoice((c) => (c - 1 + EXIT_CHOICES.length) % EXIT_CHOICES.length);
+                        return;
+                    }
                     if (activeTab !== "settings" || modalFocus !== "list" || editingIndex !== null) return;
                     const item = filteredItems[safeSelectedIndex];
                     if (!item || !isInteractive(item) || item.kind !== "select") return;
@@ -274,6 +329,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                 defaultShortcut: { key: "rightArrow" },
                 label: "Next",
                 handler: () => {
+                    if (confirmExit) {
+                        setConfirmChoice((c) => (c + 1) % EXIT_CHOICES.length);
+                        return;
+                    }
                     if (activeTab !== "settings" || modalFocus !== "list" || editingIndex !== null) return;
                     const item = filteredItems[safeSelectedIndex];
                     if (!item || !isInteractive(item) || item.kind !== "select") return;
@@ -286,7 +345,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                 defaultShortcut: { key: "delete" },
                 label: "Reset binding",
                 handler: () => {
-                    if (activeTab !== "shortcuts" || rebindingId) return;
+                    if (confirmExit || activeTab !== "shortcuts" || rebindingId) return;
                     const items = buildShortcutsTabItems(shortcutsSearchQuery);
                     const item = items[shortcutsSelectedIndex];
                     if (item) {
@@ -305,136 +364,188 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
     const listHeight = Math.max(3, terminalHeight - MODAL_OVERHEAD);
 
     return (
-        <Box
-            position="absolute"
-            width="100%"
-            height={terminalHeight}
-            flexDirection="column"
-            justifyContent="center"
-            alignItems="center"
-        >
+        <>
             <Box
+                position="absolute"
+                width="100%"
+                height={terminalHeight}
                 flexDirection="column"
-                borderStyle="round"
-                borderColor={theme.action.primary}
-                borderBackgroundColor={theme.ui.background}
-                paddingX={2}
-                paddingY={1}
-                marginX={2}
-                marginY={3}
-                width={modalWidth}
-                backgroundColor={theme.ui.background}
-                flexGrow={1}
-                flexShrink={0}
+                justifyContent="center"
+                alignItems="center"
             >
-                {/* Title + tab bar */}
-                <Box justifyContent="space-between" flexShrink={0}>
-                    <Text bold color={theme.action.primary}>
-                        SETTINGS
-                    </Text>
-                    <Box flexDirection="row" flexShrink={0}>
-                        <Text
-                            bold={activeTab === "settings"}
-                            color={activeTab === "settings" ? theme.text.active : theme.text.muted}
-                        >
-                            Settings
+                <Box
+                    flexDirection="column"
+                    borderStyle="round"
+                    borderColor={theme.action.primary}
+                    borderBackgroundColor={theme.ui.background}
+                    paddingX={2}
+                    paddingY={1}
+                    marginX={2}
+                    marginY={3}
+                    width={modalWidth}
+                    backgroundColor={theme.ui.background}
+                    flexGrow={1}
+                    flexShrink={0}
+                >
+                    {/* Title + tab bar */}
+                    <Box justifyContent="space-between" flexShrink={0}>
+                        <Text bold color={theme.action.primary}>
+                            SETTINGS
                         </Text>
-                        <Text dimColor>{" │ "}</Text>
-                        <Text
-                            bold={activeTab === "shortcuts"}
-                            color={activeTab === "shortcuts" ? theme.text.active : theme.text.muted}
-                        >
-                            Shortcuts
-                        </Text>
-                        <Text dimColor>{"  [Tab]"}</Text>
+                        <Box flexDirection="row" flexShrink={0}>
+                            <Text
+                                bold={activeTab === "settings"}
+                                color={activeTab === "settings" ? theme.text.active : theme.text.muted}
+                            >
+                                Settings
+                            </Text>
+                            <Text dimColor>{" │ "}</Text>
+                            <Text
+                                bold={activeTab === "shortcuts"}
+                                color={activeTab === "shortcuts" ? theme.text.active : theme.text.muted}
+                            >
+                                Shortcuts
+                            </Text>
+                            <Text dimColor>{"  [Tab]"}</Text>
+                        </Box>
                     </Box>
-                </Box>
 
-                {activeTab === "settings" ? (
-                    <>
-                        <Box flexGrow={1} overflow="hidden">
-                            <SettingsTab
-                                isActive={isActive}
-                                items={filteredItems}
-                                selectedIndex={safeSelectedIndex}
-                                editingIndex={editingIndex}
-                                editValue={editValue}
-                                searchQuery={searchQuery}
-                                searchFocused={modalFocus === "search"}
-                                width={innerWidth}
-                                height={listHeight}
-                                onSearchChange={setSearchQuery}
-                                onEditChange={setEditValue}
-                                onEditSubmit={(item, v) => {
-                                    if (item.kind === "textInput") item.set(v);
-                                    setEditingIndex(null);
-                                }}
-                            />
-                        </Box>
+                    {activeTab === "settings" ? (
+                        <>
+                            <Box flexGrow={1} overflow="hidden">
+                                <SettingsTab
+                                    isActive={isActive}
+                                    items={filteredItems}
+                                    selectedIndex={safeSelectedIndex}
+                                    editingIndex={editingIndex}
+                                    editValue={editValue}
+                                    searchQuery={searchQuery}
+                                    searchFocused={modalFocus === "search" && !confirmExit}
+                                    width={innerWidth}
+                                    height={listHeight}
+                                    onSearchChange={setSearchQuery}
+                                    onEditChange={setEditValue}
+                                    onEditSubmit={(item, v) => {
+                                        if (item.kind === "textInput") item.set(v);
+                                        setEditingIndex(null);
+                                    }}
+                                />
+                            </Box>
 
-                        {/* Settings footer */}
-                        <Box marginTop={1} flexDirection="row" flexShrink={0}>
-                            {modalFocus === "search" ? (
-                                <>
-                                    <Hint label="Go to list" shortcut="↓/Enter" />
-                                    <Hint label="Save & Exit" shortcut="Ctrl+S" />
-                                    <Hint label="Discard" shortcut="Esc" />
-                                </>
-                            ) : (
-                                <>
-                                    <Hint label="Navigate" shortcut="↑↓" />
-                                    <Hint label="Interact" shortcut="Enter" />
-                                    <Hint label="Save & Exit" shortcut="Ctrl+S" />
-                                    <Hint label="Discard" shortcut="Esc" />
-                                </>
-                            )}
-                        </Box>
-                    </>
-                ) : (
-                    <>
-                        {/* Shortcuts tab */}
-                        <Box flexGrow={1} overflow="hidden">
-                            <ShortcutsTab
-                                isActive={isActive}
-                                selectedIndex={shortcutsSelectedIndex}
-                                rebindingId={rebindingId}
-                                width={innerWidth}
-                                height={listHeight}
-                                searchQuery={shortcutsSearchQuery}
-                                searchFocused={shortcutsModalFocus === "search"}
-                                onSearchChange={(v) => {
-                                    setShortcutsSearchQuery(v);
-                                    setShortcutsSelectedIndex(0);
-                                }}
-                            />
-                        </Box>
+                            {/* Settings footer */}
+                            <Box marginTop={1} flexDirection="row" flexShrink={0}>
+                                {modalFocus === "search" ? (
+                                    <>
+                                        <Hint label="Go to list" shortcut="↓/Enter" />
+                                        <Hint label="Save & Exit" shortcut="Ctrl+S" />
+                                        <Hint label="Discard" shortcut="Esc" />
+                                    </>
+                                ) : (
+                                    <>
+                                        <Hint label="Navigate" shortcut="↑↓" />
+                                        <Hint label="Interact" shortcut="Enter" />
+                                        <Hint label="Save & Exit" shortcut="Ctrl+S" />
+                                        <Hint label="Discard" shortcut="Esc" />
+                                    </>
+                                )}
+                            </Box>
+                        </>
+                    ) : (
+                        <>
+                            {/* Shortcuts tab */}
+                            <Box flexGrow={1} overflow="hidden">
+                                <ShortcutsTab
+                                    isActive={isActive}
+                                    selectedIndex={shortcutsSelectedIndex}
+                                    rebindingId={rebindingId}
+                                    width={innerWidth}
+                                    height={listHeight}
+                                    searchQuery={shortcutsSearchQuery}
+                                    searchFocused={shortcutsModalFocus === "search" && !confirmExit}
+                                    onSearchChange={(v) => {
+                                        setShortcutsSearchQuery(v);
+                                        setShortcutsSelectedIndex(0);
+                                    }}
+                                />
+                            </Box>
 
-                        {/* Shortcuts footer */}
-                        <Box marginTop={1} flexDirection="row" flexShrink={0}>
-                            {rebindingId ? (
-                                <Hint label="Cancel" shortcut="Esc" />
-                            ) : shortcutsModalFocus === "search" ? (
-                                <>
-                                    <Hint label="Go to list" shortcut="↓/Enter" />
-                                    <Hint label="Save & Exit" shortcut="Ctrl+S" />
-                                    <Hint label="Discard" shortcut="Esc" />
-                                </>
-                            ) : (
-                                <>
-                                    <Hint label="Navigate" shortcut="↑↓" />
-                                    <Hint label="Rebind" shortcut="Enter" />
-                                    <Hint label="Reset" shortcut="Del" />
-                                    <Hint label="Save & Exit" shortcut="Ctrl+S" />
-                                    <Hint label="Discard" shortcut="Esc" />
-                                </>
-                            )}
-                        </Box>
-                    </>
-                )}
-                <Box flexShrink={0}>
-                    <Text dimColor>{SETTINGS_PATH}</Text>
+                            {/* Shortcuts footer */}
+                            <Box marginTop={1} flexDirection="row" flexShrink={0}>
+                                {rebindingId ? (
+                                    <Hint label="Cancel" shortcut="Esc" />
+                                ) : shortcutsModalFocus === "search" ? (
+                                    <>
+                                        <Hint label="Go to list" shortcut="↓/Enter" />
+                                        <Hint label="Save & Exit" shortcut="Ctrl+S" />
+                                        <Hint label="Discard" shortcut="Esc" />
+                                    </>
+                                ) : (
+                                    <>
+                                        <Hint label="Navigate" shortcut="↑↓" />
+                                        <Hint label="Rebind" shortcut="Enter" />
+                                        <Hint label="Reset" shortcut="Del" />
+                                        <Hint label="Save & Exit" shortcut="Ctrl+S" />
+                                        <Hint label="Discard" shortcut="Esc" />
+                                    </>
+                                )}
+                            </Box>
+                        </>
+                    )}
                 </Box>
             </Box>
-        </Box>
+
+            {confirmExit && (
+                <Box
+                    position="absolute"
+                    width="100%"
+                    height={terminalHeight}
+                    flexDirection="column"
+                    justifyContent="center"
+                    alignItems="center"
+                >
+                    <Box
+                        flexDirection="column"
+                        borderStyle="round"
+                        borderColor={theme.status.warning}
+                        borderBackgroundColor={theme.ui.background}
+                        backgroundColor={theme.ui.background}
+                        paddingX={2}
+                        paddingY={1}
+                        width={Math.min(60, modalWidth)}
+                    >
+                        <Text bold color={theme.status.warning}>
+                            Unsaved changes
+                        </Text>
+                        <Box marginTop={1}>
+                            <Text>You have unsaved changes. Save before leaving?</Text>
+                        </Box>
+                        <Box marginTop={1} flexDirection="row">
+                            {EXIT_CHOICES.map((choice, i) => {
+                                const selected = i === confirmChoice;
+                                const label =
+                                    choice === "save" ? "Save & Exit" : choice === "discard" ? "Discard" : "Cancel";
+                                return (
+                                    <Box key={choice} marginRight={2} flexShrink={0}>
+                                        <Text
+                                            bold={selected}
+                                            color={selected ? theme.ui.background : theme.text.muted}
+                                            backgroundColor={selected ? theme.action.primary : undefined}
+                                        >
+                                            {` ${label} `}
+                                        </Text>
+                                    </Box>
+                                );
+                            })}
+                        </Box>
+                        <Box marginTop={1} flexDirection="row">
+                            <Hint label="Choose" shortcut="←→" />
+                            <Hint label="Confirm" shortcut="Enter" />
+                            <Hint label="Save" shortcut="Ctrl+S" />
+                            <Hint label="Cancel" shortcut="Esc" />
+                        </Box>
+                    </Box>
+                </Box>
+            )}
+        </>
     );
 };
