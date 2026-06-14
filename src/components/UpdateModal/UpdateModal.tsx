@@ -8,6 +8,7 @@ import { useTheme } from "#base/themeContext";
 import { Hint } from "../Hint";
 import { APP_VERSION } from "../../constants";
 import { IS_SEA, getInstaller, getUpdateCommand } from "../../updater/installSource";
+import { globalLogger } from "#base/logger/logger";
 
 interface UpdateModalProps {
     latestVersion: string;
@@ -80,23 +81,32 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
 
         // Run the package manager update command
         setPkgStatus("running");
+        globalLogger.info(`[updater] running: ${updateCommand}`);
         const [bin, ...args] = updateCommand.split(" ");
         const proc = spawn(bin, args, { stdio: "pipe", shell: true });
 
         const addLines = (chunk: Buffer) => {
             const lines = chunk.toString().split("\n").filter(Boolean);
-            setPkgOutput((prev) => [...prev, ...lines].slice(-12));
+            lines.forEach((l) => globalLogger.info(`[updater] ${l}`));
+            setPkgOutput((prev) => [...prev, ...lines].slice(-20));
         };
         proc.stdout?.on("data", addLines);
         proc.stderr?.on("data", addLines);
 
         proc.on("exit", (code) => {
             if (!mountedRef.current) return;
-            setPkgStatus(code === 0 ? "done" : "error");
+            if (code === 0) {
+                globalLogger.info(`[updater] success`);
+                setPkgStatus("done");
+            } else {
+                globalLogger.error(`[updater] failed with exit code ${code}`);
+                setPkgStatus("error");
+            }
         });
 
         proc.on("error", (err) => {
             if (!mountedRef.current) return;
+            globalLogger.error(`[updater] spawn error: ${err.message}`);
             setPkgOutput((prev) => [...prev, err.message]);
             setPkgStatus("error");
         });
@@ -141,7 +151,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
 
     if (!isActive) return null;
 
-    const modalWidth = Math.min(62, terminalWidth - 8);
+    const modalWidth = Math.min(100, terminalWidth - 4);
     // SEA has no progress states — always "idle" from the modal's perspective
     const isIdle = IS_SEA || pkgStatus === "idle";
     const isInProgress = !IS_SEA && pkgStatus === "running";
@@ -218,7 +228,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                     <Box flexDirection="column" marginTop={1}>
                         <Text color={theme.ui.focusIndicator}>Updating via {installer}...</Text>
                         {pkgOutput.map((line, i) => (
-                            <Text key={i} dimColor wrap="truncate">
+                            <Text key={i} dimColor>
                                 {line}
                             </Text>
                         ))}
@@ -237,8 +247,8 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                 {!IS_SEA && pkgStatus === "error" && (
                     <Box flexDirection="column" marginTop={1}>
                         <Text color={theme.status.error}>Update failed.</Text>
-                        {pkgOutput.slice(-3).map((line, i) => (
-                            <Text key={i} color={theme.text.muted} wrap="truncate">
+                        {pkgOutput.map((line, i) => (
+                            <Text key={i} color={theme.text.muted}>
                                 {line}
                             </Text>
                         ))}
