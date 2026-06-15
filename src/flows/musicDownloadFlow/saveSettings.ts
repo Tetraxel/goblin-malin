@@ -5,6 +5,7 @@ import {
     BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS,
     StoredProviderSettings,
 } from "./settings";
+import { globalLogger } from "#base/logger/logger";
 
 export interface SaveSettings {
     outputDir: string;
@@ -36,6 +37,7 @@ export function clearTempDownloads(): void {
     if (fs.existsSync(dir)) {
         fs.rmSync(dir, { recursive: true, force: true });
     }
+    globalLogger.info("Temporary downloads cleared");
 }
 
 export function getSaveSettings(): SaveSettings {

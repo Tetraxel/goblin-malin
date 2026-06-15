@@ -372,6 +372,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                 flexDirection="column"
                 justifyContent="center"
                 alignItems="center"
+                paddingTop={4}
             >
                 <Box
                     flexDirection="column"
@@ -380,11 +381,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                     borderBackgroundColor={theme.ui.background}
                     paddingX={2}
                     paddingY={1}
-                    marginX={2}
-                    marginY={3}
+                    marginBottom={6}
                     width={modalWidth}
                     backgroundColor={theme.ui.background}
-                    flexGrow={1}
+                    // flexGrow={1}
                     flexShrink={0}
                 >
                     {/* Title + tab bar */}
