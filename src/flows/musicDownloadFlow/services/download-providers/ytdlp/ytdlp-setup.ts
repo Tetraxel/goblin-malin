@@ -13,7 +13,26 @@ interface GitHubRelease {
     }>;
 }
 
-export async function ensureYtDlpSetup(): Promise<string> {
+/**
+ * Ensure a yt-dlp binary is available and return its path.
+ *
+ * @param autoDownloadBinary When `true` (default), always check GitHub for the
+ *   latest release and download it if missing. When `false`, reuse any existing
+ *   binary without checking for updates — a download only happens when no binary
+ *   exists at all (initialization), never just to update.
+ */
+export async function ensureYtDlpSetup(autoDownloadBinary = true): Promise<string> {
+    // Updates disabled: reuse an existing binary and skip the latest-version
+    // check entirely. Fall through to the normal download only if none exists.
+    if (!autoDownloadBinary) {
+        const existingBinary = await findExistingBinary("yt-dlp_", ".exe");
+        if (existingBinary) {
+            globalLogger.info(`Auto-download disabled; using existing yt-dlp at ${existingBinary}`);
+            return existingBinary;
+        }
+        globalLogger.info("Auto-download disabled, but no yt-dlp binary found; downloading latest…");
+    }
+
     try {
         let latestVersion: string | null = null;
 

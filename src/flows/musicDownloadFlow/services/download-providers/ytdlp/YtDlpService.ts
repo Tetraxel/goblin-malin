@@ -13,7 +13,7 @@ import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { readFileInfo } from "#flows/musicDownloadFlow/utils/readFileInfo";
 import { ensureYtDlpSetup } from "./ytdlp-setup";
 import { YtDlpCell } from "./YtDlpCell";
-import { getTempDownloadDir } from "../../../saveSettings";
+import { getTempDownloadDir, getDownloadProviderSettings } from "../../../saveSettings";
 import { generateTempFilename, findExistingTempFile } from "#flows/musicDownloadFlow/utils/tempFile";
 
 export class YtDlpService extends DownloadService {
@@ -40,8 +40,11 @@ export class YtDlpService extends DownloadService {
     private async getClient(): Promise<YtDlp> {
         return this.runExclusive("init", async () => {
             if (!YtDlpService.client) {
-                const ytDlpBinaryPath = await ensureYtDlpSetup();
-                const ffmpefBinaryPath = await ensureFfmpeg();
+                // Only update the binaries to the latest release when the user
+                // opted in; an absent binary is always downloaded regardless.
+                const autoDownloadBinary = getDownloadProviderSettings("ytdlp").autoDownloadBinary !== false;
+                const ytDlpBinaryPath = await ensureYtDlpSetup(autoDownloadBinary);
+                const ffmpefBinaryPath = await ensureFfmpeg(autoDownloadBinary);
                 const ytDlpClient = new YtDlp({
                     binaryPath: ytDlpBinaryPath,
                     ffmpegPath: ffmpefBinaryPath,

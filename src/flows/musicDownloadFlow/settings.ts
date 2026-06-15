@@ -7,7 +7,6 @@ export type StoredProviderSettings = Record<string, boolean | string>;
 
 export type MusicDownloadFlowSettings = {
     metadata: {
-        autoFetchOnImport: boolean;
         autoChooseBestSource: boolean;
         providers: Record<string, StoredProviderSettings>;
         discoveryProviders: Record<string, StoredProviderSettings>;
@@ -56,7 +55,6 @@ const MEDIA_OUTPUT_DIR = getPlatformDefaultMusicOutputDir();
 /** Flow-level defaults (without provider contributions — those come from registered services). */
 export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSettings = {
     metadata: {
-        autoFetchOnImport: false,
         autoChooseBestSource: false,
         providers: {},
         discoveryProviders: {},

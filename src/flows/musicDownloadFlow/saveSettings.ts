@@ -1,6 +1,10 @@
 ﻿import fs from "fs";
 import { SettingsStore } from "#settings/settingsStore";
-import { MusicDownloadFlowSettings, BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS } from "./settings";
+import {
+    MusicDownloadFlowSettings,
+    BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS,
+    StoredProviderSettings,
+} from "./settings";
 
 export interface SaveSettings {
     outputDir: string;
@@ -20,6 +24,11 @@ export function getDownloadDir(): string {
 
 export function getTempDownloadDir(): string {
     return getFlowSettings().download.outputTemporaryDir;
+}
+
+/** Stored runtime settings for a download provider (keyed by its registry name). */
+export function getDownloadProviderSettings(providerKey: string): StoredProviderSettings {
+    return getFlowSettings().download.providers[providerKey] ?? {};
 }
 
 export function clearTempDownloads(): void {
