@@ -9,6 +9,7 @@ import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadat
 import { computeOutputFilename } from "#flows/musicDownloadFlow/utils/computeOutputPath";
 import { getInstance, PlayerStatus } from "#utils/mpvPlayer";
 import { formatBytes, formatDate, tagValue } from "#components/SecondaryPanel/DownloadPanel/utils";
+import { Uri } from "#components/SecondaryPanel/MetadataPanel/Uri";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { PlaybackBar } from "../PlaybackBar";
 import { DiffView } from "./DiffView";
@@ -288,11 +289,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
         .filter((k) => !PRIORITY_TAGS.includes(k));
 
     const dlProvider = providerDisplayRegistry.get(source.provider);
-    const metaPlatform = providerDisplayRegistry.get(source.track.apiProvider);
-    const trackType = source.track.type
-        ? source.track.type.charAt(0).toUpperCase() + source.track.type.slice(1)
-        : "Track";
-    const sourceParts = [dlProvider.label, metaPlatform.label, trackType, source.track.id].filter(Boolean);
+    const sourceUri = source.track.uri ?? `${source.track.platform.toUpperCase()}::TRACK::${source.track.id}`;
 
     return (
         <Box flexDirection="column" width={width} height={height} overflow="hidden">
@@ -334,12 +331,9 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
 
                     <Box paddingX={1} paddingBottom={1} height={1} flexShrink={0} flexDirection="row" overflow="hidden">
                         <Text color={theme.text.secondary}>{"SOURCE  "}</Text>
-                        {sourceParts.map((part, idx) => (
-                            <React.Fragment key={idx}>
-                                {idx > 0 && <Text color={theme.text.secondary}>{" > "}</Text>}
-                                <Text color={dlProvider.color}>{part}</Text>
-                            </React.Fragment>
-                        ))}
+                        <Text color={dlProvider.color}>{dlProvider.label}</Text>
+                        <Text color={theme.text.secondary}>{" > "}</Text>
+                        <Uri uri={sourceUri} platform={source.track.platform} noPaddingX />
                     </Box>
 
                     {fileNotFound ? (
