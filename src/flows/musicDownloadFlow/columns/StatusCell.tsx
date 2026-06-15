@@ -26,7 +26,7 @@ function getStatusIcon(status: StatusType): React.ReactNode | null {
         case StatusType.Default:
         case StatusType.Processing:
         default:
-            return <AnimatedIcon icon={Icon.Dots} />;
+            return <AnimatedIcon icon={Icon.Dots} interval={200} />;
     }
 }
 
