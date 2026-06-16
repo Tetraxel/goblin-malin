@@ -52,6 +52,7 @@ export class Logger {
                     // Combined log file
                     new winston.transports.File({
                         filename: logsPath,
+                        level: "debug",
                         format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
                     }),
                 ],
