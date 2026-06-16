@@ -30,6 +30,7 @@ import { DownloadService } from "./downloadService";
 import { SpotifyService } from "./services/metadata-providers/spotify/SpotifyService";
 import { YoutubeService } from "./services/metadata-providers/youtube/YoutubeService";
 import { SonglinkService } from "./services/metadata-providers/songlink/SonglinkService";
+import { MusicBrainzDiscoveryService } from "./services/metadata-providers/musicbrainz/MusicBrainzDiscoveryService";
 import { YtDlpService } from "./services/download-providers/ytdlp/YtDlpService";
 import { DownloadTask } from "./utils/downloadTask";
 import { taskIdFromUrl } from "./utils/taskId";
@@ -145,6 +146,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         // this.metadataServiceRegistry.register('musicbrainz', MusicBrainzService);
 
         this.discoveryServiceRegistry.register("songlink", SonglinkService);
+        this.discoveryServiceRegistry.register("musicBrainz", MusicBrainzDiscoveryService);
 
         this.downloadServiceRegistry.register("ytdlp", YtDlpService);
         // this.downloadServiceRegistry.register('soulseek', SoulseekService);

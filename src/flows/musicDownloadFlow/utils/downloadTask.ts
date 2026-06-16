@@ -375,6 +375,14 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
                         const targetServiceKey = this.findServiceKeyForPlatform(rudimentary.platform);
                         if (!targetServiceKey) continue;
 
+                        // A DiscoveryMetadataService must tag each result with its own key via fetchedBy.
+                        if (!rudimentary.fetchedBy) {
+                            this.logger.warn(
+                                `Discovery result missing fetchedBy from ${discoveryService.id}; skipping`
+                            );
+                            continue;
+                        }
+
                         // Check dedup: same URI already in group from Phase A?
                         const existingGroup = (this.getAttributes()?.metadataGroups ?? []).find(
                             (g) => g.serviceKey === targetServiceKey
@@ -385,7 +393,8 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
                                 : undefined;
 
                         const discoverySource: DiscoverySource = {
-                            discoveredBy: "songlink",
+                            // `fetchedBy` is the discovery service's key (e.g. "songlink", "musicBrainz")
+                            discoveredBy: rudimentary.fetchedBy,
                             fromUri: primaryUri,
                             searchKeys: ["url"],
                         };
