@@ -2779,6 +2779,11 @@ hermes-parser@^0.25.1:
   dependencies:
     hermes-estree "0.25.1"
 
+himalaya@~1.1.0:
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/himalaya/-/himalaya-1.1.1.tgz#074ffbdbfba7b6c38c839b16838c846da51e7784"
+  integrity sha512-mJLY5tErGWtsw8hO2fJ2vK4IpG6S1AIgVkduRo4FqFJhgI2H3XLzgemRemk45zcnFyxNNpOfrIDle2KcnJM0lA==
+
 hookified@^1.15.0, hookified@^1.15.1:
   version "1.15.1"
   resolved "https://registry.npmjs.org/hookified/-/hookified-1.15.1.tgz"
@@ -4438,6 +4443,19 @@ spark-md5@^3.0.2:
   version "3.0.2"
   resolved "https://registry.npmjs.org/spark-md5/-/spark-md5-3.0.2.tgz"
   integrity sha512-wcFzz9cDfbuqe0FZzfi2or1sgyIrsDwmPwfZC4hiNidPdPINjeUwNfv5kldczoEAcjl9Y1L3SM7Uz2PUEQzxQw==
+
+spotify-uri@~4.1.0:
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/spotify-uri/-/spotify-uri-4.1.0.tgz#d1286b1922055e2b0e37b773ef2bff2c40e71010"
+  integrity sha512-SFpBt8pQqO7DOFBsdUjv3GxGZAKYP7UqcTflfE7h3YL1lynl/6Motq7NERoJJR8eF9kXQRSpcdMmV5ou84rbng==
+
+spotify-url-info@^3.3.0:
+  version "3.3.0"
+  resolved "https://registry.yarnpkg.com/spotify-url-info/-/spotify-url-info-3.3.0.tgz#d4cf1298332834df703aad5c3202e2a410980cdc"
+  integrity sha512-Oln8MPghuttL6e2e8NyQg0MilZqEbMYawKZDAMbz1NpSX+on2bEtibKVBPYKlJGU/Lxvo/qXFqydMxa0fKCmwg==
+  dependencies:
+    himalaya "~1.1.0"
+    spotify-uri "~4.1.0"
 
 stack-trace@0.0.x:
   version "0.0.10"
