@@ -47,6 +47,7 @@
         "start": "ts-node src/index.ts",
         "build": "tsup",
         "type-check": "tsc --noEmit",
+        "probe:songlink": "node scripts/songlink-rate-probe.mjs",
         "lint": "eslint src/",
         "format": "prettier --write src/",
         "format:check": "prettier --check src/",
