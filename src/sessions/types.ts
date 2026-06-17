@@ -10,6 +10,8 @@ export interface StoredSession {
     createdAt: string;
     updatedAt: string;
     tasks: SessionTaskSnapshot[];
+    /** True once the user has explicitly renamed the session (vs. the derived default name). */
+    renamed?: boolean;
 }
 
 export interface SessionsFile {

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { Box, Text } from "ink";
 import TextInput from "ink-text-input";
 import { useShortcuts } from "#hooks/useShortcuts";
@@ -9,10 +9,14 @@ import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
 import { SessionStore } from "#sessions/sessionStore";
 import { SessionManager } from "#sessions/sessionManager";
 import { StoredSession } from "#sessions/types";
+import { getSessionMatches, clampToMatch } from "#sessions/sessionSearch";
 import { Hint } from "../Hint";
+import { SearchBar } from "../SearchBar";
+import { HighlightedText } from "../HighlightedText";
 import { useSessions } from "./useSessions";
 
-const MODAL_OVERHEAD = 12;
+// title(1) + search(4) + footer(1) + margins/border/padding
+const MODAL_OVERHEAD = 14;
 
 interface SessionsModalProps {
     terminalHeight: number;
@@ -28,7 +32,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
     orchestrator,
 }) => {
     const theme = useTheme();
-    const { focusState, switchBack, switchWindow } = useFocusContext();
+    const { focusState, switchBack } = useFocusContext();
     const isActive = focusState.activeWindow === "sessionsModal";
 
     const [searchQuery, setSearchQuery] = useState("");
@@ -51,9 +55,9 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
 
     const selectedSession: StoredSession | undefined = sessions[safeIndex];
 
-    const prevIsActive = useRef(isActive);
-    if (prevIsActive.current !== isActive) {
-        prevIsActive.current = isActive;
+    const [prevIsActive, setPrevIsActive] = useState(isActive);
+    if (prevIsActive !== isActive) {
+        setPrevIsActive(isActive);
         if (isActive) {
             setSearchQuery("");
             setModalFocus("search");
@@ -209,7 +213,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
             },
             {
                 id: "sessionsModal.rename",
-                defaultShortcut: { input: "r" },
+                defaultShortcut: { input: "r", ctrl: true },
                 label: "Rename",
                 handler: () => {
                     if (isBlocked || modalFocus !== "list") return;
@@ -218,7 +222,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
             },
             {
                 id: "sessionsModal.new",
-                defaultShortcut: { input: "n" },
+                defaultShortcut: { input: "n", ctrl: true },
                 label: "New session",
                 handler: () => {
                     if (isBlocked) return;
@@ -228,7 +232,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
             },
             {
                 id: "sessionsModal.duplicate",
-                defaultShortcut: { input: "c" },
+                defaultShortcut: { input: "d", ctrl: true },
                 label: "Duplicate",
                 handler: () => {
                     if (isBlocked || modalFocus !== "list") return;
@@ -247,15 +251,6 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
                     if (selectedSession) requestDelete(selectedSession);
                 },
             },
-            {
-                id: "sessionsModal.deleteX",
-                defaultShortcut: { input: "x" },
-                label: "Delete",
-                handler: () => {
-                    if (isBlocked || modalFocus !== "list") return;
-                    if (selectedSession) requestDelete(selectedSession);
-                },
-            },
         ],
     });
 
@@ -263,10 +258,11 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
 
     const modalWidth = Math.min(90, Math.max(60, terminalWidth - 6));
     const innerWidth = modalWidth - 6;
+    const isSearching = searchQuery.trim().length > 0;
 
     function formatDate(iso: string): string {
         try {
-            return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+            return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
         } catch {
             return iso;
         }
@@ -309,6 +305,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
                     borderBackgroundColor={theme.ui.background}
                     paddingX={2}
                     paddingY={1}
+                    marginTop={2}
                     marginBottom={6}
                     width={modalWidth}
                     backgroundColor={theme.ui.background}
@@ -318,21 +315,19 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
                         <Text bold color={theme.action.primary}>
                             SESSIONS
                         </Text>
-                        <Text dimColor>{sessions.length} session{sessions.length !== 1 ? "s" : ""}</Text>
+                        <Text dimColor>
+                            {sessions.length} session{sessions.length !== 1 ? "s" : ""}
+                        </Text>
                     </Box>
 
                     {/* Search bar */}
-                    <Box marginTop={1} flexShrink={0}>
-                        <Text color={theme.text.muted}>{"Search: "}</Text>
-                        <Box flexGrow={1}>
-                            <TextInput
-                                value={searchQuery}
-                                onChange={setSearchQuery}
-                                placeholder="type to filter…"
-                                focus={modalFocus === "search" && !isBlocked}
-                            />
-                        </Box>
-                    </Box>
+                    <SearchBar
+                        value={searchQuery}
+                        onChange={setSearchQuery}
+                        placeholder="Search sessions…"
+                        highlighted={modalFocus === "search" && !isBlocked}
+                        inputFocus={modalFocus === "search" && !isBlocked}
+                    />
 
                     {/* Session list */}
                     <Box flexDirection="column" height={listHeight} overflow="hidden" marginTop={1} flexShrink={0}>
@@ -348,9 +343,10 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
 
                             const cursorChar = isSelected ? "☛" : " ";
                             const cursorColor = isSelected ? theme.text.active : theme.text.muted;
+                            const matches = isSearching ? getSessionMatches(session, searchQuery) : [];
 
                             return (
-                                <Box key={session.id} flexDirection="row" flexShrink={0}>
+                                <Box key={session.id} flexDirection="row" flexShrink={0} marginTop={idx === 0 ? 0 : 1}>
                                     <Text color={cursorColor}>{cursorChar} </Text>
                                     <Box flexDirection="column" flexGrow={1}>
                                         <Box flexDirection="row" flexShrink={0}>
@@ -367,7 +363,10 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
                                                     bold={isCurrent}
                                                     color={isCurrent ? theme.action.primary : theme.text.active}
                                                 >
-                                                    {session.name}
+                                                    <HighlightedText
+                                                        text={session.name}
+                                                        query={isSearching ? searchQuery : ""}
+                                                    />
                                                 </Text>
                                             )}
                                             {isCurrent && !isRenaming && (
@@ -381,13 +380,29 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
                                                 {formatDate(session.updatedAt)} · {session.tasks.length} track
                                                 {session.tasks.length !== 1 ? "s" : ""}
                                             </Text>
-                                            {session.tasks.length > 0 && (
+                                            {!isSearching && session.tasks.length > 0 && (
                                                 <Text dimColor>
                                                     {" · "}
                                                     {getPreview(session).slice(0, innerWidth - 40)}
                                                 </Text>
                                             )}
                                         </Box>
+                                        {matches.map((m, i) => (
+                                            <Box key={`${m.field}-${i}`} paddingLeft={3} flexShrink={0}>
+                                                <Text wrap="truncate-end">
+                                                    <Text dimColor>{`└─ ${m.field}: `}</Text>
+                                                    <HighlightedText
+                                                        text={clampToMatch(
+                                                            m.value,
+                                                            searchQuery,
+                                                            Math.max(10, innerWidth - 12)
+                                                        )}
+                                                        query={searchQuery}
+                                                        color={theme.text.muted}
+                                                    />
+                                                </Text>
+                                            </Box>
+                                        ))}
                                     </Box>
                                 </Box>
                             );
@@ -395,7 +410,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
                     </Box>
 
                     {/* Footer hints */}
-                    <Box marginTop={1} flexDirection="row" flexShrink={0}>
+                    <Box marginTop={1} flexDirection="row" flexWrap="wrap" flexShrink={0}>
                         {renamingId ? (
                             <>
                                 <Hint label="Confirm" shortcut="Enter" />
@@ -404,16 +419,16 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
                         ) : modalFocus === "search" ? (
                             <>
                                 <Hint label="Go to list" shortcut="↓/Enter" />
-                                <Hint label="New" shortcut="n" />
+                                <Hint label="New" shortcut="Ctrl+N" />
                                 <Hint label="Close" shortcut="Esc" />
                             </>
                         ) : (
                             <>
                                 <Hint label="Load" shortcut="Enter" />
-                                <Hint label="Rename" shortcut="r" />
-                                <Hint label="New" shortcut="n" />
-                                <Hint label="Dupe" shortcut="c" />
-                                <Hint label="Del" shortcut="x/Del" />
+                                <Hint label="Rename" shortcut="Ctrl+R" />
+                                <Hint label="New" shortcut="Ctrl+N" />
+                                <Hint label="Duplicate" shortcut="Ctrl+D" />
+                                <Hint label="Delete" shortcut="DEL" />
                                 <Hint label="Close" shortcut="Esc" />
                             </>
                         )}

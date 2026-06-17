@@ -1,9 +1,8 @@
 import React from "react";
 import { Box, Text } from "ink";
-import TextInput from "ink-text-input";
-import { useTheme } from "#base/themeContext";
 import { itemRowHeight, SettingsItem } from "#settings/buildSettingsItems";
 import { SettingsItemRow } from "./SettingsItemRow";
+import { SearchBar } from "../SearchBar";
 
 // marginTop(1) + border+content height(3)
 const SEARCH_H = 4;
@@ -37,8 +36,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     onEditChange,
     onEditSubmit,
 }) => {
-    const theme = useTheme();
-
     const listAreaH = Math.max(3, height - SEARCH_H);
     const rowStarts: number[] = [];
     let cumRows = 0;
@@ -63,29 +60,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         visibleRows += h;
     }
 
-    const searchBorderColor = searchFocused && editingIndex === null ? theme.action.primary : theme.text.secondary;
-
     return (
         <Box flexDirection="column" width={width} height={height} overflow="hidden">
-            <Box
-                marginTop={1}
-                borderStyle="single"
-                borderColor={searchBorderColor}
-                borderBackgroundColor={theme.ui.background}
-                paddingX={1}
-                height={3}
-                flexShrink={0}
-            >
-                <Text dimColor={!searchFocused} color={searchFocused ? theme.action.primary : undefined}>
-                    {"⌕ "}
-                </Text>
-                <TextInput
-                    value={searchQuery}
-                    onChange={onSearchChange}
-                    placeholder="Search settings…"
-                    focus={searchFocused && isActive && editingIndex === null}
-                />
-            </Box>
+            <SearchBar
+                value={searchQuery}
+                onChange={onSearchChange}
+                placeholder="Search settings…"
+                highlighted={searchFocused && editingIndex === null}
+                inputFocus={searchFocused && isActive && editingIndex === null}
+            />
 
             <Box flexDirection="column" overflow="hidden" flexGrow={1} flexShrink={0}>
                 {visibleItems.map(({ item, idx }) => {

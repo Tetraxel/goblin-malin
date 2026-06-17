@@ -59,9 +59,7 @@ export class SessionStore {
         const current = this.getCached();
         const idx = current.sessions.findIndex((s) => s.id === session.id);
         const sessions =
-            idx >= 0
-                ? current.sessions.map((s, i) => (i === idx ? session : s))
-                : [session, ...current.sessions];
+            idx >= 0 ? current.sessions.map((s, i) => (i === idx ? session : s)) : [session, ...current.sessions];
         this.writeToDisk({ ...current, sessions });
     }
 
@@ -75,7 +73,7 @@ export class SessionStore {
     renameSession(id: string, name: string): void {
         const session = this.getById(id);
         if (!session) return;
-        this.upsertSession({ ...session, name });
+        this.upsertSession({ ...session, name, renamed: true });
     }
 
     setLastSessionId(id: string | null): void {

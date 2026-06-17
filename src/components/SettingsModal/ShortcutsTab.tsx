@@ -1,11 +1,11 @@
 import React, { useReducer, useEffect } from "react";
 import { Box, Text } from "ink";
 import type { Key } from "ink";
-import TextInput from "ink-text-input";
 import { shortcutRegistry } from "#base/shortcuts/ShortcutRegistry";
 import { SettingsStore } from "#settings/settingsStore";
 import { Shortcut, getShortcutLiteral } from "#types/actions";
 import { useTheme } from "#base/themeContext";
+import { SearchBar } from "../SearchBar";
 
 export interface ShortcutsTabItem {
     id: string;
@@ -96,29 +96,15 @@ export const ShortcutsTab: React.FC<ShortcutsTabProps> = ({
     const bindingColW = 16;
     const labelColW = 14;
 
-    const searchBorderColor = searchFocused && !rebindingId ? theme.action.primary : theme.text.secondary;
-
     return (
         <Box flexDirection="column" width={width} height={height} overflow="hidden">
-            <Box
-                marginTop={1}
-                borderStyle="single"
-                borderColor={searchBorderColor}
-                borderBackgroundColor={theme.ui.background}
-                paddingX={1}
-                height={3}
-                flexShrink={0}
-            >
-                <Text dimColor={!searchFocused} color={searchFocused ? theme.action.primary : undefined}>
-                    {"⌕ "}
-                </Text>
-                <TextInput
-                    value={searchQuery}
-                    onChange={onSearchChange}
-                    placeholder="Search shortcuts…"
-                    focus={searchFocused && isActive && !rebindingId}
-                />
-            </Box>
+            <SearchBar
+                value={searchQuery}
+                onChange={onSearchChange}
+                placeholder="Search shortcuts…"
+                highlighted={searchFocused && !rebindingId}
+                inputFocus={searchFocused && isActive && !rebindingId}
+            />
             {rebindingId && (
                 <Box paddingX={1} height={REBIND_H} flexShrink={0} flexDirection="column">
                     <Text color={theme.action.primary} bold>

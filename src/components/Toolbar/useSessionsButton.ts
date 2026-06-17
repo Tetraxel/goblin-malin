@@ -8,7 +8,7 @@ export const useSessionsButton: ToolbarButtonHook = () => {
     return {
         label: "Sessions",
         icon: "◈",
-        color: theme.action.neutral,
+        color: theme.palette.purple,
         enabled: true,
         onPress: () => switchWindow("sessionsModal"),
     };
