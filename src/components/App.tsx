@@ -15,9 +15,11 @@ import { getInstance } from "#utils/mpvPlayer";
 import { getAssetPath } from "#utils/appPaths";
 import { AppInner } from "./AppInner";
 import { useSettingsButton } from "./Toolbar/useSettingsButton";
+import { useSessionsButton } from "./Toolbar/useSessionsButton";
 import { useExitButton } from "./Toolbar/useExitButton";
 import { checkForUpdate, UpdateInfo } from "#updater/updateChecker";
 import { SettingsStore } from "#settings/settingsStore";
+import { SessionManager } from "#sessions/sessionManager";
 
 export const App: React.FC = () => {
     useEffect(() => {
@@ -73,16 +75,24 @@ export const App: React.FC = () => {
         globalLogger.debug(`Active flow changed: ${currentFlow?.displayName}`);
         // Subscribe to currentFlow changes to update buttons and columns dynamically
         const unsubscribe = currentFlow.subscribe((_updatedFlow) => {
-            const buttons = [...(currentFlow.getToolbarButtons() ?? []), useSettingsButton, useExitButton];
+            const buttons = [...(currentFlow.getToolbarButtons() ?? []), useSessionsButton, useSettingsButton, useExitButton];
             setToolbarButtons(buttons);
             setColumns(currentFlow.getColumns() ?? []);
         });
         return unsubscribe;
     }, [currentFlow, currentFlow?.id]);
 
+    // Init SessionManager once the active flow is ready
     useEffect(() => {
-        const unsubscribe = orchestrator.subscribe((orchestrator) => {
-            setTasks(orchestrator.getTasks());
+        if (!currentFlow) return;
+        SessionManager.getInstance().init(currentFlow, orchestrator);
+    }, [currentFlow?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        const unsubscribe = orchestrator.subscribe((orch) => {
+            const currentFlowTasks = orch.getTasks();
+            setTasks(currentFlowTasks);
+            SessionManager.getInstance().persistCurrent(currentFlowTasks.map((t) => t.get()));
         });
         return unsubscribe;
     }, [orchestrator, orchestrator.id]);

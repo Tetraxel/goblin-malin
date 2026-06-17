@@ -29,6 +29,8 @@
             "#flows/*": ["./src/flows/*"],
             "#hooks": ["./src/hooks"],
             "#hooks/*": ["./src/hooks/*"],
+            "#sessions": ["./src/sessions"],
+            "#sessions/*": ["./src/sessions/*"],
             "#settings": ["./src/settings"],
             "#settings/*": ["./src/settings/*"],
             "#updater/*": ["./src/updater/*"],
