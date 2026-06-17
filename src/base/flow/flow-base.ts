@@ -3,7 +3,7 @@ import { ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
 import { ContextualActionBar } from "#types/actions";
 import { ToolbarButtonHook } from "#components/Toolbar/Toolbar";
 import { FlowOrchestrator } from "./flow-orchestrator";
-import { Task } from "../task/task";
+import { Task, TaskSnapshot } from "../task/task";
 import type { SettingsItem } from "#settings/buildSettingsItems";
 import type { SetupWizardConfig } from "../setupWizard";
 
@@ -96,6 +96,9 @@ export class FlowBase<TaskAttributes = any> {
         throw Error("Not implemented");
     }
     public setColumnRatios(_ratios: Record<string, number>): void {}
+
+    // Optional hook for restoring tasks from persisted snapshots
+    public createTasksFromSnapshots?(snapshots: TaskSnapshot[]): Task<TaskAttributes>[];
 
     // Optional settings interface — flows that support settings implement these
     public getFlowSettings?(): Record<string, unknown>;

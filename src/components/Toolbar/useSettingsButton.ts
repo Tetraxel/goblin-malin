@@ -8,7 +8,7 @@ export const useSettingsButton: ToolbarButtonHook = () => {
     return {
         label: "Settings",
         icon: "⛭",
-        color: theme.action.neutral,
+        color: theme.palette.grayLight,
         enabled: true,
         onPress: () => switchWindow("settingsModal"),
     };

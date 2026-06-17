@@ -6,6 +6,7 @@ import { PromptModal } from "./PromptModal/PromptModal";
 import { ImportModal } from "./ImportModal/ImportModal";
 import { StartModal } from "./StartModal/StartModal";
 import { SettingsModal } from "./SettingsModal/SettingsModal";
+import { SessionsModal } from "./SessionsModal/SessionsModal";
 import { SetupWizardModal } from "./SetupWizardModal/SetupWizardModal";
 import { WelcomeModal } from "./WelcomeModal/WelcomeModal";
 import { UpdateModal } from "./UpdateModal/UpdateModal";
@@ -102,6 +103,13 @@ export const AppInner: React.FC<{
                     terminalWidth={terminalWidth}
                     onConfirm={handleStartConfirm}
                     onCancel={handleStartCancel}
+                />
+
+                <SessionsModal
+                    terminalHeight={terminalHeight}
+                    terminalWidth={terminalWidth}
+                    currentFlow={currentFlow}
+                    orchestrator={orchestrator}
                 />
 
                 <SettingsModal

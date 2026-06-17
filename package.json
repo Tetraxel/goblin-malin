@@ -19,6 +19,8 @@
         "#flows/*": "./src/flows/*.ts",
         "#hooks": "./src/hooks/index.ts",
         "#hooks/*": "./src/hooks/*.ts",
+        "#sessions": "./src/sessions/index.ts",
+        "#sessions/*": "./src/sessions/*.ts",
         "#settings": "./src/settings/index.ts",
         "#settings/*": "./src/settings/*.ts",
         "#updater/*": "./src/updater/*.ts",

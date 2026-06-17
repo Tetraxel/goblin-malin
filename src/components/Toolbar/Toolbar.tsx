@@ -11,6 +11,7 @@ import { Separator } from "../Separator";
 import { TabBar } from "../TabBar";
 import { UpdateInfo } from "#updater/updateChecker";
 import { UpdateBadge } from "./UpdateBadge";
+import { useCurrentSessionName } from "./useCurrentSessionName";
 import { APP_VERSION } from "#constants";
 
 export type ToolbarButtonHook<TFlow = FlowBase> = ({
@@ -52,8 +53,10 @@ export const Toolbar = ({
     const { focusState } = useFocusContext();
     const isActive = focusState.activeWindow === "toolbar";
     const height = focusState.toolbar.height;
+    const currentSessionName = useCurrentSessionName();
 
-    const name = "😉 " + (width > 90 ? "Goblin Malin" : "");
+    const isScreenSmall = width < 100;
+    const name = "😉 " + (isScreenSmall ? "" : "Goblin Malin");
     const nameWidth = stringWidth(name);
     const splitPositions = [nameWidth + 3];
 
@@ -70,6 +73,7 @@ export const Toolbar = ({
                 overflow="hidden"
                 display={"flex"}
                 height={height}
+                gap={1}
             >
                 <Box
                     borderStyle="single"
@@ -78,41 +82,51 @@ export const Toolbar = ({
                     borderTop={false}
                     borderBottom={false}
                     borderLeft={false}
-                    marginRight={1}
                     width={nameWidth + 2}
                     minWidth={nameWidth + 2}
                     height={height}
                     overflow="hidden"
+                    flexShrink={0}
                 >
                     <Text color={theme.action.primary} bold={true}>
                         {name}
                     </Text>
                 </Box>
 
-                {buttons.map((hook, index) => {
-                    const isSelected = isActive && focusState.toolbar.selectedButtonIndex === index;
+                <Box height={height} marginRight={1} flexGrow={1} flexShrink={0}>
+                    {buttons.map((hook, index) => {
+                        const isSelected = isActive && focusState.toolbar.selectedButtonIndex === index;
 
-                    return (
-                        <ToolbarButtonInvoker
-                            key={index}
-                            hook={hook}
-                            isSelected={isSelected}
-                            index={index}
-                            flow={flow}
-                            orchestrator={orchestrator}
-                        />
-                    );
-                })}
+                        return (
+                            <ToolbarButtonInvoker
+                                key={index}
+                                hook={hook}
+                                isSelected={isSelected}
+                                index={index}
+                                flow={flow}
+                                orchestrator={orchestrator}
+                            />
+                        );
+                    })}
+                </Box>
 
                 <Box
                     flexDirection={"row"}
                     display={"flex"}
-                    flexGrow={1}
                     justifyContent="flex-end"
                     gap={1}
                     height={height}
+                    flexShrink={1}
                 >
                     {/* <FlowSelector flows={flows} currentFlow={flow} onFlowChange={onFlowChange} /> */}
+                    {currentSessionName && !isScreenSmall && (
+                        <>
+                            <Text color={theme.text.heading} bold={true} wrap="truncate-end">
+                                {currentSessionName}
+                            </Text>
+                            <Text dimColor>·</Text>
+                        </>
+                    )}
                     {updateInfo ? (
                         <UpdateBadge
                             version={updateInfo.latestVersion}

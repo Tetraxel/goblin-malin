@@ -11,6 +11,7 @@ export interface ThemePalette {
     purple: string;
     pink: string;
     white: string;
+    grayLight: string;
     gray: string;
     grayDark: string;
 }
