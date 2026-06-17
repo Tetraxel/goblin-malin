@@ -12,12 +12,21 @@ export interface WizardField {
     required?: boolean;
 }
 
+export interface WizardMode {
+    id: string;
+    label: string;
+    description?: string;
+    fields: WizardField[];
+}
+
 export interface SetupWizardConfig {
     title: string;
     providerKey?: string;
     providerType?: "metadata" | "download";
     description: WizardContentBlock[];
-    fields: WizardField[];
+    fields: WizardField[]; // used only when modes is absent (back-compat)
+    modeEnvVar?: string; // e.g. "SPOTIFY_AUTH_MODE"
+    modes?: WizardMode[]; // if present → wizard shows a mode chooser
     /** If set, saved env vars are grouped under a labelled section comment in .env */
     envSection?: { name: string; url?: string };
 }

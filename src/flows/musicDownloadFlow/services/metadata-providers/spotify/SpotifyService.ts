@@ -1,4 +1,4 @@
-﻿import { SpotifyApi, Track } from "@spotify/web-api-ts-sdk";
+import { SpotifyApi, Track } from "@spotify/web-api-ts-sdk";
 import { ProviderDisplay } from "#base/providerDisplay";
 import { ProviderSettingsSchema } from "#base/providerSettings";
 import { SetupWizardConfig } from "#base/setupWizard";
@@ -10,6 +10,8 @@ import { StandardTrack, TrackMetadata, TrackUri, SearchTrackResult } from "#flow
 import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { SpotifyCell } from "./SpotifyCell";
 import { MetadataService } from "../../../metadataService";
+import { getSpotifyEmbedDetails } from "../../apis/spotify-url-info-client";
+import { convertSpotifyUrlInfoToTrack } from "./convertSpotifyUrlInfoToTrack";
 
 export type SpotifyTokenResponse = {
     access_token: string;
@@ -66,6 +68,8 @@ export type SpotifyPlaylistTrackResponse = {
     }[];
 };
 
+type SpotifyAuthMode = "official" | "scrape";
+
 export class SpotifyService extends MetadataService {
     static readonly display: ProviderDisplay = {
         label: "Spotify",
@@ -82,52 +86,57 @@ export class SpotifyService extends MetadataService {
         providerKey: "spotify",
         providerType: "metadata",
         envSection: { name: "SPOTIFY", url: "https://developer.spotify.com/dashboard" },
-        description: [
+        description: [],
+        fields: [], // empty — fields live in modes
+        modeEnvVar: "SPOTIFY_AUTH_MODE",
+        modes: [
             {
-                type: "note",
-                text: "You need a Premium Spotify Account to access the Spotify API.",
-            },
-            {
-                type: "paragraph",
-                text: "Steps to setup Spotify API access:",
-            },
-            {
-                type: "orderedList",
-                items: [
-                    {
-                        type: "link",
-                        text: "Log in to the Spotify Developer Dashboard",
-                        url: "https://developer.spotify.com/dashboard",
-                    },
-                    { type: "text", text: 'Click "Create app"' },
-                    { type: "text", text: "Copy the CLIENT_ID and CLIENT_SECRET from the app page" },
+                id: "official",
+                label: "Official Spotify API (needs Premium + app creds)",
+                description: "Best metadata (album, ISRC, track number).",
+                fields: [
+                    { envVar: "SPOTIFY_CLIENT_ID", label: "CLIENT_ID", hint: "e.g. b94c59cdcd…" },
+                    { envVar: "SPOTIFY_CLIENT_SECRET", label: "CLIENT_SECRET", hint: "e.g. fa5a8a70ab…" },
                 ],
             },
-        ],
-        fields: [
-            { envVar: "SPOTIFY_CLIENT_ID", label: "CLIENT_ID", hint: "e.g. b94c59cdcd…" },
-            { envVar: "SPOTIFY_CLIENT_SECRET", label: "CLIENT_SECRET", hint: "e.g. fa5a8a70ab…" },
+            {
+                id: "scrape",
+                label: "spotify-url-info (no account, reads public page)",
+                description: "Limited metadata (no album, no ISRC). May break if Spotify changes embed page.",
+                fields: [],
+            },
         ],
     };
     static readonly cellComponent = SpotifyCell;
 
-    private static client: SpotifyApi;
+    private static client: SpotifyApi | null = null;
+    private static authMode: SpotifyAuthMode | null = null;
 
     constructor(task: DownloadTask, logger: Logger) {
         super("SpotifyService", task, logger);
     }
 
-    private async getClient(): Promise<SpotifyApi> {
+    private async resolveAuth(): Promise<void> {
         return this.runExclusive("init", async () => {
-            if (!SpotifyService.client) {
-                const vars = await this.env.getVariablesWithWizard(SpotifyService.setupWizard);
+            if (SpotifyService.authMode !== null) return;
+            await this.env.getVariablesWithWizard(SpotifyService.setupWizard);
+            const mode = (process.env.SPOTIFY_AUTH_MODE ?? "official") as SpotifyAuthMode;
+            SpotifyService.authMode = mode;
+            if (mode === "official") {
                 SpotifyService.client = SpotifyApi.withClientCredentials(
-                    vars["SPOTIFY_CLIENT_ID"],
-                    vars["SPOTIFY_CLIENT_SECRET"]
+                    process.env.SPOTIFY_CLIENT_ID!,
+                    process.env.SPOTIFY_CLIENT_SECRET!
                 );
             }
-            return SpotifyService.client;
         });
+    }
+
+    private async getClient(): Promise<SpotifyApi> {
+        await this.resolveAuth();
+        if (!SpotifyService.client) {
+            throw new Error("Spotify client not initialized (scrape mode active)");
+        }
+        return SpotifyService.client;
     }
 
     /**
@@ -218,34 +227,81 @@ export class SpotifyService extends MetadataService {
         return null;
     }
 
+    private async fetchViaUrlInfo(url: string, trackId: string): Promise<TrackMetadata> {
+        this.logger.info(`Fetching Spotify track via spotify-url-info: "${trackId}"…`);
+        this.status.set({
+            type: StatusType.Processing,
+            message: "Get spotify track info (embed)",
+            timeTracking: true,
+            progress: 0,
+        });
+        try {
+            const details = await getSpotifyEmbedDetails(url);
+            this.status.clear();
+            return convertSpotifyUrlInfoToTrack(url, details);
+        } catch (error) {
+            this.logger.error(`Error fetching Spotify track via spotify-url-info for ID ${trackId}:`, { error });
+            this.status.set({
+                type: StatusType.Error,
+                message: "Error fetching Spotify track info (embed)",
+            });
+            throw error;
+        }
+    }
+
     @Cached()
     async getTrackMetadata(url: string): Promise<TrackMetadata> {
+        await this.resolveAuth();
+
         const trackId = SpotifyService.parseUrl(url)?.id;
         if (!trackId) {
             throw new Error(`Invalid Spotify track URL: ${url}`);
         }
 
-        const spotifyTrack = await this.getTrackInfo(trackId);
-        if (!spotifyTrack) {
-            throw new Error(`Could not fetch Spotify track: ${trackId}`);
+        const mode = SpotifyService.authMode ?? "official";
+
+        if (mode === "scrape") {
+            return this.fetchViaUrlInfo(url, trackId);
         }
 
-        const standardTrack = this.convertSpotifyTrack(spotifyTrack, url);
+        // Official mode — try the API, fall back to embed scraping
+        try {
+            const spotifyTrack = await this.getTrackInfo(trackId);
+            if (!spotifyTrack) {
+                throw new Error(`Could not fetch Spotify track: ${trackId}`);
+            }
 
-        const metadata: TrackMetadata = {
-            ...standardTrack,
-            platform: "spotify",
-            apiProvider: "spotify",
-            uri: `SPOTIFY::TRACK::${spotifyTrack.id}` as TrackUri<"spotify">,
+            const standardTrack = this.convertSpotifyTrack(spotifyTrack, url);
 
-            fetchedAt: new Date(),
-            type: "track",
-        };
+            const metadata: TrackMetadata = {
+                ...standardTrack,
+                platform: "spotify",
+                apiProvider: "spotify",
+                uri: `SPOTIFY::TRACK::${spotifyTrack.id}` as TrackUri<"spotify">,
 
-        return metadata;
+                fetchedAt: new Date(),
+                type: "track",
+            };
+
+            return metadata;
+        } catch (error) {
+            this.logger.warn(`Official Spotify API failed for "${trackId}", falling back to spotify-url-info`, {
+                error,
+            });
+            return this.fetchViaUrlInfo(url, trackId);
+        }
     }
 
     async searchTrack(sourceTrackMetadata: TrackMetadata): Promise<SearchTrackResult[]> {
+        await this.resolveAuth();
+
+        const mode = SpotifyService.authMode ?? "official";
+        if (mode === "scrape") {
+            throw new Error(
+                "Spotify search is not available in scrape mode. Switch to official API mode for search support."
+            );
+        }
+
         const client = await this.getClient();
 
         const artist = sourceTrackMetadata.artists?.[0]?.name;

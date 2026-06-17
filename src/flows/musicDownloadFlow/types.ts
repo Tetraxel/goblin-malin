@@ -107,7 +107,8 @@ export type APIProvider =
     | "anghami"
     | "boomplay"
     | "bandcamp"
-    | "songlink";
+    | "songlink"
+    | "spotifyUrlInfo";
 
 export type TrackUri<PlatformString extends string = string> = `${Uppercase<PlatformString>}::TRACK::${string}`;
 
