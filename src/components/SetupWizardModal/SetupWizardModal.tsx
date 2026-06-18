@@ -5,7 +5,7 @@ import TextInput from "ink-text-input";
 import { Task } from "#base/task/task";
 import { PromptType, SetupWizardPrompt } from "#base/task/task-prompt";
 import { providerDisplayRegistry } from "#base/providerDisplay";
-import { SetupWizardConfig } from "#base/setupWizard";
+import { SetupWizardConfig, WizardContentBlock } from "#base/setupWizard";
 import { useTheme } from "#base/themeContext";
 import { useFocusContext } from "#contexts/FocusContext";
 import { openUrl } from "#utils/openUrl";
@@ -26,8 +26,18 @@ function buildInteractiveItems(config: SetupWizardConfig, selectedMode?: string)
         for (const mode of config.modes) {
             items.push({ kind: "mode", id: mode.id, label: mode.label });
         }
-        // Then add fields of the active mode
         const activeMode = config.modes.find((m) => m.id === selectedMode) ?? config.modes[0];
+        // Then the active mode's detail links (navigable, between the chooser and the fields)
+        for (const block of activeMode.details ?? []) {
+            if (block.type === "orderedList") {
+                for (const item of block.items) {
+                    if (item.type === "link") {
+                        items.push({ kind: "link", text: item.text, url: item.url });
+                    }
+                }
+            }
+        }
+        // Then the fields of the active mode
         for (const field of activeMode.fields) {
             items.push({ kind: "field", envVar: field.envVar, label: field.label, hint: field.hint });
         }
@@ -92,9 +102,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
             setFocusedIndex(0);
             setEditingField(null);
             const initialMode =
-                config.modes && config.modeEnvVar
-                    ? (process.env[config.modeEnvVar] ?? config.modes[0].id)
-                    : "";
+                config.modes && config.modeEnvVar ? (process.env[config.modeEnvVar] ?? config.modes[0].id) : "";
             setSelectedMode(initialMode);
             const activeFields = config.modes
                 ? (config.modes.find((m) => m.id === initialMode) ?? config.modes[0]).fields
@@ -270,18 +278,79 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
 
     const modalWidth = Math.min(80, Math.max(60, terminalWidth - 6));
 
-    // Determine active fields for labelWidth (mode-aware)
-    const activeFields = config.modes
-        ? (config.modes.find((m) => m.id === selectedMode) ?? config.modes[0]).fields
-        : config.fields;
+    // Resolve the active mode once (mode-aware fields/description/details).
+    const activeMode = config.modes ? (config.modes.find((m) => m.id === selectedMode) ?? config.modes[0]) : undefined;
+    const activeFields = activeMode ? activeMode.fields : config.fields;
     const labelWidth = activeFields.length > 0 ? Math.max(...activeFields.map((f) => f.label.length)) + 2 : 2;
+    const activeModeDescription = activeMode?.description;
+    const activeModeDetails = activeMode?.details;
 
-    // Active mode description (for modes config)
-    const activeModeDescription = config.modes
-        ? (config.modes.find((m) => m.id === selectedMode) ?? config.modes[0]).description
-        : undefined;
+    // Link items follow the mode radio items in the interactive list, so offset past them.
+    let linkInteractiveIndex = config.modes ? config.modes.length : 0;
 
-    let linkInteractiveIndex = 0;
+    // Renders rich content blocks (notes, paragraphs, ordered lists with focusable links). Shared by
+    // the non-modes description and the per-mode `details`. Mutates `linkInteractiveIndex` so each
+    // rendered link lines up with its entry in `interactiveItems` for keyboard focus.
+    const renderContentBlocks = (blocks: WizardContentBlock[]) =>
+        blocks.map((block, bi) => {
+            if (block.type === "note") {
+                return (
+                    <Box key={bi} flexDirection="column" marginBottom={1}>
+                        <Box flexDirection="row">
+                            <Text color={theme.palette.blue}>{"│ "}</Text>
+                            <Text color={theme.palette.blue} bold>
+                                {"ℹ Note"}
+                            </Text>
+                        </Box>
+                        <Box flexDirection="row">
+                            <Text color={theme.palette.blue}>{"│ "}</Text>
+                            <Text dimColor>{block.text}</Text>
+                        </Box>
+                    </Box>
+                );
+            }
+            if (block.type === "paragraph") {
+                return (
+                    <Box key={bi} marginBottom={1}>
+                        <Text>{block.text}</Text>
+                    </Box>
+                );
+            }
+            if (block.type === "orderedList") {
+                return (
+                    <Box key={bi} flexDirection="column">
+                        {block.items.map((item, ii) => {
+                            const myIndex = linkInteractiveIndex;
+                            if (item.type === "link") linkInteractiveIndex++;
+                            const isFocused = isActive && item.type === "link" && focusedIndex === myIndex;
+                            return (
+                                <Box key={ii} flexDirection="row">
+                                    <Text color={isFocused ? theme.text.active : theme.text.muted}>
+                                        {isFocused ? "☛ " : "  "}
+                                    </Text>
+                                    <Text color={theme.text.muted}>
+                                        {ii + 1}
+                                        {"."}{" "}
+                                    </Text>
+                                    {item.type === "link" ? (
+                                        <Text
+                                            color={theme.palette.blue}
+                                            underline={isFocused}
+                                            backgroundColor={isFocused ? theme.ui.rowActiveBackground : undefined}
+                                        >
+                                            {item.text}
+                                        </Text>
+                                    ) : (
+                                        <Text>{item.text}</Text>
+                                    )}
+                                </Box>
+                            );
+                        })}
+                    </Box>
+                );
+            }
+            return null;
+        });
 
     return (
         <Box
@@ -309,34 +378,46 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
                 {/* Mode chooser (when modes are configured) */}
                 {config.modes && (
                     <Box flexDirection="column" marginTop={1}>
-                        <Text dimColor>{"  Choose how to fetch Spotify metadata:"}</Text>
-                        {config.modes.map((mode, mi) => {
+                        <Text color={theme.text.heading} bold>
+                            {"Choose how to fetch Spotify metadata:"}
+                        </Text>
+                        {config.modes.map((mode) => {
                             const itemIndex = interactiveItems.findIndex(
                                 (it) => it.kind === "mode" && it.id === mode.id
                             );
                             const isFocused = focusedIndex === itemIndex;
                             const isSelected = selectedMode === mode.id;
+                            // Focus (gold) takes priority over the selected (green) color, and applies
+                            // to the radio dot as well as the label.
+                            const itemColor = isFocused
+                                ? theme.action.primary
+                                : isSelected
+                                  ? borderColor
+                                  : theme.text.secondary;
                             return (
-                                <Box key={mode.id} flexDirection="row" marginTop={mi === 0 ? 0 : 0}>
-                                    <Text color={isFocused ? theme.text.active : theme.text.muted}>
+                                <Box key={mode.id} flexDirection="row">
+                                    <Text color={isFocused ? theme.action.primary : theme.text.muted}>
                                         {isFocused ? "☛ " : "  "}
                                     </Text>
-                                    <Text color={isSelected ? theme.text.active : theme.text.secondary}>
+                                    <Text color={itemColor} bold={isSelected}>
                                         {isSelected ? "◉ " : "○ "}
                                     </Text>
-                                    <Text
-                                        color={isFocused ? theme.text.active : theme.text.secondary}
-                                        bold={isSelected}
-                                    >
+                                    <Text color={itemColor} bold={isSelected || isFocused}>
                                         {mode.label}
                                     </Text>
                                 </Box>
                             );
                         })}
                         {activeModeDescription && (
-                            <Box marginTop={1}>
-                                <Text dimColor>{"  "}</Text>
-                                <Text dimColor>{activeModeDescription}</Text>
+                            <Box marginTop={1} paddingLeft={4}>
+                                <Text color={theme.text.secondary} italic>
+                                    {activeModeDescription}
+                                </Text>
+                            </Box>
+                        )}
+                        {activeModeDetails && activeModeDetails.length > 0 && (
+                            <Box flexDirection="column" marginTop={1} paddingLeft={4}>
+                                {renderContentBlocks(activeModeDetails)}
                             </Box>
                         )}
                     </Box>
@@ -345,73 +426,12 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
                 {/* Description blocks (non-modes path) */}
                 {!config.modes && (
                     <Box flexDirection="column" marginTop={1}>
-                        {config.description.map((block, bi) => {
-                            if (block.type === "note") {
-                                return (
-                                    <Box key={bi} flexDirection="column" marginBottom={1}>
-                                        <Box flexDirection="row">
-                                            <Text color={theme.palette.blue}>{"│ "}</Text>
-                                            <Text color={theme.palette.blue} bold>
-                                                {"ℹ Note"}
-                                            </Text>
-                                        </Box>
-                                        <Box flexDirection="row">
-                                            <Text color={theme.palette.blue}>{"│ "}</Text>
-                                            <Text dimColor>{block.text}</Text>
-                                        </Box>
-                                    </Box>
-                                );
-                            }
-                            if (block.type === "paragraph") {
-                                return (
-                                    <Box key={bi} marginBottom={1}>
-                                        <Text>{block.text}</Text>
-                                    </Box>
-                                );
-                            }
-                            if (block.type === "orderedList") {
-                                return (
-                                    <Box key={bi} flexDirection="column">
-                                        {block.items.map((item, ii) => {
-                                            const myIndex = linkInteractiveIndex;
-                                            if (item.type === "link") linkInteractiveIndex++;
-                                            const isFocused =
-                                                isActive && item.type === "link" && focusedIndex === myIndex;
-                                            return (
-                                                <Box key={ii} flexDirection="row">
-                                                    <Text color={isFocused ? theme.text.active : theme.text.muted}>
-                                                        {isFocused ? "☛ " : "  "}
-                                                    </Text>
-                                                    <Text color={theme.text.muted}>
-                                                        {ii + 1}
-                                                        {"."}{" "}
-                                                    </Text>
-                                                    {item.type === "link" ? (
-                                                        <Text
-                                                            color={theme.palette.blue}
-                                                            underline={isFocused}
-                                                            backgroundColor={
-                                                                isFocused ? theme.ui.rowActiveBackground : undefined
-                                                            }
-                                                        >
-                                                            {item.text}
-                                                        </Text>
-                                                    ) : (
-                                                        <Text>{item.text}</Text>
-                                                    )}
-                                                </Box>
-                                            );
-                                        })}
-                                    </Box>
-                                );
-                            }
-                            return null;
-                        })}
+                        {renderContentBlocks(config.description)}
                     </Box>
                 )}
 
                 {/* Fields (active mode fields when modes present, all fields otherwise) */}
-                <Box flexDirection="column" marginTop={1}>
+                <Box flexDirection="column" marginTop={1} paddingLeft={config.modes ? 2 : 0}>
                     {activeFields.map((field, fi) => {
                         const itemIndex = interactiveItems.findIndex(
                             (it) => it.kind === "field" && it.envVar === field.envVar
@@ -423,7 +443,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
                             <Box
                                 flexDirection="row"
                                 key={field.envVar}
-                                marginTop={fi === 0 ? 1 : 0}
+                                marginTop={fi === 0 ? (config.modes ? 0 : 1) : 0}
                                 height={3}
                                 alignItems="center"
                             >

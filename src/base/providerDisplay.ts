@@ -62,7 +62,13 @@ const BUILTIN_PROVIDERS: Record<string, ProviderDisplay> = {
         colorSubtle: "#7a3000",
         colorBright: "#ff8c3a",
     },
-    spotifyUrlInfo: { label: "Spotify Web", acronym: "SPOTIFY WEB", color: "#3bb0a0", colorSubtle: "#0f5a52", colorBright: "#56d4c4" },
+    spotifyUrlInfo: {
+        label: "Scraped",
+        acronym: "SCRAPED SPOTIFY",
+        color: "#3bb0a0",
+        colorSubtle: "#0f5a52",
+        colorBright: "#56d4c4",
+    },
 };
 
 const FALLBACK: ProviderDisplay = {

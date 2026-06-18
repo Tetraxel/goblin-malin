@@ -32,6 +32,11 @@ export function getDownloadProviderSettings(providerKey: string): StoredProvider
     return getFlowSettings().download.providers[providerKey] ?? {};
 }
 
+/** Stored runtime settings for a metadata provider (keyed by its registry name). */
+export function getMetadataProviderSettings(providerKey: string): StoredProviderSettings {
+    return getFlowSettings().metadata.providers[providerKey] ?? {};
+}
+
 export function clearTempDownloads(): void {
     const dir = getTempDownloadDir();
     if (fs.existsSync(dir)) {

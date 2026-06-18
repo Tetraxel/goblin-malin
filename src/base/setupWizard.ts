@@ -15,7 +15,8 @@ export interface WizardField {
 export interface WizardMode {
     id: string;
     label: string;
-    description?: string;
+    description?: string; // one-line helper shown under the chooser
+    details?: WizardContentBlock[]; // richer content (notes, steps, links) shown above the fields
     fields: WizardField[];
 }
 

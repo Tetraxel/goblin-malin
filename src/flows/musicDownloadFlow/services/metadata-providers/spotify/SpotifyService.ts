@@ -1,4 +1,4 @@
-import { SpotifyApi, Track } from "@spotify/web-api-ts-sdk";
+﻿import { SpotifyApi, Track } from "@spotify/web-api-ts-sdk";
 import { ProviderDisplay } from "#base/providerDisplay";
 import { ProviderSettingsSchema } from "#base/providerSettings";
 import { SetupWizardConfig } from "#base/setupWizard";
@@ -12,6 +12,7 @@ import { SpotifyCell } from "./SpotifyCell";
 import { MetadataService } from "../../../metadataService";
 import { getSpotifyEmbedDetails } from "../../apis/spotify-url-info-client";
 import { convertSpotifyUrlInfoToTrack } from "./convertSpotifyUrlInfoToTrack";
+import { getMetadataProviderSettings } from "../../../saveSettings";
 
 export type SpotifyTokenResponse = {
     access_token: string;
@@ -80,6 +81,11 @@ export class SpotifyService extends MetadataService {
     };
     static readonly defaultSettings: ProviderSettingsSchema = {
         enabled: { label: "Enable", defaultValue: true, kind: "checkbox" },
+        fallbackToWeb: {
+            label: "Fallback on Spotify Web if API is unavailable",
+            defaultValue: true,
+            kind: "checkbox",
+        },
     };
     static readonly setupWizard: SetupWizardConfig = {
         title: "⚙  Spotify Setup Wizard",
@@ -92,8 +98,30 @@ export class SpotifyService extends MetadataService {
         modes: [
             {
                 id: "official",
-                label: "Official Spotify API (needs Premium + app creds)",
+                label: "Official Spotify API (needs Premium account)",
                 description: "Best metadata (album, ISRC, track number).",
+                details: [
+                    {
+                        type: "note",
+                        text: "You need a Premium Spotify Account to access the Spotify API.",
+                    },
+                    {
+                        type: "paragraph",
+                        text: "Steps to setup Spotify API access:",
+                    },
+                    {
+                        type: "orderedList",
+                        items: [
+                            {
+                                type: "link",
+                                text: "Log in to the Spotify Developer Dashboard",
+                                url: "https://developer.spotify.com/dashboard",
+                            },
+                            { type: "text", text: 'Click "Create app"' },
+                            { type: "text", text: "Copy the CLIENT_ID and CLIENT_SECRET from the app page" },
+                        ],
+                    },
+                ],
                 fields: [
                     { envVar: "SPOTIFY_CLIENT_ID", label: "CLIENT_ID", hint: "e.g. b94c59cdcd…" },
                     { envVar: "SPOTIFY_CLIENT_SECRET", label: "CLIENT_SECRET", hint: "e.g. fa5a8a70ab…" },
@@ -101,8 +129,8 @@ export class SpotifyService extends MetadataService {
             },
             {
                 id: "scrape",
-                label: "spotify-url-info (no account, reads public page)",
-                description: "Limited metadata (no album, no ISRC). May break if Spotify changes embed page.",
+                label: "Scrape Spotify Web page (reads public page)",
+                description: "Limited metadata (no album, no ISRC).\nMay break if Spotify changes embed page.",
                 fields: [],
             },
         ],
@@ -227,7 +255,7 @@ export class SpotifyService extends MetadataService {
         return null;
     }
 
-    private async fetchViaUrlInfo(url: string, trackId: string): Promise<TrackMetadata> {
+    private async fetchViaUrlInfo(url: string, trackId: string, isFallback: boolean): Promise<TrackMetadata> {
         this.logger.info(`Fetching Spotify track via spotify-url-info: "${trackId}"…`);
         this.status.set({
             type: StatusType.Processing,
@@ -238,7 +266,7 @@ export class SpotifyService extends MetadataService {
         try {
             const details = await getSpotifyEmbedDetails(url);
             this.status.clear();
-            return convertSpotifyUrlInfoToTrack(url, details);
+            return convertSpotifyUrlInfoToTrack(url, details, { isFallback });
         } catch (error) {
             this.logger.error(`Error fetching Spotify track via spotify-url-info for ID ${trackId}:`, { error });
             this.status.set({
@@ -261,7 +289,8 @@ export class SpotifyService extends MetadataService {
         const mode = SpotifyService.authMode ?? "official";
 
         if (mode === "scrape") {
-            return this.fetchViaUrlInfo(url, trackId);
+            // User deliberately chose scrape mode — this is the primary source, not a fallback.
+            return this.fetchViaUrlInfo(url, trackId, false);
         }
 
         // Official mode — try the API, fall back to embed scraping
@@ -285,10 +314,19 @@ export class SpotifyService extends MetadataService {
 
             return metadata;
         } catch (error) {
+            // Only fall back to the public embed page if the user opted into it. When disabled we
+            // surface the API failure instead of silently degrading metadata.
+            const fallbackEnabled = getMetadataProviderSettings("spotify").fallbackToWeb !== false;
+            if (!fallbackEnabled) {
+                this.logger.error(`Official Spotify API failed for "${trackId}" and Spotify Web fallback is disabled`, {
+                    error,
+                });
+                throw error;
+            }
             this.logger.warn(`Official Spotify API failed for "${trackId}", falling back to spotify-url-info`, {
                 error,
             });
-            return this.fetchViaUrlInfo(url, trackId);
+            return this.fetchViaUrlInfo(url, trackId, true);
         }
     }
 

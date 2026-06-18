@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+
 // Local type definitions for spotify-url-info (v3.3.0)
 // The package ships CJS with a callable module.exports; the type declaration
 // exports the interface as the default type which causes TS2693 when used
@@ -33,7 +35,10 @@ interface SpotifyUrlInfoApi {
     getDetails: (url: string, opts?: RequestInit) => Promise<Details>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// The package is CJS-only with an awkward default export type (see note above), so we bridge it
+// via createRequire — a plain ESM `import` would crash at runtime ("require is not defined") under
+// this project's `"type": "module"`, and a default import would trip TS2693.
+const require = createRequire(import.meta.url);
 const createSpotifyUrlInfo = require("spotify-url-info") as (fetch: typeof globalThis.fetch) => SpotifyUrlInfoApi;
 
 const api: SpotifyUrlInfoApi = createSpotifyUrlInfo(fetch);

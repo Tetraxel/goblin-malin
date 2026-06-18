@@ -16,9 +16,9 @@ export type AppSettings = {
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
     general: {
-        reopenLastSession: false,
+        reopenLastSession: true,
         appDataDir: DEFAULT_APP_DATA_DIR,
-        animationsEnabled: false,
+        animationsEnabled: true,
         theme: "dark",
         showWelcomeTutorial: true,
         checkForUpdates: true,

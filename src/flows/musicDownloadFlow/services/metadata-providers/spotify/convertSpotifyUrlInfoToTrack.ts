@@ -20,7 +20,17 @@ function extractTrackId(url: string): string | null {
     }
 }
 
-export function convertSpotifyUrlInfoToTrack(url: string, details: Details): TrackMetadata {
+/**
+ * @param options.isFallback When true, this result is a fallback after the official Spotify API
+ *   was unavailable, so `apiProvider` stays `"spotify"` and `fetchedBy` differs — this is what
+ *   surfaces the "Spotify is not available…" note. When false (the user deliberately chose the
+ *   scrape mode), `apiProvider` is set to `"spotifyUrlInfo"` so no "not available" note is shown.
+ */
+export function convertSpotifyUrlInfoToTrack(
+    url: string,
+    details: Details,
+    options: { isFallback?: boolean } = {}
+): TrackMetadata {
     const track = details.tracks[0];
     const id = extractTrackId(url) ?? track.uri?.split(":").pop() ?? "";
 
@@ -33,7 +43,7 @@ export function convertSpotifyUrlInfoToTrack(url: string, details: Details): Tra
         uri: `SPOTIFY::TRACK::${id}` as TrackUri<"spotify">,
         nativeAppUriDesktop: `spotify:track:${id}`,
         platform: "spotify",
-        apiProvider: "spotify",
+        apiProvider: options.isFallback ? "spotify" : "spotifyUrlInfo",
         fetchedBy: "spotifyUrlInfo",
         fetchedAt: new Date(),
         type: "track",
