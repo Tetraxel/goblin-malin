@@ -34,7 +34,9 @@ import { MusicBrainzDiscoveryService } from "./services/metadata-providers/music
 import { YtDlpService } from "./services/download-providers/ytdlp/YtDlpService";
 import { DownloadTask } from "./utils/downloadTask";
 import { taskIdFromUrl } from "./utils/taskId";
+import { reviveTaskDates } from "./utils/reviveTaskDates";
 import { MusicDownloadTaskAttributes } from "./types";
+import { TaskSnapshot } from "#base/task/task";
 import {
     MusicDownloadFlowSettings,
     BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS,
@@ -207,6 +209,27 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                     isDownloadServiceEnabled: (key) => this.settings.get().download.providers[key]?.enabled !== false,
                 })
         );
+    }
+
+    public createTasksFromSnapshots(snapshots: TaskSnapshot[]): DownloadTask[] {
+        return snapshots.map((snap) => {
+            const rawAttrs = snap.attributes as MusicDownloadTaskAttributes | undefined;
+            const attributes = rawAttrs ? reviveTaskDates(rawAttrs) : undefined;
+            return new DownloadTask({
+                id: snap.id,
+                initialInput: snap.initialInput,
+                attributes,
+                flowId: this.id,
+                logger: this.logger,
+                metadataServiceRegistry: this.metadataServiceRegistry,
+                discoveryServiceRegistry: this.discoveryServiceRegistry,
+                downloadServiceRegistry: this.downloadServiceRegistry,
+                isMetadataServiceEnabled: (key) => this.settings.get().metadata.providers[key]?.enabled !== false,
+                isDiscoveryServiceEnabled: (key) =>
+                    this.settings.get().metadata.discoveryProviders[key]?.enabled !== false,
+                isDownloadServiceEnabled: (key) => this.settings.get().download.providers[key]?.enabled !== false,
+            });
+        });
     }
 
     async restartTask(task: DownloadTask): Promise<void> {

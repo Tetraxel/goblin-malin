@@ -82,6 +82,13 @@ export class FlowOrchestrator {
         this.notifySubscribers();
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setTasks(tasks: Task<any>[]): void {
+        this.tasks = [...tasks];
+        this.activeTasks = [];
+        this.notifySubscribers();
+    }
+
     public getTasks(): Task[] {
         return this.tasks;
     }
