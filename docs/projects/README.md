@@ -20,3 +20,4 @@ These are not task lists — each project is a self-contained scope of work. Ind
 | P12 — Global Input System                        | [p12/tasks.md](p12/tasks.md) |
 | P13 — Session management                         | [p13/tasks.md](p13/tasks.md) |
 | P14 — Spotify auth-mode choice & scrape fallback | [p14/tasks.md](p14/tasks.md) |
+| P16 — Logging Revamp                              | [p16/tasks.md](p16/tasks.md) |

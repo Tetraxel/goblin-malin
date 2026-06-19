@@ -106,6 +106,15 @@ export class Task<TTaskAttributes = TaskAttributes> {
         return this.logger;
     }
 
+    /**
+     * Short, human-readable label identifying this task in log lines (e.g. a
+     * track uri). Returns undefined by default; subclasses override. The full
+     * string is returned here — the log panel truncates it to fit.
+     */
+    public getLogLabel(): string | undefined {
+        return undefined;
+    }
+
     public setInitialInput(initialInput: string): void {
         this.initialInput = initialInput;
         this.notifyTaskSubscribers();

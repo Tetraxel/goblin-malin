@@ -114,6 +114,7 @@
         "@spotify/web-api-ts-sdk": "^1.2.0",
         "adm-zip": "^0.5.17",
         "chalk": "^5.6.2",
+        "cli-truncate": "^6.0.0",
         "clipboardy": "^5.3.1",
         "dotenv": "^17.4.2",
         "flac-tagger": "^2.0.0",
@@ -134,8 +135,10 @@
         "react": "^19.2.6",
         "slsk-client": "^1.1.0",
         "spotify-url-info": "^3.3.0",
+        "strip-ansi": "^6.0.1",
         "winston": "^3.19.0",
         "winston-transport": "^4.9.0",
+        "wrap-ansi": "^10.0.0",
         "ytdlp-nodejs": "^3.4.4",
         "ytmusic-api": "^5.3.1"
     }

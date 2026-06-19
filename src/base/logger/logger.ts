@@ -1,9 +1,9 @@
 ﻿import fs from "fs";
 import path from "path";
-import chalk from "chalk";
 import winston from "winston";
 import { inkTransport } from "./ink-transport";
 import { LogMetadata, LogLevel, LogDetails } from "./types";
+import { getCurrentTask } from "#base/task/taskContext";
 import { getLogsPath } from "#utils/appPaths";
 
 // Capture once at startup; ensure directory exists
@@ -18,19 +18,6 @@ function getString(obj: unknown): string {
         return obj.message;
     } else {
         return JSON.stringify(obj);
-    }
-}
-
-function setLogColor(level: LogLevel, message: string): string {
-    switch (level) {
-        case LogLevel.INFO:
-            return chalk.blue(message);
-        case LogLevel.WARN:
-            return chalk.yellow(message);
-        case LogLevel.ERROR:
-            return chalk.red(message);
-        case LogLevel.DEBUG:
-            return chalk.gray(message);
     }
 }
 
@@ -67,27 +54,32 @@ export class Logger {
     }
 
     private log(level: LogLevel, message: unknown, details: LogDetails = {}) {
-        const service = this.metadata?.service;
-        const prefix = service ? `[${service}] ` : "";
-        const formattedMessage = prefix + setLogColor(level, getString(message));
-        // const formattedMessage = prefix + getString(message)
+        // Store the plain message. Presentation (level color, [service] prefix,
+        // uri prefix) is applied by the log panel at render time so the on-disk
+        // log stays free of ANSI escapes and width math is accurate.
+        const plainMessage = getString(message);
+
+        // Attribute to the explicitly-bound task, else the ambient task context
+        // (set by @TaskScoped) so shared code logs land under the right task.
+        const task = this.metadata?.task ?? getCurrentTask();
+
         const metadata: Omit<LogMetadata, "message"> = {
             ...this.metadata,
+            task,
             id: crypto.randomUUID(),
             timestamp: new Date(),
             level,
-            // message: formattedMessage,
             details,
         };
 
         if (level === LogLevel.ERROR) {
-            Logger.logger.error(formattedMessage, metadata);
+            Logger.logger.error(plainMessage, metadata);
         } else if (level === LogLevel.WARN) {
-            Logger.logger.warn(formattedMessage, metadata);
+            Logger.logger.warn(plainMessage, metadata);
         } else if (level === LogLevel.DEBUG) {
-            Logger.logger.debug(formattedMessage, metadata);
+            Logger.logger.debug(plainMessage, metadata);
         } else {
-            Logger.logger.info(formattedMessage, metadata);
+            Logger.logger.info(plainMessage, metadata);
         }
     }
 

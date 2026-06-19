@@ -298,8 +298,21 @@ export type TrackDownloadSource = {
 //         TASK         //
 //----------------------//
 
+// Structured task-level uri, used for the log-line prefix. Distinct from the
+// metadata-level `TrackUri` string brand: this is derived from the recognized
+// input URL (and refined once primary metadata is fetched).
+export type TrackUriParts = {
+    platform: Platform;
+    type: "track";
+    id: string;
+};
+
 export type TrackDownloadTask = {
     state: "pending" | "running" | "finished" | "failed";
+    /** Structured uri of the track once recognized; undefined falls back to the URL. */
+    uri?: TrackUriParts;
+    /** Registry key of the metadata service that recognized the input URL. */
+    recognizedServiceKey?: string;
     primaryMetadataInProgress?: boolean;
     metadataDiscoveringInProgress?: boolean;
     primaryMetadataFetched?: boolean;
