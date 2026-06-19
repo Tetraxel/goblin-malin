@@ -1,6 +1,6 @@
 {
     "name": "goblin-malin",
-    "version": "0.1.13",
+    "version": "0.1.14",
     "description": "A keyboard-driven terminal UI for downloading and tagging music tracks with metadata from Spotify and YouTube",
     "type": "module",
     "main": "./dist/index.js",
@@ -103,7 +103,6 @@
         "eslint-plugin-react-hooks": "^7.1.1",
         "postject": "^1.0.0-alpha.6",
         "prettier": "^3.8.3",
-        "spotify-url-info": "^3.3.0",
         "ts-node": "^10.9.2",
         "tsup": "^8.0.0",
         "tsx": "^4.21.0",
@@ -134,6 +133,7 @@
         "open": "^11.0.0",
         "react": "^19.2.6",
         "slsk-client": "^1.1.0",
+        "spotify-url-info": "^3.3.0",
         "winston": "^3.19.0",
         "winston-transport": "^4.9.0",
         "ytdlp-nodejs": "^3.4.4",
