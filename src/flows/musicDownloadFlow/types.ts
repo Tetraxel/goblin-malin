@@ -112,6 +112,15 @@ export type APIProvider =
 
 export type TrackUri<PlatformString extends string = string> = `${Uppercase<PlatformString>}::TRACK::${string}`;
 
+// Structured, round-trippable form of a track URI. Stored on a task at import time
+// for handy field access; serialize to/from the canonical "PLATFORM::TRACK::ID"
+// string via formatTrackUri()/parseTrackUri() (utils/trackUri.ts).
+export type TrackUriParts = {
+    platform: Platform; // exact casing, e.g. "spotify", "youtubeMusic"
+    type: "track";
+    id: string; // platform-specific id
+};
+
 export type BaseTrackMetadata = {
     id: string; // "4rye8ZgoRgbQPfgBqxjfqG"
     isrc?: string; // "FRT092400049"
@@ -321,6 +330,10 @@ export type TrackDownloadTask = {
     toTag?: boolean;
     toDownload?: boolean;
     userInput: UserInput;
+    // Recognized at import time from the URL (before any fetch). Both are set
+    // together, or both absent ⇒ the URL was not recognized by any service ("Unknown").
+    uri?: TrackUriParts; // structured URI, e.g. { platform: "spotify", type: "track", id: "123" }
+    recognizedServiceKey?: string; // registry key that matched & will fetch (e.g. "youtube")
     metadataGroups: MetadataGroupState[];
     metadataOverride: MetadataOverrides;
     downloadSources: TrackDownloadSource[];

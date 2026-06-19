@@ -12,7 +12,6 @@ import {
     MetadataGroupState,
     MetadataResultState,
     DiscoverySource,
-    Platform,
 } from "#flows/musicDownloadFlow/types";
 import { cleanAndTagFlac } from "#utils/metadata";
 import { SafeAction } from "#utils/decorators";
@@ -209,36 +208,16 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         });
 
         try {
-            // Step 1: Find which MetadataService recognizes the URL (including disabled ones)
-            const allConstructors = this.metadataServiceRegistry.getAllConstructors();
-            let recognizingServiceKey: string | undefined;
-            let recognizedPlatform: string | undefined;
-            let recognizedId: string | undefined;
-
-            for (const [key, constructor] of allConstructors) {
-                const parsed = constructor.parseUrl?.(url);
-                if (parsed?.type === "track") {
-                    recognizingServiceKey = key;
-                    recognizedPlatform = parsed.platform;
-                    recognizedId = parsed.id;
-                    break;
-                }
-            }
+            // Step 1: Recognition was resolved once at import time (resolveTrackRecognition)
+            // and stored on the task. A missing recognition means the URL is "Unknown".
+            const attrs = this.getAttributes();
+            const recognizingServiceKey = attrs?.recognizedServiceKey;
+            const recognizedPlatform = attrs?.uri?.platform;
 
             if (!recognizingServiceKey || !recognizedPlatform) {
                 this.status.update({ type: StatusType.Error, message: "Primary metadata unavailable" });
                 throw new Error(`No metadata service recognized the URL: ${url}`);
             }
-
-            // Record the recognized service and (when the id is known) a structured
-            // uri for the log-line prefix. Refined with the authoritative id once
-            // primary metadata is fetched below.
-            this.updateAttributes({
-                recognizedServiceKey: recognizingServiceKey,
-                uri: recognizedId
-                    ? { platform: recognizedPlatform as Platform, type: "track", id: recognizedId }
-                    : this.getAttributes()?.uri,
-            });
 
             // Step 2: If the recognizing service is enabled, try fetching
             let fetchedViaService = false;

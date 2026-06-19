@@ -34,6 +34,7 @@ import { MusicBrainzDiscoveryService } from "./services/metadata-providers/music
 import { YtDlpService } from "./services/download-providers/ytdlp/YtDlpService";
 import { DownloadTask } from "./utils/downloadTask";
 import { taskIdFromUrl } from "./utils/taskId";
+import { resolveTrackRecognition } from "./utils/resolveTrackRecognition";
 import { reviveTaskDates } from "./utils/reviveTaskDates";
 import { MusicDownloadTaskAttributes } from "./types";
 import { TaskSnapshot } from "#base/task/task";
@@ -184,31 +185,35 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
 
     public createTasksFromUrls(urls: string[], opts: { toTag?: boolean; toDownload?: boolean } = {}): DownloadTask[] {
         const { toTag = true, toDownload = false } = opts;
-        return urls.map(
-            (url) =>
-                new DownloadTask({
-                    id: taskIdFromUrl(url),
-                    initialInput: url,
-                    attributes: {
-                        state: "pending",
-                        userInput: { type: "url", url },
-                        metadataGroups: [],
-                        metadataOverride: {},
-                        downloadSources: [],
-                        toTag,
-                        toDownload,
-                    },
-                    flowId: this.id,
-                    logger: this.logger,
-                    metadataServiceRegistry: this.metadataServiceRegistry,
-                    discoveryServiceRegistry: this.discoveryServiceRegistry,
-                    downloadServiceRegistry: this.downloadServiceRegistry,
-                    isMetadataServiceEnabled: (key) => this.settings.get().metadata.providers[key]?.enabled !== false,
-                    isDiscoveryServiceEnabled: (key) =>
-                        this.settings.get().metadata.discoveryProviders[key]?.enabled !== false,
-                    isDownloadServiceEnabled: (key) => this.settings.get().download.providers[key]?.enabled !== false,
-                })
-        );
+        return urls.map((url) => {
+            // Recognize the URL once, at import time, so the task carries its uri from
+            // the start (before any fetch). Absent ⇒ "Unknown".
+            const recognition = resolveTrackRecognition(url, this.metadataServiceRegistry);
+            return new DownloadTask({
+                id: taskIdFromUrl(url),
+                initialInput: url,
+                attributes: {
+                    state: "pending",
+                    userInput: { type: "url", url },
+                    uri: recognition?.uri,
+                    recognizedServiceKey: recognition?.serviceKey,
+                    metadataGroups: [],
+                    metadataOverride: {},
+                    downloadSources: [],
+                    toTag,
+                    toDownload,
+                },
+                flowId: this.id,
+                logger: this.logger,
+                metadataServiceRegistry: this.metadataServiceRegistry,
+                discoveryServiceRegistry: this.discoveryServiceRegistry,
+                downloadServiceRegistry: this.downloadServiceRegistry,
+                isMetadataServiceEnabled: (key) => this.settings.get().metadata.providers[key]?.enabled !== false,
+                isDiscoveryServiceEnabled: (key) =>
+                    this.settings.get().metadata.discoveryProviders[key]?.enabled !== false,
+                isDownloadServiceEnabled: (key) => this.settings.get().download.providers[key]?.enabled !== false,
+            });
+        });
     }
 
     public createTasksFromSnapshots(snapshots: TaskSnapshot[]): DownloadTask[] {
@@ -362,12 +367,19 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         }
 
         if (column.id === "url") {
-            const url = attrs?.userInput.url ?? "";
-            columnActions.push({
-                shortcuts: [{ input: "c", ctrl: true }],
-                label: "Copy source URL",
-                onClick: () => clipboard.writeSync(url),
-            });
+            const primaryGroup = attrs?.metadataGroups.find((g) =>
+                g.results.some((r) => r.isPrimaryInput && (r.metadata.url || r.metadata.uri))
+            );
+            const serviceKey = primaryGroup?.serviceKey ?? attrs?.recognizedServiceKey;
+            if (serviceKey) {
+                columnActions.push(...this.buildMetadataServiceColumnActions(serviceKey, attrs, task));
+            } else {
+                columnActions.push({
+                    shortcuts: [{ input: "c", ctrl: true }],
+                    label: "Copy source URL",
+                    onClick: () => clipboard.writeSync(attrs?.userInput.url ?? ""),
+                });
+            }
         }
 
         if (column.id === "artist") {
@@ -393,28 +405,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             const display = providerDisplayRegistry.get(serviceKey);
             columnLabel = display.label;
             columnColor = display.color;
-            const group = attrs?.metadataGroups.find((g) => g.serviceKey === serviceKey);
-            const source = group?.results.find((r) => !r.isRejected) ?? group?.results[0];
-            const url = source?.metadata.url ?? "";
-            if (url) {
-                columnActions.push({
-                    shortcuts: [{ input: "c", ctrl: true }],
-                    label: `Copy ${display.label} URL`,
-                    onClick: () => clipboard.writeSync(url),
-                });
-                columnActions.push({
-                    shortcuts: [{ key: "return" }],
-                    label: `Open in ${display.label}`,
-                    onClick: () => {
-                        open(toOpenableUri(url)).catch(() => {});
-                    },
-                });
-            }
-            columnActions.push({
-                shortcuts: [{ input: "s" }],
-                label: "Re-search",
-                onClick: () => fire(task.startSingleProviderSearch(serviceKey)),
-            });
+            columnActions.push(...this.buildMetadataServiceColumnActions(serviceKey, attrs, task));
         }
 
         return {
@@ -423,6 +414,39 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 { text: `Task ${attributes.taskIndex + 1}/${attributes.taskCount}`, actions: taskActions },
             ],
         };
+    }
+
+    private buildMetadataServiceColumnActions(
+        serviceKey: string,
+        attrs: MusicDownloadTaskAttributes | undefined,
+        task: DownloadTask
+    ): ContextualActions[] {
+        const display = providerDisplayRegistry.get(serviceKey);
+        const group = attrs?.metadataGroups.find((g) => g.serviceKey === serviceKey);
+        const source = group?.results.find((r) => !r.isRejected) ?? group?.results[0];
+        const url = source?.metadata.url ?? "";
+        const actions: ContextualActions[] = [];
+        if (url) {
+            actions.push({
+                shortcuts: [{ input: "c", ctrl: true }],
+                label: `Copy ${display.label} URL`,
+                onClick: () => clipboard.writeSync(url),
+            });
+            const openTarget = source?.metadata.nativeAppUriDesktop ?? toOpenableUri(url);
+            actions.push({
+                shortcuts: [{ key: "return" }],
+                label: `Open in ${display.label}`,
+                onClick: () => {
+                    open(openTarget).catch(() => {});
+                },
+            });
+        }
+        actions.push({
+            shortcuts: [{ input: "s" }],
+            label: "Re-search",
+            onClick: () => fire(task.startSingleProviderSearch(serviceKey)),
+        });
+        return actions;
     }
 
     //!\ Always return all columns to maintain consistent hook count !
