@@ -34,8 +34,14 @@ export const Uri: React.FC<MetadataUriProps> = ({ uri, platform, fetchState, dim
 
     if (fetchState === "error") {
         return (
-            <Box flexDirection="row" flexShrink={0} height={1} backgroundColor={darken(theme.status.error, 0.2)}>
-                <Text color={theme.status.error}>{"✘ "}</Text>
+            <Box
+                flexDirection="row"
+                flexShrink={0}
+                height={1}
+                gap={1}
+                backgroundColor={darken(theme.status.error, 0.2)}
+            >
+                <Text color={theme.status.error}>{"✘"}</Text>
                 <Text color={theme.status.error} wrap="truncate-end">
                     {uri}
                 </Text>

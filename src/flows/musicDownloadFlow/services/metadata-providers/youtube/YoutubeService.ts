@@ -183,7 +183,7 @@ export class YoutubeService extends MetadataService {
 
         if (host === "music.youtube.com") {
             if (!parsed.pathname.startsWith("/watch")) return null;
-            return { platform: "youtubeMusic", type: "track", id: parsed.searchParams.get("v") ?? undefined };
+            return { platform: "youtube", type: "track", id: parsed.searchParams.get("v") ?? undefined };
         }
 
         if (host === "youtube.com" || host.endsWith(".youtube.com")) {
