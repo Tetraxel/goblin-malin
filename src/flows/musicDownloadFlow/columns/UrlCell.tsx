@@ -26,15 +26,13 @@ export const UrlCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, is
     // Otherwise show the URI recognized at import time, before any fetch.
     const importUri = task.attributes?.uri;
     if (importUri) {
-        return (
-            <Uri uri={formatTrackUri(importUri)} platform={importUri.platform} dimmed={!isSelected} noPaddingX />
-        );
+        return <Uri uri={formatTrackUri(importUri)} platform={importUri.platform} dimmed={!isSelected} noPaddingX />;
     }
 
-    // Unrecognized URL.
+    // Unrecognized URL: show the raw input
     return (
         <Text color={isSelected ? "green" : "white"} underline={isSelected} wrap="truncate-end">
-            Unknown
+            {task.attributes?.userInput?.url ?? "Unknown URL"}
         </Text>
     );
 };
