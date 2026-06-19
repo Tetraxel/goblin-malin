@@ -198,19 +198,11 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         });
 
         try {
-            // Step 1: Find which MetadataService recognizes the URL (including disabled ones)
-            const allConstructors = this.metadataServiceRegistry.getAllConstructors();
-            let recognizingServiceKey: string | undefined;
-            let recognizedPlatform: string | undefined;
-
-            for (const [key, constructor] of allConstructors) {
-                const parsed = constructor.parseUrl?.(url);
-                if (parsed?.type === "track") {
-                    recognizingServiceKey = key;
-                    recognizedPlatform = parsed.platform;
-                    break;
-                }
-            }
+            // Step 1: Recognition was resolved once at import time (resolveTrackRecognition)
+            // and stored on the task. A missing recognition means the URL is "Unknown".
+            const attrs = this.getAttributes();
+            const recognizingServiceKey = attrs?.recognizedServiceKey;
+            const recognizedPlatform = attrs?.uri?.platform;
 
             if (!recognizingServiceKey || !recognizedPlatform) {
                 this.status.update({ type: StatusType.Error, message: "Primary metadata unavailable" });

@@ -34,6 +34,7 @@ import { MusicBrainzDiscoveryService } from "./services/metadata-providers/music
 import { YtDlpService } from "./services/download-providers/ytdlp/YtDlpService";
 import { DownloadTask } from "./utils/downloadTask";
 import { taskIdFromUrl } from "./utils/taskId";
+import { resolveTrackRecognition } from "./utils/resolveTrackRecognition";
 import { reviveTaskDates } from "./utils/reviveTaskDates";
 import { MusicDownloadTaskAttributes } from "./types";
 import { TaskSnapshot } from "#base/task/task";
@@ -184,31 +185,35 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
 
     public createTasksFromUrls(urls: string[], opts: { toTag?: boolean; toDownload?: boolean } = {}): DownloadTask[] {
         const { toTag = true, toDownload = false } = opts;
-        return urls.map(
-            (url) =>
-                new DownloadTask({
-                    id: taskIdFromUrl(url),
-                    initialInput: url,
-                    attributes: {
-                        state: "pending",
-                        userInput: { type: "url", url },
-                        metadataGroups: [],
-                        metadataOverride: {},
-                        downloadSources: [],
-                        toTag,
-                        toDownload,
-                    },
-                    flowId: this.id,
-                    logger: this.logger,
-                    metadataServiceRegistry: this.metadataServiceRegistry,
-                    discoveryServiceRegistry: this.discoveryServiceRegistry,
-                    downloadServiceRegistry: this.downloadServiceRegistry,
-                    isMetadataServiceEnabled: (key) => this.settings.get().metadata.providers[key]?.enabled !== false,
-                    isDiscoveryServiceEnabled: (key) =>
-                        this.settings.get().metadata.discoveryProviders[key]?.enabled !== false,
-                    isDownloadServiceEnabled: (key) => this.settings.get().download.providers[key]?.enabled !== false,
-                })
-        );
+        return urls.map((url) => {
+            // Recognize the URL once, at import time, so the task carries its uri from
+            // the start (before any fetch). Absent ⇒ "Unknown".
+            const recognition = resolveTrackRecognition(url, this.metadataServiceRegistry);
+            return new DownloadTask({
+                id: taskIdFromUrl(url),
+                initialInput: url,
+                attributes: {
+                    state: "pending",
+                    userInput: { type: "url", url },
+                    uri: recognition?.uri,
+                    recognizedServiceKey: recognition?.serviceKey,
+                    metadataGroups: [],
+                    metadataOverride: {},
+                    downloadSources: [],
+                    toTag,
+                    toDownload,
+                },
+                flowId: this.id,
+                logger: this.logger,
+                metadataServiceRegistry: this.metadataServiceRegistry,
+                discoveryServiceRegistry: this.discoveryServiceRegistry,
+                downloadServiceRegistry: this.downloadServiceRegistry,
+                isMetadataServiceEnabled: (key) => this.settings.get().metadata.providers[key]?.enabled !== false,
+                isDiscoveryServiceEnabled: (key) =>
+                    this.settings.get().metadata.discoveryProviders[key]?.enabled !== false,
+                isDownloadServiceEnabled: (key) => this.settings.get().download.providers[key]?.enabled !== false,
+            });
+        });
     }
 
     public createTasksFromSnapshots(snapshots: TaskSnapshot[]): DownloadTask[] {
