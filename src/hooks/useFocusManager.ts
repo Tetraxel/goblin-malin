@@ -41,7 +41,7 @@ export type FocusableWindow =
     | "setupWizardModal"
     | "welcomeModal"
     | "updateModal"
-    | "deleteConfirmModal";
+    | "confirmModal";
 
 export interface FocusState {
     activeWindow: FocusableWindow;

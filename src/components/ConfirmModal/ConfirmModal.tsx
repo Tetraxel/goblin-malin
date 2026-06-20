@@ -3,22 +3,19 @@ import { Box, Text } from "ink";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusContext } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
-import { DeleteConfirmRequest } from "#base/flow/deleteConfirmBridge";
+import { ConfirmModalConfig } from "./useConfirmModal";
 import { Hint } from "../Hint";
 
-const CHOICES = ["delete", "cancel"] as const;
-type Choice = (typeof CHOICES)[number];
-
-interface DeleteConfirmModalProps {
-    pendingDelete: DeleteConfirmRequest | null;
+interface ConfirmModalProps {
+    pendingConfig: ConfirmModalConfig | null;
     terminalHeight: number;
     terminalWidth: number;
-    onConfirm: () => void;
+    onConfirm: (index: number) => void;
     onCancel: () => void;
 }
 
-export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
-    pendingDelete,
+export const ConfirmModal: React.FC<ConfirmModalProps> = ({
+    pendingConfig,
     terminalHeight,
     terminalWidth,
     onConfirm,
@@ -28,55 +25,49 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
     const { focusState, switchWindow, switchBack } = useFocusContext();
     const [choiceIndex, setChoiceIndex] = useState(0);
 
-    const [prevPending, setPrevPending] = useState(pendingDelete);
-    if (prevPending !== pendingDelete) {
-        setPrevPending(pendingDelete);
+    const [prevConfig, setPrevConfig] = useState(pendingConfig);
+    if (prevConfig !== pendingConfig) {
+        setPrevConfig(pendingConfig);
         setChoiceIndex(0);
     }
 
     useEffect(() => {
-        if (!pendingDelete) return;
-        switchWindow("deleteConfirmModal");
+        if (!pendingConfig) return;
+        switchWindow("confirmModal");
         return () => {
             switchBack();
         };
-    }, [pendingDelete, switchWindow, switchBack]);
+    }, [pendingConfig, switchWindow, switchBack]);
 
-    const isActive = pendingDelete !== null && focusState.activeWindow === "deleteConfirmModal";
+    const choiceCount = pendingConfig?.choices.length ?? 1;
+    const isActive = pendingConfig !== null && focusState.activeWindow === "confirmModal";
 
     useShortcuts({
-        id: "deleteConfirmModal",
+        id: "confirmModal",
         isActive,
         exclusive: true,
         priority: 300,
         shortcuts: [
             {
-                id: "deleteConfirmModal.left",
+                id: "confirmModal.left",
                 defaultShortcut: { key: "leftArrow" },
                 label: "Previous",
-                handler: () => setChoiceIndex((c) => (c - 1 + CHOICES.length) % CHOICES.length),
+                handler: () => setChoiceIndex((c) => (c - 1 + choiceCount) % choiceCount),
             },
             {
-                id: "deleteConfirmModal.right",
+                id: "confirmModal.right",
                 defaultShortcut: { key: "rightArrow" },
                 label: "Next",
-                handler: () => setChoiceIndex((c) => (c + 1) % CHOICES.length),
+                handler: () => setChoiceIndex((c) => (c + 1) % choiceCount),
             },
             {
-                id: "deleteConfirmModal.confirm",
+                id: "confirmModal.confirm",
                 defaultShortcut: { key: "return" },
                 label: "Confirm",
-                handler: () => {
-                    const choice: Choice = CHOICES[choiceIndex];
-                    if (choice === "delete") {
-                        onConfirm();
-                    } else {
-                        onCancel();
-                    }
-                },
+                handler: () => onConfirm(choiceIndex),
             },
             {
-                id: "deleteConfirmModal.cancel",
+                id: "confirmModal.cancel",
                 defaultShortcut: { key: "escape" },
                 label: "Cancel",
                 handler: () => onCancel(),
@@ -84,12 +75,9 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
         ],
     });
 
-    if (!pendingDelete) return null;
+    if (!pendingConfig) return null;
 
-    const count = pendingDelete.taskCount;
     const modalWidth = Math.min(60, Math.max(40, terminalWidth - 10));
-
-    const choiceLabel = (choice: Choice): string => (choice === "delete" ? "Delete" : "Cancel");
 
     return (
         <Box
@@ -103,33 +91,30 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
             <Box
                 flexDirection="column"
                 borderStyle="round"
-                borderColor={theme.status.error}
+                borderColor={pendingConfig.accentColor}
                 borderBackgroundColor={theme.ui.background}
                 backgroundColor={theme.ui.background}
                 paddingX={2}
                 paddingY={1}
                 width={modalWidth}
             >
-                <Text bold color={theme.status.error}>
-                    Delete {count === 1 ? "task" : "tasks"}
+                <Text bold color={pendingConfig.accentColor}>
+                    {pendingConfig.title}
                 </Text>
                 <Box marginTop={1}>
-                    <Text>
-                        Remove {count} {count === 1 ? "task" : "tasks"} from the queue?
-                    </Text>
+                    <Text>{pendingConfig.message}</Text>
                 </Box>
                 <Box marginTop={1} flexDirection="row">
-                    {CHOICES.map((choice, i) => {
+                    {pendingConfig.choices.map((choice, i) => {
                         const selected = i === choiceIndex;
-                        const color = choice === "delete" ? theme.status.error : theme.text.muted;
                         return (
-                            <Box key={choice} marginRight={2} flexShrink={0}>
+                            <Box key={i} marginRight={2} flexShrink={0}>
                                 <Text
                                     bold={selected}
-                                    color={selected ? theme.ui.background : color}
-                                    backgroundColor={selected ? color : undefined}
+                                    color={selected ? theme.ui.background : choice.color}
+                                    backgroundColor={selected ? choice.color : undefined}
                                 >
-                                    {` ${choiceLabel(choice)} `}
+                                    {` ${choice.label} `}
                                 </Text>
                             </Box>
                         );
