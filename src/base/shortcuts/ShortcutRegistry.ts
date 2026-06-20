@@ -179,6 +179,20 @@ class ShortcutRegistryClass {
     }
 
     /**
+     * Returns the default binding for a shortcut id, searching live contexts first
+     * (most up-to-date) and falling back to persisted stubs so hints resolve even
+     * when the owning context is not currently mounted. Callers apply any user
+     * override on top (see useShortcutLiteral).
+     */
+    getDefaultShortcut(id: string): Shortcut | undefined {
+        for (const ctx of this.contexts.values()) {
+            const entry = ctx.shortcuts.find((s) => s.id === id);
+            if (entry) return entry.defaultShortcut;
+        }
+        return this.knownStubs.get(id)?.defaultShortcut;
+    }
+
+    /**
      * Returns active hint contexts sorted by priority descending (highest = most specific = first).
      */
     getActiveHintContexts(): ActiveHintContext[] {

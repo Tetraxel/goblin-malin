@@ -159,8 +159,8 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ terminalHeight, term
                 </Box>
 
                 <Box marginTop={1} flexDirection="row" flexShrink={0}>
-                    <Hint label="Toggle" shortcut="Enter" />
-                    <Hint label="Close" shortcut="Esc" />
+                    <Hint label="Toggle" shortcutId="welcomeModal.toggle" />
+                    <Hint label="Close" shortcutId="welcomeModal.close" />
                 </Box>
             </Box>
         </Box>

@@ -382,23 +382,23 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
                 <Box marginTop={1} flexDirection="row" flexWrap="wrap" flexShrink={0}>
                     {renamingId ? (
                         <>
-                            <Hint label="Confirm" shortcut="Enter" />
-                            <Hint label="Cancel" shortcut="Esc" />
+                            <Hint label="Confirm" shortcutId="sessionsModal.enter" />
+                            <Hint label="Cancel" shortcutId="sessionsModal.escape" />
                         </>
                     ) : modalFocus === "search" ? (
                         <>
-                            <Hint label="Go to list" shortcut="↓/Enter" />
-                            <Hint label="New" shortcut="Ctrl+N" />
-                            <Hint label="Close" shortcut="Esc" />
+                            <Hint label="Go to list" shortcutIds={["sessionsModal.down", "sessionsModal.enter"]} />
+                            <Hint label="New" shortcutId="sessionsModal.new" />
+                            <Hint label="Close" shortcutId="sessionsModal.escape" />
                         </>
                     ) : (
                         <>
-                            <Hint label="Load" shortcut="Enter" />
-                            <Hint label="Rename" shortcut="Ctrl+R" />
-                            <Hint label="New" shortcut="Ctrl+N" />
-                            <Hint label="Duplicate" shortcut="Ctrl+D" />
-                            <Hint label="Delete" shortcut="DEL" />
-                            <Hint label="Close" shortcut="Esc" />
+                            <Hint label="Load" shortcutId="sessionsModal.enter" />
+                            <Hint label="Rename" shortcutId="sessionsModal.rename" />
+                            <Hint label="New" shortcutId="sessionsModal.new" />
+                            <Hint label="Duplicate" shortcutId="sessionsModal.duplicate" />
+                            <Hint label="Delete" shortcutId="sessionsModal.delete" />
+                            <Hint label="Close" shortcutId="sessionsModal.escape" />
                         </>
                     )}
                 </Box>

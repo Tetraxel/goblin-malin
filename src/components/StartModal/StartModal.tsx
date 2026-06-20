@@ -4,6 +4,7 @@ import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusContext } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { StartOptionsRequest } from "#types/actions";
+import { Hint } from "../Hint";
 
 interface StartModalProps {
     pendingStart: StartOptionsRequest | null;
@@ -139,8 +140,10 @@ export const StartModal: React.FC<StartModalProps> = ({
                         })}
                     </Box>
 
-                    <Box marginTop={1}>
-                        <Text dimColor>[ENTER] Confirm · [↑↓] Select · [ESC] Cancel</Text>
+                    <Box marginTop={1} flexDirection="row">
+                        <Hint label="Confirm" shortcutId="startModal.confirm" />
+                        <Hint label="Select" shortcutIds={["startModal.up", "startModal.down"]} />
+                        <Hint label="Cancel" shortcutId="startModal.cancel" />
                     </Box>
                 </Box>
             </Box>

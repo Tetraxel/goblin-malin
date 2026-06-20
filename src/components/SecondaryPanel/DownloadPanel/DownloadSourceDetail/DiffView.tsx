@@ -117,10 +117,10 @@ export function DiffView({
                 <Box flexDirection="row" paddingX={1} height={1} overflow="hidden" flexShrink={0}>
                     <Hint
                         label={diffKind === "metadata-change" ? "Save changes" : "Switch source"}
-                        shortcut="Enter"
+                        shortcutId="downloadSourceDetail.confirm"
                         dim={!isActive}
                     />
-                    <Hint label="Cancel" shortcut="Esc" dim={!isActive} />
+                    <Hint label="Cancel" shortcutId="downloadSourceDetail.cancel" dim={!isActive} />
                 </Box>
             </Box>
         </Box>

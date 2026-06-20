@@ -258,16 +258,16 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                 <Box marginTop={1} flexDirection="row">
                     {isIdle && (
                         <>
-                            {!IS_SEA && <Hint label="Select" shortcut="↑↓" />}
-                            <Hint label="Confirm" shortcut="Enter" />
-                            <Hint label="Dismiss" shortcut="Esc" />
+                            {!IS_SEA && <Hint label="Select" shortcutIds={["updateModal.up", "updateModal.down"]} />}
+                            <Hint label="Confirm" shortcutId="updateModal.confirm" />
+                            <Hint label="Dismiss" shortcutId="updateModal.close" />
                         </>
                     )}
                     {isInProgress && <Text dimColor>Please wait...</Text>}
                     {!isIdle && !isInProgress && (
                         <>
-                            {pkgStatus === "done" && <Hint label="Exit" shortcut="Enter" />}
-                            <Hint label="Close" shortcut="Esc" />
+                            {pkgStatus === "done" && <Hint label="Exit" shortcutId="updateModal.confirm" />}
+                            <Hint label="Close" shortcutId="updateModal.close" />
                         </>
                     )}
                 </Box>

@@ -122,9 +122,9 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
                     })}
                 </Box>
                 <Box marginTop={1} flexDirection="row">
-                    <Hint label="Choose" shortcut="←→" />
-                    <Hint label="Confirm" shortcut="Enter" />
-                    <Hint label="Cancel" shortcut="Esc" />
+                    <Hint label="Choose" shortcutIds={["confirmModal.left", "confirmModal.right"]} />
+                    <Hint label="Confirm" shortcutId="confirmModal.confirm" />
+                    <Hint label="Cancel" shortcutId="confirmModal.cancel" />
                 </Box>
             </Box>
         </Box>

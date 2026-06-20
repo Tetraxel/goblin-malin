@@ -5,6 +5,7 @@ import { Task } from "#base/task/task";
 import { PromptType } from "#base/task/task-prompt";
 import { useActivePrompt } from "#components/PromptModal/useActivePrompt";
 import { useShortcuts, ShortcutDef } from "#hooks/useShortcuts";
+import { getContextualShortcutIds } from "#types/actions";
 import { globalLogger } from "#base/logger/logger";
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
@@ -69,15 +70,11 @@ export function useTaskListShortcuts(tasks: Task[], flow: FlowBase | undefined):
 
         const defs: ShortcutDef[] = [];
         for (const action of bar.rows.flatMap((r) => r.actions)) {
+            const ids = getContextualShortcutIds(action);
             for (let i = 0; i < action.shortcuts.length; i++) {
                 const shortcut = action.shortcuts[i];
-                const slug = action.label
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]+/g, "-")
-                    .replace(/^-|-$/g, "");
-                const suffix = action.shortcuts.length > 1 ? `.${i}` : "";
                 defs.push({
-                    id: `taskList.contextual.${slug}${suffix}`,
+                    id: ids[i],
                     defaultShortcut: shortcut,
                     label: action.label,
                     handler: () => {

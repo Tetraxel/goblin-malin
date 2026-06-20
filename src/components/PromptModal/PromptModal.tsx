@@ -101,22 +101,24 @@ export const PromptModal: React.FC<PromptModalProps> = ({ tasks, terminalHeight,
                     <Box marginTop={1} flexDirection="row">
                         {currentPrompt.type === PromptType.Confirm && (
                             <>
-                                <Hint label="Yes" shortcut="Y" />
-                                <Hint label="No" shortcut="N" />
-                                <Hint label="Cancel" shortcut="Esc" />
+                                <Hint label="Yes" shortcutId="prompt.yes" />
+                                <Hint label="No" shortcutId="prompt.no" />
+                                <Hint label="Cancel" shortcutId="prompt.cancel" />
                             </>
                         )}
                         {currentPrompt.type === PromptType.Input && (
                             <>
+                                {/* Enter is owned by ink-text-input, not the keybinding registry. */}
                                 <Hint label="Submit" shortcut="Enter" />
-                                <Hint label="Cancel" shortcut="Esc" />
+                                <Hint label="Cancel" shortcutId="prompt.cancel" />
                             </>
                         )}
                         {currentPrompt.type === PromptType.Select && (
                             <>
+                                {/* ↑↓ / Enter are owned by ink-select-input, not the keybinding registry. */}
                                 <Hint label="Navigate" shortcut="↑↓" />
                                 <Hint label="Select" shortcut="Enter" />
-                                <Hint label="Cancel" shortcut="Esc" />
+                                <Hint label="Cancel" shortcutId="prompt.cancel" />
                             </>
                         )}
                     </Box>

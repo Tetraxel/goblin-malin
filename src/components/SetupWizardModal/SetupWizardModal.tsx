@@ -492,15 +492,15 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
 
                 {/* Footer */}
                 <Box marginTop={1} flexDirection="row" flexWrap="wrap">
-                    <Hint label="Navigate" shortcut="↑↓" />
-                    <Hint label="Open/Edit" shortcut="Enter" />
-                    <Hint label="Submit" shortcut="Ctrl+S" />
+                    <Hint label="Navigate" shortcutIds={["setupWizardModal.up", "setupWizardModal.down"]} />
+                    <Hint label="Open/Edit" shortcutId="setupWizardModal.enter" />
+                    <Hint label="Submit" shortcutId="setupWizardModal.submit" />
                     {wizardTask ? (
-                        <Hint label="Cancel & Disable service" shortcut="Esc" />
+                        <Hint label="Cancel & Disable service" shortcutId="setupWizardModal.escape" />
                     ) : (
                         <>
-                            <Hint label="Cancel" shortcut="Esc" />
-                            <Hint label="Disable service" shortcut="D" />
+                            <Hint label="Cancel" shortcutId="setupWizardModal.escape" />
+                            <Hint label="Disable service" shortcutId="setupWizardModal.disable" />
                         </>
                     )}
                 </Box>

@@ -435,16 +435,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <Box marginTop={1} flexDirection="row" flexShrink={0}>
                             {modalFocus === "search" ? (
                                 <>
-                                    <Hint label="Go to list" shortcut="↓/Enter" />
-                                    <Hint label="Save & Exit" shortcut="Ctrl+S" />
-                                    <Hint label="Discard" shortcut="Esc" />
+                                    <Hint
+                                        label="Go to list"
+                                        shortcutIds={["settingsModal.down", "settingsModal.enter"]}
+                                    />
+                                    <Hint label="Save & Exit" shortcutId="settingsModal.save" />
+                                    <Hint label="Discard" shortcutId="settingsModal.escape" />
                                 </>
                             ) : (
                                 <>
-                                    <Hint label="Navigate" shortcut="↑↓" />
-                                    <Hint label="Interact" shortcut="Enter" />
-                                    <Hint label="Save & Exit" shortcut="Ctrl+S" />
-                                    <Hint label="Discard" shortcut="Esc" />
+                                    <Hint label="Navigate" shortcutIds={["settingsModal.up", "settingsModal.down"]} />
+                                    <Hint label="Interact" shortcutId="settingsModal.enter" />
+                                    <Hint label="Save & Exit" shortcutId="settingsModal.save" />
+                                    <Hint label="Discard" shortcutId="settingsModal.escape" />
                                 </>
                             )}
                         </Box>
@@ -471,20 +474,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         {/* Shortcuts footer */}
                         <Box marginTop={1} flexDirection="row" flexShrink={0}>
                             {rebindingId ? (
+                                // Esc here is the intrinsic rebind-capture cancel, not a registry shortcut.
                                 <Hint label="Cancel" shortcut="Esc" />
                             ) : shortcutsModalFocus === "search" ? (
                                 <>
-                                    <Hint label="Go to list" shortcut="↓/Enter" />
-                                    <Hint label="Save & Exit" shortcut="Ctrl+S" />
-                                    <Hint label="Discard" shortcut="Esc" />
+                                    <Hint
+                                        label="Go to list"
+                                        shortcutIds={["settingsModal.down", "settingsModal.enter"]}
+                                    />
+                                    <Hint label="Save & Exit" shortcutId="settingsModal.save" />
+                                    <Hint label="Discard" shortcutId="settingsModal.escape" />
                                 </>
                             ) : (
                                 <>
-                                    <Hint label="Navigate" shortcut="↑↓" />
-                                    <Hint label="Rebind" shortcut="Enter" />
-                                    <Hint label="Reset" shortcut="Del" />
-                                    <Hint label="Save & Exit" shortcut="Ctrl+S" />
-                                    <Hint label="Discard" shortcut="Esc" />
+                                    <Hint label="Navigate" shortcutIds={["settingsModal.up", "settingsModal.down"]} />
+                                    <Hint label="Rebind" shortcutId="settingsModal.enter" />
+                                    <Hint label="Reset" shortcutId="settingsModal.resetBinding" />
+                                    <Hint label="Save & Exit" shortcutId="settingsModal.save" />
+                                    <Hint label="Discard" shortcutId="settingsModal.escape" />
                                 </>
                             )}
                         </Box>

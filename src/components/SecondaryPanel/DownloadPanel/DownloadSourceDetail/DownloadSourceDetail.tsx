@@ -11,6 +11,7 @@ import { getInstance, PlayerStatus } from "#utils/mpvPlayer";
 import { formatBytes, formatDate, tagValue } from "#components/SecondaryPanel/DownloadPanel/utils";
 import { Uri } from "#components/SecondaryPanel/MetadataPanel/Uri";
 import { useShortcuts } from "#hooks/useShortcuts";
+import { Hint } from "#components/Hint";
 import { PlaybackBar } from "../PlaybackBar";
 import { DiffView } from "./DiffView";
 import { DownloadInProgress } from "./DownloadInProgress";
@@ -343,10 +344,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                                 Last known: {source.localFile?.path ?? "—"}
                             </Text>
                             <Box marginTop={1}>
-                                <Text color={theme.text.active} bold>
-                                    [Ctrl+F]
-                                </Text>
-                                <Text color={theme.text.hint}> Relocate file</Text>
+                                <Hint shortcutId="downloadSourceDetail.relocate" label="Relocate file" />
                             </Box>
                         </Box>
                     ) : (

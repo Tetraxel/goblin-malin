@@ -5,6 +5,7 @@ import { useFocusContext } from "#contexts/FocusContext";
 import { DetectedUrl, SupportedPlatform } from "./detectUrls";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
+import { Hint } from "../Hint";
 
 export type PendingImport = {
     urls: DetectedUrl[];
@@ -210,8 +211,10 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                         })}
                     </Box>
 
-                    <Box marginTop={1}>
-                        <Text dimColor>[ENTER] Confirm · [↑↓] Select · [ESC] Cancel</Text>
+                    <Box marginTop={1} flexDirection="row">
+                        <Hint label="Confirm" shortcutId="importModal.confirm" />
+                        <Hint label="Select" shortcutIds={["importModal.up", "importModal.down"]} />
+                        <Hint label="Cancel" shortcutId="importModal.cancel" />
                     </Box>
                 </Box>
             </Box>

@@ -39,6 +39,39 @@ export type ContextualActionBar = {
     rows: ActionBarRow[];
 };
 
+/**
+ * Registry id(s) for a flow's contextual action-bar shortcuts. This is the single
+ * source of truth for the `taskList.contextual.*` id scheme — used both when
+ * registering the shortcuts (useKeyHandlers) and when displaying their hints
+ * (ActionBar), so the two never drift. Actions with multiple bindings get one id
+ * per binding (`.0`, `.1`, …); single-binding actions get a bare slug.
+ */
+export function getContextualShortcutIds(action: ContextualActions): string[] {
+    const slug = action.label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+    return action.shortcuts.map((_, i) => `taskList.contextual.${slug}${action.shortcuts.length > 1 ? `.${i}` : ""}`);
+}
+
+// Friendly display labels for named keys. Anything not listed falls back to the
+// raw key name uppercased.
+const KEY_LABELS: Partial<Record<keyof Key, string>> = {
+    return: "Enter",
+    escape: "Esc",
+    delete: "Del",
+    backspace: "⌫",
+    tab: "Tab",
+    upArrow: "↑",
+    downArrow: "↓",
+    leftArrow: "←",
+    rightArrow: "→",
+    pageUp: "PgUp",
+    pageDown: "PgDn",
+    home: "Home",
+    end: "End",
+};
+
 export function getShortcutLiteral(shortcuts: Shortcut[]): string {
     return shortcuts
         .map((shortcut) => {
@@ -46,8 +79,8 @@ export function getShortcutLiteral(shortcuts: Shortcut[]): string {
             if (shortcut.ctrl) modifiers.push("Ctrl");
             if (shortcut.shift) modifiers.push("Shift");
             if (shortcut.meta) modifiers.push("Meta");
-            const keyName = shortcut.key ? shortcut.key.toUpperCase() : "";
-            const inputName = shortcut.input ? (shortcut.input === " " ? "SPACE" : shortcut.input.toUpperCase()) : "";
+            const keyName = shortcut.key ? (KEY_LABELS[shortcut.key] ?? shortcut.key.toUpperCase()) : "";
+            const inputName = shortcut.input ? (shortcut.input === " " ? "Space" : shortcut.input.toUpperCase()) : "";
             const base = keyName || inputName || "";
             return [...modifiers, base].filter(Boolean).join("+");
         })

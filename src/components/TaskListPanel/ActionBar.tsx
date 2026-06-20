@@ -4,7 +4,7 @@ import { FlowBase } from "#base/flow/flow-base";
 import { Task } from "#base/task/task";
 import { useTheme } from "#base/themeContext";
 import { useFocusContext } from "#contexts/FocusContext";
-import { ActionBarRow, getShortcutLiteral } from "#types/actions";
+import { ActionBarRow, getContextualShortcutIds } from "#types/actions";
 import { Hint } from "../Hint";
 
 export const ActionBar: React.FC<{
@@ -70,11 +70,7 @@ export const ActionBar: React.FC<{
                             </Box>
                             {visible.length > 0 ? (
                                 visible.map((action, j) => (
-                                    <Hint
-                                        key={j}
-                                        label={action.label}
-                                        shortcut={getShortcutLiteral(action.shortcuts)}
-                                    />
+                                    <Hint key={j} label={action.label} shortcutIds={getContextualShortcutIds(action)} />
                                 ))
                             ) : (
                                 <Text color={theme.text.hint} italic>
