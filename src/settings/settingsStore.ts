@@ -11,6 +11,7 @@ export const SETTINGS_PATH = path.join(DEFAULT_APP_DATA_DIR, "settings.json");
 /** Shape of the full JSON file on disk. */
 type StoredSettings = {
     general: AppSettings["general"];
+    logs: AppSettings["logs"];
     keybindings: AppSettings["keybindings"];
     flows: Record<string, Record<string, unknown>>;
 };
@@ -30,7 +31,12 @@ export class SettingsStore {
             const raw = fs.readFileSync(SETTINGS_PATH, "utf-8");
             return JSON.parse(raw) as StoredSettings;
         } catch {
-            return { general: DEFAULT_APP_SETTINGS.general, keybindings: {}, flows: {} };
+            return {
+                general: DEFAULT_APP_SETTINGS.general,
+                logs: DEFAULT_APP_SETTINGS.logs,
+                keybindings: {},
+                flows: {},
+            };
         }
     }
 
@@ -54,13 +60,19 @@ export class SettingsStore {
         const s = this.getCached();
         return deepMerge(DEFAULT_APP_SETTINGS, {
             general: s.general,
+            logs: s.logs,
             keybindings: s.keybindings ?? {},
         } as DeepPartial<AppSettings>);
     }
 
     writeAppSettings(settings: AppSettings): void {
         const current = this.getCached();
-        this.writeToDisk({ ...current, general: settings.general, keybindings: settings.keybindings ?? {} });
+        this.writeToDisk({
+            ...current,
+            general: settings.general,
+            logs: settings.logs,
+            keybindings: settings.keybindings ?? {},
+        });
     }
 
     /** Save a single key binding override. */

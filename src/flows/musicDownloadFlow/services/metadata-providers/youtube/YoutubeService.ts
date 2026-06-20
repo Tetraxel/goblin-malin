@@ -26,7 +26,7 @@ export class YoutubeService extends MetadataService {
     private static client: YTMusic;
 
     constructor(task: DownloadTask, logger: Logger) {
-        super("Youtube", task, logger);
+        super("YoutubeService", task, logger);
     }
 
     private async getClient(): Promise<YTMusic> {

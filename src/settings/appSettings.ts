@@ -1,4 +1,5 @@
 import { DEFAULT_APP_DATA_DIR } from "#constants";
+import { LogLevel } from "#base/logger/types";
 import { Shortcut } from "#types/actions";
 
 export type AppSettings = {
@@ -9,6 +10,12 @@ export type AppSettings = {
         theme: string;
         showWelcomeTutorial: boolean;
         checkForUpdates: boolean;
+    };
+    logs: {
+        /** Minimum level shown in the log panel (file transport always keeps debug). */
+        logLevel: LogLevel;
+        /** When a task is focused, also show logs not attributed to any task. */
+        includeGlobalLogsInFocusedTask: boolean;
     };
     /** User-remapped key bindings. Keys are shortcut action IDs, values override defaults. */
     keybindings: Record<string, Shortcut>;
@@ -22,6 +29,10 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
         theme: "dark",
         showWelcomeTutorial: true,
         checkForUpdates: true,
+    },
+    logs: {
+        logLevel: LogLevel.INFO,
+        includeGlobalLogsInFocusedTask: false,
     },
     keybindings: {},
 };

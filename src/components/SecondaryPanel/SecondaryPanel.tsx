@@ -44,7 +44,7 @@ export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) 
                 <DownloadPanel selectedTask={selectedTask} width={width} height={contentHeight} />
             )}
 
-            {subTab === "logs" && <LogPanel tasks={tasks} height={contentHeight} />}
+            {subTab === "logs" && <LogPanel tasks={tasks} height={contentHeight} width={width} />}
         </Box>
     );
 };

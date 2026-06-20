@@ -1,48 +1,47 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text } from "ink";
 import { useShortcuts } from "#hooks/useShortcuts";
-import { inspect } from "util";
+import { useScreenSize } from "#hooks/useScreenSize";
+import { useAppSettings } from "#hooks/useAppSettings";
 import { useFocusContext } from "#contexts/FocusContext";
 import { inkTransport } from "#base/logger/ink-transport";
-import { LogMetadata } from "#base/logger/types";
+import { LogLevel, LogMetadata } from "#base/logger/types";
 import { Task } from "#base/task/task";
 import { useTheme } from "#base/themeContext";
+import { formatLogRows } from "./logFormat";
 
-function formatDetails(details?: Record<string, unknown>): string {
-    if (!details || Object.keys(details).length === 0) {
-        return "";
-    }
-    return "\n └ " + JSON.stringify(details);
+const LEVEL_ORDER: Record<LogLevel, number> = {
+    [LogLevel.DEBUG]: 0,
+    [LogLevel.INFO]: 1,
+    [LogLevel.WARN]: 2,
+    [LogLevel.ERROR]: 3,
+};
 
-    // inspect options:
-    // depth: null -> recurse indefinitely (show everything)
-    // colors: false -> keep it plain string (set true if your logs support ANSI colors)
-    // compact: false -> forces indentation/multi-line
-    // breakLength: Infinity -> prevents wrapping long lines weirdly
-    return `\n${inspect(details, {
-        depth: null,
-        colors: false,
-        compact: false,
-        breakLength: Infinity,
-    })}`;
-}
-
-function getLogString(log: LogMetadata): string {
-    const level = `[${log.level.toUpperCase()}]`;
-    const flow = log.flow ? ` [${log.flow}]` : "";
-    const service = log.service ? ` [${log.service}]` : "";
-    const message = ` ${log.message}`;
-    const details = formatDetails(log.details);
-
-    return level + flow + service + message + details;
-}
-
-export const LogPanel = ({ tasks, height: heightProp }: { tasks: Task[]; height?: number }) => {
+export const LogPanel = ({
+    tasks,
+    height: heightProp,
+    width: widthProp,
+}: {
+    tasks: Task[];
+    height?: number;
+    width?: number;
+}) => {
     const theme = useTheme();
+    const settings = useAppSettings();
+    const screen = useScreenSize();
     const { focusState } = useFocusContext();
     const height = heightProp ?? focusState.layout.secondaryPanelHeight;
 
-    const selectedTask = focusState.activeWindow === "taskList" ? tasks?.[focusState.taskList.selectedTaskIndex] : null;
+    // Inner text width = panel width minus left/right border (2) and paddingX (2).
+    const innerWidth = Math.max(10, (widthProp ?? screen.width) - 4);
+
+    // Keep the task filter when the user Tabs into the log panel — the taskList
+    // focus state (selected index / isHeaderFocused) is preserved across Tab.
+    const selectedTask =
+        (focusState.activeWindow === "taskList" || focusState.activeWindow === "secondaryPanel") &&
+        !focusState.taskList.isHeaderFocused
+            ? (tasks?.[focusState.taskList.selectedTaskIndex] ?? null)
+            : null;
 
     const [logs, setLogs] = useState<LogMetadata[]>([]);
     const [scrollOffset, setScrollOffset] = useState(0);
@@ -57,11 +56,37 @@ export const LogPanel = ({ tasks, height: heightProp }: { tasks: Task[]; height?
 
     const isActive = focusState.activeWindow === "secondaryPanel" && focusState.secondaryPanel.subTab === "logs";
 
-    // Reset scroll when task filter changes or when panel loses focus
+    const minLevel = LEVEL_ORDER[settings.logs.logLevel];
+    const includeGlobal = settings.logs.includeGlobalLogsInFocusedTask;
+
+    const filteredLogs = useMemo(
+        () =>
+            logs.filter((log) => {
+                if (LEVEL_ORDER[log.level] < minLevel) return false;
+                if (!selectedTask) return true; // not focusing a task → show everything
+                if (log.task === selectedTask) return true; // this task's logs
+                if (!log.task && includeGlobal) return true; // optionally include global logs
+                return false;
+            }),
+        [logs, selectedTask, minLevel, includeGlobal]
+    );
+
+    // Flatten each log into its visual rows (header + wrapped message + details).
+    const allRows = useMemo(
+        () => filteredLogs.flatMap((log) => formatLogRows(log, innerWidth)),
+        [filteredLogs, innerWidth]
+    );
+
+    // Reset scroll when the row set changes meaningfully or the panel loses focus.
     const [prevSelectedTask, setPrevSelectedTask] = useState(selectedTask);
     const [prevIsActive, setPrevIsActive] = useState(isActive);
+    const [prevWidth, setPrevWidth] = useState(innerWidth);
     if (prevSelectedTask !== selectedTask) {
         setPrevSelectedTask(selectedTask);
+        setScrollOffset(0);
+    }
+    if (prevWidth !== innerWidth) {
+        setPrevWidth(innerWidth);
         setScrollOffset(0);
     }
     if (prevIsActive !== isActive) {
@@ -69,10 +94,8 @@ export const LogPanel = ({ tasks, height: heightProp }: { tasks: Task[]; height?
         if (!isActive) setScrollOffset(0);
     }
 
-    const filteredLogs = logs.filter((log) => !selectedTask || !log.task || selectedTask === log.task);
-
     // When scrolled (indicator row visible), only height-1 rows are available for logs
-    const maxOffset = Math.max(0, filteredLogs.length - (height - 1));
+    const maxOffset = Math.max(0, allRows.length - (height - 1));
 
     useShortcuts({
         id: "logPanel",
@@ -104,14 +127,14 @@ export const LogPanel = ({ tasks, height: heightProp }: { tasks: Task[]; height?
     const clampedOffset = Math.min(scrollOffset, maxOffset);
     const showBottomIndicator = clampedOffset > 0;
     // First pass: determine if a top indicator is needed (without reserving its row yet)
-    const logRowsNoTop = showBottomIndicator ? height - 1 : height;
-    const visibleEnd = showBottomIndicator ? filteredLogs.length - clampedOffset : undefined;
-    const visibleStartNoTop = Math.max(0, (visibleEnd ?? filteredLogs.length) - logRowsNoTop);
+    const rowsNoTop = showBottomIndicator ? height - 1 : height;
+    const visibleEnd = showBottomIndicator ? allRows.length - clampedOffset : undefined;
+    const visibleStartNoTop = Math.max(0, (visibleEnd ?? allRows.length) - rowsNoTop);
     const showTopIndicator = visibleStartNoTop > 0;
     // Reserve one row per visible indicator
-    const logRows = logRowsNoTop - (showTopIndicator ? 1 : 0);
-    const visibleStart = Math.max(0, (visibleEnd ?? filteredLogs.length) - logRows);
-    const visibleLogs = filteredLogs.slice(visibleStart, visibleEnd);
+    const rowsAvailable = rowsNoTop - (showTopIndicator ? 1 : 0);
+    const visibleStart = Math.max(0, (visibleEnd ?? allRows.length) - rowsAvailable);
+    const visibleRows = allRows.slice(visibleStart, visibleEnd);
 
     return (
         <Box
@@ -141,9 +164,15 @@ export const LogPanel = ({ tasks, height: heightProp }: { tasks: Task[]; height?
                         </Text>
                     </Box>
                 )}
-                {visibleLogs.map((log) => (
-                    <Box key={log.id} paddingX={1} height={1} overflow="hidden" flexGrow={1} flexShrink={0}>
-                        <Text wrap="truncate-end">{getLogString(log)}</Text>
+                {visibleRows.map((row) => (
+                    <Box key={row.key} paddingX={1} height={1} overflow="hidden" flexShrink={0}>
+                        <Text wrap="truncate-end">
+                            {row.segments.map((seg, i) => (
+                                <Text key={i} color={seg.color} dimColor={seg.dim}>
+                                    {seg.text}
+                                </Text>
+                            ))}
+                        </Text>
                     </Box>
                 ))}
                 {showBottomIndicator && (

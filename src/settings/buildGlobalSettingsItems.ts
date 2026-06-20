@@ -1,8 +1,11 @@
 ﻿import { DeepPartial } from "#utils/types";
 import { clearCache } from "#utils/cache";
 import { THEME_KEYS } from "#base/theme";
+import { LogLevel } from "#base/logger/types";
 import { AppSettings } from "./appSettings";
 import { SettingsItem } from "./buildSettingsItems";
+
+const LOG_LEVELS: readonly string[] = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR];
 
 export function buildGlobalSettingsItems(
     settings: AppSettings,
@@ -60,6 +63,25 @@ export function buildGlobalSettingsItems(
             indent: 0,
             label: "⛒  Clear cache",
             run: () => clearCache(),
+        },
+        {
+            kind: "sectionHeader",
+            label: "Logs",
+        },
+        {
+            kind: "select",
+            indent: 0,
+            label: "Minimum log level",
+            options: LOG_LEVELS,
+            get: () => settings.logs.logLevel,
+            set: (v) => onChange({ logs: { logLevel: v as LogLevel } }),
+        },
+        {
+            kind: "checkbox",
+            indent: 0,
+            label: "Include global logs when a task is focused",
+            get: () => settings.logs.includeGlobalLogsInFocusedTask,
+            set: (v) => onChange({ logs: { includeGlobalLogsInFocusedTask: v } }),
         },
     ];
 }

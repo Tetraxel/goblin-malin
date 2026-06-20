@@ -30,6 +30,8 @@ export type ColumnComponent<TAttributes> = ({
 export type ColumnDefinition<TAttributes = any> = {
     id: string;
     label: string;
+    /** Short fallback shown in the header when `label` doesn't fit the column width. */
+    acronym?: string;
     color?: React.ComponentProps<typeof Text>["color"];
     weight: number;
     minWidth?: number;
@@ -119,7 +121,13 @@ export const TaskListPanel: React.FC<{
     const RESERVED_WIDTH = 6; // must match reservedWidth in calculateColumnWidths
     const calculatedColumns = useMemo(() => {
         const availableWidth = width - RESERVED_WIDTH;
-        const naturalMins = columns.map((col) => Math.max(2, col.label.length + 3));
+        // When a column has an explicit minWidth or an acronym fallback, use that for space
+        // reservation — avoids inflating layout when label is the long display form.
+        const naturalMins = columns.map((col) => {
+            if (col.minWidth !== undefined) return col.minWidth;
+            const displayLen = col.acronym !== undefined ? col.acronym.length : col.label.length;
+            return Math.max(2, displayLen + 3);
+        });
         const totalNaturalMin = naturalMins.reduce((s, m) => s + m, 0);
 
         // Ratios are stored relative to resizableWidth (excludes fixed non-resizable columns)
@@ -305,7 +313,7 @@ export const TaskListPanel: React.FC<{
                         focusState.taskList.selectedColumnIndex === index;
                     return (
                         <Box
-                            key={`header-${column.label}-${index}`}
+                            key={`header-${column.id}-${index}`}
                             width={column.width}
                             minWidth={column.width}
                             maxWidth={column.width}
@@ -316,7 +324,9 @@ export const TaskListPanel: React.FC<{
                             backgroundColor={isActive ? theme.ui.rowActiveBackground : undefined}
                         >
                             <Text bold color={isActive ? "white" : column.color || "cyan"}>
-                                {column.label}
+                                {column.acronym && column.label.length > column.width - 2
+                                    ? column.acronym
+                                    : column.label}
                             </Text>
                         </Box>
                     );

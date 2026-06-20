@@ -21,3 +21,4 @@ These are not task lists — each project is a self-contained scope of work. Ind
 | P13 — Session management                         | [p13/tasks.md](p13/tasks.md) |
 | P14 — Spotify auth-mode choice & scrape fallback | [p14/tasks.md](p14/tasks.md) |
 | P15 — URI parsing on import                      | [p15/tasks.md](p15/tasks.md) |
+| P16 — Logging Revamp                             | [p16/tasks.md](p16/tasks.md) |

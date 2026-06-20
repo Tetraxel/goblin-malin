@@ -40,7 +40,8 @@ export type FocusableWindow =
     | "startModal"
     | "setupWizardModal"
     | "welcomeModal"
-    | "updateModal";
+    | "updateModal"
+    | "confirmModal";
 
 export interface FocusState {
     activeWindow: FocusableWindow;
@@ -120,7 +121,7 @@ export const useFocusManager = ({
         },
         taskList: {
             selectedTaskIndex: 0,
-            selectedColumnIndex: 0,
+            selectedColumnIndex: 2,
             selectedTaskIds: new Set<string>(),
             width: terminalWidth,
             isHeaderFocused: false,

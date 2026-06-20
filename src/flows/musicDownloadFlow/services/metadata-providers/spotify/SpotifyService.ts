@@ -74,7 +74,7 @@ type SpotifyAuthMode = "official" | "scrape";
 export class SpotifyService extends MetadataService {
     static readonly display: ProviderDisplay = {
         label: "Spotify",
-        acronym: "SPOTIFY",
+        acronym: "SP",
         color: "#1ed760",
         colorSubtle: "#156b30",
         colorBright: "#1db954",

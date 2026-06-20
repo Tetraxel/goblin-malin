@@ -37,7 +37,7 @@ function platformBadge(platform: SupportedPlatform): {
     color: string;
 } {
     const display = providerDisplayRegistry.get(platform);
-    return { label: display.acronym, color: display.color };
+    return { label: display.label, color: display.color };
 }
 
 function truncateUrl(str: string, max: number): string {
@@ -127,7 +127,6 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     if (!pendingImport) return null;
 
     const modalWidth = Math.min(80, Math.max(40, terminalWidth - 10));
-    const urlMaxWidth = modalWidth - 20;
 
     // Fixed rows consumed by the modal shell: border(2) + paddingY(2) + title(1)
     // + margin+urls-section-header(1) + margin+options(1+3) + margin+hint(1+1) = 12
@@ -147,6 +146,10 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     }
     const hiddenCount = totalUrls - visibleCount;
     const visibleUrls = pendingImport.urls.slice(0, visibleCount);
+
+    const labelWidth =
+        visibleUrls.length === 0 ? 0 : Math.max(...visibleUrls.map((u) => platformBadge(u.platform).label.length)) + 3; // [label] + 1 space
+    const urlMaxWidth = modalWidth - labelWidth - 8; // subtract label col and type col
 
     const title = totalUrls === 1 ? "Import 1 URL" : `Import ${totalUrls} URLs`;
 
@@ -172,7 +175,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                             const { label, color } = platformBadge(url.platform);
                             return (
                                 <Box key={idx} flexDirection="row">
-                                    <Box width={12} minWidth={12}>
+                                    <Box width={labelWidth} minWidth={labelWidth}>
                                         <Text color={color} bold>
                                             [{label}]
                                         </Text>

@@ -34,7 +34,7 @@ export class YtDlpService extends DownloadService {
     private static client: YtDlp;
 
     constructor(task: DownloadTask, logger: Logger) {
-        super("YtDlp", task, logger);
+        super("YtDlpService", task, logger);
     }
 
     private async getClient(): Promise<YtDlp> {

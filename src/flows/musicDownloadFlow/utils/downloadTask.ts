@@ -1,5 +1,6 @@
 import fs from "fs/promises";
 import { Task } from "#base/task/task";
+import { TaskScoped } from "#base/task/taskContext";
 import { globalLogger, Logger } from "#base/logger/logger";
 import { ServiceRegistry } from "#base/service-registry";
 import { ServiceScope } from "#base/service-scope";
@@ -62,6 +63,13 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         this.metadataServices = metadataServiceRegistry.createScope(this, this.logger, isMetadataServiceEnabled);
         this.discoveryServices = discoveryServiceRegistry.createScope(this, this.logger, isDiscoveryServiceEnabled);
         this.downloadServices = downloadServiceRegistry.createScope(this, this.logger, isDownloadServiceEnabled);
+    }
+
+    // Log-line label: the structured uri when known, else the input URL.
+    public override getLogLabel(): string | undefined {
+        const uri = this.getAttributes()?.uri;
+        if (uri) return `${uri.platform}::${uri.type}::${uri.id}`;
+        return this.getAttributes()?.userInput.url ?? this.getInitialInput();
     }
 
     // ── Internal helpers ─────────────────────────────────────────────────────
@@ -144,6 +152,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
+    @TaskScoped()
     @SafeAction("Start task")
     async start(): Promise<void> {
         try {
@@ -175,6 +184,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
 
     // ── Primary metadata ──────────────────────────────────────────────────────
 
+    @TaskScoped()
     @SafeAction("Re-fetch primary metadata")
     async startPrimaryMetadataFetching(): Promise<void> {
         const url = this.getAttributes()?.userInput.url;
@@ -292,11 +302,21 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         } finally {
             this.updateAttributes({ primaryMetadataInProgress: false });
         }
+
+        // Refine the log-prefix uri with the authoritative platform + id.
+        const primaryMeta = this.getPrimaryMetadata()?.metadata;
+        if (primaryMeta?.id) {
+            this.updateAttributes({
+                uri: { platform: primaryMeta.platform, type: "track", id: primaryMeta.id },
+            });
+        }
+
         this.updateAttributes({ primaryMetadataFetched: true });
     }
 
     // ── Discovery ─────────────────────────────────────────────────────────────
 
+    @TaskScoped()
     @SafeAction("Re-discover metadata providers")
     async startMetadataDiscovering(): Promise<void> {
         const primaryResult = this.getPrimaryMetadata();
@@ -464,6 +484,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
 
     // ── Re-search / Re-fetch ─────────────────────────────────────────────────
 
+    @TaskScoped()
     async startSingleProviderSearch(serviceKey: string): Promise<void> {
         const primaryMetadata = this.getPrimaryMetadata()?.metadata;
         if (!primaryMetadata) {
@@ -516,6 +537,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
 
     // ── Misc mutations ────────────────────────────────────────────────────────
 
+    @TaskScoped()
     @SafeAction("Restart task")
     async restart(): Promise<void> {
         this.updateAttributes({
@@ -638,6 +660,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         }
     }
 
+    @TaskScoped()
     @SafeAction("Start downloads")
     async startDownloads(): Promise<void> {
         const metadataGroups = this.getAttributes()?.metadataGroups;

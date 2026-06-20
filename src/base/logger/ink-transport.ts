@@ -14,8 +14,10 @@ export class InkTransport extends Transport {
         setImmediate(() => {
             this.emit("logged", info);
         });
-        this.history.push(info);
-        this.pending.push(info);
+        // Winston normalizes levels to lowercase; our LogLevel enum uses uppercase.
+        const entry = { ...info, level: info.level.toUpperCase() };
+        this.history.push(entry);
+        this.pending.push(entry);
         this.notifySubscribers();
         callback();
     }

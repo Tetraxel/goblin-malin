@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from "react";
+import React, { useCallback, useEffect } from "react";
 import { Box } from "ink";
 import { Footer } from "./Footer";
 import { Separator } from "./Separator";
@@ -24,6 +24,9 @@ import { FlowBase } from "#base/flow/flow-base";
 import { useImportFlow } from "./ImportModal/useImportFlow";
 import { useStartFlow } from "./StartModal/useStartFlow";
 import { startOptionsBridge } from "#base/flow/startOptionsBridge";
+import { deleteConfirmBridge, DeleteConfirmRequest } from "#base/flow/deleteConfirmBridge";
+import { ConfirmModal } from "./ConfirmModal/ConfirmModal";
+import { useConfirmModal } from "./ConfirmModal/useConfirmModal";
 import { useTheme } from "#base/themeContext";
 
 export const AppInner: React.FC<{
@@ -52,12 +55,38 @@ export const AppInner: React.FC<{
     const theme = useTheme();
     const { pendingImport, openImportFlow, handleImportConfirm, handleImportCancel } = useImportFlow(currentFlow);
     const { pendingStart, openStartFlow, handleStartConfirm, handleStartCancel } = useStartFlow();
+    const { pendingConfig, openConfirmModal, handleConfirm, handleCancel } = useConfirmModal();
+
+    const handleDeleteBridgeRequest = useCallback(
+        (req: DeleteConfirmRequest) => {
+            const count = req.taskCount;
+            openConfirmModal({
+                title: `Delete ${count === 1 ? "task" : "tasks"}`,
+                message: `Remove ${count} ${count === 1 ? "task" : "tasks"} from the queue?`,
+                choices: [
+                    { label: "Delete", color: theme.status.error },
+                    { label: "Cancel", color: theme.text.muted },
+                ],
+                accentColor: theme.status.error,
+                onConfirm: (i) => {
+                    if (i === 0) req.apply();
+                },
+            });
+        },
+        [openConfirmModal, theme]
+    );
 
     // Bridge: let plain-TS flow actions open the start-options modal.
     useEffect(() => {
         startOptionsBridge.setOpener(openStartFlow);
         return () => startOptionsBridge.setOpener(null);
     }, [openStartFlow]);
+
+    // Bridge: let plain-TS flow actions open the confirm modal.
+    useEffect(() => {
+        deleteConfirmBridge.setOpener(handleDeleteBridgeRequest);
+        return () => deleteConfirmBridge.setOpener(null);
+    }, [handleDeleteBridgeRequest]);
 
     return (
         <ImportActionsProvider openImportFlow={openImportFlow}>
@@ -110,17 +139,27 @@ export const AppInner: React.FC<{
                     terminalWidth={terminalWidth}
                     currentFlow={currentFlow}
                     orchestrator={orchestrator}
+                    openConfirmModal={openConfirmModal}
                 />
 
                 <SettingsModal
                     terminalHeight={terminalHeight}
                     terminalWidth={terminalWidth}
                     currentFlow={currentFlow}
+                    openConfirmModal={openConfirmModal}
                 />
 
                 <SetupWizardModal tasks={tasks} terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
 
                 <WelcomeModal terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
+
+                <ConfirmModal
+                    pendingConfig={pendingConfig}
+                    terminalHeight={terminalHeight}
+                    terminalWidth={terminalWidth}
+                    onConfirm={handleConfirm}
+                    onCancel={handleCancel}
+                />
 
                 {updateInfo && (
                     <UpdateModal

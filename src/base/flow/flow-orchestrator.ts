@@ -20,6 +20,10 @@ export class FlowOrchestrator {
     private flows: Set<FlowBase> = new Set();
     private tasks: Task[] = [];
     private activeTasks: Task[] = [];
+    // Tasks removed while running — kept here so getTasksInProgress() still
+    // counts their concurrency slot until the background promise finishes.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private removingTasks: Set<Task<any>> = new Set();
 
     private constructor() {
         this.logger = globalLogger.createChild({ service: "FlowOrchestrator" });
@@ -93,12 +97,28 @@ export class FlowOrchestrator {
         return this.tasks;
     }
 
+    public removeTasks(ids: string[]): void {
+        const idSet = new Set(ids);
+        for (const task of this.tasks) {
+            if (idSet.has(task.getId()) && task.running) {
+                // Task is mid-flight — hold its slot until the promise finishes.
+                this.removingTasks.add(task);
+            }
+        }
+        this.tasks = this.tasks.filter((t) => !idSet.has(t.getId()));
+        this.notifySubscribers();
+    }
+
     public getTasksCandidates(): Task[] {
         return this.tasks.filter((task) => !task.running && task.finishedAt == undefined);
     }
 
     public getTasksInProgress(): Task[] {
-        return this.tasks.filter((task) => task.running);
+        // Drop any removing tasks whose promise has finished.
+        for (const t of this.removingTasks) {
+            if (!t.running) this.removingTasks.delete(t);
+        }
+        return [...this.tasks.filter((task) => task.running), ...Array.from(this.removingTasks)];
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

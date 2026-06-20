@@ -15,9 +15,8 @@ import { ToolbarButtonHook } from "#components/Toolbar/Toolbar";
 import { ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
 import { ContextualActionBar, ContextualActions } from "#types/actions";
 import { runWithoutCache } from "#utils/cache";
-import { useExitButton } from "../../components/Toolbar/useExitButton";
+import { deleteConfirmBridge } from "#base/flow/deleteConfirmBridge";
 import { useRunAllButton } from "./toolbar/useRunAllButton";
-import { useSettingsButton } from "../../components/Toolbar/useSettingsButton";
 import { UrlCell } from "./columns/UrlCell";
 import { ArtistCell } from "./columns/ArtistCell";
 import { TrackCell } from "./columns/TrackCell";
@@ -304,6 +303,22 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 },
             },
         ];
+        taskActions.push({
+            shortcuts: [{ key: "delete" }],
+            label: "Delete",
+            description: "Remove this task from the list",
+            multiSelectAllowed: true,
+            onClick: () =>
+                deleteConfirmBridge.request({
+                    taskCount: 1,
+                    apply: () => this.orchestrator.removeTasks([task.getId()]),
+                }),
+            onClickBatch: (tasks) =>
+                deleteConfirmBridge.request({
+                    taskCount: tasks.length,
+                    apply: () => this.orchestrator.removeTasks(tasks.map((t) => t.getId())),
+                }),
+        });
         if (attrs?.primaryMetadataFetched) {
             taskActions.push({
                 shortcuts: [{ input: "f" }],
@@ -480,7 +495,9 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 const display = providerDisplayRegistry.get(key);
                 return {
                     id: `metadataService-${key}`,
-                    label: display.acronym,
+                    label: display.label.toUpperCase(),
+                    acronym: display.acronym,
+                    minWidth: Math.max(2, display.acronym.length + 3),
                     color: display.color,
                     weight: 20,
                     flexGrow: 0,
@@ -500,7 +517,9 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 const display = providerDisplayRegistry.get(key);
                 return {
                     id: `downloadService-${key}`,
-                    label: display.acronym,
+                    label: display.label.toUpperCase(),
+                    acronym: display.acronym,
+                    minWidth: Math.max(2, display.acronym.length + 3),
                     color: display.color,
                     weight: 32,
                     flexGrow: 0,
