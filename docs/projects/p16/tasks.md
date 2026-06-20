@@ -135,6 +135,30 @@ Promoted `cli-truncate`, `strip-ansi`, `wrap-ansi` to explicit runtime dependenc
 
 ---
 
+### T16.10 — Log transport: level case normalization
+
+**File:** `src/base/logger/ink-transport.ts`
+
+Winston normalizes log levels to lowercase internally, but the `LogLevel` enum uses uppercase strings (`INFO`, `DEBUG`, etc.). The ink transport now uppercases `info.level` before pushing entries to `history` and `pending`, so level comparisons in `LogPanel` work without defensive casing at read time.
+
+| Status     |
+| ---------- |
+| ✅ Done    |
+
+---
+
+### T16.11 — Delete confirm bridge
+
+**File:** `src/base/flow/deleteConfirmBridge.ts` (new)
+
+A thin module-level bridge that lets non-UI flow code trigger a delete-confirmation modal without a direct component dependency. Flow code calls `deleteConfirmBridge.request({ taskCount, apply })`; the UI registers a handler via `deleteConfirmBridge.setOpener(fn)`. Decouples the confirmation UI from the deletion logic.
+
+| Status     |
+| ---------- |
+| ✅ Done    |
+
+---
+
 ## Verification
 
 | Check                  | Action                                                                                                                                            |
