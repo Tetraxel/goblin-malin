@@ -97,14 +97,14 @@ export function formatLogRows(log: LogMetadata, width: number): LogRow[] {
         | { uri?: { platform: string; type: string; id: string }; recognizedServiceKey?: string }
         | undefined;
     const recognizedServiceKey = attrs?.recognizedServiceKey;
-    const uriColor = recognizedServiceKey ? providerDisplayRegistry.get(recognizedServiceKey).color : "cyan";
+    const serviceDisplay = recognizedServiceKey ? providerDisplayRegistry.get(recognizedServiceKey) : null;
+    const uriColor = serviceDisplay ? serviceDisplay.color : "cyan";
 
     // URI: always "ACRONYM:id" — e.g. "YT:dlr8ale…", "SP:4rye8zg…".
     // Falls back to the raw log label (URL) for unrecognized inputs.
     let uriDisplay: string | undefined;
-    if (attrs?.uri && recognizedServiceKey) {
-        const display = providerDisplayRegistry.get(recognizedServiceKey);
-        uriDisplay = `${display.acronym}:${attrs.uri.id.toLowerCase()}`;
+    if (attrs?.uri && serviceDisplay) {
+        uriDisplay = `${serviceDisplay.acronym}:${attrs.uri.id.toLowerCase()}`;
     } else {
         const rawLabel = log.task?.getLogLabel?.();
         if (rawLabel) uriDisplay = rawLabel;

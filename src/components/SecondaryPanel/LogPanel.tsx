@@ -45,7 +45,6 @@ export const LogPanel = ({
 
     const [logs, setLogs] = useState<LogMetadata[]>([]);
     const [scrollOffset, setScrollOffset] = useState(0);
-    const [showDetails, setShowDetails] = useState(true);
 
     useEffect(() => {
         const unsubscribe = inkTransport.subscribe((incomingLogs) => {
@@ -74,11 +73,8 @@ export const LogPanel = ({
 
     // Flatten each log into its visual rows (header + wrapped message + details).
     const allRows = useMemo(
-        () =>
-            filteredLogs
-                .flatMap((log) => formatLogRows(log, innerWidth))
-                .filter((row) => showDetails || row.kind !== "detail"),
-        [filteredLogs, innerWidth, showDetails]
+        () => filteredLogs.flatMap((log) => formatLogRows(log, innerWidth)),
+        [filteredLogs, innerWidth]
     );
 
     // Reset scroll when the row set changes meaningfully or the panel loses focus.
@@ -118,18 +114,12 @@ export const LogPanel = ({
                 label: "Scroll down",
                 handler: () => setScrollOffset((prev) => Math.max(0, prev - 1)),
             },
-            {
-                id: "logPanel.toggleDetails",
-                defaultShortcut: { input: "d" },
-                label: showDetails ? "Fold details" : "Unfold details",
-                handler: () => setShowDetails((prev) => !prev),
-            },
         ],
         hintLines: [
             {
                 id: "logPanel.line.scroll",
                 left: { type: "text", value: "Logs", bold: true },
-                shortcutIds: ["logPanel.up", "logPanel.down", "logPanel.toggleDetails"],
+                shortcutIds: ["logPanel.up", "logPanel.down"],
             },
         ],
     });

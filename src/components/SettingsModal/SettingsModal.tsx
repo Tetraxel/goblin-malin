@@ -141,18 +141,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     if (i === 0) {
                         commitAndExit();
                     } else if (i === 1) {
-                        // Restore keybindings that were changed this session
-                        const currentKbs = SettingsStore.getInstance().getAppSettings().keybindings;
-                        for (const [id, shortcut] of Object.entries(originalKeybindings)) {
-                            if (JSON.stringify(currentKbs[id]) !== JSON.stringify(shortcut)) {
-                                SettingsStore.getInstance().setKeybinding(id, shortcut);
-                            }
-                        }
-                        for (const id of Object.keys(currentKbs)) {
-                            if (!(id in originalKeybindings)) {
-                                SettingsStore.getInstance().setKeybinding(id, null);
-                            }
-                        }
+                        // Restore all keybindings to the snapshot from modal-open in one write.
+                        const current = SettingsStore.getInstance().getAppSettings();
+                        SettingsStore.getInstance().writeAppSettings({
+                            ...current,
+                            keybindings: { ...originalKeybindings },
+                        });
                         switchBack();
                     }
                     // i === 2: do nothing, stay in settings

@@ -97,6 +97,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
                 paddingX={2}
                 paddingY={1}
                 width={modalWidth}
+                flexShrink={0}
             >
                 <Text bold color={pendingConfig.accentColor}>
                     {pendingConfig.title}
