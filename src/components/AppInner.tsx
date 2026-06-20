@@ -24,6 +24,9 @@ import { FlowBase } from "#base/flow/flow-base";
 import { useImportFlow } from "./ImportModal/useImportFlow";
 import { useStartFlow } from "./StartModal/useStartFlow";
 import { startOptionsBridge } from "#base/flow/startOptionsBridge";
+import { deleteConfirmBridge } from "#base/flow/deleteConfirmBridge";
+import { DeleteConfirmModal } from "./DeleteConfirmModal/DeleteConfirmModal";
+import { useDeleteConfirmFlow } from "./DeleteConfirmModal/useDeleteConfirmFlow";
 import { useTheme } from "#base/themeContext";
 
 export const AppInner: React.FC<{
@@ -52,12 +55,19 @@ export const AppInner: React.FC<{
     const theme = useTheme();
     const { pendingImport, openImportFlow, handleImportConfirm, handleImportCancel } = useImportFlow(currentFlow);
     const { pendingStart, openStartFlow, handleStartConfirm, handleStartCancel } = useStartFlow();
+    const { pendingDelete, openDeleteConfirm, handleDeleteConfirm, handleDeleteCancel } = useDeleteConfirmFlow();
 
     // Bridge: let plain-TS flow actions open the start-options modal.
     useEffect(() => {
         startOptionsBridge.setOpener(openStartFlow);
         return () => startOptionsBridge.setOpener(null);
     }, [openStartFlow]);
+
+    // Bridge: let plain-TS flow actions open the delete-confirm modal.
+    useEffect(() => {
+        deleteConfirmBridge.setOpener(openDeleteConfirm);
+        return () => deleteConfirmBridge.setOpener(null);
+    }, [openDeleteConfirm]);
 
     return (
         <ImportActionsProvider openImportFlow={openImportFlow}>
@@ -121,6 +131,14 @@ export const AppInner: React.FC<{
                 <SetupWizardModal tasks={tasks} terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
 
                 <WelcomeModal terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
+
+                <DeleteConfirmModal
+                    pendingDelete={pendingDelete}
+                    terminalHeight={terminalHeight}
+                    terminalWidth={terminalWidth}
+                    onConfirm={handleDeleteConfirm}
+                    onCancel={handleDeleteCancel}
+                />
 
                 {updateInfo && (
                     <UpdateModal

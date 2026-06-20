@@ -93,6 +93,12 @@ export class FlowOrchestrator {
         return this.tasks;
     }
 
+    public removeTasks(ids: string[]): void {
+        const idSet = new Set(ids);
+        this.tasks = this.tasks.filter((t) => !idSet.has(t.getId()));
+        this.notifySubscribers();
+    }
+
     public getTasksCandidates(): Task[] {
         return this.tasks.filter((task) => !task.running && task.finishedAt == undefined);
     }

@@ -307,20 +307,15 @@ export type TrackDownloadSource = {
 //         TASK         //
 //----------------------//
 
-// Structured task-level uri, used for the log-line prefix. Distinct from the
-// metadata-level `TrackUri` string brand: this is derived from the recognized
-// input URL (and refined once primary metadata is fetched).
-export type TrackUriParts = {
-    platform: Platform;
-    type: "track";
-    id: string;
-};
-
 export type TrackDownloadTask = {
     state: "pending" | "running" | "finished" | "failed";
-    /** Structured uri of the track once recognized; undefined falls back to the URL. */
+    /**
+     * Structured uri set at import time from the recognized URL. Refined once primary
+     * metadata is fetched. Both uri and recognizedServiceKey are set together, or both
+     * absent (URL unrecognized → "Unknown").
+     */
     uri?: TrackUriParts;
-    /** Registry key of the metadata service that recognized the input URL. */
+    /** Registry key of the metadata service that recognized the input URL (e.g. "spotify", "youtube"). */
     recognizedServiceKey?: string;
     primaryMetadataInProgress?: boolean;
     metadataDiscoveringInProgress?: boolean;
@@ -330,10 +325,6 @@ export type TrackDownloadTask = {
     toTag?: boolean;
     toDownload?: boolean;
     userInput: UserInput;
-    // Recognized at import time from the URL (before any fetch). Both are set
-    // together, or both absent ⇒ the URL was not recognized by any service ("Unknown").
-    uri?: TrackUriParts; // structured URI, e.g. { platform: "spotify", type: "track", id: "123" }
-    recognizedServiceKey?: string; // registry key that matched & will fetch (e.g. "youtube")
     metadataGroups: MetadataGroupState[];
     metadataOverride: MetadataOverrides;
     downloadSources: TrackDownloadSource[];

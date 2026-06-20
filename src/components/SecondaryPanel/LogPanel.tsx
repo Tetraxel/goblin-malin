@@ -17,19 +17,6 @@ const LEVEL_ORDER: Record<LogLevel, number> = {
     [LogLevel.ERROR]: 3,
 };
 
-function levelColor(level: LogLevel): string {
-    switch (level) {
-        case LogLevel.WARN:
-            return "yellow";
-        case LogLevel.ERROR:
-            return "red";
-        case LogLevel.DEBUG:
-            return "gray";
-        default:
-            return "blue";
-    }
-}
-
 export const LogPanel = ({
     tasks,
     height: heightProp,
@@ -48,10 +35,17 @@ export const LogPanel = ({
     // Inner text width = panel width minus left/right border (2) and paddingX (2).
     const innerWidth = Math.max(10, (widthProp ?? screen.width) - 4);
 
-    const selectedTask = focusState.activeWindow === "taskList" ? tasks?.[focusState.taskList.selectedTaskIndex] : null;
+    // Keep the task filter when the user Tabs into the log panel — the taskList
+    // focus state (selected index / isHeaderFocused) is preserved across Tab.
+    const selectedTask =
+        (focusState.activeWindow === "taskList" || focusState.activeWindow === "secondaryPanel") &&
+        !focusState.taskList.isHeaderFocused
+            ? (tasks?.[focusState.taskList.selectedTaskIndex] ?? null)
+            : null;
 
     const [logs, setLogs] = useState<LogMetadata[]>([]);
     const [scrollOffset, setScrollOffset] = useState(0);
+    const [showDetails, setShowDetails] = useState(true);
 
     useEffect(() => {
         const unsubscribe = inkTransport.subscribe((incomingLogs) => {
@@ -80,8 +74,11 @@ export const LogPanel = ({
 
     // Flatten each log into its visual rows (header + wrapped message + details).
     const allRows = useMemo(
-        () => filteredLogs.flatMap((log) => formatLogRows(log, innerWidth)),
-        [filteredLogs, innerWidth]
+        () =>
+            filteredLogs
+                .flatMap((log) => formatLogRows(log, innerWidth))
+                .filter((row) => showDetails || row.kind !== "detail"),
+        [filteredLogs, innerWidth, showDetails]
     );
 
     // Reset scroll when the row set changes meaningfully or the panel loses focus.
@@ -121,12 +118,18 @@ export const LogPanel = ({
                 label: "Scroll down",
                 handler: () => setScrollOffset((prev) => Math.max(0, prev - 1)),
             },
+            {
+                id: "logPanel.toggleDetails",
+                defaultShortcut: { input: "d" },
+                label: showDetails ? "Fold details" : "Unfold details",
+                handler: () => setShowDetails((prev) => !prev),
+            },
         ],
         hintLines: [
             {
                 id: "logPanel.line.scroll",
                 left: { type: "text", value: "Logs", bold: true },
-                shortcutIds: ["logPanel.up", "logPanel.down"],
+                shortcutIds: ["logPanel.up", "logPanel.down", "logPanel.toggleDetails"],
             },
         ],
     });
@@ -172,9 +175,13 @@ export const LogPanel = ({
                     </Box>
                 )}
                 {visibleRows.map((row) => (
-                    <Box key={row.key} paddingX={1} height={1} overflow="hidden" flexGrow={1} flexShrink={0}>
-                        <Text color={levelColor(row.level)} dimColor={row.kind !== "header"} wrap="truncate-end">
-                            {row.text}
+                    <Box key={row.key} paddingX={1} height={1} overflow="hidden" flexShrink={0}>
+                        <Text wrap="truncate-end">
+                            {row.segments.map((seg, i) => (
+                                <Text key={i} color={seg.color} dimColor={seg.dim}>
+                                    {seg.text}
+                                </Text>
+                            ))}
                         </Text>
                     </Box>
                 ))}
