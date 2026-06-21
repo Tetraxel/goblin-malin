@@ -3,7 +3,7 @@ import { useInput } from "ink";
 import { shortcutRegistry } from "#base/shortcuts/ShortcutRegistry";
 import { useImportActions } from "#contexts/ImportActionsContext";
 
-const PASTE_DEBOUNCE_MS = 32;
+const PASTE_DEBOUNCE_MS = 64;
 
 /**
  * The single `useInput` in the application.

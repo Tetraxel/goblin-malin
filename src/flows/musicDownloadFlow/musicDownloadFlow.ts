@@ -14,6 +14,7 @@ import { SettingsItem } from "#settings/buildSettingsItems";
 import { ToolbarButtonHook } from "#components/Toolbar/Toolbar";
 import { ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
 import { ContextualActionBar, ContextualActions } from "#types/actions";
+import { StatusType } from "#base/task/task-status";
 import { runWithoutCache } from "#utils/cache";
 import { deleteConfirmBridge } from "#base/flow/deleteConfirmBridge";
 import { useRunAllButton } from "./toolbar/useRunAllButton";
@@ -223,6 +224,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 id: snap.id,
                 initialInput: snap.initialInput,
                 attributes,
+                initialStatus: snap.status,
                 flowId: this.id,
                 logger: this.logger,
                 metadataServiceRegistry: this.metadataServiceRegistry,
@@ -242,9 +244,44 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
     }
 
     async runAll(): Promise<void> {
+        if (!this.orchestrator.isProcessing()) {
+            for (const task of this.orchestrator.getTasksCandidates()) {
+                if (task.getFlowId() === this.id) {
+                    task.getStatus().set({ type: StatusType.Pending, message: "Queued" });
+                }
+            }
+        }
         this.orchestrator.processTasks();
     }
-    async stopAll(): Promise<void> {}
+
+    async runSelected(ids: Set<string>): Promise<void> {
+        const tasks = this.orchestrator.getTasks() as unknown as DownloadTask[];
+        for (const t of tasks) {
+            if (!ids.has(t.getId())) continue;
+            const state = t.getAttributes()?.state;
+            if (state !== "pending" && state !== "stopped") {
+                t.updateAttributes({
+                    state: "pending",
+                    metadataGroups: [],
+                    metadataOverride: {},
+                    downloadSources: [],
+                    primaryMetadataFetched: false,
+                    metadataDiscovered: false,
+                    downloadsFetched: false,
+                });
+                t.finishedAt = undefined;
+                t.runnedAt = undefined;
+            }
+            t.getStatus().set({ type: StatusType.Pending, message: "Queued" });
+        }
+        // Pass the ID filter so the orchestrator only processes the selected tasks,
+        // leaving other pending tasks untouched.
+        this.orchestrator.processTasks(ids);
+    }
+
+    async stopAll(): Promise<void> {
+        this.orchestrator.stopProcessing();
+    }
 
     public getToolbarButtons(): ToolbarButtonHook[] {
         return [useRunAllButton];
@@ -252,17 +289,21 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
 
     public getContextualActionBar(
         task: DownloadTask,
-        attributes: { columnIndex: number; taskIndex: number; taskCount: number }
+        attributes: { columnIndex: number; taskIndex?: number; taskCount?: number; selectedCount?: number }
     ): ContextualActionBar {
         const columns = this.getColumns();
         const column = columns[attributes.columnIndex];
         const attrs = task.getAttributes();
 
         // ── Task row (bottom) ─────────────────────────────────────────────────
-        const hasBeenRun = attrs?.state !== "pending";
-        // Already-run tasks restart without cache; pending tasks start normally.
+        const state = attrs?.state;
+        // Stopped and pending tasks start fresh; anything else is a restart.
+        const hasBeenRun = state !== "pending" && state !== "stopped";
+        // Already-run tasks restart without cache; pending/stopped tasks start normally.
         const runTask = (t: DownloadTask) =>
-            t.getAttributes()?.state !== "pending" ? fire(runWithoutCache(() => t.restart())) : fire(t.start());
+            t.getAttributes()?.state !== "pending" && t.getAttributes()?.state !== "stopped"
+                ? fire(runWithoutCache(() => t.restart()))
+                : fire(t.start());
         const needsOptions = (t: DownloadTask) => {
             const a = t.getAttributes();
             return !a?.toTag && !a?.toDownload;
@@ -289,16 +330,19 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                 onClickBatch: (tasks) => {
                     const selected = tasks as DownloadTask[];
                     const needing = selected.filter(needsOptions);
+                    const doRun = (selectedTasks: DownloadTask[]) => {
+                        this.runSelected(new Set(selectedTasks.map((t) => t.getId())));
+                    };
                     if (needing.length > 0) {
                         startOptionsBridge.request({
                             taskCount: selected.length,
                             apply: (opts) => {
                                 needing.forEach((t) => t.updateAttributes(opts));
-                                selected.forEach(runTask);
+                                doRun(selected);
                             },
                         });
                     } else {
-                        selected.forEach(runTask);
+                        doRun(selected);
                     }
                 },
             },
@@ -423,10 +467,18 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             columnActions.push(...this.buildMetadataServiceColumnActions(serviceKey, attrs, task));
         }
 
+        const { selectedCount, taskIndex, taskCount } = attributes;
+        const taskRowLabel =
+            selectedCount != null && selectedCount > 1
+                ? `${selectedCount} selected tasks`
+                : taskIndex != null && taskCount != null
+                  ? `Task ${taskIndex + 1}/${taskCount}`
+                  : "Task";
+
         return {
             rows: [
                 { text: columnLabel, textColor: columnColor, actions: columnActions },
-                { text: `Task ${attributes.taskIndex + 1}/${attributes.taskCount}`, actions: taskActions },
+                { text: taskRowLabel, actions: taskActions },
             ],
         };
     }

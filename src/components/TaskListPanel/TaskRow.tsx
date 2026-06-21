@@ -2,9 +2,23 @@
 import { Box, Text } from "ink";
 import { Task } from "#base/task/task";
 import { FlowBase } from "#base/flow/flow-base";
+import { Theme } from "#base/theme";
 import { useTheme } from "#base/themeContext";
 import { useTask } from "#hooks/useTask";
 import { CalculatedColumn } from "./TaskListPanel";
+
+function getRowBackground(
+    theme: Theme,
+    isActive: boolean,
+    isHighlighted: boolean,
+    isMultiSelected: boolean
+): string | undefined {
+    if (isActive)
+        return isMultiSelected ? theme.ui.rowMultiSelectedActiveBackground : theme.ui.rowActiveDimmedBackground;
+    if (isHighlighted || isMultiSelected)
+        return isMultiSelected ? theme.ui.rowMultiSelectedBackground : theme.ui.rowBackground;
+    return undefined;
+}
 
 export const TaskRow = React.memo(function TaskRow<TAttributes>({
     taskReference,
@@ -28,11 +42,7 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
 
     const isActiveIndicator = isActive ? "☛" : " ";
     const indicator = isActiveIndicator + (isMultiSelected ? "✓" : " ");
-    const backgroundColor = isActive
-        ? theme.ui.rowActiveDimmedBackground
-        : isHighlighted
-          ? theme.ui.rowBackground
-          : undefined;
+    const backgroundColor = getRowBackground(theme, isActive, isHighlighted, isMultiSelected);
 
     return (
         <Box key={task.id} paddingX={1} overflowY="hidden" backgroundColor={backgroundColor}>
@@ -52,7 +62,15 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
                         flexGrow={column.flexGrow}
                         flexShrink={0}
                         paddingX={1}
-                        backgroundColor={isCellActive ? theme.ui.rowActiveBackground : undefined}
+                        backgroundColor={
+                            isCellActive
+                                ? isMultiSelected
+                                    ? theme.ui.rowMultiSelectedCellActiveBackground
+                                    : theme.ui.rowActiveBackground
+                                : isMultiSelected
+                                  ? backgroundColor
+                                  : undefined
+                        }
                         overflow="hidden"
                     >
                         <CellComponent

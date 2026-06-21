@@ -7,6 +7,7 @@ import { ProviderSettingsSchema } from "#base/providerSettings";
 import { StatusType } from "#base/task/task-status";
 import { Logger } from "#base/logger/logger";
 import { getBinDir } from "#utils/appPaths";
+import { makeAbortError } from "#utils/errors";
 import { ensureFfmpeg } from "#utils/ffmpeg-setup";
 import { APIProvider, TrackMetadata, TrackDownloadSource, LocalFile, FileInfo } from "#flows/musicDownloadFlow/types";
 import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
@@ -57,7 +58,8 @@ export class YtDlpService extends DownloadService {
 
     async downloadTrack(
         trackMetadata: TrackMetadata,
-        onUpdate?: (source: TrackDownloadSource) => void
+        onUpdate?: (source: TrackDownloadSource) => void,
+        signal?: AbortSignal
     ): Promise<TrackDownloadSource> {
         // Check if this service can handle the track's source
         if (!this.canDownload(trackMetadata)) {
@@ -130,13 +132,6 @@ export class YtDlpService extends DownloadService {
                     audioFormat: format,
                     extractAudio: true,
                     restrictFilenames: true,
-                    onProgress: (progress) => {
-                        this.status.update({ progress: progress.percentage });
-                        onUpdate?.({ ...pendingSource, progress: progress.percentage });
-                        this.logger.debug(
-                            `Download progress: ${progress.percentage}% ${progress.speed_str} (ETA: ${progress.eta_str})`
-                        );
-                    },
                 };
 
                 // Add cookies if the file exists
@@ -147,9 +142,31 @@ export class YtDlpService extends DownloadService {
                     this.logger.warn("No cookies file found, proceeding without cookies");
                 }
 
-                // Download the track
+                // Use the builder API so we can kill the process on abort
                 const client = await this.getClient();
-                await client.downloadAsync(trackUrl, downloadOptions);
+                const dl = client.download(trackUrl, downloadOptions).on("progress", (progress) => {
+                    this.status.update({ progress: progress.percentage });
+                    onUpdate?.({ ...pendingSource, progress: progress.percentage });
+                    this.logger.debug(
+                        `Download progress: ${progress.percentage}% ${progress.speed_str} (ETA: ${progress.eta_str})`
+                    );
+                });
+
+                const onAbort = () => dl.kill();
+                signal?.addEventListener("abort", onAbort, { once: true });
+
+                try {
+                    await dl.run();
+                } finally {
+                    signal?.removeEventListener("abort", onAbort);
+                }
+
+                // If aborted, delete the partial temp file to avoid it being treated as a
+                // complete cached download on the next run, then re-raise as AbortError.
+                if (signal?.aborted) {
+                    await fs.promises.unlink(fullPath).catch(() => {});
+                    throw makeAbortError();
+                }
 
                 this.logger.info(`Successfully downloaded: ${path.basename(fullPath)}`);
                 localFile = {
@@ -182,6 +199,7 @@ export class YtDlpService extends DownloadService {
             };
             return downloadSource;
         } catch (error) {
+            if ((error as Error).name === "AbortError") throw error;
             this.logger.error(`Error downloading track: ${trackMetadata.trackName}`, { error });
             this.status.set({
                 type: StatusType.Error,

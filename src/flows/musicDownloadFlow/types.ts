@@ -308,7 +308,7 @@ export type TrackDownloadSource = {
 //----------------------//
 
 export type TrackDownloadTask = {
-    state: "pending" | "running" | "finished" | "failed";
+    state: "pending" | "running" | "finished" | "failed" | "stopped";
     /**
      * Structured uri set at import time from the recognized URL. Refined once primary
      * metadata is fetched. Both uri and recognizedServiceKey are set together, or both
@@ -332,7 +332,7 @@ export type TrackDownloadTask = {
 };
 
 export type TracksDownloadTask = {
-    state: "pending" | "running" | "finished" | "failed";
+    state: "pending" | "running" | "finished" | "failed" | "stopped";
     toTag?: boolean;
     toDownload?: boolean;
     userInput: UserInput;

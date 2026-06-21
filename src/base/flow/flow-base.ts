@@ -69,6 +69,10 @@ export class FlowBase<TaskAttributes = any> {
         throw Error("Not implemented");
     }
 
+    public async runSelected(_ids: Set<string>): Promise<void> {
+        return this.runAll();
+    }
+
     public async stopAll(): Promise<void> {
         throw Error("Not implemented");
     }

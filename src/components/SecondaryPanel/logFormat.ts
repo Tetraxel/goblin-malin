@@ -104,7 +104,7 @@ export function formatLogRows(log: LogMetadata, width: number): LogRow[] {
     // Falls back to the raw log label (URL) for unrecognized inputs.
     let uriDisplay: string | undefined;
     if (attrs?.uri && serviceDisplay) {
-        uriDisplay = `${serviceDisplay.acronym}:${attrs.uri.id.toLowerCase()}`;
+        uriDisplay = `${serviceDisplay.acronym}:${attrs.uri.id}`;
     } else {
         const rawLabel = log.task?.getLogLabel?.();
         if (rawLabel) uriDisplay = rawLabel;

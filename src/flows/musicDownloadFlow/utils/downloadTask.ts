@@ -4,7 +4,8 @@ import { TaskScoped } from "#base/task/taskContext";
 import { globalLogger, Logger } from "#base/logger/logger";
 import { ServiceRegistry } from "#base/service-registry";
 import { ServiceScope } from "#base/service-scope";
-import { StatusType } from "#base/task/task-status";
+import { StatusAttributes, StatusType } from "#base/task/task-status";
+import { throwIfAborted } from "#utils/errors";
 import {
     MusicDownloadTaskAttributes,
     TrackMetadata,
@@ -37,6 +38,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         attributes,
         flowId,
         logger,
+        initialStatus,
         metadataServiceRegistry,
         discoveryServiceRegistry,
         downloadServiceRegistry,
@@ -49,6 +51,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         attributes?: MusicDownloadTaskAttributes;
         flowId: string;
         logger: Logger;
+        initialStatus?: StatusAttributes;
         metadataServiceRegistry: ServiceRegistry<DownloadTask, MetadataService>;
         discoveryServiceRegistry: ServiceRegistry<DownloadTask, DiscoveryMetadataService>;
         downloadServiceRegistry: ServiceRegistry<DownloadTask, DownloadService>;
@@ -56,7 +59,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         isDiscoveryServiceEnabled: (key: string) => boolean;
         isDownloadServiceEnabled: (key: string) => boolean;
     }) {
-        super({ id, initialInput, attributes, flowId, logger });
+        super({ id, initialInput, attributes, flowId, logger, initialStatus });
 
         this.metadataServiceRegistry = metadataServiceRegistry;
         this.isMetadataServiceEnabled = isMetadataServiceEnabled;
@@ -154,29 +157,54 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
 
     @TaskScoped()
     @SafeAction("Start task")
-    async start(): Promise<void> {
+    async start(signal?: AbortSignal): Promise<void> {
         try {
-            if (this.getAttributes()?.state !== "pending") {
+            const state = this.getAttributes()?.state;
+            if (state !== "pending" && state !== "stopped") {
                 this.logger.info(`Skipping because task already processed ${this.getInitialInput()}`);
                 return;
             }
 
+            // Clean up partial state from a previous stopped run
+            if (state === "stopped") {
+                this.updateAttributes({
+                    state: "pending",
+                    metadataGroups: [],
+                    metadataOverride: {},
+                    downloadSources: [],
+                    primaryMetadataFetched: false,
+                    metadataDiscovered: false,
+                    downloadsFetched: false,
+                });
+                this.status.clear();
+            }
+
             this.logger.info(`Starting to process ${this.getInitialInput()}`);
             this.updateAttributes({ state: "running" });
+
+            throwIfAborted(signal);
 
             if (this.getAttributes()?.toTag) {
                 // If primary metadata is not fetched -> fetch it
                 if (!this.getPrimaryMetadata()) {
                     await this.startPrimaryMetadataFetching();
                 }
+                throwIfAborted(signal);
                 await this.startMetadataDiscovering();
             }
 
+            throwIfAborted(signal);
+
             if (this.getAttributes()?.toDownload) {
-                await this.startDownloads();
+                await this.startDownloads(signal);
             }
             this.updateAttributes({ state: "finished" });
         } catch (error) {
+            if ((error as Error).name === "AbortError") {
+                this.updateAttributes({ state: "stopped" });
+                this.status.set({ type: StatusType.Skipped, message: "Stopped" });
+                throw error;
+            }
             this.updateAttributes({ state: "failed" });
             throw error;
         }
@@ -662,7 +690,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
 
     @TaskScoped()
     @SafeAction("Start downloads")
-    async startDownloads(): Promise<void> {
+    async startDownloads(signal?: AbortSignal): Promise<void> {
         const metadataGroups = this.getAttributes()?.metadataGroups;
 
         if (!metadataGroups || metadataGroups.length === 0) {
@@ -677,6 +705,8 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         const downloadSources: TrackDownloadSource[] = [];
 
         for (const downloadService of downloadServices) {
+            throwIfAborted(signal);
+
             try {
                 // Find first compatible metadata across groups (sorted by group rank, then result rank)
                 let compatibleMetadata: TrackMetadata | undefined;
@@ -717,7 +747,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
                 };
 
                 // Download the track
-                const downloadSource = await downloadService.downloadTrack(compatibleMetadata, onUpdate);
+                const downloadSource = await downloadService.downloadTrack(compatibleMetadata, onUpdate, signal);
                 if (slotIndex === -1) {
                     downloadSources.push(downloadSource);
                 } else {
@@ -726,6 +756,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
                 this.updateAttributes({ downloadSources: [...downloadSources] });
                 this.logger.info(`Successfully downloaded using ${downloadService.id}`);
             } catch (error) {
+                if ((error as Error).name === "AbortError") throw error;
                 this.logger.warn(`Failed to download using ${downloadService.id}:`, { error });
                 // Continue to next download service
             }

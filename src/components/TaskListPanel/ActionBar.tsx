@@ -30,6 +30,7 @@ export const ActionBar: React.FC<{
                   columnIndex: focusState.taskList.selectedColumnIndex,
                   taskIndex: selectedIndex,
                   taskCount: tasks.length,
+                  selectedCount: multiCount > 1 ? multiCount : undefined,
               })
             : null;
 

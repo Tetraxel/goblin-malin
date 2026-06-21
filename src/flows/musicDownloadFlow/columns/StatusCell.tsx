@@ -14,13 +14,13 @@ function getStatusIcon(status: StatusType): React.ReactNode | null {
         case StatusType.PendingUserAction:
             return <AnimatedIcon icon={Icon.Warning} />;
         case StatusType.Skipped:
-            return <Text>⏭️</Text>;
+            return <Text>⏭️ </Text>;
         case StatusType.Locked:
-            return <Text>🔒</Text>;
+            return <Text>🔒 </Text>;
         case StatusType.Error:
-            return <Text>❌</Text>;
+            return <Text>❌ </Text>;
         case StatusType.Success:
-            return <Text>✅</Text>;
+            return <Text>✅ </Text>;
         case StatusType.NoStatus:
             return null;
         case StatusType.Default:
@@ -75,7 +75,7 @@ export const StatusCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task,
     return (
         <Box flexGrow={1}>
             {iconComponent && (
-                <Box marginRight={1} flexShrink={0}>
+                <Box paddingRight={1} flexShrink={0}>
                     {iconComponent}
                 </Box>
             )}

@@ -24,6 +24,9 @@ export class FlowOrchestrator {
     // counts their concurrency slot until the background promise finishes.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private removingTasks: Set<Task<any>> = new Set();
+    private processing: boolean = false;
+    private stopping: boolean = false;
+    private abortController?: AbortController;
 
     private constructor() {
         this.logger = globalLogger.createChild({ service: "FlowOrchestrator" });
@@ -122,14 +125,15 @@ export class FlowOrchestrator {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    public async processTask(task: Task<any>): Promise<void> {
+    public async processTask(task: Task<any>, signal?: AbortSignal): Promise<void> {
         // Clean attributes in case the task is restarted
         return task
-            .start()
+            .start(signal)
             .then(() => {
                 task.success = true;
             })
             .catch((error: Error) => {
+                if (error.name === "AbortError") return;
                 task.getStatus().set({
                     type: StatusType.Error,
                     message: "Failed to process task",
@@ -141,49 +145,107 @@ export class FlowOrchestrator {
             })
             .finally(() => {
                 task.running = false;
-                task.finishedAt = new Date();
+                // Stopped tasks keep finishedAt=undefined so they remain candidates for the next run
+                if (task.getAttributes()?.state !== "stopped") {
+                    task.finishedAt = new Date();
+                }
             });
     }
 
-    public async processTasks(): Promise<void> {
-        const promises: Promise<void>[] = [];
-        this.logger.info(`Processing ${this.getTasksCandidates()} tasks`);
-
-        while (this.getTasksCandidates().length > 0 || this.getTasksInProgress().length > 0) {
-            // Start new tasks up to maxConcurrent
-            while (
-                this.getTasksCandidates().length > 0 &&
-                this.getTasksInProgress().length < this.globalMaxConcurrent
-            ) {
-                const task = this.getTasksCandidates()[0];
-
-                if (!task) break;
-
-                task.running = true;
-                task.runnedAt = new Date();
-                task.attempt += 1;
-
-                // Start processing without awaiting (for parallel execution)
-                const promise = this.processTask(task);
-                promises.push(promise);
-            }
-
-            this.notifySubscribers();
-
-            // Wait for at least one download to complete before continuing
-            if (this.getTasksInProgress().length >= this.globalMaxConcurrent) {
-                await Promise.race(promises);
-            }
-
-            this.notifySubscribers();
-
-            // Small delay to prevent tight loop
-            await new Promise((resolve) => setTimeout(resolve, 100));
+    public async processTasks(filterIds?: Set<string>): Promise<void> {
+        if (this.processing) {
+            this.logger.warn("processTasks already running — ignoring duplicate call");
+            return;
         }
 
-        // Wait for all remaining downloads to complete
-        await Promise.all(promises);
+        this.processing = true;
+        this.abortController = new AbortController();
+        const signal = this.abortController.signal;
+
         this.notifySubscribers();
+
+        const getCandidates = () => {
+            const all = this.getTasksCandidates();
+            return filterIds ? all.filter((t) => filterIds.has(t.getId())) : all;
+        };
+
+        const promises: Promise<void>[] = [];
+        this.logger.info(`Processing ${getCandidates().length} tasks`);
+
+        try {
+            while (getCandidates().length > 0 || this.getTasksInProgress().length > 0) {
+                // Stop launching new tasks when aborted, but drain in-flight ones
+                while (
+                    !signal.aborted &&
+                    getCandidates().length > 0 &&
+                    this.getTasksInProgress().length < this.globalMaxConcurrent
+                ) {
+                    const task = getCandidates()[0];
+
+                    if (!task) break;
+
+                    task.running = true;
+                    task.runnedAt = new Date();
+                    task.attempt += 1;
+
+                    // Start processing without awaiting (for parallel execution)
+                    const promise = this.processTask(task, signal);
+                    promises.push(promise);
+                }
+
+                this.notifySubscribers();
+
+                // If aborted and nothing in-flight, exit the drain loop
+                if (signal.aborted && this.getTasksInProgress().length === 0) break;
+
+                // Wait for at least one task to complete before continuing
+                if (this.getTasksInProgress().length >= this.globalMaxConcurrent) {
+                    await Promise.race(promises);
+                } else if (signal.aborted && this.getTasksInProgress().length > 0) {
+                    // Still draining after abort — wait for one to finish
+                    await Promise.race(promises);
+                }
+
+                this.notifySubscribers();
+
+                // Small delay to prevent tight loop
+                await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+
+            // Wait for all remaining tasks to settle
+            await Promise.all(promises);
+        } finally {
+            this.clearQueuedStatus();
+            this.processing = false;
+            this.stopping = false;
+            this.abortController = undefined;
+            this.notifySubscribers();
+        }
+    }
+
+    public stopProcessing(): void {
+        this.stopping = true;
+        this.abortController?.abort();
+        this.notifySubscribers();
+    }
+
+    private clearQueuedStatus(): void {
+        for (const task of this.tasks) {
+            if (!task.running && task.finishedAt === undefined) {
+                const s = task.getStatus().get();
+                if (s.type === StatusType.Pending) {
+                    task.getStatus().clear();
+                }
+            }
+        }
+    }
+
+    public isProcessing(): boolean {
+        return this.processing;
+    }
+
+    public isStopping(): boolean {
+        return this.stopping;
     }
 
     public subscribe(callback: OrchestratorSubscriber): () => void {

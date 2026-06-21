@@ -26,6 +26,7 @@ export type ToolbarButtonHook<TFlow = FlowBase> = ({
     enabled: boolean;
     label?: string;
     icon?: string;
+    inProgress?: boolean;
     color?: React.ComponentProps<typeof Text>["color"];
     bold?: boolean;
     italic?: boolean;

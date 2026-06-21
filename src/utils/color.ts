@@ -1,3 +1,12 @@
+// Blend overlay color into base: amount 0 = all base, 1 = all overlay
+export function blend(base: string, overlay: string, amount: number): string {
+    const t = Math.max(0, Math.min(1, amount));
+    const r = Math.round(parseInt(base.slice(1, 3), 16) * (1 - t) + parseInt(overlay.slice(1, 3), 16) * t);
+    const g = Math.round(parseInt(base.slice(3, 5), 16) * (1 - t) + parseInt(overlay.slice(3, 5), 16) * t);
+    const b = Math.round(parseInt(base.slice(5, 7), 16) * (1 - t) + parseInt(overlay.slice(5, 7), 16) * t);
+    return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+}
+
 export function darken(hex: string, factor: number): string {
     const scale = Math.max(0, Math.min(1, factor));
     const r = Math.round(parseInt(hex.slice(1, 3), 16) * scale);

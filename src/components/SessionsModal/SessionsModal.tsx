@@ -35,7 +35,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
     openConfirmModal,
 }) => {
     const theme = useTheme();
-    const { focusState, switchBack } = useFocusContext();
+    const { focusState, switchBack, clearSelection } = useFocusContext();
     const isActive = focusState.activeWindow === "sessionsModal";
     const isVisible = isActive || focusState.previousWindow === "sessionsModal";
 
@@ -71,6 +71,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
     function doLoad(session: StoredSession) {
         if (!currentFlow) return;
         manager.loadSession(session.id, currentFlow, orchestrator);
+        clearSelection();
         switchBack();
     }
 
@@ -104,6 +105,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
             onConfirm: (i) => {
                 if (i === 0) {
                     manager.deleteSession(session.id, orchestrator);
+                    clearSelection();
                     setSelectedIndex(0);
                 }
             },
@@ -201,6 +203,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
                 handler: () => {
                     if (renamingId) return;
                     manager.newSession(orchestrator);
+                    clearSelection();
                     switchBack();
                 },
             },
@@ -212,6 +215,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
                     if (renamingId || modalFocus !== "list") return;
                     if (selectedSession && currentFlow) {
                         manager.duplicateSession(selectedSession.id, currentFlow, orchestrator);
+                        clearSelection();
                         switchBack();
                     }
                 },

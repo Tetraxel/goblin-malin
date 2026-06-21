@@ -28,6 +28,7 @@ export abstract class DownloadService extends ServiceBase {
      */
     abstract downloadTrack(
         trackMetadata: TrackMetadata,
-        onUpdate?: (source: TrackDownloadSource) => void
+        onUpdate?: (source: TrackDownloadSource) => void,
+        signal?: AbortSignal
     ): Promise<TrackDownloadSource>;
 }

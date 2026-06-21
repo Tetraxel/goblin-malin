@@ -24,6 +24,9 @@ export interface Theme {
         rowBackground: string;
         rowActiveDimmedBackground: string;
         rowActiveBackground: string;
+        rowMultiSelectedActiveBackground: string;
+        rowMultiSelectedBackground: string;
+        rowMultiSelectedCellActiveBackground: string;
         border: string;
         separator: string;
         selection: string;

@@ -43,12 +43,14 @@ export class Task<TTaskAttributes = TaskAttributes> {
         attributes,
         flowId,
         logger,
+        initialStatus,
     }: {
         id: string;
         initialInput?: string;
         attributes?: TTaskAttributes;
         flowId: string;
         logger: Logger;
+        initialStatus?: StatusAttributes;
     }) {
         this.id = id;
         this.flowId = flowId;
@@ -58,8 +60,8 @@ export class Task<TTaskAttributes = TaskAttributes> {
             task: this,
         });
 
-        // Initialize status
-        this.status = new TaskStatus();
+        // Initialize status, restoring persisted status when provided (e.g. from session)
+        this.status = new TaskStatus(initialStatus);
         this.prompt = new TaskPrompt(this.id, this.status, () => this.notifyTaskSubscribers());
 
         // Subscribe to status changes to notify task subscribers
@@ -129,7 +131,7 @@ export class Task<TTaskAttributes = TaskAttributes> {
         this.setAttributes({ ...this.attributes, ...attributes } as TTaskAttributes);
     }
 
-    async start(): Promise<void> {
+    async start(_signal?: AbortSignal): Promise<void> {
         throw Error("Not implemented");
     }
 

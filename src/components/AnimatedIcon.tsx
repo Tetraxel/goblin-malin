@@ -31,9 +31,10 @@ const ICON_COLOR: Record<Icon, string> = {
 interface AnimatedIconProps {
     icon: Icon;
     interval?: number; // Animation speed in ms
+    color?: string;
 }
 
-export const AnimatedIcon: React.FC<AnimatedIconProps> = ({ icon, interval = 500 }) => {
+export const AnimatedIcon: React.FC<AnimatedIconProps> = ({ icon, interval = 500, color }) => {
     // Instead of a local setInterval, we ask the global ticker for the count
     const globalTick = useGlobalTicker(interval);
 
@@ -46,7 +47,7 @@ export const AnimatedIcon: React.FC<AnimatedIconProps> = ({ icon, interval = 500
     const frameIndex = animationsEnabled ? globalTick % frames.length : 0;
     const currentFrame = frames[frameIndex];
 
-    const color = ICON_COLOR[icon];
+    const resolvedColor = color ?? ICON_COLOR[icon];
 
-    return <Text color={color}>{currentFrame}</Text>;
+    return <Text color={resolvedColor}>{currentFrame}</Text>;
 };
