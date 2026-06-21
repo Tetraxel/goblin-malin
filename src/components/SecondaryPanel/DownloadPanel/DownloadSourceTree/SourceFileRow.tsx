@@ -15,7 +15,12 @@ interface SourceFileRowProps {
 
 export function SourceFileRow({ source, sourceIndex, isSelected, isActive, width }: SourceFileRowProps) {
     const theme = useTheme();
-    const bg = isSelected && isActive ? theme.ui.rowActiveBackground : isSelected ? theme.ui.rowBackground : undefined;
+    const bg =
+        isSelected && isActive
+            ? theme.ui.rowBackground.regular.cellActive
+            : isSelected
+              ? theme.ui.rowBackground.regular.highlighted
+              : undefined;
 
     const localFile = source.localFile;
     const filename = localFile ? `${localFile.name}.${localFile.extension}` : null;

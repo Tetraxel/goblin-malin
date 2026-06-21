@@ -15,12 +15,19 @@
     },
     "ui": {
         "background": "#000000",
-        "rowBackground": "#111111",
-        "rowActiveDimmedBackground": "#1d1d1d",
-        "rowActiveBackground": "#2f2f2f",
-        "rowMultiSelectedActiveBackground": "#213638",
-        "rowMultiSelectedBackground": "#162728",
-        "rowMultiSelectedCellActiveBackground": "#314d4f",
+        "rowBackground": {
+            "regular": {
+                "highlighted": "#1a1a1a",
+                "activeDimmed": "#252525",
+                "cellActive": "#363636"
+            },
+            "multiSelected": {
+                "base": "#152222",
+                "highlighted": "#233939",
+                "activeDimmed": "#273e3e",
+                "cellActive": "#375555"
+            }
+        },
         "border": "#39c5cf",
         "separator": "#39c5cf",
         "selection": "#58a6ff",

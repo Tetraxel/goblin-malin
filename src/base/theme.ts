@@ -21,12 +21,19 @@ export interface Theme {
 
     ui: {
         background: string;
-        rowBackground: string;
-        rowActiveDimmedBackground: string;
-        rowActiveBackground: string;
-        rowMultiSelectedActiveBackground: string;
-        rowMultiSelectedBackground: string;
-        rowMultiSelectedCellActiveBackground: string;
+        rowBackground: {
+            regular: {
+                highlighted: string;
+                activeDimmed: string;
+                cellActive: string;
+            };
+            multiSelected: {
+                base: string;
+                highlighted: string;
+                activeDimmed: string;
+                cellActive: string;
+            };
+        };
         border: string;
         separator: string;
         selection: string;

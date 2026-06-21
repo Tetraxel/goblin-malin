@@ -336,7 +336,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
                                         <Text
                                             color={theme.palette.blue}
                                             underline={isFocused}
-                                            backgroundColor={isFocused ? theme.ui.rowActiveBackground : undefined}
+                                            backgroundColor={isFocused ? theme.ui.rowBackground.regular.cellActive : undefined}
                                         >
                                             {item.text}
                                         </Text>

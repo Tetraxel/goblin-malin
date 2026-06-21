@@ -13,7 +13,7 @@ interface MetadataGroupHeaderProps {
 export const MetadataGroupHeader: React.FC<MetadataGroupHeaderProps> = ({ group, isSelected, isActive }) => {
     const theme = useTheme();
     const display = providerDisplayRegistry.get(group.serviceKey);
-    const focusColorBg = isActive ? theme.ui.rowActiveBackground : theme.ui.rowBackground;
+    const focusColorBg = isActive ? theme.ui.rowBackground.regular.cellActive : theme.ui.rowBackground.regular.highlighted;
     const bg = isSelected ? focusColorBg : undefined;
 
     const primaryResult = group.results.find((r) => r.isPrimaryInput);

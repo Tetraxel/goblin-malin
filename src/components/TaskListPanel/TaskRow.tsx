@@ -13,10 +13,17 @@ function getRowBackground(
     isHighlighted: boolean,
     isMultiSelected: boolean
 ): string | undefined {
+    // focus is on the window and the current row is active
     if (isActive)
-        return isMultiSelected ? theme.ui.rowMultiSelectedActiveBackground : theme.ui.rowActiveDimmedBackground;
-    if (isHighlighted || isMultiSelected)
-        return isMultiSelected ? theme.ui.rowMultiSelectedBackground : theme.ui.rowBackground;
+        return isMultiSelected
+            ? theme.ui.rowBackground.multiSelected.activeDimmed
+            : theme.ui.rowBackground.regular.activeDimmed;
+    // focus is not on the window, but the current row is highlighted
+    if (isHighlighted)
+        return isMultiSelected
+            ? theme.ui.rowBackground.multiSelected.highlighted
+            : theme.ui.rowBackground.regular.highlighted;
+    if (isMultiSelected) return theme.ui.rowBackground.multiSelected.base;
     return undefined;
 }
 
@@ -65,8 +72,8 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
                         backgroundColor={
                             isCellActive
                                 ? isMultiSelected
-                                    ? theme.ui.rowMultiSelectedCellActiveBackground
-                                    : theme.ui.rowActiveBackground
+                                    ? theme.ui.rowBackground.multiSelected.cellActive
+                                    : theme.ui.rowBackground.regular.cellActive
                                 : isMultiSelected
                                   ? backgroundColor
                                   : undefined

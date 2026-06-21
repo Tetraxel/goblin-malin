@@ -321,7 +321,7 @@ export const TaskListPanel: React.FC<{
                             paddingX={1}
                             overflow="hidden"
                             flexShrink={0}
-                            backgroundColor={isActive ? theme.ui.rowActiveBackground : undefined}
+                            backgroundColor={isActive ? theme.ui.rowBackground.regular.cellActive : undefined}
                         >
                             <Text bold color={isActive ? "white" : column.color || "cyan"}>
                                 {column.acronym && column.label.length > column.width - 2
