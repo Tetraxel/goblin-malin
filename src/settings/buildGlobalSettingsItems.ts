@@ -59,6 +59,13 @@ export function buildGlobalSettingsItems(
             value: settings.general.appDataDir,
         },
         {
+            kind: "checkbox",
+            indent: 0,
+            label: "Enable cache",
+            get: () => settings.general.cacheEnabled,
+            set: (v) => onChange({ general: { cacheEnabled: v } }),
+        },
+        {
             kind: "action",
             indent: 0,
             label: "⛒  Clear cache",

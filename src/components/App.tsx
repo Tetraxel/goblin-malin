@@ -20,6 +20,7 @@ import { useExitButton } from "./Toolbar/useExitButton";
 import { checkForUpdate, UpdateInfo } from "#updater/updateChecker";
 import { SettingsStore } from "#settings/settingsStore";
 import { SessionManager } from "#sessions/sessionManager";
+import { setCacheEnabled } from "#utils/cache";
 
 export const App: React.FC = () => {
     useEffect(() => {
@@ -45,6 +46,14 @@ export const App: React.FC = () => {
     const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
     const [pendingUpdate, setPendingUpdate] = useState<UpdateInfo | null>(null);
     const isOrchestratorIdle = useCallback((orch: FlowOrchestrator) => orch.getTasksInProgress().length === 0, []);
+
+    useEffect(() => {
+        const store = SettingsStore.getInstance();
+        setCacheEnabled(store.getAppSettings().general.cacheEnabled);
+        return store.onSettingsChanged(() => {
+            setCacheEnabled(store.getAppSettings().general.cacheEnabled);
+        });
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         const settings = SettingsStore.getInstance().getAppSettings();

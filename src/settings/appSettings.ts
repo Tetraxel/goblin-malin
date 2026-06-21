@@ -10,6 +10,7 @@ export type AppSettings = {
         theme: string;
         showWelcomeTutorial: boolean;
         checkForUpdates: boolean;
+        cacheEnabled: boolean;
     };
     logs: {
         /** Minimum level shown in the log panel (file transport always keeps debug). */
@@ -29,6 +30,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
         theme: "dark",
         showWelcomeTutorial: true,
         checkForUpdates: true,
+        cacheEnabled: true,
     },
     logs: {
         logLevel: LogLevel.INFO,

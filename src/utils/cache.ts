@@ -6,6 +6,11 @@ import { getCacheDir } from "./appPaths";
 
 const skipCacheStorage = new AsyncLocalStorage<boolean>();
 
+let cacheGloballyEnabled = true;
+export function setCacheEnabled(v: boolean): void {
+    cacheGloballyEnabled = v;
+}
+
 export function withSkipCache<T>(fn: () => Promise<T>): Promise<T> {
     return skipCacheStorage.run(true, fn);
 }
@@ -56,8 +61,8 @@ export function Cached(options: CacheOptions = {}) {
             // Generate cache key
             const cacheKey = `${className}:${propertyKey}:${JSON.stringify(args)}`;
 
-            // Return existing cache value ONLY if skipCache is not set in the AsyncLocalStorage context
-            const shouldSkip = skipCacheStorage.getStore() === true;
+            // Return existing cache value ONLY if cache is globally enabled and not skipped for this call
+            const shouldSkip = !cacheGloballyEnabled || skipCacheStorage.getStore() === true;
             if (!shouldSkip) {
                 const cached = cache.get(cacheKey);
                 if (cached !== undefined) {
