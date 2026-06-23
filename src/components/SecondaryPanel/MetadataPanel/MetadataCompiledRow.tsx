@@ -22,7 +22,9 @@ export const MetadataCompiledRow: React.FC<CompiledRowProps> = ({
     width,
 }) => {
     const theme = useTheme();
-    const focusColorBg = isActive ? theme.ui.rowBackground.regular.cellActive : theme.ui.rowBackground.regular.highlighted;
+    const focusColorBg = isActive
+        ? theme.ui.rowBackground.regular.cellActive
+        : theme.ui.rowBackground.regular.highlighted;
     const bg = isSelected ? focusColorBg : undefined;
     const artist = compiled.artists[0]?.name ?? "";
     const title = compiled.trackName ?? "";

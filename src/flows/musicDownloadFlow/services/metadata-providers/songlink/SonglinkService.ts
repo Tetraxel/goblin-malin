@@ -3,11 +3,12 @@ import { ProviderDisplay } from "#base/providerDisplay";
 import { ProviderSettingsSchema } from "#base/providerSettings";
 import { StatusType } from "#base/task/task-status";
 import { Cached } from "#utils/cache";
-import type { TrackMetadata } from "#flows/musicDownloadFlow/types";
+import type { TrackMetadata, DiscoveryResult } from "#flows/musicDownloadFlow/types";
 import { DiscoveryMetadataService } from "#flows/musicDownloadFlow/discoveryMetadataService";
 import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { SonglinkClient, SonglinkRateLimitError } from "../../apis/songlink-client";
 import { extractTracksFromSonglinkResponse } from "./convertSonglinkToTrack";
+import { SonglinkCell } from "./SonglinkCell";
 
 /**
  * ⚠️⚠️  SONGLINK RATE LIMIT — READ BEFORE USING  ⚠️⚠️
@@ -35,7 +36,7 @@ import { extractTracksFromSonglinkResponse } from "./convertSonglinkToTrack";
 export class SonglinkService extends DiscoveryMetadataService {
     static readonly display: ProviderDisplay = {
         label: "Songlink",
-        acronym: "SONGLINK",
+        acronym: "SL",
         color: "#f76c1b",
         colorSubtle: "#7a3000",
         colorBright: "#ff8c3a",
@@ -43,6 +44,7 @@ export class SonglinkService extends DiscoveryMetadataService {
     static readonly defaultSettings: ProviderSettingsSchema = {
         enabled: { label: "Enable", defaultValue: true, kind: "checkbox" },
     };
+    static readonly cellComponent = SonglinkCell;
 
     private static client: SonglinkClient;
 
@@ -58,9 +60,9 @@ export class SonglinkService extends DiscoveryMetadataService {
     }
 
     @Cached()
-    async discoverFromUri(sourceMetadata: TrackMetadata): Promise<TrackMetadata[]> {
+    async discoverFromUri(sourceMetadata: TrackMetadata): Promise<DiscoveryResult> {
         const url = sourceMetadata.url;
-        if (!url) return [];
+        if (!url) return { tracks: [], anchor: { state: "notFound" } };
 
         this.logger.info(`Discovering tracks via Songlink for: ${url}`);
         this.status.set({
@@ -89,22 +91,15 @@ export class SonglinkService extends DiscoveryMetadataService {
 
             const tracks = extractTracksFromSonglinkResponse(data);
 
-            // // TEMP: inject a fake YouTube track for UI testing
-            // const fakeYoutube: TrackMetadata = {
-            //     id: "dQw4w9WgXcQ",
-            //     trackName: sourceMetadata.trackName,
-            //     artists: sourceMetadata.artists,
-            //     url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-            //     uri: "YOUTUBE::TRACK::dQw4w9WgXcQ" as TrackMetadata["uri"],
-            //     platform: "youtube",
-            //     apiProvider: "youtube",
-            //     fetchedBy: "songlink",
-            //     fetchedAt: new Date(),
-            //     type: "track",
-            // } as unknown as TrackMetadata;
-            // tracks.push(fakeYoutube);
-
-            return tracks;
+            return {
+                tracks,
+                anchor: {
+                    state: "found",
+                    url: data.pageUrl,
+                    openUri: data.pageUrl,
+                    count: tracks.length,
+                },
+            };
         } catch (error) {
             this.logger.error(`Error discovering via Songlink for: ${url}`, { error });
             this.status.set({

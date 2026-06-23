@@ -1,6 +1,6 @@
 import { ServiceBase } from "#base/service-base";
 import { Logger } from "#base/logger/logger";
-import { TrackMetadata } from "./types";
+import { TrackMetadata, DiscoveryResult } from "./types";
 import { DownloadTask } from "./utils/downloadTask";
 
 export abstract class DiscoveryMetadataService extends ServiceBase {
@@ -8,7 +8,7 @@ export abstract class DiscoveryMetadataService extends ServiceBase {
         super(serviceName, task, logger);
     }
 
-    // Returns rudimentary TrackMetadata objects for each discovered platform.
-    // Each result has fetchedBy set to this service's key and sparse fields.
-    abstract discoverFromUri(sourceMetadata: TrackMetadata): Promise<TrackMetadata[]>;
+    // Returns discovered TrackMetadata objects for each platform plus an optional anchor
+    // (the provider's own URL/identifier for Copy/Open actions).
+    abstract discoverFromUri(sourceMetadata: TrackMetadata): Promise<DiscoveryResult>;
 }

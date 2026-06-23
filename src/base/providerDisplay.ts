@@ -57,7 +57,7 @@ const BUILTIN_PROVIDERS: Record<string, ProviderDisplay> = {
     },
     songlink: {
         label: "Songlink",
-        acronym: "SONGLINK",
+        acronym: "SL",
         color: "#f76c1b",
         colorSubtle: "#7a3000",
         colorBright: "#ff8c3a",

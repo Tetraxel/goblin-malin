@@ -60,7 +60,9 @@ export const MetadataResultRow: React.FC<MetadataResultRowProps> = ({
 
     const badge = confidenceBadge(result, theme);
     const badgeText = badge.text.padStart(6);
-    const focusColorBg = isActive ? theme.ui.rowBackground.regular.cellActive : theme.ui.rowBackground.regular.highlighted;
+    const focusColorBg = isActive
+        ? theme.ui.rowBackground.regular.cellActive
+        : theme.ui.rowBackground.regular.highlighted;
     const bg = isSelected ? focusColorBg : undefined;
 
     const uri = m.uri ?? `${m.platform.toUpperCase()}::TRACK::${m.id}`;

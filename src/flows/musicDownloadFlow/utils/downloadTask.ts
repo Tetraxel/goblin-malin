@@ -13,7 +13,9 @@ import {
     MetadataGroupState,
     MetadataResultState,
     DiscoverySource,
+    DiscoveryResult,
 } from "#flows/musicDownloadFlow/types";
+import { runWithoutCache } from "#utils/cache";
 import { cleanAndTagFlac } from "#utils/metadata";
 import { SafeAction } from "#utils/decorators";
 import { computeConfidenceScore } from "./confidence";
@@ -25,11 +27,20 @@ import { DiscoveryMetadataService } from "../discoveryMetadataService";
 import { DownloadService } from "../downloadService";
 import { getSaveSettings } from "../saveSettings";
 
+// The @Cached() decorator persists results to a 90-day disk cache. Old cache entries
+// may still contain a plain TrackMetadata[] (the previous return format). Normalizing
+// at call sites lets us handle both formats without clearing user caches.
+function normalizeDiscoveryResult(raw: unknown): DiscoveryResult {
+    if (Array.isArray(raw)) return { tracks: raw as TrackMetadata[] };
+    return raw as DiscoveryResult;
+}
+
 export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
     private metadataServices: ServiceScope<DownloadTask, MetadataService>;
     private discoveryServices: ServiceScope<DownloadTask, DiscoveryMetadataService>;
     private downloadServices: ServiceScope<DownloadTask, DownloadService>;
     private metadataServiceRegistry: ServiceRegistry<DownloadTask, MetadataService>;
+    private discoveryServiceRegistry: ServiceRegistry<DownloadTask, DiscoveryMetadataService>;
     private isMetadataServiceEnabled: (key: string) => boolean;
 
     constructor({
@@ -62,6 +73,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         super({ id, initialInput, attributes, flowId, logger, initialStatus });
 
         this.metadataServiceRegistry = metadataServiceRegistry;
+        this.discoveryServiceRegistry = discoveryServiceRegistry;
         this.isMetadataServiceEnabled = isMetadataServiceEnabled;
         this.metadataServices = metadataServiceRegistry.createScope(this, this.logger, isMetadataServiceEnabled);
         this.discoveryServices = discoveryServiceRegistry.createScope(this, this.logger, isDiscoveryServiceEnabled);
@@ -279,7 +291,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
 
                 for (const discoveryService of this.discoveryServices.getAllServices()) {
                     try {
-                        const discovered = await discoveryService.discoverFromUri(stubMetadata);
+                        const { tracks: discovered } = await discoveryService.discoverFromUri(stubMetadata);
                         const match = discovered.find((m) => m.platform === recognizedPlatform);
                         if (!match) continue;
 
@@ -407,9 +419,23 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             // Phase B — DiscoveryMetadataService.discoverFromUri (like Songlink)
             for (const discoveryService of this.discoveryServices.getAllServices()) {
                 try {
-                    const allDiscovered = await discoveryService.discoverFromUri(primaryMetadata);
+                    const { tracks: allDiscovered, anchor } = normalizeDiscoveryResult(
+                        await discoveryService.discoverFromUri(primaryMetadata)
+                    );
+
+                    // Store the anchor for Copy/Open contextual actions
+                    if (anchor) {
+                        const discoveryKey = this.findDiscoveryServiceKey(discoveryService.id);
+                        if (discoveryKey) {
+                            const currentAnchors = this.getAttributes()?.discoveryAnchors ?? {};
+                            this.updateAttributes({
+                                discoveryAnchors: { ...currentAnchors, [discoveryKey]: anchor },
+                            });
+                        }
+                    }
+
                     // Exclude the primary platform — it's already handled
-                    const discovered = allDiscovered.filter((m) => m.platform !== primaryMetadata.platform);
+                    const discovered = (allDiscovered ?? []).filter((m) => m.platform !== primaryMetadata.platform);
 
                     for (const rudimentary of discovered) {
                         const targetServiceKey = this.findServiceKeyForPlatform(rudimentary.platform);
@@ -510,6 +536,15 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         return undefined;
     }
 
+    // Find discovery registry key by matching service instance id (service.id = constructor name)
+    private findDiscoveryServiceKey(serviceId: string): string | undefined {
+        for (const [key] of this.discoveryServiceRegistry.getAllConstructors()) {
+            const service = this.discoveryServices.get(key);
+            if (service.id === serviceId) return key;
+        }
+        return undefined;
+    }
+
     // ── Re-search / Re-fetch ─────────────────────────────────────────────────
 
     @TaskScoped()
@@ -532,6 +567,71 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         } catch (error) {
             this.logger.warn(
                 `Failed to re-search ${serviceKey}: ${error instanceof Error ? error.message : String(error)}`
+            );
+        }
+    }
+
+    @TaskScoped()
+    async startSingleProviderDiscovery(serviceKey: string): Promise<void> {
+        const primaryMetadata = this.getPrimaryMetadata()?.metadata;
+        if (!primaryMetadata) {
+            this.logger.warn("No primary metadata available for re-discovery");
+            return;
+        }
+        const primaryUri = primaryMetadata.uri ?? primaryMetadata.url;
+        try {
+            const service = this.discoveryServices.get(serviceKey);
+            // Bypass the disk cache so [S] Re-search always fetches fresh data and stores
+            // a valid anchor (stale cache entries from old code have the wrong shape).
+            const { tracks: allDiscovered, anchor } = normalizeDiscoveryResult(
+                await runWithoutCache(() => service.discoverFromUri(primaryMetadata))
+            );
+
+            if (anchor) {
+                const currentAnchors = this.getAttributes()?.discoveryAnchors ?? {};
+                this.updateAttributes({ discoveryAnchors: { ...currentAnchors, [serviceKey]: anchor } });
+            }
+
+            const discovered = (allDiscovered ?? []).filter((m) => m.platform !== primaryMetadata.platform);
+            for (const rudimentary of discovered) {
+                const targetServiceKey = this.findServiceKeyForPlatform(rudimentary.platform);
+                if (!targetServiceKey) continue;
+                if (!rudimentary.fetchedBy) continue;
+
+                const discoverySource = {
+                    discoveredBy: rudimentary.fetchedBy,
+                    fromUri: primaryUri,
+                    searchKeys: ["url"] as import("#flows/musicDownloadFlow/types").SearchKey[],
+                };
+
+                let finalMetadata = rudimentary;
+                let fetchState: "error" | undefined;
+                let fetchError: string | undefined;
+
+                if (this.isMetadataServiceEnabled(targetServiceKey) && rudimentary.url) {
+                    try {
+                        const enrichService = this.metadataServices.get(targetServiceKey);
+                        finalMetadata = await enrichService.getTrackMetadata(rudimentary.url);
+                    } catch {
+                        fetchState = "error";
+                        fetchError = "Enrichment failed";
+                        finalMetadata = rudimentary;
+                    }
+                }
+
+                this.addResultToGroup(
+                    finalMetadata,
+                    targetServiceKey,
+                    [discoverySource],
+                    false,
+                    fetchState,
+                    fetchError
+                );
+            }
+            this.logger.info(`Re-discovery completed for ${serviceKey}`);
+        } catch (error) {
+            this.logger.warn(
+                `Failed to re-discover ${serviceKey}: ${error instanceof Error ? error.message : String(error)}`
             );
         }
     }

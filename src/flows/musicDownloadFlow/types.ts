@@ -250,6 +250,19 @@ export type SearchTrackResult = {
     searchKeys: SearchKey[]; // which fields of the source metadata drove this search
 };
 
+export type DiscoveryAnchor = {
+    state: "found" | "notFound" | "error";
+    url?: string;
+    id?: string;
+    openUri?: string;
+    count?: number;
+};
+
+export type DiscoveryResult = {
+    tracks: TrackMetadata[];
+    anchor?: DiscoveryAnchor;
+};
+
 export type MetadataOverrides = Partial<{
     trackName: string;
     artists: StandardArtist[];
@@ -329,6 +342,7 @@ export type TrackDownloadTask = {
     metadataOverride: MetadataOverrides;
     downloadSources: TrackDownloadSource[];
     parentAlbumDownloadTask?: AlbumDownloadTask;
+    discoveryAnchors?: Record<string, DiscoveryAnchor>;
 };
 
 export type TracksDownloadTask = {

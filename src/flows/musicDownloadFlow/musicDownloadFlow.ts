@@ -467,6 +467,14 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             columnActions.push(...this.buildMetadataServiceColumnActions(serviceKey, attrs, task));
         }
 
+        if (column.id.startsWith("discoveryService-")) {
+            const serviceKey = column.id.replace("discoveryService-", "");
+            const display = providerDisplayRegistry.get(serviceKey);
+            columnLabel = display.label;
+            columnColor = display.color;
+            columnActions.push(...this.buildDiscoveryServiceColumnActions(serviceKey, attrs, task));
+        }
+
         const { selectedCount, taskIndex, taskCount } = attributes;
         const taskRowLabel =
             selectedCount != null && selectedCount > 1
@@ -516,6 +524,52 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         return actions;
     }
 
+    private buildDiscoveryServiceColumnActions(
+        serviceKey: string,
+        attrs: MusicDownloadTaskAttributes | undefined,
+        task: DownloadTask
+    ): ContextualActions[] {
+        const display = providerDisplayRegistry.get(serviceKey);
+        const anchor = attrs?.discoveryAnchors?.[serviceKey];
+        const actions: ContextualActions[] = [];
+
+        if (anchor?.url) {
+            actions.push({
+                shortcuts: [{ input: "c", ctrl: true }],
+                label: `Copy ${display.label} URL`,
+                onClick: () => clipboard.writeSync(anchor.url!),
+            });
+        }
+
+        if (anchor?.openUri) {
+            actions.push({
+                shortcuts: [{ key: "return" }],
+                label: serviceKey === "musicBrainz" ? `Open in MusicBrainz Picard` : `Open in ${display.label}`,
+                onClick: () => {
+                    open(anchor.openUri!).catch(() => {});
+                },
+            });
+        }
+
+        if (serviceKey === "musicBrainz" && anchor?.url) {
+            actions.push({
+                shortcuts: [{ input: "o" }],
+                label: "Open in MusicBrainz",
+                onClick: () => {
+                    open(anchor.url!).catch(() => {});
+                },
+            });
+        }
+
+        actions.push({
+            shortcuts: [{ input: "s" }],
+            label: "Re-search",
+            onClick: () => fire(task.startSingleProviderDiscovery(serviceKey)),
+        });
+
+        return actions;
+    }
+
     //!\ Always return all columns to maintain consistent hook count !
     public getColumns(): Column[] {
         const checkboxColumns: Column[] = [
@@ -540,7 +594,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         let columns: Column[] = [...checkboxColumns, ...trackColumns];
 
         if (this.displayMode === "metadata") {
-            const { providers } = this.settings.get().metadata;
+            const { providers, discoveryProviders } = this.settings.get().metadata;
             const metadataServiceColumns: Column[] = Array.from(
                 this.metadataServiceRegistry.getEnabledFactories((key) => providers[key]?.enabled !== false).keys()
             ).map((key) => {
@@ -558,7 +612,27 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
                         (this.metadataServiceRegistry.getConstructor(key) as any)?.cellComponent ?? GenericProviderCell,
                 };
             });
-            columns = columns.concat(metadataServiceColumns);
+            const discoveryServiceColumns: Column[] = Array.from(
+                this.discoveryServiceRegistry
+                    .getEnabledFactories((key) => discoveryProviders[key]?.enabled !== false)
+                    .keys()
+            ).map((key) => {
+                const display = providerDisplayRegistry.get(key);
+                return {
+                    id: `discoveryService-${key}`,
+                    label: display.label.toUpperCase(),
+                    acronym: display.acronym,
+                    minWidth: Math.max(2, display.acronym.length + 3),
+                    color: display.color,
+                    weight: 12,
+                    flexGrow: 0,
+                    component:
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        (this.discoveryServiceRegistry.getConstructor(key) as any)?.cellComponent ??
+                        GenericProviderCell,
+                };
+            });
+            columns = columns.concat(metadataServiceColumns).concat(discoveryServiceColumns);
         }
 
         if (this.displayMode === "download") {

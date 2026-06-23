@@ -91,7 +91,16 @@ export const App: React.FC = () => {
                 useExitButton,
             ];
             setToolbarButtons(buttons);
-            setColumns(currentFlow.getColumns() ?? []);
+            const newColumns = currentFlow.getColumns() ?? [];
+            setColumns((prev) => {
+                // Avoid handing TaskRow a new array reference when column ids and ratios
+                // haven't changed (e.g. on task-status updates that fire the flow subscriber
+                // but don't touch column layout). Keeps React.memo guards intact.
+                const structurallyEqual =
+                    newColumns.length === prev.length &&
+                    newColumns.every((c, i) => c.id === prev[i]?.id && c.widthRatio === prev[i]?.widthRatio);
+                return structurallyEqual ? prev : newColumns;
+            });
         });
         return unsubscribe;
     }, [currentFlow, currentFlow?.id]);

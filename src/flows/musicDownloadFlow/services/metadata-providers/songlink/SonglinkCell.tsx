@@ -3,9 +3,9 @@ import { Text } from "ink";
 import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
-export const MusicBrainzCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, isSelected }) => {
+export const SonglinkCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, isSelected }) => {
     const attrs = task.attributes;
-    const anchor = attrs?.discoveryAnchors?.["musicBrainz"];
+    const anchor = attrs?.discoveryAnchors?.["songlink"];
 
     // Use stored count when available (O(1)); fall back to scanning discoverySources
     // for tasks run before the anchor field existed (e.g. loaded from an old session).
@@ -13,13 +13,13 @@ export const MusicBrainzCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ 
         anchor?.count ??
         attrs?.metadataGroups.reduce(
             (sum, g) =>
-                sum + g.results.filter((r) => r.discoverySources.some((s) => s.discoveredBy === "musicBrainz")).length,
+                sum + g.results.filter((r) => r.discoverySources.some((s) => s.discoveredBy === "songlink")).length,
             0
         ) ??
         0;
 
     const hasResult = count > 0 || anchor?.state === "found";
-    const color = hasResult ? "#ba47b5" : "gray";
+    const color = hasResult ? "#f76c1b" : "gray";
 
     return (
         <Text color={color} underline={isSelected} wrap="truncate-end">
