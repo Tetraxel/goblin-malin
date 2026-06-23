@@ -346,7 +346,9 @@ export const TaskListPanel: React.FC<{
                         const visibleIndex = index + offset;
                         const isRowHighlighted = selectedIndex === visibleIndex;
                         const isRowActive =
-                            isWindowActive && !focusState.taskList.isHeaderFocused && selectedIndex === visibleIndex;
+                                isWindowActive &&
+                                !focusState.taskList.isHeaderFocused &&
+                                selectedIndex === visibleIndex;
                         const selectedColumnIndex = isRowActive ? focusState.taskList.selectedColumnIndex : -1;
                         const isMultiSelected = focusState.taskList.selectedTaskIds.has(task.getId());
                         return (
