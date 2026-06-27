@@ -22,7 +22,8 @@ function getPlatformDefaultDataDir(): string {
     }
 }
 
-export const DEFAULT_APP_DATA_DIR = IS_DEV ? path.join(PROJECT_ROOT, "data") : getPlatformDefaultDataDir();
+export const DEFAULT_APP_DATA_DIR =
+    process.env.GOBLIN_DATA_DIR ?? (IS_DEV ? path.join(PROJECT_ROOT, "data") : getPlatformDefaultDataDir());
 
 dotenv.config({ path: path.join(DEFAULT_APP_DATA_DIR, ".env") });
 

@@ -10,6 +10,8 @@ releases/
 sea-bundle.cjs
 sea-prep.blob
 sea-config.json
+scripts/tui-test/fixtures/*/bin/
+api-cache
 
 ### Node js ptoject .gitignore
 

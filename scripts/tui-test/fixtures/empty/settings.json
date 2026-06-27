@@ -1,0 +1,17 @@
+{
+    "general": {
+        "reopenLastSession": true,
+        "appDataDir": "C:\\Users\\axel7\\Documents\\Github\\goblin-malin\\scripts\\tui-test\\fixtures\\empty",
+        "animationsEnabled": true,
+        "theme": "dark",
+        "showWelcomeTutorial": false,
+        "checkForUpdates": false,
+        "cacheEnabled": false
+    },
+    "logs": {
+        "logLevel": "INFO",
+        "includeGlobalLogsInFocusedTask": false
+    },
+    "keybindings": {},
+    "flows": {}
+}

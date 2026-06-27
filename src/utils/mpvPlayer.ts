@@ -73,6 +73,8 @@ export class MpvPlayer extends EventEmitter {
     }
 
     private async _start(): Promise<void> {
+        if (process.env["GOBLIN_NO_AUDIO"]) return;
+
         if (process.platform !== "win32" && fs.existsSync(this.socketPath)) {
             fs.unlinkSync(this.socketPath);
         }

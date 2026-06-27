@@ -27,7 +27,7 @@ Unregistered API platforms (youtubeMusic, deezer, appleMusic, etc.) that appear 
 
 ## Shortcuts & hints
 
-> **Philosophy**: Every keyboard shortcut is user-rebindable, and every on-screen hint must reflect the *live* binding (default + user override). Never hardcode a key label that maps to a registered shortcut — if a user remaps it in Settings, the hint must update too.
+> **Philosophy**: Every keyboard shortcut is user-rebindable, and every on-screen hint must reflect the _live_ binding (default + user override). Never hardcode a key label that maps to a registered shortcut — if a user remaps it in Settings, the hint must update too.
 
 How it fits together:
 
@@ -54,13 +54,22 @@ yarn run type-check  # Check typescript errors
 yarn run lint  # Check eslint errors
 ```
 
+## TUI test harness
+
+`scripts/tui-test/` is a headless scenario runner for validating user flows and visual appearance. See [scripts/tui-test/README.md](scripts/tui-test/README.md) for full documentation.
+
+```bash
+yarn tsx scripts/tui-test/cli.ts <scenario.json>           # JSON output
+yarn tsx scripts/tui-test/cli.ts <scenario.json> --pretty  # human-readable
+```
+
 ## Tips for common mistakes
 
 Prefer use of import aliases from `package.json`
 
 ```ts
-import { APP_VERSION } from "../../constants";
-import { APP_VERSION } from "#constants";
+import { APP_VERSION } from "../../constants"; // before
+import { APP_VERSION } from "#constants"; // after
 ```
 
 ### Box shrinking

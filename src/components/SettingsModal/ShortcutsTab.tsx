@@ -120,22 +120,12 @@ export const ShortcutsTab: React.FC<ShortcutsTabProps> = ({
                     const binding = item.customBinding ?? item.defaultBinding;
                     const isCustom = item.customBinding !== null;
                     return (
-                            <Box
-                                key={item.id}
-                                paddingX={1}
-                                height={1}
-                                flexShrink={0}
-                                flexDirection="row"
-                                overflow="hidden"
-                            >
+                        <Box key={item.id} paddingX={1} height={1} flexShrink={0} flexDirection="row" overflow="hidden">
                             <Text color={isSelected ? theme.ui.focusIndicator : undefined}>
                                 {isSelected ? "☛ " : "  "}
                             </Text>
                             <Box flexGrow={1} overflow="hidden">
-                                    <Text
-                                        wrap="truncate-end"
-                                        color={isSelected ? theme.text.active : theme.text.secondary}
-                                    >
+                                <Text wrap="truncate-end" color={isSelected ? theme.text.active : theme.text.secondary}>
                                     {item.id}
                                 </Text>
                             </Box>

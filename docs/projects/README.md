@@ -22,3 +22,4 @@ These are not task lists — each project is a self-contained scope of work. Ind
 | P14 — Spotify auth-mode choice & scrape fallback | [p14/tasks.md](p14/tasks.md) |
 | P15 — URI parsing on import                      | [p15/tasks.md](p15/tasks.md) |
 | P16 — Logging Revamp                             | [p16/tasks.md](p16/tasks.md) |
+| P17 — TUI Test Harness                           | [p17/tasks.md](p17/tasks.md) |

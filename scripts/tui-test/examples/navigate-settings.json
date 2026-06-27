@@ -1,0 +1,28 @@
+{
+    "terminal": { "cols": 128, "rows": 64 },
+    "dataDir": "scripts/tui-test/fixtures/empty",
+    "steps": [
+        { "type": "stable", "timeout": 8000 },
+        { "type": "waitForContent", "text": "No task to run", "timeout": 5000 },
+        { "type": "snapshot", "name": "initial" },
+
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "key", "key": "Enter" },
+        { "type": "stable" },
+        { "type": "snapshot", "name": "settings-open" },
+
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "Settings" },
+        { "type": "snapshot", "name": "settings-navigated" },
+
+        { "type": "key", "key": "Escape" },
+        { "type": "stable" },
+        { "type": "snapshot", "name": "settings-closed" },
+        { "type": "screenshot", "name": "settings-open" },
+        { "type": "screenshot-browser", "name": "settings-open-browser" },
+        { "type": "screenshot-powershell", "name": "settings-open-powershell" }
+    ]
+}

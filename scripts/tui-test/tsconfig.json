@@ -1,0 +1,12 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "rootDir": ".",
+        "outDir": "../../dist-tui-test",
+        "noEmit": true,
+        "allowImportingTsExtensions": true,
+        "paths": {}
+    },
+    "include": ["./**/*.ts", "../../tests/**/*.ts"],
+    "exclude": ["node_modules"]
+}
