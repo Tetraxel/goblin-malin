@@ -1,3 +1,5 @@
+import type { ProfileConfig, ProfileReport } from "./profiling/types.ts";
+
 export type Step =
     | { type: "key"; key: string }
     | { type: "type"; text: string }
@@ -16,6 +18,10 @@ export type Scenario = {
     dataDir?: string;
     steps: Step[];
     env?: Record<string, string>;
+    /** Stable name used to key the profiling baseline. Defaults to the scenario filename. */
+    name?: string;
+    /** Per-component render profiling. Enable in JSON or via the CLI `--profile` flag. */
+    profile?: ProfileConfig;
 };
 
 export type Snapshot = { raw: string; plain: string; ansi: string };
@@ -24,6 +30,8 @@ export type HarnessResult = {
     snapshots: Record<string, Snapshot>;
     metrics: Record<string, number | boolean>;
     exitCode: number | null;
+    /** Present only when the scenario ran with profiling enabled. */
+    profile?: ProfileReport;
 };
 
 export type HarnessEvent =
@@ -36,7 +44,8 @@ export type HarnessEvent =
     | { type: "waitForContent:end"; text: string; ms: number; found: boolean }
     | { type: "assert:pass"; contains: string }
     | { type: "snapshot"; name: string; plain: string; ansi: string }
-    | { type: "screenshot"; name: string; path: string };
+    | { type: "screenshot"; name: string; path: string }
+    | { type: "profile"; report: ProfileReport };
 
 export type RunOptions = {
     onEvent?: (event: HarnessEvent) => void;

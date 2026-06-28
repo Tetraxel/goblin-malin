@@ -1,12 +1,16 @@
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import { runScenario } from "./runner.ts";
+import { formatProfile } from "./profiling/format.ts";
 import type { HarnessEvent, HarnessResult, Scenario } from "./types.ts";
 
 const [, , scenarioPath, ...flags] = process.argv;
 const pretty = flags.includes("--pretty");
+const profile = flags.includes("--profile");
+const updateBaseline = flags.includes("--update-baseline");
 
 if (!scenarioPath) {
-    process.stderr.write("Usage: tsx scripts/tui-test/cli.ts <scenario.json> [--pretty]\n");
+    process.stderr.write("Usage: tsx scripts/tui-test/cli.ts <scenario.json> [--pretty] [--profile] [--update-baseline]\n");
     process.exit(1);
 }
 
@@ -82,6 +86,9 @@ function makeLiveHandler(): (event: HarnessEvent) => void {
             case "screenshot":
                 process.stdout.write(`  ${CYAN}screenshot${R} ${GRAY}${event.name}${R} → ${event.path}\n`);
                 break;
+            case "profile":
+                process.stdout.write(formatProfile(event.report) + "\n");
+                break;
         }
     };
 }
@@ -89,6 +96,12 @@ function makeLiveHandler(): (event: HarnessEvent) => void {
 try {
     const raw = readFileSync(scenarioPath, "utf-8");
     const scenario = JSON.parse(raw) as Scenario;
+
+    if (!scenario.name) scenario.name = path.basename(scenarioPath).replace(/\.json$/, "");
+    if (profile || updateBaseline) {
+        scenario.profile = { ...(scenario.profile ?? { enabled: true }), enabled: true };
+        if (updateBaseline) scenario.profile.updateBaseline = true;
+    }
 
     if (pretty) {
         process.stdout.write(sep(scenarioPath, "─") + "\n\n");

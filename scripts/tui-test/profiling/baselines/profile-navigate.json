@@ -1,0 +1,250 @@
+{
+  "scenario": "profile-navigate",
+  "createdAt": "2026-06-28T11:56:49.177Z",
+  "totals": {
+    "commits": 14,
+    "reactMs": 170.61
+  },
+  "components": {
+    "Box": {
+      "renders": 1435,
+      "selfMsP50": 0.033,
+      "selfMsP95": 0.058
+    },
+    "Text": {
+      "renders": 1342,
+      "selfMsP50": 0.034,
+      "selfMsP95": 0.049
+    },
+    "FieldRow": {
+      "renders": 130,
+      "selfMsP50": 0.18,
+      "selfMsP95": 0.337
+    },
+    "Toolbar": {
+      "renders": 6,
+      "selfMsP50": 2.878,
+      "selfMsP95": 15.008
+    },
+    "SettingsModal": {
+      "renders": 8,
+      "selfMsP50": 1.317,
+      "selfMsP95": 7.509
+    },
+    "SettingsItemRow": {
+      "renders": 165,
+      "selfMsP50": 0.063,
+      "selfMsP95": 0.118
+    },
+    "TabBar": {
+      "renders": 21,
+      "selfMsP50": 0.404,
+      "selfMsP95": 1.447
+    },
+    "MetadataDetailPanel": {
+      "renders": 13,
+      "selfMsP50": 0.643,
+      "selfMsP95": 2.367
+    },
+    "TaskListPanel": {
+      "renders": 6,
+      "selfMsP50": 1.226,
+      "selfMsP95": 3.903
+    },
+    "ToolbarButtonInvoker": {
+      "renders": 45,
+      "selfMsP50": 0.124,
+      "selfMsP95": 0.204
+    },
+    "InputRouter": {
+      "renders": 7,
+      "selfMsP50": 0.611,
+      "selfMsP95": 2.064
+    },
+    "App": {
+      "renders": 2,
+      "selfMsP50": 1.878,
+      "selfMsP95": 3.071
+    },
+    "SettingsTab": {
+      "renders": 3,
+      "selfMsP50": 1.112,
+      "selfMsP95": 1.727
+    },
+    "MetadataSourceList": {
+      "renders": 13,
+      "selfMsP50": 0.254,
+      "selfMsP95": 0.713
+    },
+    "AppInner": {
+      "renders": 6,
+      "selfMsP50": 0.535,
+      "selfMsP95": 0.626
+    },
+    "MetadataCompiledRow": {
+      "renders": 13,
+      "selfMsP50": 0.242,
+      "selfMsP95": 0.58
+    },
+    "Hint": {
+      "renders": 18,
+      "selfMsP50": 0.167,
+      "selfMsP95": 0.426
+    },
+    "MetadataPanel": {
+      "renders": 8,
+      "selfMsP50": 0.291,
+      "selfMsP95": 0.718
+    },
+    "SessionsModal": {
+      "renders": 6,
+      "selfMsP50": 0.259,
+      "selfMsP95": 1.128
+    },
+    "Separator": {
+      "renders": 18,
+      "selfMsP50": 0.076,
+      "selfMsP95": 0.177
+    },
+    "FocusProvider": {
+      "renders": 6,
+      "selfMsP50": 0.202,
+      "selfMsP95": 0.36
+    },
+    "SetupWizardModal": {
+      "renders": 6,
+      "selfMsP50": 0.18,
+      "selfMsP95": 0.622
+    },
+    "InternalApp": {
+      "renders": 1,
+      "selfMsP50": 1.07,
+      "selfMsP95": 1.07
+    },
+    "ShortcutDispatcher": {
+      "renders": 6,
+      "selfMsP50": 0.13,
+      "selfMsP95": 0.608
+    },
+    "ConfirmModal": {
+      "renders": 6,
+      "selfMsP50": 0.109,
+      "selfMsP95": 0.347
+    },
+    "ImportModal": {
+      "renders": 6,
+      "selfMsP50": 0.103,
+      "selfMsP95": 0.284
+    },
+    "Footer": {
+      "renders": 6,
+      "selfMsP50": 0.099,
+      "selfMsP95": 0.186
+    },
+    "SecondaryPanel": {
+      "renders": 6,
+      "selfMsP50": 0.093,
+      "selfMsP95": 0.134
+    },
+    "InternalErrorBoundary": {
+      "renders": 1,
+      "selfMsP50": 0.55,
+      "selfMsP95": 0.55
+    },
+    "DynamicHintBar": {
+      "renders": 13,
+      "selfMsP50": 0.039,
+      "selfMsP95": 0.153
+    },
+    "TextInput": {
+      "renders": 4,
+      "selfMsP50": 0.127,
+      "selfMsP95": 0.271
+    },
+    "PrimaryModeTabBar": {
+      "renders": 12,
+      "selfMsP50": 0.041,
+      "selfMsP95": 0.087
+    },
+    "WelcomeModal": {
+      "renders": 6,
+      "selfMsP50": 0.08,
+      "selfMsP95": 0.218
+    },
+    "StartModal": {
+      "renders": 6,
+      "selfMsP50": 0.076,
+      "selfMsP95": 0.176
+    },
+    "SearchBar": {
+      "renders": 3,
+      "selfMsP50": 0.121,
+      "selfMsP95": 0.225
+    },
+    "ActionBar": {
+      "renders": 13,
+      "selfMsP50": 0.026,
+      "selfMsP95": 0.113
+    },
+    "PromptModal": {
+      "renders": 7,
+      "selfMsP50": 0.041,
+      "selfMsP95": 0.151
+    },
+    "ImportActionsProvider": {
+      "renders": 6,
+      "selfMsP50": 0.032,
+      "selfMsP95": 0.047
+    },
+    "ThemeProvider": {
+      "renders": 2,
+      "selfMsP50": 0.069,
+      "selfMsP95": 0.094
+    },
+    "ToolbarActionsProvider": {
+      "renders": 2,
+      "selfMsP50": 0.053,
+      "selfMsP95": 0.053
+    },
+    "ShortcutRegistryProvider": {
+      "renders": 2,
+      "selfMsP50": 0.028,
+      "selfMsP95": 0.037
+    },
+    "InternalAppContext": {
+      "renders": 1,
+      "selfMsP50": 0.028,
+      "selfMsP95": 0.028
+    },
+    "InternalAnimationContext": {
+      "renders": 1,
+      "selfMsP50": 0.019,
+      "selfMsP95": 0.019
+    },
+    "InternalFocusContext": {
+      "renders": 1,
+      "selfMsP50": 0.017,
+      "selfMsP95": 0.017
+    },
+    "InternalCursorContext": {
+      "renders": 1,
+      "selfMsP50": 0.014,
+      "selfMsP95": 0.014
+    },
+    "InternalStdinContext": {
+      "renders": 1,
+      "selfMsP50": 0.01,
+      "selfMsP95": 0.01
+    },
+    "InternalStderrContext": {
+      "renders": 1,
+      "selfMsP50": 0.006,
+      "selfMsP95": 0.006
+    },
+    "InternalStdoutContext": {
+      "renders": 1,
+      "selfMsP50": 0.005,
+      "selfMsP95": 0.005
+    }
+  }
+}

@@ -68,4 +68,71 @@ Single characters pass through as-is: `"D"`, `"E"`, `"1"`, `"y"`, etc.
 
 ## Fixtures
 
-`scripts/tui-test/fixtures/empty/` — blank data directory (no sessions, no cache). Use it as `"dataDir"` to start the app in a clean state.
+| Fixture | Sessions | Tasks | State |
+|---|---|---|---|
+| `empty` | 0 | 0 | Blank slate — no sessions, no cache. Start here for onboarding flows. |
+| `50-tasks` | 1 | 50 | Tasks are `pending` — Spotify URLs imported but metadata not yet fetched. |
+| `50-tasks-with-metadata` | 1 | 50 | Tasks are `finished` — Spotify + YouTube metadata fetched, Songlink and MusicBrainz anchors resolved. |
+
+Set the fixture with `"dataDir"` in the scenario:
+
+```jsonc
+{ "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata", "steps": [ ... ] }
+```
+
+## Render profiling
+
+Screenshots tell you *what* rendered; profiling tells you *how expensively*. With profiling enabled, the harness boots the app through an instrumented entrypoint that records, on **every React commit**, each component's render time, render count, mount-vs-update, and **why it rendered** (which prop/state changed) — then attributes all of it to the keystroke that caused it.
+
+```bash
+# Enable on any scenario without editing it:
+yarn tsx scripts/tui-test/cli.ts <scenario.json> --profile --pretty
+
+# Or set it in the scenario file:
+#   { "profile": { "enabled": true }, "steps": [ ... ] }
+yarn tsx scripts/tui-test/cli.ts scripts/tui-test/examples/profile-navigate.json --pretty
+```
+
+The JSON result gains a `profile` field; `--pretty` prints a `profile` section.
+
+### What you get
+
+- **Per-component table** — `renders`, total `self ms`, `p95`, and `wasted` (parent-only re-renders — React.memo candidates), sorted by self time. Ink's own `Box`/`Text` appear here and show the raw redraw volume.
+- **Per-interaction breakdown** — for `boot` and each keystroke: commit count, React time, Ink output time (`ink`), app-component wasted renders, and the top components by self time. This is a per-keystroke render budget.
+- **Two cost axes** — `react` is the cost of running component functions (reconciliation); `ink` is Ink's output cost (Yoga layout + ANSI diff + write), captured from Ink's own `onRender`. A component can be cheap to render but expensive to lay out — both are reported.
+- **Anomalies** — see below.
+
+### How it works (so you can trust the numbers)
+
+- `src/profiling/install.ts` installs a `__REACT_DEVTOOLS_GLOBAL_HOOK__` and sets `DEV=true` so Ink wires the reconciler into it. The app is wrapped in one `<Profiler>` to force React's ProfileMode tree-wide, which is what populates per-fiber timing. On each commit the hook walks the fiber tree.
+- "Did this component render this commit?" uses React's `PerformedWork` flag (the same signal DevTools uses) — **not** `actualDuration`, which is stale on memoized/bailed-out subtrees.
+- Records are written as JSONL synchronously per commit, so they survive the harness killing the PTY. The harness buckets them against timestamped keystroke marks.
+
+> Visual output is identical to a normal run, so all `snapshot`/`assert`/`screenshot` steps still work under `--profile`.
+
+### Anomalies, thresholds, and baselines
+
+Anomaly rules are **component-agnostic** — they enumerate every component, so a newly-added slow component is caught without naming it anywhere.
+
+| Rule | Severity | Meaning |
+|---|---|---|
+| `commit-cascade` | **error** | One keystroke caused more commits than `maxCommitsPerInteraction` — an effect loop / runaway `setState`. Machine-independent → fails CI. |
+| `slow-interaction` | warn | One keystroke spent over `maxInteractionReactMs` in React. |
+| `slow-commit` | warn | A single commit exceeded `maxCommitDurationMs`. |
+| `slow-component` | warn | A component's p95 self render exceeded `maxComponentSelfMsP95`. |
+| `wasted-renders` | warn | An interaction caused more than `maxWastedRendersPerInteraction` app-component parent-only re-renders (Ink primitives excluded). |
+
+Only `commit-cascade` is an `error` because absolute ms vary by machine (dev `tsx` runs slower than a built binary); ms-based rules are **advisory warnings**. The `render profile` vitest test (`tests/e2e/perf.test.ts`) fails only on `error`-severity anomalies. Override defaults per scenario:
+
+```jsonc
+{ "profile": { "enabled": true, "thresholds": { "maxCommitsPerInteraction": 8 } } }
+```
+
+**Baselines** catch gradual per-component drift that global thresholds miss. Give the scenario a stable `name` (the CLI defaults it to the filename), then:
+
+```bash
+yarn tsx scripts/tui-test/cli.ts <scenario.json> --update-baseline   # write/refresh
+yarn tsx scripts/tui-test/cli.ts <scenario.json> --profile           # compare
+```
+
+Baselines live in `scripts/tui-test/profiling/baselines/<name>.json`. A regenerated baseline is diffed against the current run: a **render-count** regression is an `error` (machine-independent); a **render-time** regression is a `warn` (with generous tolerance). New components are listed and still covered by the global p95 threshold.

@@ -1,0 +1,1465 @@
+{
+  "version": 1,
+  "lastSessionId": "7014ba64-f9e2-4dd0-a1f5-a983444f7c71",
+  "sessions": [
+    {
+      "id": "7014ba64-f9e2-4dd0-a1f5-a983444f7c71",
+      "name": "https://open.spotify.com/track/4v7kKFlEDmpVToHOICsXaM",
+      "flowId": "music-downloader",
+      "createdAt": "2026-06-28T13:20:56.208Z",
+      "updatedAt": "2026-06-28T13:23:26.889Z",
+      "tasks": [
+        {
+          "id": "task:6230e6a1b95f",
+          "initialInput": "https://open.spotify.com/track/4v7kKFlEDmpVToHOICsXaM",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/4v7kKFlEDmpVToHOICsXaM"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "4v7kKFlEDmpVToHOICsXaM"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:97282a3e31a9",
+          "initialInput": "https://open.spotify.com/track/5b3n32izrzbkTMC16FZ83r",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/5b3n32izrzbkTMC16FZ83r"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "5b3n32izrzbkTMC16FZ83r"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:38fd11faafe7",
+          "initialInput": "https://open.spotify.com/track/4qJzVJ3QzvYq6PrahkUlAI",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/4qJzVJ3QzvYq6PrahkUlAI"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "4qJzVJ3QzvYq6PrahkUlAI"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:d2573fb3d9ba",
+          "initialInput": "https://open.spotify.com/track/0U7HhD9Eqx5bk8HmRQwN5u",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/0U7HhD9Eqx5bk8HmRQwN5u"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "0U7HhD9Eqx5bk8HmRQwN5u"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:dceb547e3c27",
+          "initialInput": "https://open.spotify.com/track/6FOlC4eNFNkQYalK0WfGHa",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/6FOlC4eNFNkQYalK0WfGHa"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "6FOlC4eNFNkQYalK0WfGHa"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:ae2402c9ed54",
+          "initialInput": "https://open.spotify.com/track/6I9VzXrHxO9rA9A5euc8Ak",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/6I9VzXrHxO9rA9A5euc8Ak"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "6I9VzXrHxO9rA9A5euc8Ak"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:86f8d54755b9",
+          "initialInput": "https://open.spotify.com/track/2jrzCpf7Ie750KCENF6yDo",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/2jrzCpf7Ie750KCENF6yDo"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "2jrzCpf7Ie750KCENF6yDo"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:aa65fc7dd2c9",
+          "initialInput": "https://open.spotify.com/track/2zflx0uUTi6e8nw25XYvMo",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/2zflx0uUTi6e8nw25XYvMo"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "2zflx0uUTi6e8nw25XYvMo"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:3174529c6505",
+          "initialInput": "https://open.spotify.com/track/14gYIWhaZ3kKQiwr7kI4JQ",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/14gYIWhaZ3kKQiwr7kI4JQ"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "14gYIWhaZ3kKQiwr7kI4JQ"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:9fe83cc8dece",
+          "initialInput": "https://open.spotify.com/track/7fYWjo1FSyRdOARXPxAcuy",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/7fYWjo1FSyRdOARXPxAcuy"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "7fYWjo1FSyRdOARXPxAcuy"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:0e507a523076",
+          "initialInput": "https://open.spotify.com/track/33CwSfGS6XblMHwJ9jd61l",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/33CwSfGS6XblMHwJ9jd61l"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "33CwSfGS6XblMHwJ9jd61l"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:1fdbbe2720fc",
+          "initialInput": "https://open.spotify.com/track/4a1fWHeiBYD23v2mgQt6Ag",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/4a1fWHeiBYD23v2mgQt6Ag"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "4a1fWHeiBYD23v2mgQt6Ag"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:1a349ab32426",
+          "initialInput": "https://open.spotify.com/track/3AOnhg8AT2afqKnPMc3PvJ",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/3AOnhg8AT2afqKnPMc3PvJ"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "3AOnhg8AT2afqKnPMc3PvJ"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:cd81830a4666",
+          "initialInput": "https://open.spotify.com/track/4Xp1xs51rfpHzMrkVHaOUP",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/4Xp1xs51rfpHzMrkVHaOUP"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "4Xp1xs51rfpHzMrkVHaOUP"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:2d6fe3adc5e2",
+          "initialInput": "https://open.spotify.com/track/4GhZrN0R9qgOWoTzZu2pT9",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/4GhZrN0R9qgOWoTzZu2pT9"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "4GhZrN0R9qgOWoTzZu2pT9"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:238d93c02eee",
+          "initialInput": "https://open.spotify.com/track/6Ij7pVHwxgq8SgLrFzShCg",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/6Ij7pVHwxgq8SgLrFzShCg"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "6Ij7pVHwxgq8SgLrFzShCg"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:59bd485d5032",
+          "initialInput": "https://open.spotify.com/track/0GOH92e18bXmuathmzbzyI",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/0GOH92e18bXmuathmzbzyI"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "0GOH92e18bXmuathmzbzyI"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:8168a2e3ca20",
+          "initialInput": "https://open.spotify.com/track/7cvDZORj6uvaNOUPvYY0AC",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/7cvDZORj6uvaNOUPvYY0AC"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "7cvDZORj6uvaNOUPvYY0AC"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:a17ac609a3c3",
+          "initialInput": "https://open.spotify.com/track/6zJsP2xNsXw6kZVKHUie9J",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/6zJsP2xNsXw6kZVKHUie9J"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "6zJsP2xNsXw6kZVKHUie9J"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:7a9f4ebf0b44",
+          "initialInput": "https://open.spotify.com/track/2utE575Mfh8CJQqHPqcoFV",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/2utE575Mfh8CJQqHPqcoFV"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "2utE575Mfh8CJQqHPqcoFV"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:68498339859c",
+          "initialInput": "https://open.spotify.com/track/0FaxWqBwLLSxBfR0jMIgAA",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/0FaxWqBwLLSxBfR0jMIgAA"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "0FaxWqBwLLSxBfR0jMIgAA"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:629febe00b4d",
+          "initialInput": "https://open.spotify.com/track/2bBrirDuZf2mDbE6P7PCwh",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/2bBrirDuZf2mDbE6P7PCwh"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "2bBrirDuZf2mDbE6P7PCwh"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:e24ce05e8a28",
+          "initialInput": "https://open.spotify.com/track/4NtAzKU95OIuLhwFhCgaGl",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/4NtAzKU95OIuLhwFhCgaGl"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "4NtAzKU95OIuLhwFhCgaGl"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:b82272023bdf",
+          "initialInput": "https://open.spotify.com/track/15gffsjzuRYgmZvLu99Ee3",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/15gffsjzuRYgmZvLu99Ee3"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "15gffsjzuRYgmZvLu99Ee3"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:8764800a36cb",
+          "initialInput": "https://open.spotify.com/track/61pUpuJLZTBBrbF5vpRDps",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/61pUpuJLZTBBrbF5vpRDps"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "61pUpuJLZTBBrbF5vpRDps"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:8c15b1410287",
+          "initialInput": "https://open.spotify.com/track/1tgMUSZmDbwCPQDQFjemCk",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/1tgMUSZmDbwCPQDQFjemCk"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "1tgMUSZmDbwCPQDQFjemCk"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:1f5002b9fa2d",
+          "initialInput": "https://open.spotify.com/track/46aUo70Soi8AoZzmzaA5n5",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/46aUo70Soi8AoZzmzaA5n5"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "46aUo70Soi8AoZzmzaA5n5"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:b4513f48120c",
+          "initialInput": "https://open.spotify.com/track/2BWIDTVln2LvwGpJ5BYyJD",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/2BWIDTVln2LvwGpJ5BYyJD"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "2BWIDTVln2LvwGpJ5BYyJD"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:09024577d5f8",
+          "initialInput": "https://open.spotify.com/track/74gdAHLjGAKPZdYNj3Ud5t",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/74gdAHLjGAKPZdYNj3Ud5t"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "74gdAHLjGAKPZdYNj3Ud5t"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:bb9800fe0af7",
+          "initialInput": "https://open.spotify.com/track/1n7MNtaIkGYXiOCOSqKuD3",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/1n7MNtaIkGYXiOCOSqKuD3"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "1n7MNtaIkGYXiOCOSqKuD3"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:16a37c4ad7ce",
+          "initialInput": "https://open.spotify.com/track/2VXRVqJ02WMnUlxTvwdtoz",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/2VXRVqJ02WMnUlxTvwdtoz"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "2VXRVqJ02WMnUlxTvwdtoz"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:3aeefbdc604c",
+          "initialInput": "https://open.spotify.com/track/1eh2EPeKP4jjxvRXUF4nPm",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/1eh2EPeKP4jjxvRXUF4nPm"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "1eh2EPeKP4jjxvRXUF4nPm"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:20a6f9b07a79",
+          "initialInput": "https://open.spotify.com/track/1Lpt1GZWUcibnxgXoGTmfW",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/1Lpt1GZWUcibnxgXoGTmfW"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "1Lpt1GZWUcibnxgXoGTmfW"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:454342c509ab",
+          "initialInput": "https://open.spotify.com/track/2NTFEcAwU2s6VawsrmrFw8",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/2NTFEcAwU2s6VawsrmrFw8"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "2NTFEcAwU2s6VawsrmrFw8"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:9e8b57f2121b",
+          "initialInput": "https://open.spotify.com/track/1V3QaQbtEyVCr43dGfubsE",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/1V3QaQbtEyVCr43dGfubsE"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "1V3QaQbtEyVCr43dGfubsE"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:e28cb0e9c19f",
+          "initialInput": "https://open.spotify.com/track/5emrpSNSDbKe6HotCObSFp",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/5emrpSNSDbKe6HotCObSFp"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "5emrpSNSDbKe6HotCObSFp"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:7118b059be89",
+          "initialInput": "https://open.spotify.com/track/4egwGq65exfjAIb1UKPGMw",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/4egwGq65exfjAIb1UKPGMw"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "4egwGq65exfjAIb1UKPGMw"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:169d0ec9b125",
+          "initialInput": "https://open.spotify.com/track/4eJDjBokfv4kst4vYKEQPK",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/4eJDjBokfv4kst4vYKEQPK"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "4eJDjBokfv4kst4vYKEQPK"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:b966c8b31b40",
+          "initialInput": "https://open.spotify.com/track/4eOHzpbHC1ahrAMsu6gIi3",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/4eOHzpbHC1ahrAMsu6gIi3"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "4eOHzpbHC1ahrAMsu6gIi3"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:489d48961520",
+          "initialInput": "https://open.spotify.com/track/0SpcAJlNgcujtwrVJTVvlM",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/0SpcAJlNgcujtwrVJTVvlM"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "0SpcAJlNgcujtwrVJTVvlM"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:b5f4058757d3",
+          "initialInput": "https://open.spotify.com/track/4V5j90EUJG9kI4YrfAGtND",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/4V5j90EUJG9kI4YrfAGtND"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "4V5j90EUJG9kI4YrfAGtND"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:c403b9211bbe",
+          "initialInput": "https://open.spotify.com/track/0QzRVIKjGxKNPzBkX1rZJn",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/0QzRVIKjGxKNPzBkX1rZJn"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "0QzRVIKjGxKNPzBkX1rZJn"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:77c03de42e68",
+          "initialInput": "https://open.spotify.com/track/2Z9w7yNmigtIOFs84CBAZL",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/2Z9w7yNmigtIOFs84CBAZL"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "2Z9w7yNmigtIOFs84CBAZL"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:34ea57722406",
+          "initialInput": "https://open.spotify.com/track/5IXgT6PDkfyUEN40w4rQAp",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/5IXgT6PDkfyUEN40w4rQAp"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "5IXgT6PDkfyUEN40w4rQAp"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:38c85db0756c",
+          "initialInput": "https://open.spotify.com/track/20e927Z1Gv3BZh8Wk8atwP",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/20e927Z1Gv3BZh8Wk8atwP"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "20e927Z1Gv3BZh8Wk8atwP"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:19afe2341916",
+          "initialInput": "https://open.spotify.com/track/3JpvBva0TwiWMVFebNqtTL",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/3JpvBva0TwiWMVFebNqtTL"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "3JpvBva0TwiWMVFebNqtTL"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:a2068a638b5c",
+          "initialInput": "https://open.spotify.com/track/1HzVoPGDJajmXaEOzjEdwN",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/1HzVoPGDJajmXaEOzjEdwN"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "1HzVoPGDJajmXaEOzjEdwN"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:dcc221344ba8",
+          "initialInput": "https://open.spotify.com/track/11RXJgrGmyPJEtbOJ9ZFYQ",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/11RXJgrGmyPJEtbOJ9ZFYQ"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "11RXJgrGmyPJEtbOJ9ZFYQ"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:5858ed499653",
+          "initialInput": "https://open.spotify.com/track/09FIGqpuSWmv5WNWXR5s8X",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/09FIGqpuSWmv5WNWXR5s8X"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "09FIGqpuSWmv5WNWXR5s8X"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        },
+        {
+          "id": "task:0fb495bea703",
+          "initialInput": "https://open.spotify.com/track/3IvQDgUTVygzEbD4UZz00g",
+          "attributes": {
+            "state": "pending",
+            "userInput": {
+              "type": "url",
+              "url": "https://open.spotify.com/track/3IvQDgUTVygzEbD4UZz00g"
+            },
+            "uri": {
+              "platform": "spotify",
+              "type": "track",
+              "id": "3IvQDgUTVygzEbD4UZz00g"
+            },
+            "recognizedServiceKey": "spotify",
+            "metadataGroups": [],
+            "metadataOverride": {},
+            "downloadSources": [],
+            "toTag": true,
+            "toDownload": false
+          },
+          "status": {
+            "type": "noStatus",
+            "message": "No status",
+            "timeTracking": false,
+            "startTime": null
+          },
+          "prompt": null
+        }
+      ]
+    }
+  ]
+}

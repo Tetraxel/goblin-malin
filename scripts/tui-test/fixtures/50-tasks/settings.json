@@ -1,0 +1,57 @@
+{
+    "general": {
+        "reopenLastSession": true,
+        "appDataDir": "C:\\Users\\axel7\\Documents\\Github\\goblin-malin\\scripts\\tui-test\\fixtures\\50-tasks",
+        "animationsEnabled": true,
+        "theme": "dark",
+        "showWelcomeTutorial": false,
+        "checkForUpdates": false,
+        "cacheEnabled": false
+    },
+    "logs": {
+        "logLevel": "DEBUG",
+        "includeGlobalLogsInFocusedTask": false
+    },
+    "keybindings": {},
+    "flows": {
+        "music-downloader": {
+            "metadata": {
+                "autoChooseBestSource": false,
+                "providers": {
+                    "spotify": {
+                        "enabled": true,
+                        "fallbackToWeb": true
+                    },
+                    "youtube": {
+                        "enabled": true
+                    }
+                },
+                "discoveryProviders": {
+                    "songlink": {
+                        "enabled": true
+                    },
+                    "musicBrainz": {
+                        "enabled": true
+                    }
+                }
+            },
+            "download": {
+                "autoChooseBestSource": false,
+                "autoSaveToOutputDir": true,
+                "autoDeleteTempAfter24h": false,
+                "autoRelocateMissingFiles": false,
+                "outputDir": "C:\\Users\\axel7\\Documents\\Github\\goblin-malin\\scripts\\tui-test\\fixtures\\50-tasks\\output",
+                "outputTemporaryDir": "C:\\Users\\axel7\\Documents\\Github\\goblin-malin\\scripts\\tui-test\\fixtures\\50-tasks\\output\\tmp",
+                "providers": {
+                    "ytdlp": {
+                        "enabled": true,
+                        "autoDownloadBinary": true
+                    }
+                }
+            },
+            "ui": {
+                "columnRatios": {}
+            }
+        }
+    }
+}

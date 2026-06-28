@@ -9,7 +9,7 @@
         "cacheEnabled": false
     },
     "logs": {
-        "logLevel": "INFO",
+        "logLevel": "DEBUG",
         "includeGlobalLogsInFocusedTask": false
     },
     "keybindings": {},

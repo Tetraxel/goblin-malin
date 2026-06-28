@@ -1,4 +1,5 @@
 import * as pty from "node-pty";
+import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
@@ -6,6 +7,8 @@ import { TermEmulator } from "./termEmulator.ts";
 import { resolveKey } from "./keyMap.ts";
 import { renderToImageBrowser } from "./screenshotBrowser.ts";
 import { renderToImagePowerShell } from "./screenshotPowerShell.ts";
+import { analyzeProfileFile } from "./profiling/analyze.ts";
+import type { InteractionMark } from "./profiling/types.ts";
 import type { HarnessEvent, HarnessResult, RunOptions, Scenario, Snapshot } from "./types.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -18,6 +21,23 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
     const termEmulator = new TermEmulator(cols, rows);
     const snapshots: Record<string, Snapshot> = {};
     const metrics: Record<string, number | boolean> = {};
+
+    // --- Profiling setup ---
+    const profileCfg = scenario.profile?.enabled ? scenario.profile : undefined;
+    const marks: InteractionMark[] = [];
+    let interactionIdx = 0;
+    const profileOut = profileCfg ? path.join(os.tmpdir(), "goblin-tui-test", `profile-${Date.now()}.jsonl`) : undefined;
+    if (profileOut) {
+        fs.mkdirSync(path.dirname(profileOut), { recursive: true });
+        try {
+            fs.rmSync(profileOut);
+        } catch {
+            /* fresh file */
+        }
+    }
+    const markInteraction = (label: string): void => {
+        if (profileCfg) marks.push({ index: interactionIdx++, label, t: Date.now() });
+    };
 
     let rawBuffer = "";
     let lastSnapshotBoundary = 0;
@@ -47,9 +67,14 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
         COLORTERM: "truecolor",
         GOBLIN_NO_AUDIO: "1",
         ...(dataDirOverride ? { GOBLIN_DATA_DIR: dataDirOverride } : {}),
+        ...(profileOut ? { DEV: "true", GOBLIN_PROFILE_OUT: profileOut } : {}),
     });
 
-    const ptyProcess = pty.spawn(shell, [shellFlag, "yarn dev"], {
+    // Profile mode boots through the instrumented entry, which installs the
+    // React devtools hook before Ink loads. Visual output is identical, so all
+    // snapshot/assert steps still work.
+    const command = profileCfg ? "yarn tsx src/profiling/profiledEntry.tsx" : "yarn dev";
+    const ptyProcess = pty.spawn(shell, [shellFlag, command], {
         name: "xterm-256color",
         cols,
         rows,
@@ -112,12 +137,14 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
             switch (step.type) {
                 case "key":
                     emit({ type: "key", key: step.key });
+                    markInteraction(step.key);
                     ptyProcess.write(resolveKey(step.key));
                     await new Promise<void>((r) => setTimeout(r, 100));
                     break;
 
                 case "type":
                     emit({ type: "type", text: step.text });
+                    markInteraction(`type ${JSON.stringify(step.text)}`);
                     ptyProcess.write(step.text);
                     break;
 
@@ -224,5 +251,20 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
         await new Promise<void>((r) => setTimeout(r, 300));
     }
 
-    return { snapshots, metrics, exitCode: appExitCode };
+    const result: HarnessResult = { snapshots, metrics, exitCode: appExitCode };
+
+    if (profileCfg && profileOut) {
+        // Records are written synchronously per commit, so the file is complete
+        // by the time the process is gone. Bucket commits against interaction marks.
+        const report = analyzeProfileFile(profileOut, {
+            marks,
+            thresholds: profileCfg.thresholds,
+            scenario: scenario.name,
+            updateBaseline: profileCfg.updateBaseline,
+        });
+        result.profile = report;
+        emit({ type: "profile", report });
+    }
+
+    return result;
 }

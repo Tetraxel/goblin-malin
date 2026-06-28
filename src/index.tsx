@@ -1,5 +1,5 @@
-import React from "react";
-import { type Instance, render } from "ink";
+import React, { Profiler } from "react";
+import { type Instance, type RenderOptions, render } from "ink";
 import process from "node:process";
 import { App } from "./components/App";
 import { FullScreenBox } from "./components/FullScreenBox";
@@ -61,11 +61,25 @@ export function start(): void {
 
     process.stdout.write("\x1b[?1049h"); // enter alternate screen buffer
 
-    const instance = render(<App />, {
+    // In profile mode (TUI test harness), wrap the app in a single <Profiler>
+    // to force ProfileMode tree-wide and forward Ink's per-frame render time.
+    // The global is only set by src/profiling/install.ts; production is untouched.
+    const profile = globalThis.__GOBLIN_PROFILE__;
+    const tree = profile ? (
+        <Profiler id="app" onRender={profile.onProfilerRender}>
+            <App />
+        </Profiler>
+    ) : (
+        <App />
+    );
+    const options: RenderOptions & { onRender?: (info: { renderTime: number }) => void } = {
         patchConsole: true,
         maxFps: 60,
         exitOnCtrlC: false,
-    });
+    };
+    if (profile) options.onRender = profile.onInkRender;
+
+    const instance = render(tree, options);
 
     instance.waitUntilExit().then(() => {
         process.stdout.write("\x1b[?1049l"); // restore main screen buffer

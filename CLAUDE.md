@@ -61,7 +61,12 @@ yarn run lint  # Check eslint errors
 ```bash
 yarn tsx scripts/tui-test/cli.ts <scenario.json>           # JSON output
 yarn tsx scripts/tui-test/cli.ts <scenario.json> --pretty  # human-readable
+yarn tsx scripts/tui-test/cli.ts <scenario.json> --profile # + per-component render profiling
 ```
+
+### Render profiling
+
+`--profile` (or `"profile": { "enabled": true }` in a scenario) boots the app through `src/profiling/profiledEntry.tsx`, which installs a React devtools hook and reads per-component render timing/counts/reasons on every commit, attributed to each keystroke. The harness reports a per-component table, a per-interaction breakdown, axis-E Ink output cost, and **anomalies** (component-agnostic thresholds, so new components are covered automatically). See [scripts/tui-test/README.md](scripts/tui-test/README.md#render-profiling) and [docs/projects/p18/tasks.md](docs/projects/p18/tasks.md). The `render profile` vitest test fails CI on `error`-severity anomalies (render cascades); ms budgets are advisory `warn`s.
 
 ## Tips for common mistakes
 

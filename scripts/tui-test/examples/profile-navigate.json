@@ -1,0 +1,25 @@
+{
+    "name": "profile-navigate",
+    "terminal": { "cols": 128, "rows": 64 },
+    "dataDir": "scripts/tui-test/fixtures/empty",
+    "profile": { "enabled": true },
+    "steps": [
+        { "type": "stable", "timeout": 8000 },
+        { "type": "waitForContent", "text": "No task to run", "timeout": 5000 },
+
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "stable" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "stable" },
+        { "type": "key", "key": "Enter" },
+        { "type": "stable" },
+
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "stable" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "stable" },
+
+        { "type": "key", "key": "Escape" },
+        { "type": "stable" }
+    ]
+}
