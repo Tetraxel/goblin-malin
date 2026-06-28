@@ -1,0 +1,53 @@
+{
+    "terminal": { "cols": 128, "rows": 50 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "steps": [
+        { "type": "stable", "timeout": 8000 },
+        { "type": "waitForContent", "text": "Hooked", "timeout": 5000 },
+        { "type": "snapshot", "name": "initial" },
+
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "stable" },
+        { "type": "snapshot", "name": "task-list-focused" },
+
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "stable" },
+        { "type": "snapshot", "name": "scrolled-10" },
+
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "stable" },
+        { "type": "snapshot", "name": "scrolled-20" },
+
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "stable" },
+        { "type": "snapshot", "name": "scrolled-30" },
+        { "type": "screenshot-powershell", "name": "scrolled-30" }
+    ]
+}
