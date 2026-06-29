@@ -1,9 +1,9 @@
 ﻿import React from "react";
 import { Text } from "ink";
-import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
+import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
-export const ToTagCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, isSelected }) => {
+export const ToTagCell = React.memo(function ToTagCell({ task, isSelected }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
     const toTag = task.attributes?.toTag ?? false;
     const checkbox = toTag ? "☒" : "☐";
 
@@ -12,4 +12,4 @@ export const ToTagCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, 
             {checkbox}
         </Text>
     );
-};
+});

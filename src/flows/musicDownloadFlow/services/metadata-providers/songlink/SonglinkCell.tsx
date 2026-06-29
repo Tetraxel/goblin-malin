@@ -1,9 +1,9 @@
 import React from "react";
 import { Text } from "ink";
-import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
+import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
-export const SonglinkCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, isSelected }) => {
+export const SonglinkCell = React.memo(function SonglinkCell({ task, isSelected }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
     const attrs = task.attributes;
     const anchor = attrs?.discoveryAnchors?.["songlink"];
 
@@ -26,4 +26,4 @@ export const SonglinkCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ tas
             {hasResult ? `✓ ${count}` : "✗"}
         </Text>
     );
-};
+});

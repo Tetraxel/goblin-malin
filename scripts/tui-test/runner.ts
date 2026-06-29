@@ -135,12 +135,19 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
     try {
         for (const step of scenario.steps) {
             switch (step.type) {
-                case "key":
-                    emit({ type: "key", key: step.key });
-                    markInteraction(step.key);
-                    ptyProcess.write(resolveKey(step.key));
-                    await new Promise<void>((r) => setTimeout(r, 100));
+                case "key": {
+                    // delayMs: gap after each press (default 100ms). Set lower to
+                    // simulate held-key autorepeat (~30-50ms). repeat: send N times.
+                    const keyDelay = step.delayMs ?? 100;
+                    const repeat = step.repeat ?? 1;
+                    for (let i = 0; i < repeat; i++) {
+                        emit({ type: "key", key: step.key });
+                        markInteraction(step.key);
+                        ptyProcess.write(resolveKey(step.key));
+                        await new Promise<void>((r) => setTimeout(r, keyDelay));
+                    }
                     break;
+                }
 
                 case "type":
                     emit({ type: "type", text: step.text });

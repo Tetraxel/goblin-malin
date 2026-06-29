@@ -13,18 +13,17 @@ import { globalLogger } from "#base/logger/logger";
 
 export type { Shortcut, ContextualActions, ContextualActionBar };
 
-export type ColumnComponent<TAttributes> = ({
-    task,
-    width,
-    isSelected,
-    flow,
-}: {
+export type ColumnComponentProps<TAttributes> = {
     task: TaskSnapshot<TAttributes>;
     taskReference: Task<TAttributes>;
     width: number;
     isSelected: boolean;
     flow: FlowBase;
-}) => React.ReactNode;
+};
+
+// React.ComponentType accepts both plain function components and React.memo-wrapped ones.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ColumnComponent<TAttributes = any> = React.ComponentType<ColumnComponentProps<TAttributes>>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ColumnDefinition<TAttributes = any> = {

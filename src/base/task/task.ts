@@ -37,6 +37,10 @@ export class Task<TTaskAttributes = TaskAttributes> {
     public attempt: number = 0;
     public success: boolean = false;
 
+    // Snapshot cache — invalidated on every notifyTaskSubscribers call so React.memo
+    // in cell components can bail out when the task data hasn't actually changed.
+    private _snapshotCache: TaskSnapshot<TTaskAttributes> | null = null;
+
     constructor({
         id,
         initialInput,
@@ -71,13 +75,15 @@ export class Task<TTaskAttributes = TaskAttributes> {
     }
 
     public get(): TaskSnapshot<TTaskAttributes> {
-        return {
+        if (this._snapshotCache) return this._snapshotCache;
+        this._snapshotCache = {
             id: this.id,
             initialInput: this.initialInput,
             attributes: this.getAttributes(),
             status: this.status.get(),
             prompt: this.prompt.get(),
         };
+        return this._snapshotCache;
     }
 
     public getId(): string {
@@ -150,6 +156,7 @@ export class Task<TTaskAttributes = TaskAttributes> {
     }
 
     protected notifyTaskSubscribers(): void {
+        this._snapshotCache = null;
         this.subscribers?.forEach((callback) => callback(this));
     }
 }

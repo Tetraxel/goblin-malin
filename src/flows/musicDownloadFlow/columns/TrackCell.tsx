@@ -1,10 +1,10 @@
 ﻿import React from "react";
 import { Text } from "ink";
-import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
+import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import { computeCompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 
-export const TrackCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, isSelected }) => {
+export const TrackCell = React.memo(function TrackCell({ task, isSelected }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
     const groups = task.attributes?.metadataGroups ?? [];
     const overrides = task.attributes?.metadataOverride ?? {};
     const compiled = computeCompiledMetadata(groups, overrides);
@@ -15,4 +15,4 @@ export const TrackCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, 
             {trackName}
         </Text>
     );
-};
+});

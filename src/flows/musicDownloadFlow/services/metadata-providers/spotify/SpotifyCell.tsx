@@ -1,9 +1,9 @@
 ﻿import React from "react";
 import { Text } from "ink";
-import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
+import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
-export const SpotifyCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, isSelected }) => {
+export const SpotifyCell = React.memo(function SpotifyCell({ task, isSelected }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
     const group = task.attributes?.metadataGroups.find((g) => g.serviceKey === "spotify");
     const metadata = group?.results.find((r) => !r.isRejected)?.metadata;
     const fullUri = metadata?.uri;
@@ -14,4 +14,4 @@ export const SpotifyCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task
             {uri || ""}
         </Text>
     );
-};
+});

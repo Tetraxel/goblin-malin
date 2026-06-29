@@ -1,11 +1,11 @@
 import React from "react";
 import { Text } from "ink";
-import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
+import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import { Uri } from "#components/SecondaryPanel/MetadataPanel/Uri";
 import { formatTrackUri } from "#flows/musicDownloadFlow/utils/trackUri";
 
-export const UrlCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, isSelected }) => {
+export const UrlCell = React.memo(function UrlCell({ task, isSelected }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
     const primaryResult = task.attributes?.metadataGroups
         .flatMap((g) => g.results)
         .find((r) => r.isPrimaryInput && (r.metadata.url || r.metadata.uri));
@@ -35,4 +35,4 @@ export const UrlCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, is
             {task.attributes?.userInput?.url ?? "Unknown URL"}
         </Text>
     );
-};
+});

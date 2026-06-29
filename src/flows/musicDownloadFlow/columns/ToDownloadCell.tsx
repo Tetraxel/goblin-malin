@@ -1,9 +1,9 @@
 ﻿import React from "react";
 import { Text } from "ink";
-import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
+import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
-export const ToDownloadCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, isSelected }) => {
+export const ToDownloadCell = React.memo(function ToDownloadCell({ task, isSelected }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
     const toDownload = task.attributes?.toDownload ?? false;
     const checkbox = toDownload ? "☒" : "☐";
 
@@ -12,4 +12,4 @@ export const ToDownloadCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ t
             {checkbox}
         </Text>
     );
-};
+});

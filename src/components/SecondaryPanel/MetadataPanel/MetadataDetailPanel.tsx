@@ -4,7 +4,6 @@ import clipboard from "clipboardy";
 import { MetadataResultState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
 import { CompiledMetadata, CompiledMetadataField } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { FIELDS, navigableFields } from "#flows/musicDownloadFlow/utils/metadataFields";
-import { useFocusContext } from "#contexts/FocusContext";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { FieldRow } from "./FieldRow";
 import { providerDisplayRegistry } from "#base/providerDisplay";
@@ -20,6 +19,7 @@ interface MetadataSourceDetailProps {
     height: number;
     onOverrideChange: (overrides: MetadataOverrides) => void;
     onInnerFocusSwitch: () => void;
+    setIsEditingField: (editing: boolean) => void;
 }
 
 function getPlatformBrightColor(apiProvider: string): string {
@@ -35,9 +35,9 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
     width,
     onOverrideChange,
     onInnerFocusSwitch,
+    setIsEditingField,
 }) => {
     const theme = useTheme();
-    const { setIsEditingField } = useFocusContext();
     const [editingField, setEditingField] = useState<CompiledMetadataField | null>(null);
     const [editValue, setEditValue] = useState("");
     const [editError, setEditError] = useState(false);

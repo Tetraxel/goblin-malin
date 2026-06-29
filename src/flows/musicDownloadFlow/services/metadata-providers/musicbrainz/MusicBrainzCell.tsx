@@ -1,9 +1,9 @@
 import React from "react";
 import { Text } from "ink";
-import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
+import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
-export const MusicBrainzCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, isSelected }) => {
+export const MusicBrainzCell = React.memo(function MusicBrainzCell({ task, isSelected }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
     const attrs = task.attributes;
     const anchor = attrs?.discoveryAnchors?.["musicBrainz"];
 
@@ -26,4 +26,4 @@ export const MusicBrainzCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ 
             {hasResult ? `✓ ${count}` : "✗"}
         </Text>
     );
-};
+});

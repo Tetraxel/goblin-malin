@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import { Theme } from "#base/theme";
 import { useTheme } from "#base/themeContext";
 import { StatusAttributes, StatusType } from "#base/task/task-status";
-import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
+import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { AnimatedIcon, Icon } from "#components/AnimatedIcon";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
@@ -66,7 +66,7 @@ const getStatusText = (status: StatusAttributes): string => {
     return statusMessage;
 };
 
-export const StatusCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, isSelected }) => {
+export const StatusCell = React.memo(function StatusCell({ task, isSelected }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
     const theme = useTheme();
     const statusColor = getStatusColor(task.status.type, theme);
     const statusText = getStatusText(task.status);
@@ -84,4 +84,4 @@ export const StatusCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task,
             </Text>
         </Box>
     );
-};
+});

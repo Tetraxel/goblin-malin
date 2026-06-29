@@ -1,7 +1,7 @@
 import type { ProfileConfig, ProfileReport } from "./profiling/types.ts";
 
 export type Step =
-    | { type: "key"; key: string }
+    | { type: "key"; key: string; delayMs?: number; repeat?: number }
     | { type: "type"; text: string }
     | { type: "wait"; ms: number }
     | { type: "stable"; timeout?: number; quiescenceMs?: number; minBytes?: number }

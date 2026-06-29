@@ -14,7 +14,7 @@ interface MetadataUriProps {
     noPaddingX?: boolean;
 }
 
-export const Uri: React.FC<MetadataUriProps> = ({ uri, platform, fetchState, dimmed, fetchedBy, noPaddingX }) => {
+export const Uri = React.memo(function Uri({ uri, platform, fetchState, dimmed, fetchedBy, noPaddingX }: MetadataUriProps) {
     const theme = useTheme();
     const parts = uri.split("::");
     const display = providerDisplayRegistry.get(platform);
@@ -83,4 +83,4 @@ export const Uri: React.FC<MetadataUriProps> = ({ uri, platform, fetchState, dim
             )}
         </Box>
     );
-};
+});

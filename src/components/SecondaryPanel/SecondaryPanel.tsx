@@ -1,6 +1,7 @@
-﻿import React from "react";
+import React from "react";
 import { Box } from "ink";
 import { useFocusContext } from "#contexts/FocusContext";
+import { useDebouncedValue } from "#hooks/useDebouncedValue";
 import { LogPanel } from "./LogPanel";
 import { MetadataPanel } from "./MetadataPanel/MetadataPanel";
 import { DownloadPanel } from "./DownloadPanel/DownloadPanel";
@@ -15,14 +16,30 @@ interface SecondaryPanelProps {
 }
 
 export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) => {
-    const { focusState } = useFocusContext();
+    const {
+        focusState,
+        setCursor,
+        setShowDiscoverySources,
+        setSourcesInnerFocus,
+        setDetailFieldIndex,
+        setIsEditingField,
+    } = useFocusContext();
     const { subTab } = focusState.secondaryPanel;
     const height = focusState.layout.secondaryPanelHeight;
     const contentHeight = Math.max(1, height - 1);
 
-    const selectedTask = tasks[focusState.taskList.selectedTaskIndex] ?? null;
+    const liveSelectedTask = tasks[focusState.taskList.selectedTaskIndex] ?? null;
+    // Freeze the heavy detail panels while the task cursor is moving; they catch up
+    // ~80ms after the user settles. This keeps task-list scrolling smooth — the
+    // secondary panel is the dominant per-keystroke render cost otherwise.
+    const selectedTask = useDebouncedValue(liveSelectedTask, 80);
 
     const activeTabKey = subTab === "metadataSources" ? "3" : subTab === "downloadSources" ? "4" : "5";
+
+    // Derived once here so MetadataPanel can stay a memoized, context-free child:
+    // every value below is referentially stable while only the task cursor moves,
+    // so MetadataPanel bails out entirely during scroll.
+    const isMetadataPanelActive = focusState.activeWindow === "secondaryPanel" && subTab === "metadataSources";
 
     return (
         <Box flexDirection="column" height={height} overflow="hidden">
@@ -37,7 +54,19 @@ export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) 
             />
 
             {subTab === "metadataSources" && (
-                <MetadataPanel selectedTask={selectedTask} width={width} height={contentHeight} />
+                <MetadataPanel
+                    selectedTask={selectedTask}
+                    width={width}
+                    height={contentHeight}
+                    sourcesPanel={focusState.secondaryPanel.sourcesPanel}
+                    isPanelActive={isMetadataPanelActive}
+                    isEditingField={focusState.isEditingField}
+                    setCursor={setCursor}
+                    setShowDiscoverySources={setShowDiscoverySources}
+                    setSourcesInnerFocus={setSourcesInnerFocus}
+                    setDetailFieldIndex={setDetailFieldIndex}
+                    setIsEditingField={setIsEditingField}
+                />
             )}
 
             {subTab === "downloadSources" && (

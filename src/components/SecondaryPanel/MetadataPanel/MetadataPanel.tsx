@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Box } from "ink";
 import { useTheme } from "#base/themeContext";
 import { Task, TaskSnapshot } from "#base/task/task";
-import { useFocusContext } from "#contexts/FocusContext";
+import { CursorPosition } from "#hooks/useFocusManager";
 import { MusicDownloadTaskAttributes, MetadataGroupState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
 import { computeCompiledMetadata, pickGroupRepresentative } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { navigableFields } from "#flows/musicDownloadFlow/utils/metadataFields";
@@ -11,22 +11,46 @@ import { MetadataDetailPanel } from "./MetadataDetailPanel";
 import { DynamicHintBar } from "#components/DynamicHintBar/DynamicHintBar";
 import { useShortcuts } from "#hooks/useShortcuts";
 
+interface SourcesPanelState {
+    cursor: CursorPosition;
+    showDiscoverySources: boolean;
+    innerFocus: "list" | "detail";
+    selectedFieldIndex: number;
+}
+
 interface MetadataPanelProps {
     selectedTask: Task | null;
     width: number;
     height: number;
+    // Lifted out of FocusContext so this panel can be a memoized, context-free
+    // child: every prop below is referentially stable while only the task cursor
+    // moves, so React.memo bails out the whole subtree during scroll.
+    sourcesPanel: SourcesPanelState;
+    isPanelActive: boolean;
+    isEditingField: boolean;
+    setCursor: (cursor: CursorPosition) => void;
+    setShowDiscoverySources: (show: boolean) => void;
+    setSourcesInnerFocus: (focus: "list" | "detail") => void;
+    setDetailFieldIndex: (index: number) => void;
+    setIsEditingField: (editing: boolean) => void;
 }
 
-export const MetadataPanel: React.FC<MetadataPanelProps> = ({ selectedTask, width, height }) => {
+export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function MetadataPanel({
+    selectedTask,
+    width,
+    height,
+    sourcesPanel,
+    isPanelActive,
+    isEditingField,
+    setCursor,
+    setShowDiscoverySources,
+    setSourcesInnerFocus,
+    setDetailFieldIndex,
+    setIsEditingField,
+}) {
     const theme = useTheme();
-    const { focusState, setCursor, setShowDiscoverySources, setSourcesInnerFocus, setDetailFieldIndex } =
-        useFocusContext();
 
-    const { sourcesPanel } = focusState.secondaryPanel;
     const { cursor, showDiscoverySources, innerFocus, selectedFieldIndex } = sourcesPanel;
-
-    const isPanelActive =
-        focusState.activeWindow === "secondaryPanel" && focusState.secondaryPanel.subTab === "metadataSources";
 
     const typedTask = selectedTask as Task<MusicDownloadTaskAttributes> | null;
 
@@ -48,7 +72,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ selectedTask, widt
 
     const groups: MetadataGroupState[] = snapshot?.attributes?.metadataGroups ?? [];
     const overrides: MetadataOverrides = snapshot?.attributes?.metadataOverride ?? {};
-    const compiled = computeCompiledMetadata(groups, overrides);
+    const compiled = useMemo(() => computeCompiledMetadata(groups, overrides), [groups, overrides]);
 
     const [splitRatio, setSplitRatio] = useState(0.6);
     const leftWidth = Math.floor(width * splitRatio) - 4;
@@ -107,7 +131,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ selectedTask, widt
     // Detail-panel navigation shortcuts (only active when detail is focused).
     useShortcuts({
         id: "metadataPanelDetail",
-        isActive: isPanelActive && innerFocus === "detail" && !focusState.isEditingField,
+        isActive: isPanelActive && innerFocus === "detail" && !isEditingField,
         priority: 120,
         shortcuts: [
             {
@@ -193,9 +217,10 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ selectedTask, widt
                     height={listHeight}
                     onOverrideChange={handleOverrideChange}
                     onInnerFocusSwitch={() => setSourcesInnerFocus("list")}
+                    setIsEditingField={setIsEditingField}
                 />
             </Box>
             <DynamicHintBar width={width - 2} isActive={isPanelActive} />
         </Box>
     );
-};
+});
