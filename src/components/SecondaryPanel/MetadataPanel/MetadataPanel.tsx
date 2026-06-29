@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Box } from "ink";
 import { useTheme } from "#base/themeContext";
 import { Task, TaskSnapshot } from "#base/task/task";
@@ -70,8 +70,10 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
         });
     }, [typedTask]);
 
-    const groups: MetadataGroupState[] = snapshot?.attributes?.metadataGroups ?? [];
-    const overrides: MetadataOverrides = snapshot?.attributes?.metadataOverride ?? {};
+    // Stable identities while the task snapshot is unchanged (e.g. navigating
+    // fields/sources), so `compiled` and the memoized rows below can bail.
+    const groups: MetadataGroupState[] = useMemo(() => snapshot?.attributes?.metadataGroups ?? [], [snapshot]);
+    const overrides: MetadataOverrides = useMemo(() => snapshot?.attributes?.metadataOverride ?? {}, [snapshot]);
     const compiled = useMemo(() => computeCompiledMetadata(groups, overrides), [groups, overrides]);
 
     const [splitRatio, setSplitRatio] = useState(0.6);
@@ -149,18 +151,23 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
         ],
     });
 
-    function handleGroupsChange(updated: MetadataGroupState[]) {
-        typedTask?.updateAttributes({ metadataGroups: updated });
-    }
+    // Stable while the task is unchanged so memoized children (FieldRow via
+    // onEditSubmit, source rows) bail during field/source navigation.
+    const handleGroupsChange = useCallback(
+        (updated: MetadataGroupState[]) => typedTask?.updateAttributes({ metadataGroups: updated }),
+        [typedTask]
+    );
 
-    function handleOverrideChange(updated: MetadataOverrides) {
-        typedTask?.updateAttributes({ metadataOverride: updated });
-    }
+    const handleOverrideChange = useCallback(
+        (updated: MetadataOverrides) => typedTask?.updateAttributes({ metadataOverride: updated }),
+        [typedTask]
+    );
 
-    function handleRefetchResult(groupIndex: number, resultIndex: number) {
+    const handleRefetchResult = useCallback(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (typedTask as any)?.refetchResult?.(groupIndex, resultIndex);
-    }
+        (groupIndex: number, resultIndex: number) => (typedTask as any)?.refetchResult?.(groupIndex, resultIndex),
+        [typedTask]
+    );
 
     const sortedGroups = [...groups].sort((a, b) => a.rank - b.rank);
     const selectedResult =

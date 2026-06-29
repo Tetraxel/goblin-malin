@@ -10,26 +10,31 @@ type FocusManager = ReturnType<typeof useFocusManager>;
  *
  * - `FocusActionsContext` — the dispatch functions. Stable for the app's life;
  *   action-only consumers (toolbar buttons, etc.) never re-render.
- * - `FocusChromeContext` — everything that does NOT change while the task cursor
- *   moves (activeWindow, toolbar, secondaryPanel, layout, modals, …). Chrome
- *   consumers (Toolbar, Footer, InputRouter, modals) skip task-scroll renders.
- * - `FocusTaskListContext` — the task-list selection slice; changes on scroll.
+ * - `FocusChromeContext` — the window chrome that changes on neither task scroll
+ *   nor secondary-panel navigation (activeWindow, toolbar, layout, modals, …).
+ *   Chrome consumers (Toolbar name/buttons, modals) skip both kinds of scroll.
+ * - `FocusTaskListContext` — the task-list selection slice; changes on task scroll.
+ * - `FocusSecondaryPanelContext` — the secondary-panel slice (subTab + sourcesPanel
+ *   cursor/field index); changes when navigating fields/sources in that panel, so
+ *   field/source navigation doesn't churn the chrome.
  * - `FocusStateContext` — the full derived state, for the back-compat
- *   `useFocusContext()` aggregator used by task-list consumers that genuinely
- *   need to re-render on scroll.
+ *   `useFocusContext()` aggregator used by consumers that genuinely need to
+ *   re-render on any state change.
  */
 
 // Actions are everything the manager returns except `focusState`.
 export type FocusActions = Omit<FocusManager, "focusState">;
 
-// Chrome = full state minus the task-list slice (the only part that changes on scroll).
-export type FocusChrome = Omit<FocusState, "taskList">;
+// Chrome = full state minus the slices that change during in-panel navigation.
+export type FocusChrome = Omit<FocusState, "taskList" | "secondaryPanel">;
 
 export type FocusTaskList = FocusState["taskList"];
+export type FocusSecondaryPanel = FocusState["secondaryPanel"];
 
 const FocusActionsContext = createContext<FocusActions | null>(null);
 const FocusChromeContext = createContext<FocusChrome | null>(null);
 const FocusTaskListContext = createContext<FocusTaskList | null>(null);
+const FocusSecondaryPanelContext = createContext<FocusSecondaryPanel | null>(null);
 const FocusStateContext = createContext<FocusState | null>(null);
 
 export const FocusProvider: React.FC<{
@@ -89,7 +94,7 @@ export const FocusProvider: React.FC<{
     );
 
     // Chrome slice — memoized on each field so it keeps a stable identity while
-    // only the task-list cursor moves (then every dep below is unchanged).
+    // only an in-panel cursor moves (then every dep below is unchanged).
     const chrome = useMemo<FocusChrome>(
         () => ({
             activeWindow: fs.activeWindow,
@@ -100,7 +105,6 @@ export const FocusProvider: React.FC<{
             footer: fs.footer,
             layout: fs.layout,
             prompt: fs.prompt,
-            secondaryPanel: fs.secondaryPanel,
             modal: fs.modal,
             wizardConfig: fs.wizardConfig,
             wizardOnDisable: fs.wizardOnDisable,
@@ -115,7 +119,6 @@ export const FocusProvider: React.FC<{
             fs.footer,
             fs.layout,
             fs.prompt,
-            fs.secondaryPanel,
             fs.modal,
             fs.wizardConfig,
             fs.wizardOnDisable,
@@ -126,9 +129,11 @@ export const FocusProvider: React.FC<{
     return (
         <FocusActionsContext.Provider value={actions}>
             <FocusChromeContext.Provider value={chrome}>
-                <FocusTaskListContext.Provider value={fs.taskList}>
-                    <FocusStateContext.Provider value={fs}>{children}</FocusStateContext.Provider>
-                </FocusTaskListContext.Provider>
+                <FocusSecondaryPanelContext.Provider value={fs.secondaryPanel}>
+                    <FocusTaskListContext.Provider value={fs.taskList}>
+                        <FocusStateContext.Provider value={fs}>{children}</FocusStateContext.Provider>
+                    </FocusTaskListContext.Provider>
+                </FocusSecondaryPanelContext.Provider>
             </FocusChromeContext.Provider>
         </FocusActionsContext.Provider>
     );
@@ -152,6 +157,13 @@ export const useFocusChrome = (): FocusChrome => {
 export const useFocusTaskList = (): FocusTaskList => {
     const ctx = useContext(FocusTaskListContext);
     if (!ctx) throw new Error("useFocusTaskList must be used within FocusProvider");
+    return ctx;
+};
+
+/** Secondary-panel slice (subTab + sources cursor/field index). Changes on in-panel navigation. */
+export const useFocusSecondaryPanel = (): FocusSecondaryPanel => {
+    const ctx = useContext(FocusSecondaryPanelContext);
+    if (!ctx) throw new Error("useFocusSecondaryPanel must be used within FocusProvider");
     return ctx;
 };
 

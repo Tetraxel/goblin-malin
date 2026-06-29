@@ -4,7 +4,7 @@ import stringWidth from "string-width";
 import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
 import { FlowBase } from "#base/flow/flow-base";
 import { useTheme } from "#base/themeContext";
-import { useFocusChrome } from "#contexts/FocusContext";
+import { useFocusChrome, useFocusSecondaryPanel } from "#contexts/FocusContext";
 import { ToolbarButtonInvoker } from "./ToolbarButtonInvoker";
 import { FlowSelector } from "./FlowSelector";
 import { Separator } from "../Separator";
@@ -145,8 +145,7 @@ export const Toolbar = ({
 };
 
 const PrimaryModeTabBar: React.FC<{ width: number; splitPos: number }> = ({ width, splitPos }) => {
-    const { secondaryPanel } = useFocusChrome();
-    const { primaryMode } = secondaryPanel;
+    const { primaryMode } = useFocusSecondaryPanel();
 
     return (
         <TabBar

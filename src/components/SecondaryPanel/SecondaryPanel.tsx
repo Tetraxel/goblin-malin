@@ -1,6 +1,6 @@
 import React from "react";
 import { Box } from "ink";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusActions, useFocusChrome, useFocusSecondaryPanel, useFocusTaskList } from "#contexts/FocusContext";
 import { useDebouncedValue } from "#hooks/useDebouncedValue";
 import { LogPanel } from "./LogPanel";
 import { MetadataPanel } from "./MetadataPanel/MetadataPanel";
@@ -16,19 +16,16 @@ interface SecondaryPanelProps {
 }
 
 export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) => {
-    const {
-        focusState,
-        setCursor,
-        setShowDiscoverySources,
-        setSourcesInnerFocus,
-        setDetailFieldIndex,
-        setIsEditingField,
-    } = useFocusContext();
-    const { subTab } = focusState.secondaryPanel;
-    const height = focusState.layout.secondaryPanelHeight;
+    const { setCursor, setShowDiscoverySources, setSourcesInnerFocus, setDetailFieldIndex, setIsEditingField } =
+        useFocusActions();
+    const { activeWindow, layout, isEditingField } = useFocusChrome();
+    const secondaryPanel = useFocusSecondaryPanel();
+    const taskList = useFocusTaskList();
+    const { subTab } = secondaryPanel;
+    const height = layout.secondaryPanelHeight;
     const contentHeight = Math.max(1, height - 1);
 
-    const liveSelectedTask = tasks[focusState.taskList.selectedTaskIndex] ?? null;
+    const liveSelectedTask = tasks[taskList.selectedTaskIndex] ?? null;
     // Freeze the heavy detail panels while the task cursor is moving; they catch up
     // ~80ms after the user settles. This keeps task-list scrolling smooth — the
     // secondary panel is the dominant per-keystroke render cost otherwise.
@@ -39,7 +36,7 @@ export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) 
     // Derived once here so MetadataPanel can stay a memoized, context-free child:
     // every value below is referentially stable while only the task cursor moves,
     // so MetadataPanel bails out entirely during scroll.
-    const isMetadataPanelActive = focusState.activeWindow === "secondaryPanel" && subTab === "metadataSources";
+    const isMetadataPanelActive = activeWindow === "secondaryPanel" && subTab === "metadataSources";
 
     return (
         <Box flexDirection="column" height={height} overflow="hidden">
@@ -58,9 +55,9 @@ export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) 
                     selectedTask={selectedTask}
                     width={width}
                     height={contentHeight}
-                    sourcesPanel={focusState.secondaryPanel.sourcesPanel}
+                    sourcesPanel={secondaryPanel.sourcesPanel}
                     isPanelActive={isMetadataPanelActive}
-                    isEditingField={focusState.isEditingField}
+                    isEditingField={isEditingField}
                     setCursor={setCursor}
                     setShowDiscoverySources={setShowDiscoverySources}
                     setSourcesInnerFocus={setSourcesInnerFocus}

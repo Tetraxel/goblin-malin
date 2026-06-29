@@ -1,0 +1,21 @@
+{
+    "terminal": { "cols": 128, "rows": 50 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "steps": [
+        { "type": "stable", "timeout": 8000 },
+        { "type": "waitForContent", "text": "Hooked", "timeout": 5000 },
+
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "stable" },
+        { "type": "key", "key": "Tab" },
+        { "type": "stable" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "stable" },
+        { "type": "snapshot", "name": "detail-focused" },
+
+        { "type": "key", "key": "ArrowDown", "repeat": 16, "delayMs": 35 },
+        { "type": "stable" },
+        { "type": "snapshot", "name": "fields-scrolled" }
+    ]
+}

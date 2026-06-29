@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import { Task, TaskSnapshot } from "#base/task/task";
 import { FlowBase } from "#base/flow/flow-base";
 import { useTheme } from "#base/themeContext";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusChrome, useFocusTaskList } from "#contexts/FocusContext";
 import { Shortcut, ContextualActions, ContextualActionBar } from "#types/actions";
 import { ActionBar } from "./ActionBar";
 import { DynamicHintBar } from "#components/DynamicHintBar/DynamicHintBar";
@@ -101,14 +101,15 @@ export const TaskListPanel: React.FC<{
     flow: FlowBase;
 }> = ({ columns, tasks, width, flow }) => {
     const theme = useTheme();
-    const { focusState } = useFocusContext();
-    const isWindowActive = focusState.activeWindow === "taskList";
-    const fullHeight = focusState.layout.taskListHeight;
+    const { activeWindow, layout } = useFocusChrome();
+    const taskListFocus = useFocusTaskList();
+    const isWindowActive = activeWindow === "taskList";
+    const fullHeight = layout.taskListHeight;
     const actionBarRows = isWindowActive ? 2 : 0;
     const height = fullHeight - 1 - actionBarRows; // subtract header and action bar
 
     // Calculate scroll offset so the selected task stays visible (center when possible)
-    const selectedIndex = focusState.taskList.selectedTaskIndex;
+    const selectedIndex = taskListFocus.selectedTaskIndex;
     const taskCount = tasks.length;
     const maxOffset = Math.max(0, taskCount - height);
 
@@ -178,7 +179,7 @@ export const TaskListPanel: React.FC<{
         return calculateColumnWidths(resolved, width);
     }, [columns, width]);
 
-    const selectedColIndex = focusState.taskList.selectedColumnIndex;
+    const selectedColIndex = taskListFocus.selectedColumnIndex;
     // Use original columns prop (not calculatedColumns) — calculateColumnWidths output may drop fields
     const isColumnResizable = columns[selectedColIndex]?.resizable !== false;
 
@@ -307,9 +308,7 @@ export const TaskListPanel: React.FC<{
                 <Box width={2} height={1} flexShrink={0} />
                 {calculatedColumns.map((column, index) => {
                     const isActive =
-                        isWindowActive &&
-                        focusState.taskList.isHeaderFocused &&
-                        focusState.taskList.selectedColumnIndex === index;
+                        isWindowActive && taskListFocus.isHeaderFocused && taskListFocus.selectedColumnIndex === index;
                     return (
                         <Box
                             key={`header-${column.id}-${index}`}
@@ -345,9 +344,9 @@ export const TaskListPanel: React.FC<{
                         const visibleIndex = index + offset;
                         const isRowHighlighted = selectedIndex === visibleIndex;
                         const isRowActive =
-                            isWindowActive && !focusState.taskList.isHeaderFocused && selectedIndex === visibleIndex;
-                        const selectedColumnIndex = isRowActive ? focusState.taskList.selectedColumnIndex : -1;
-                        const isMultiSelected = focusState.taskList.selectedTaskIds.has(task.getId());
+                            isWindowActive && !taskListFocus.isHeaderFocused && selectedIndex === visibleIndex;
+                        const selectedColumnIndex = isRowActive ? taskListFocus.selectedColumnIndex : -1;
+                        const isMultiSelected = taskListFocus.selectedTaskIds.has(task.getId());
                         return (
                             <TaskRow
                                 key={task.getId()}
@@ -365,7 +364,7 @@ export const TaskListPanel: React.FC<{
             </Box>
 
             {/* Shortcut hints */}
-            {isWindowActive && focusState.taskList.isHeaderFocused ? (
+            {isWindowActive && taskListFocus.isHeaderFocused ? (
                 <DynamicHintBar width={width - 2} isActive={true} />
             ) : (
                 <ActionBar tasks={tasks} flow={flow} />

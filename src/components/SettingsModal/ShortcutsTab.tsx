@@ -1,4 +1,4 @@
-import React, { useReducer, useEffect } from "react";
+import React, { useReducer, useEffect, useMemo } from "react";
 import { Box, Text } from "ink";
 import type { Key } from "ink";
 import { shortcutRegistry } from "#base/shortcuts/ShortcutRegistry";
@@ -14,6 +14,42 @@ export interface ShortcutsTabItem {
     defaultBinding: string;
     customBinding: string | null;
 }
+
+// Memoized so that scrolling the list only re-renders the two rows whose
+// selection changed — `items` carry stable identity (the build is memoized).
+const ShortcutRow = React.memo(function ShortcutRow({
+    item,
+    isSelected,
+    labelColW,
+    bindingColW,
+}: {
+    item: ShortcutsTabItem;
+    isSelected: boolean;
+    labelColW: number;
+    bindingColW: number;
+}) {
+    const theme = useTheme();
+    const binding = item.customBinding ?? item.defaultBinding;
+    const isCustom = item.customBinding !== null;
+    return (
+        <Box paddingX={1} height={1} flexShrink={0} flexDirection="row" overflow="hidden">
+            <Text color={isSelected ? theme.ui.focusIndicator : undefined}>{isSelected ? "☛ " : "  "}</Text>
+            <Box flexGrow={1} overflow="hidden">
+                <Text wrap="truncate-end" color={isSelected ? theme.text.active : theme.text.secondary}>
+                    {item.id}
+                </Text>
+            </Box>
+            <Box flexShrink={0} width={labelColW} overflow="hidden">
+                <Text dimColor wrap="truncate-end">
+                    {item.label}
+                </Text>
+            </Box>
+            <Box flexShrink={0} width={bindingColW} justifyContent="flex-end">
+                <Text color={isCustom ? theme.status.warning : theme.text.muted}>[{binding}]</Text>
+            </Box>
+        </Box>
+    );
+});
 
 export function buildShortcutsTabItems(searchQuery?: string): ShortcutsTabItem[] {
     const keybindings = SettingsStore.getInstance().getAppSettings().keybindings;
@@ -79,10 +115,16 @@ export const ShortcutsTab: React.FC<ShortcutsTabProps> = ({
     onSearchChange,
 }) => {
     const theme = useTheme();
-    const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
+    const [registryVersion, forceUpdate] = useReducer((x: number) => x + 1, 0);
     useEffect(() => shortcutRegistry.subscribe(forceUpdate), []);
 
-    const items = buildShortcutsTabItems(searchQuery);
+    // Rebuilding sorts the whole registry; only redo it when the search or the
+    // registry itself changes — not on every scroll step (selectedIndex change).
+    const items = useMemo(
+        () => buildShortcutsTabItems(searchQuery),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [searchQuery, registryVersion]
+    );
     const safeIdx = Math.max(0, Math.min(selectedIndex, items.length - 1));
 
     const rebindUsedH = rebindingId ? REBIND_H : 0;
@@ -117,27 +159,14 @@ export const ShortcutsTab: React.FC<ShortcutsTabProps> = ({
                 {visibleItems.map((item, i) => {
                     const idx = scrollOffset + i;
                     const isSelected = isActive && idx === safeIdx && !rebindingId && !searchFocused;
-                    const binding = item.customBinding ?? item.defaultBinding;
-                    const isCustom = item.customBinding !== null;
                     return (
-                        <Box key={item.id} paddingX={1} height={1} flexShrink={0} flexDirection="row" overflow="hidden">
-                            <Text color={isSelected ? theme.ui.focusIndicator : undefined}>
-                                {isSelected ? "☛ " : "  "}
-                            </Text>
-                            <Box flexGrow={1} overflow="hidden">
-                                <Text wrap="truncate-end" color={isSelected ? theme.text.active : theme.text.secondary}>
-                                    {item.id}
-                                </Text>
-                            </Box>
-                            <Box flexShrink={0} width={labelColW} overflow="hidden">
-                                <Text dimColor wrap="truncate-end">
-                                    {item.label}
-                                </Text>
-                            </Box>
-                            <Box flexShrink={0} width={bindingColW} justifyContent="flex-end">
-                                <Text color={isCustom ? theme.status.warning : theme.text.muted}>[{binding}]</Text>
-                            </Box>
-                        </Box>
+                        <ShortcutRow
+                            key={item.id}
+                            item={item}
+                            isSelected={isSelected}
+                            labelColW={labelColW}
+                            bindingColW={bindingColW}
+                        />
                     );
                 })}
                 {items.length === 0 && searchQuery && (

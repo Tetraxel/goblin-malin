@@ -14,13 +14,13 @@ interface CompiledRowProps {
     width: number;
 }
 
-export const MetadataCompiledRow: React.FC<CompiledRowProps> = ({
+export const MetadataCompiledRow = React.memo(function MetadataCompiledRow({
     compiled,
     overrideCount,
     isSelected,
     isActive,
     width,
-}) => {
+}: CompiledRowProps) {
     const theme = useTheme();
     const focusColorBg = isActive
         ? theme.ui.rowBackground.regular.cellActive
@@ -70,4 +70,4 @@ export const MetadataCompiledRow: React.FC<CompiledRowProps> = ({
             )}
         </Box>
     );
-};
+});

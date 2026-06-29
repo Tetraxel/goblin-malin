@@ -1,13 +1,14 @@
 ﻿import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
-import { useFocusChrome } from "#contexts/FocusContext";
+import { useFocusChrome, useFocusSecondaryPanel } from "#contexts/FocusContext";
 import { inkTransport } from "#base/logger/ink-transport";
 import { LogMetadata } from "#base/logger/types";
 import { useTheme } from "#base/themeContext";
 
 export const Footer: React.FC = () => {
     const theme = useTheme();
-    const { footer, secondaryPanel } = useFocusChrome();
+    const { footer } = useFocusChrome();
+    const secondaryPanel = useFocusSecondaryPanel();
     const height = footer.height;
     const subTab = secondaryPanel.subTab;
     const [lastLog, setLastLog] = useState<LogMetadata | null>(null);

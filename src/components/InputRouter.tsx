@@ -1,5 +1,5 @@
 import React from "react";
-import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
+import { useFocusActions, useFocusChrome, useFocusSecondaryPanel } from "#contexts/FocusContext";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useToolbarShortcuts, useTaskListShortcuts, usePromptShortcuts } from "#hooks/useKeyHandlers";
 import { FlowBase } from "#base/flow/flow-base";
@@ -15,7 +15,8 @@ export const InputRouter: React.FC<{
     flow: FlowBase | undefined;
 }> = ({ tasks, flow }) => {
     const { handleTabPress, switchMode, setPrimaryMode, setSecondaryTab } = useFocusActions();
-    const { activeWindow, secondaryPanel, isEditingField } = useFocusChrome();
+    const { activeWindow, isEditingField } = useFocusChrome();
+    const secondaryPanel = useFocusSecondaryPanel();
     const { openImportFlow } = useImportActions();
 
     const isMainScreen =

@@ -34,14 +34,14 @@ interface MetadataResultRowProps {
     showDiscoverySources: boolean;
 }
 
-export const MetadataResultRow: React.FC<MetadataResultRowProps> = ({
+export const MetadataResultRow = React.memo(function MetadataResultRow({
     result,
     serviceKey: _serviceKey,
     isSelected,
     isActive,
     width,
     showDiscoverySources,
-}) => {
+}: MetadataResultRowProps) {
     const theme = useTheme();
     const isDimmed = result.isRejected;
     const statusIcon = result.isRejected ? "✘" : result.isFavorited ? "★" : " ";
@@ -139,4 +139,4 @@ export const MetadataResultRow: React.FC<MetadataResultRowProps> = ({
             ))}
         </Box>
     );
-};
+});

@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import { FlowBase } from "#base/flow/flow-base";
 import { Task } from "#base/task/task";
 import { useTheme } from "#base/themeContext";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusChrome, useFocusTaskList } from "#contexts/FocusContext";
 import { ActionBarRow, getContextualShortcutIds } from "#types/actions";
 import { Hint } from "../Hint";
 
@@ -12,10 +12,11 @@ export const ActionBar: React.FC<{
     flow: FlowBase | undefined;
 }> = ({ tasks, flow }) => {
     const theme = useTheme();
-    const { focusState } = useFocusContext();
-    const isTaskListActive = focusState.activeWindow === "taskList";
-    const selectedIndex = focusState.taskList.selectedTaskIndex;
-    const multiCount = focusState.taskList.selectedTaskIds.size;
+    const { activeWindow } = useFocusChrome();
+    const taskList = useFocusTaskList();
+    const isTaskListActive = activeWindow === "taskList";
+    const selectedIndex = taskList.selectedTaskIndex;
+    const multiCount = taskList.selectedTaskIds.size;
     const selectedTask = tasks[selectedIndex];
 
     const [, setTaskVersion] = useState(0);
@@ -27,7 +28,7 @@ export const ActionBar: React.FC<{
     const bar =
         isTaskListActive && flow && selectedTask
             ? flow.getContextualActionBar(selectedTask, {
-                  columnIndex: focusState.taskList.selectedColumnIndex,
+                  columnIndex: taskList.selectedColumnIndex,
                   taskIndex: selectedIndex,
                   taskCount: tasks.length,
                   selectedCount: multiCount > 1 ? multiCount : undefined,

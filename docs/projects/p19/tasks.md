@@ -2,10 +2,11 @@
 
 ## Goal
 
-Scrolling the task list felt sluggish (~15 fps). [P18](../p18/tasks.md) gave us the
-tooling to see why: per-keystroke React + Ink timing, attributed to each keystroke.
-This project uses that signal to remove the structural causes of the slowness so the
-task list scrolls smoothly regardless of how much metadata each task carries.
+Scrolling felt sluggish (~15 fps) — first in the task list, then in the metadata detail
+fields and the Settings shortcut list. [P18](../p18/tasks.md) gave us the tooling to see
+why: per-keystroke React + Ink timing, attributed to each keystroke. This project uses
+that signal to remove the structural causes so every list/cursor in the app moves
+smoothly regardless of how much metadata each task carries.
 
 ### What the profiler showed
 
@@ -134,6 +135,44 @@ SecondaryPanel, LogPanel, and the taskList branch of useKeyHandlers.
 | --------- |
 | ✅ Done |
 
+### T19.6 — In-panel navigation (metadata fields + shortcut list)
+
+The same two-front problem showed up when navigating *within* a panel:
+
+**Metadata detail fields** — `selectedFieldIndex`/`cursor` live in `secondaryPanel`,
+which was bundled into the chrome slice, so every field move churned the whole chrome
+(Toolbar, all modals). And `FieldRow` wasn't memoized, so all ~10 rows re-rendered.
+
+**Shortcut list** — [ShortcutsTab.tsx](../../../src/components/SettingsModal/ShortcutsTab.tsx)
+rebuilt and re-sorted the entire registry on every render (every scroll step), and rendered
+every visible row inline.
+
+Fixes:
+
+- **New `FocusSecondaryPanelContext` slice** (`useFocusSecondaryPanel`), split out of chrome.
+  Field/source navigation no longer churns the chrome. Migrated Footer, `PrimaryModeTabBar`,
+  InputRouter, DownloadPanel, and `SecondaryPanel` to it.
+- **Memoized the metadata rows** — `FieldRow`, `MetadataResultRow`, `MetadataGroupHeader`,
+  `MetadataCompiledRow` — and stabilized the props that fed them: `useCallback` on
+  `handleOverrideChange`/`handleGroupsChange`/`handleRefetchResult` and on
+  `handleEditSubmit`/`stopEditing`, `useMemo` on `groups`/`overrides`, and gating the edit
+  state to the editing row only. (The unstable `onOverrideChange` was silently defeating
+  `FieldRow`'s memo — all 10 rows re-rendered until it was wrapped.)
+- **Migrated `TaskListPanel` + `ActionBar`** off the compat aggregator to the chrome/taskList
+  slices, so they bail on field/source navigation.
+- **Memoized the shortcut-list build** (`useMemo` keyed on search + a registry version) and
+  extracted a memoized `ShortcutRow`, so scrolling re-renders only the two changed rows.
+
+**Files:** `src/contexts/FocusContext.tsx`, `src/hooks/useFocusManager.ts` (unchanged slice),
+the metadata panel + row components, `src/components/SettingsModal/ShortcutsTab.tsx`,
+`src/components/TaskListPanel/{TaskListPanel,ActionBar}.tsx`, `src/components/{Footer,InputRouter}.tsx`,
+`src/components/Toolbar/Toolbar.tsx`, `src/components/SecondaryPanel/DownloadPanel/DownloadPanel.tsx`.
+New scenarios: `scroll-metadata-fields.json`, `scroll-shortcut-list.json`.
+
+| Status |
+| --------- |
+| ✅ Done |
+
 ### T19.5 — Docs
 
 **Files:** `docs/projects/README.md`, this file.
@@ -155,7 +194,9 @@ SecondaryPanel, LogPanel, and the taskList branch of useKeyHandlers.
 | Panel deferral | `MetadataPanel` bails during a scroll burst (mount once, then absent from commits) |
 | Behaviour intact | snapshots in the scroll scenarios still show the correct selected-task metadata after settling |
 
-### Results (fast-scroll scenario, `50-tasks-with-metadata`)
+### Results
+
+Task-list scroll (fast-scroll scenario, `50-tasks-with-metadata`):
 
 | Metric | Before | After |
 |---|---|---|
@@ -163,6 +204,17 @@ SecondaryPanel, LogPanel, and the taskList branch of useKeyHandlers.
 | Chrome components rendering on scroll | all | **none** |
 | Ink frames over the burst | 70 | 33 |
 | React / keystroke when coalesced | ~24 ms | down to **~4 ms** |
+
+In-panel navigation (`scroll-metadata-fields.json`, `scroll-shortcut-list.json`):
+
+| Metric | Before | After |
+|---|---|---|
+| Metadata field move — React / keystroke | ~9–21 ms | **~4–5 ms** |
+| Metadata field move — `FieldRow` re-renders | 10 (all) | **1** |
+| Metadata field move — chrome + task list | re-render | **0** |
+| Shortcut-list scroll — React / keystroke | — | **~3.5 ms** |
+| Shortcut-list scroll — rows re-rendered | all visible | **2** |
+| Shortcut-list scroll — registry rebuild/sort | every key | **only on search/rebind** |
 
 ## Limitations / future work
 

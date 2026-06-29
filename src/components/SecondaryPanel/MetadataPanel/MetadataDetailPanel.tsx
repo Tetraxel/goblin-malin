@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Box, Text } from "ink";
 import clipboard from "clipboardy";
 import { MetadataResultState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
@@ -49,11 +49,11 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
         setIsEditingField(true);
     }
 
-    function stopEditing() {
+    const stopEditing = useCallback(() => {
         setEditingField(null);
         setEditError(false);
         setIsEditingField(false);
-    }
+    }, [setIsEditingField]);
 
     const isCompiled = source === "compiled";
     const clampedFieldIdx = Math.min(selectedFieldIndex, navigableFields.length - 1);
@@ -139,29 +139,32 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
             : [],
     });
 
-    function handleEditSubmit(value: string) {
-        if (!editingField) return;
-        const field = FIELDS.find((f) => f.key === editingField);
-        if (!field) return;
+    const handleEditSubmit = useCallback(
+        (value: string) => {
+            if (!editingField) return;
+            const field = FIELDS.find((f) => f.key === editingField);
+            if (!field) return;
 
-        const currentDisplay = field.getCompiledValue(compiled);
-        if (value === currentDisplay || (currentDisplay === "—" && value === "")) {
-            stopEditing();
-            return;
-        }
-
-        let parsed: unknown = value;
-        if (field.parseValue) {
-            parsed = field.parseValue(value);
-            if (parsed === null) {
-                setEditError(true);
+            const currentDisplay = field.getCompiledValue(compiled);
+            if (value === currentDisplay || (currentDisplay === "—" && value === "")) {
+                stopEditing();
                 return;
             }
-        }
 
-        onOverrideChange({ ...overrides, [editingField]: parsed });
-        stopEditing();
-    }
+            let parsed: unknown = value;
+            if (field.parseValue) {
+                parsed = field.parseValue(value);
+                if (parsed === null) {
+                    setEditError(true);
+                    return;
+                }
+            }
+
+            onOverrideChange({ ...overrides, [editingField]: parsed });
+            stopEditing();
+        },
+        [editingField, compiled, overrides, onOverrideChange, stopEditing]
+    );
 
     const titleInner = width - 2;
     const headerLabel = isCompiled ? "Compiled Metadata" : source.metadata.platform.toUpperCase();
@@ -214,8 +217,10 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
                                     value={value}
                                     attribution={attr}
                                     hasOverride={hasOverride}
-                                    editValue={editValue}
-                                    editError={editError}
+                                    // Only the editing row gets live edit state, so the other
+                                    // rows keep stable props and stay memo-bailed while typing.
+                                    editValue={isEditing ? editValue : ""}
+                                    editError={isEditing ? editError : false}
                                     onEditValueChange={setEditValue}
                                     onEditSubmit={handleEditSubmit}
                                 />

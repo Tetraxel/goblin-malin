@@ -10,7 +10,11 @@ interface MetadataGroupHeaderProps {
     isActive: boolean;
 }
 
-export const MetadataGroupHeader: React.FC<MetadataGroupHeaderProps> = ({ group, isSelected, isActive }) => {
+export const MetadataGroupHeader = React.memo(function MetadataGroupHeader({
+    group,
+    isSelected,
+    isActive,
+}: MetadataGroupHeaderProps) {
     const theme = useTheme();
     const display = providerDisplayRegistry.get(group.serviceKey);
     const focusColorBg = isActive
@@ -64,4 +68,4 @@ export const MetadataGroupHeader: React.FC<MetadataGroupHeaderProps> = ({ group,
             )}
         </Box>
     );
-};
+});

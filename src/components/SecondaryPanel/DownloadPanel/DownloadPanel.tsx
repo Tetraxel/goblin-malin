@@ -2,7 +2,7 @@
 import { Box } from "ink";
 import fs from "fs";
 import path from "path";
-import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
+import { useFocusActions, useFocusChrome, useFocusSecondaryPanel } from "#contexts/FocusContext";
 import { Task, TaskSnapshot } from "#base/task/task";
 import { StatusType } from "#base/task/task-status";
 import { useTheme } from "#base/themeContext";
@@ -27,7 +27,8 @@ interface DownloadPanelProps {
 export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, width, height }) => {
     const theme = useTheme();
     const { setSourcesInnerFocus } = useFocusActions();
-    const { activeWindow, secondaryPanel, isEditingField } = useFocusChrome();
+    const { activeWindow, isEditingField } = useFocusChrome();
+    const secondaryPanel = useFocusSecondaryPanel();
 
     const { sourcesPanel } = secondaryPanel;
     const { innerFocus } = sourcesPanel;

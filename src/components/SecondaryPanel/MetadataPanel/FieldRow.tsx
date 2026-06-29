@@ -44,7 +44,7 @@ export interface FieldRowProps {
     onEditSubmit: (value: string) => void;
 }
 
-export const FieldRow: React.FC<FieldRowProps> = ({
+export const FieldRow = React.memo(function FieldRow({
     field,
     isFocused,
     isCompiled,
@@ -56,7 +56,7 @@ export const FieldRow: React.FC<FieldRowProps> = ({
     editError,
     onEditValueChange,
     onEditSubmit,
-}) => {
+}: FieldRowProps) {
     const theme = useTheme();
     const badge = attributionBadge(attribution, theme);
 
@@ -104,4 +104,4 @@ export const FieldRow: React.FC<FieldRowProps> = ({
             )}
         </Box>
     );
-};
+});
