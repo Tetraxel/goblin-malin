@@ -1,10 +1,10 @@
 import { ToolbarButtonHook } from "#components/Toolbar/Toolbar";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusActions } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 
 export const useSessionsButton: ToolbarButtonHook = () => {
     const theme = useTheme();
-    const { switchWindow } = useFocusContext();
+    const { switchWindow } = useFocusActions();
     return {
         label: "Sessions",
         icon: "◈",

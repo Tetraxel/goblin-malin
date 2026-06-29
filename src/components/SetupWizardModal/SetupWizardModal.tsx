@@ -7,7 +7,7 @@ import { PromptType, SetupWizardPrompt } from "#base/task/task-prompt";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { SetupWizardConfig, WizardContentBlock } from "#base/setupWizard";
 import { useTheme } from "#base/themeContext";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { openUrl } from "#utils/openUrl";
 import { removeEnvVars, saveEnvVar, saveEnvVarsGroup } from "#utils/envFile";
 import { useActiveWizardPrompt } from "./useActiveWizardPrompt";
@@ -72,13 +72,14 @@ interface SetupWizardModalProps {
 
 export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, terminalHeight, terminalWidth }) => {
     const theme = useTheme();
-    const { focusState, switchWindow, switchBack } = useFocusContext();
+    const { switchWindow, switchBack } = useFocusActions();
+    const { activeWindow, wizardConfig, wizardOnDisable } = useFocusChrome();
     const { task: wizardTask, prompt: wizardPrompt, config: autoConfig } = useActiveWizardPrompt(tasks);
 
-    const settingsConfig = focusState.activeWindow === "setupWizardModal" ? focusState.wizardConfig : null;
+    const settingsConfig = activeWindow === "setupWizardModal" ? wizardConfig : null;
     const config: SetupWizardConfig | null = autoConfig ?? settingsConfig;
 
-    const isActive = focusState.activeWindow === "setupWizardModal";
+    const isActive = activeWindow === "setupWizardModal";
 
     useEffect(() => {
         if (autoConfig) {
@@ -186,9 +187,9 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
     }, [wizardTask, wizardPrompt, switchBack]);
 
     const handleDisable = useCallback(() => {
-        focusState.wizardOnDisable?.();
+        wizardOnDisable?.();
         switchBack();
-    }, [focusState, switchBack]);
+    }, [wizardOnDisable, switchBack]);
 
     useShortcuts({
         id: "setupWizardModal",

@@ -1,5 +1,5 @@
 import React from "react";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useToolbarShortcuts, useTaskListShortcuts, usePromptShortcuts } from "#hooks/useKeyHandlers";
 import { FlowBase } from "#base/flow/flow-base";
@@ -14,25 +14,26 @@ export const InputRouter: React.FC<{
     tasks: Task[];
     flow: FlowBase | undefined;
 }> = ({ tasks, flow }) => {
-    const { focusState, handleTabPress, switchMode, setPrimaryMode, setSecondaryTab } = useFocusContext();
+    const { handleTabPress, switchMode, setPrimaryMode, setSecondaryTab } = useFocusActions();
+    const { activeWindow, secondaryPanel, isEditingField } = useFocusChrome();
     const { openImportFlow } = useImportActions();
 
     const isMainScreen =
-        focusState.activeWindow !== "importModal" &&
-        focusState.activeWindow !== "settingsModal" &&
-        focusState.activeWindow !== "setupWizardModal" &&
-        focusState.activeWindow !== "welcomeModal" &&
-        focusState.activeWindow !== "updateModal";
+        activeWindow !== "importModal" &&
+        activeWindow !== "settingsModal" &&
+        activeWindow !== "setupWizardModal" &&
+        activeWindow !== "welcomeModal" &&
+        activeWindow !== "updateModal";
 
     const isDetailFocused =
-        focusState.activeWindow === "secondaryPanel" &&
-        focusState.secondaryPanel.subTab !== "logs" &&
-        focusState.secondaryPanel.sourcesPanel.innerFocus === "detail";
+        activeWindow === "secondaryPanel" &&
+        secondaryPanel.subTab !== "logs" &&
+        secondaryPanel.sourcesPanel.innerFocus === "detail";
 
     // Global shortcuts — active on the main screen, not while editing a field.
     useShortcuts({
         id: "global",
-        isActive: isMainScreen && !focusState.isEditingField,
+        isActive: isMainScreen && !isEditingField,
         priority: 50,
         shortcuts: [
             {

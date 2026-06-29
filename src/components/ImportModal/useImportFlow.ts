@@ -1,18 +1,18 @@
 ﻿import { useState, useCallback } from "react";
 import { PendingImport } from "./ImportModal";
 import { FlowBase } from "#base/flow/flow-base";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusChrome } from "#contexts/FocusContext";
 import { globalLogger } from "#base/logger/logger";
 import { readClipboard } from "./clipboard";
 import { detectUrls } from "./detectUrls";
 
 export function useImportFlow(currentFlow: FlowBase | undefined) {
-    const { focusState } = useFocusContext();
+    const { activeWindow } = useFocusChrome();
     const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
 
     const openImportFlow = useCallback(
         (text?: string) => {
-            if (focusState.activeWindow === "prompt") return;
+            if (activeWindow === "prompt") return;
 
             const handle = (raw: string) => {
                 const urls = detectUrls(raw);
@@ -40,7 +40,7 @@ export function useImportFlow(currentFlow: FlowBase | undefined) {
                 .then(handle)
                 .catch((err) => globalLogger.error("Clipboard read failed", { err }));
         },
-        [focusState.activeWindow]
+        [activeWindow]
     );
 
     const handleImportConfirm = useCallback(

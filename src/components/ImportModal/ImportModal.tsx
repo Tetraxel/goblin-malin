@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
 import { useShortcuts } from "#hooks/useShortcuts";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { DetectedUrl, SupportedPlatform } from "./detectUrls";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
@@ -55,7 +55,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     onCancel,
 }) => {
     const theme = useTheme();
-    const { focusState, switchWindow, switchBack } = useFocusContext();
+    const { switchWindow, switchBack } = useFocusActions();
+    const { activeWindow } = useFocusChrome();
     const [selectedIndex, setSelectedIndex] = useState<number>(0);
     const [prevPendingImport, setPrevPendingImport] = useState(pendingImport);
     if (prevPendingImport !== pendingImport) {
@@ -72,7 +73,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
         };
     }, [pendingImport, switchBack, switchWindow]);
 
-    const isActive = pendingImport !== null && focusState.activeWindow === "importModal";
+    const isActive = pendingImport !== null && activeWindow === "importModal";
 
     useShortcuts({
         id: "importModal",

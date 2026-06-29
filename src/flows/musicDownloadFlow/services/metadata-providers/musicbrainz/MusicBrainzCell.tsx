@@ -3,7 +3,10 @@ import { Text } from "ink";
 import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
-export const MusicBrainzCell = React.memo(function MusicBrainzCell({ task, isSelected }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
+export const MusicBrainzCell = React.memo(function MusicBrainzCell({
+    task,
+    isSelected,
+}: ColumnComponentProps<MusicDownloadTaskAttributes>) {
     const attrs = task.attributes;
     const anchor = attrs?.discoveryAnchors?.["musicBrainz"];
 

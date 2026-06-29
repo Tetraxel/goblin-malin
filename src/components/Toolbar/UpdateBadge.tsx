@@ -1,7 +1,7 @@
 import React, { useLayoutEffect } from "react";
 import { Box, Text } from "ink";
 import { useTheme } from "#base/themeContext";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusActions } from "#contexts/FocusContext";
 import { useToolbarActionsRef } from "#contexts/ToolbarActionsContext";
 
 export const UpdateBadge: React.FC<{ version: string; isSelected: boolean; index: number }> = ({
@@ -10,7 +10,7 @@ export const UpdateBadge: React.FC<{ version: string; isSelected: boolean; index
     index,
 }) => {
     const theme = useTheme();
-    const { openUpdateModal } = useFocusContext();
+    const { openUpdateModal } = useFocusActions();
     const actionsRef = useToolbarActionsRef();
 
     useLayoutEffect(() => {

@@ -5,7 +5,7 @@ import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
 import { Task } from "#base/task/task";
 import { StatusType } from "#base/task/task-status";
 import { useTheme } from "#base/themeContext";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusTaskList } from "#contexts/FocusContext";
 
 export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({
     flow,
@@ -16,8 +16,8 @@ export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({
     orchestrator: FlowOrchestrator;
 }) => {
     const theme = useTheme();
-    const { focusState } = useFocusContext();
-    const selectedIds = focusState.taskList.selectedTaskIds;
+    const taskList = useFocusTaskList();
+    const selectedIds = taskList.selectedTaskIds;
 
     const [runnableTasks, setRunnableTasks] = useState<Task[]>([]);
     const [batchCount, setBatchCount] = useState(0);

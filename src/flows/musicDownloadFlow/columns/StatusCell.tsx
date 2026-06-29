@@ -66,7 +66,10 @@ const getStatusText = (status: StatusAttributes): string => {
     return statusMessage;
 };
 
-export const StatusCell = React.memo(function StatusCell({ task, isSelected }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
+export const StatusCell = React.memo(function StatusCell({
+    task,
+    isSelected,
+}: ColumnComponentProps<MusicDownloadTaskAttributes>) {
     const theme = useTheme();
     const statusColor = getStatusColor(task.status.type, theme);
     const statusText = getStatusText(task.status);

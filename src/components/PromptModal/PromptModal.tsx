@@ -5,7 +5,7 @@ import SelectInput from "ink-select-input";
 import { Task } from "#base/task/task";
 import { PromptType } from "#base/task/task-prompt";
 import { useActivePrompt } from "./useActivePrompt";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusActions } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { Hint } from "../Hint";
 
@@ -17,7 +17,7 @@ interface PromptModalProps {
 
 export const PromptModal: React.FC<PromptModalProps> = ({ tasks, terminalHeight, terminalWidth }) => {
     const theme = useTheme();
-    const { switchWindow, switchBack } = useFocusContext();
+    const { switchWindow, switchBack } = useFocusActions();
     const [inputValue, setInputValue] = useState("");
     const { task, prompt } = useActivePrompt(tasks);
     const currentPrompt = prompt?.getCurrentPrompt();

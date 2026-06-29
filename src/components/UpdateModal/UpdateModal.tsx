@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import { spawn, exec } from "child_process";
 import open from "open";
 import { useShortcuts } from "#hooks/useShortcuts";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { Hint } from "../Hint";
 import { APP_VERSION } from "#constants";
@@ -29,8 +29,9 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
 }) => {
     const updateCommand = getUpdateCommand(latestVersion);
     const theme = useTheme();
-    const { focusState, switchBack } = useFocusContext();
-    const isActive = focusState.activeWindow === "updateModal";
+    const { switchBack } = useFocusActions();
+    const { activeWindow } = useFocusChrome();
+    const isActive = activeWindow === "updateModal";
     const mountedRef = useRef(true);
 
     useEffect(() => {

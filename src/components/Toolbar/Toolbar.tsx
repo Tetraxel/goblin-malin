@@ -4,7 +4,7 @@ import stringWidth from "string-width";
 import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
 import { FlowBase } from "#base/flow/flow-base";
 import { useTheme } from "#base/themeContext";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusChrome } from "#contexts/FocusContext";
 import { ToolbarButtonInvoker } from "./ToolbarButtonInvoker";
 import { FlowSelector } from "./FlowSelector";
 import { Separator } from "../Separator";
@@ -51,9 +51,9 @@ export const Toolbar = ({
     updateInfo?: UpdateInfo | null;
 }) => {
     const theme = useTheme();
-    const { focusState } = useFocusContext();
-    const isActive = focusState.activeWindow === "toolbar";
-    const height = focusState.toolbar.height;
+    const { activeWindow, toolbar } = useFocusChrome();
+    const isActive = activeWindow === "toolbar";
+    const height = toolbar.height;
     const currentSessionName = useCurrentSessionName();
 
     const isScreenSmall = width < 100;
@@ -96,7 +96,7 @@ export const Toolbar = ({
 
                 <Box height={height} marginRight={1} flexGrow={1} flexShrink={0}>
                     {buttons.map((hook, index) => {
-                        const isSelected = isActive && focusState.toolbar.selectedButtonIndex === index;
+                        const isSelected = isActive && toolbar.selectedButtonIndex === index;
 
                         return (
                             <ToolbarButtonInvoker
@@ -131,7 +131,7 @@ export const Toolbar = ({
                     {updateInfo ? (
                         <UpdateBadge
                             version={updateInfo.latestVersion}
-                            isSelected={isActive && focusState.toolbar.selectedButtonIndex === buttons.length}
+                            isSelected={isActive && toolbar.selectedButtonIndex === buttons.length}
                             index={buttons.length}
                         />
                     ) : (
@@ -145,8 +145,8 @@ export const Toolbar = ({
 };
 
 const PrimaryModeTabBar: React.FC<{ width: number; splitPos: number }> = ({ width, splitPos }) => {
-    const { focusState } = useFocusContext();
-    const { primaryMode } = focusState.secondaryPanel;
+    const { secondaryPanel } = useFocusChrome();
+    const { primaryMode } = secondaryPanel;
 
     return (
         <TabBar

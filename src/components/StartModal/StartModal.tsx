@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
 import { useShortcuts } from "#hooks/useShortcuts";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { StartOptionsRequest } from "#types/actions";
 import { Hint } from "../Hint";
@@ -33,7 +33,8 @@ export const StartModal: React.FC<StartModalProps> = ({
     onCancel,
 }) => {
     const theme = useTheme();
-    const { focusState, switchWindow, switchBack } = useFocusContext();
+    const { switchWindow, switchBack } = useFocusActions();
+    const { activeWindow } = useFocusChrome();
     const [selectedIndex, setSelectedIndex] = useState<number>(0);
     const [prevPendingStart, setPrevPendingStart] = useState(pendingStart);
     if (prevPendingStart !== pendingStart) {
@@ -50,7 +51,7 @@ export const StartModal: React.FC<StartModalProps> = ({
         };
     }, [pendingStart, switchBack, switchWindow]);
 
-    const isActive = pendingStart !== null && focusState.activeWindow === "startModal";
+    const isActive = pendingStart !== null && activeWindow === "startModal";
 
     useShortcuts({
         id: "startModal",

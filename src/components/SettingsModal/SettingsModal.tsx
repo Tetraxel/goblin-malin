@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { FlowBase } from "#base/flow/flow-base";
 import { useTheme } from "#base/themeContext";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { SettingsStore } from "#settings/settingsStore";
 import { AppSettings } from "#settings/appSettings";
 import { buildGlobalSettingsItems } from "#settings/buildGlobalSettingsItems";
@@ -36,9 +36,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     openConfirmModal,
 }) => {
     const theme = useTheme();
-    const { focusState, switchBack, openWizard } = useFocusContext();
-    const isActive = focusState.activeWindow === "settingsModal";
-    const isVisible = isActive || focusState.previousWindow === "settingsModal";
+    const { switchBack, openWizard } = useFocusActions();
+    const { activeWindow, previousWindow, returningFromWindow } = useFocusChrome();
+    const isActive = activeWindow === "settingsModal";
+    const isVisible = isActive || previousWindow === "settingsModal";
 
     const [appDraft, setAppDraft] = useState<AppSettings>(() => SettingsStore.getInstance().getAppSettings());
     const [flowPatch, setFlowPatch] = useState<Record<string, unknown>>({});
@@ -98,7 +99,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             ) ?? [];
         return [...globalItems, ...flowItems];
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [appDraft, flowPatch, currentFlow, focusState.returningFromWindow]);
+    }, [appDraft, flowPatch, currentFlow, returningFromWindow]);
 
     const filteredItems = useMemo(() => filterSettingsItems(allItems, searchQuery), [allItems, searchQuery]);
     const safeSelectedIndex = Math.min(selectedIndex, Math.max(0, filteredItems.length - 1));

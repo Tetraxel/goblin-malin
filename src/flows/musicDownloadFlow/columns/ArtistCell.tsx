@@ -4,7 +4,10 @@ import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import { computeCompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 
-export const ArtistCell = React.memo(function ArtistCell({ task, isSelected }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
+export const ArtistCell = React.memo(function ArtistCell({
+    task,
+    isSelected,
+}: ColumnComponentProps<MusicDownloadTaskAttributes>) {
     const groups = task.attributes?.metadataGroups ?? [];
     const overrides = task.attributes?.metadataOverride ?? {};
     const compiled = computeCompiledMetadata(groups, overrides);

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
 import { useShortcuts } from "#hooks/useShortcuts";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { ConfirmModalConfig } from "./useConfirmModal";
 import { Hint } from "../Hint";
@@ -22,7 +22,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
     onCancel,
 }) => {
     const theme = useTheme();
-    const { focusState, switchWindow, switchBack } = useFocusContext();
+    const { switchWindow, switchBack } = useFocusActions();
+    const { activeWindow } = useFocusChrome();
     const [choiceIndex, setChoiceIndex] = useState(0);
 
     const [prevConfig, setPrevConfig] = useState(pendingConfig);
@@ -40,7 +41,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
     }, [pendingConfig, switchWindow, switchBack]);
 
     const choiceCount = pendingConfig?.choices.length ?? 1;
-    const isActive = pendingConfig !== null && focusState.activeWindow === "confirmModal";
+    const isActive = pendingConfig !== null && activeWindow === "confirmModal";
 
     useShortcuts({
         id: "confirmModal",

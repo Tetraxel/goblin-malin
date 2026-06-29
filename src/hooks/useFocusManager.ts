@@ -393,12 +393,21 @@ export const useFocusManager = ({
         }));
     }, []);
 
-    const derivedFocusState: FocusState = {
-        ...focusState,
-        layout,
-        taskList: { ...focusState.taskList, width: terminalWidth },
-        logPanel: { ...focusState.logPanel, width: terminalWidth },
-    };
+    // Memoize the width-derived slices so their identity is stable across renders
+    // that don't touch them. This is what lets the split FocusContext slices
+    // (see FocusContext.tsx) avoid re-rendering chrome consumers on task scroll.
+    const taskListSlice = useMemo(
+        () => ({ ...focusState.taskList, width: terminalWidth }),
+        [focusState.taskList, terminalWidth]
+    );
+    const logPanelSlice = useMemo(
+        () => ({ ...focusState.logPanel, width: terminalWidth }),
+        [focusState.logPanel, terminalWidth]
+    );
+    const derivedFocusState: FocusState = useMemo(
+        () => ({ ...focusState, layout, taskList: taskListSlice, logPanel: logPanelSlice }),
+        [focusState, layout, taskListSlice, logPanelSlice]
+    );
 
     return {
         focusState: derivedFocusState,

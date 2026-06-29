@@ -1,4 +1,4 @@
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusActions, useFocusChrome, useFocusTaskList } from "#contexts/FocusContext";
 import { useToolbarActionsRef } from "#contexts/ToolbarActionsContext";
 import { FlowBase } from "#base/flow/flow-base";
 import { Task } from "#base/task/task";
@@ -11,9 +11,10 @@ import { globalLogger } from "#base/logger/logger";
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 
 export function useToolbarShortcuts(): void {
-    const { focusState, moveToolbarSelection } = useFocusContext();
+    const { moveToolbarSelection } = useFocusActions();
+    const { activeWindow, toolbar } = useFocusChrome();
     const actionsRef = useToolbarActionsRef();
-    const isActive = focusState.activeWindow === "toolbar";
+    const isActive = activeWindow === "toolbar";
 
     useShortcuts({
         id: "toolbar",
@@ -42,7 +43,7 @@ export function useToolbarShortcuts(): void {
                 id: "toolbar.enter",
                 defaultShortcut: { key: "return" },
                 label: "Activate",
-                handler: () => actionsRef.current[focusState.toolbar.selectedButtonIndex]?.(),
+                handler: () => actionsRef.current[toolbar.selectedButtonIndex]?.(),
             },
         ],
     });
@@ -51,12 +52,13 @@ export function useToolbarShortcuts(): void {
 // ── Task list ─────────────────────────────────────────────────────────────────
 
 export function useTaskListShortcuts(tasks: Task[], flow: FlowBase | undefined): void {
-    const { focusState, moveTaskSelection, resizePanels, toggleTaskSelection, selectAllTasks, clearSelection } =
-        useFocusContext();
-    const isActive = focusState.activeWindow === "taskList";
+    const { moveTaskSelection, resizePanels, toggleTaskSelection, selectAllTasks, clearSelection } = useFocusActions();
+    const { activeWindow } = useFocusChrome();
+    const taskList = useFocusTaskList();
+    const isActive = activeWindow === "taskList";
 
-    const selectedTask = tasks[focusState.taskList.selectedTaskIndex];
-    const multiCount = focusState.taskList.selectedTaskIds.size;
+    const selectedTask = tasks[taskList.selectedTaskIndex];
+    const multiCount = taskList.selectedTaskIds.size;
 
     // Derive contextual action shortcuts from the flow's action bar for the current task/column.
     // Computed inline (no memo) so the action bar is always fresh — task internal state (status,
@@ -64,7 +66,7 @@ export function useTaskListShortcuts(tasks: Task[], flow: FlowBase | undefined):
     const contextualShortcuts: ShortcutDef[] = (() => {
         if (!flow || !selectedTask) return [];
         const bar = flow.getContextualActionBar(selectedTask, {
-            columnIndex: focusState.taskList.selectedColumnIndex,
+            columnIndex: taskList.selectedColumnIndex,
         });
         if (!bar) return [];
 
@@ -80,9 +82,7 @@ export function useTaskListShortcuts(tasks: Task[], flow: FlowBase | undefined):
                     handler: () => {
                         try {
                             if (multiCount > 1 && action.multiSelectAllowed && action.onClickBatch) {
-                                const selected = tasks.filter((t) =>
-                                    focusState.taskList.selectedTaskIds.has(t.getId())
-                                );
+                                const selected = tasks.filter((t) => taskList.selectedTaskIds.has(t.getId()));
                                 action.onClickBatch(selected);
                             } else if (
                                 !(multiCount > 1 && !action.multiSelectAllowed) &&
@@ -158,7 +158,7 @@ export function useTaskListShortcuts(tasks: Task[], flow: FlowBase | undefined):
                 defaultShortcut: { input: " " },
                 label: "Multi-select",
                 handler: () => {
-                    const task = tasks[focusState.taskList.selectedTaskIndex];
+                    const task = tasks[taskList.selectedTaskIndex];
                     if (task) toggleTaskSelection(task.getId());
                 },
             },
@@ -174,8 +174,9 @@ export function useTaskHeaderShortcuts(
     columnLabel: string,
     onResize: (direction: "left" | "right") => void
 ): void {
-    const { focusState } = useFocusContext();
-    const isActive = focusState.activeWindow === "taskList" && focusState.taskList.isHeaderFocused && isColumnResizable;
+    const { activeWindow } = useFocusChrome();
+    const taskList = useFocusTaskList();
+    const isActive = activeWindow === "taskList" && taskList.isHeaderFocused && isColumnResizable;
 
     useShortcuts({
         id: "taskListHeader",
@@ -209,8 +210,8 @@ export function useTaskHeaderShortcuts(
 
 export function usePromptShortcuts(tasks: Task[]): void {
     const { task, prompt } = useActivePrompt(tasks);
-    const { focusState } = useFocusContext();
-    const isActive = focusState.activeWindow === "prompt";
+    const { activeWindow } = useFocusChrome();
+    const isActive = activeWindow === "prompt";
 
     useShortcuts({
         id: "prompt",

@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import { useShortcuts } from "#hooks/useShortcuts";
 import Gradient from "ink-gradient";
 import BigText from "ink-big-text";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { SettingsStore } from "#settings/settingsStore";
 import { useTheme } from "#base/themeContext";
 import { Hint } from "../Hint";
@@ -31,8 +31,9 @@ interface WelcomeModalProps {
 
 export const WelcomeModal: React.FC<WelcomeModalProps> = ({ terminalHeight, terminalWidth }) => {
     const theme = useTheme();
-    const { focusState, switchWindow, switchBack } = useFocusContext();
-    const isActive = focusState.activeWindow === "welcomeModal";
+    const { switchWindow, switchBack } = useFocusActions();
+    const { activeWindow } = useFocusChrome();
+    const isActive = activeWindow === "welcomeModal";
     const [dontShowAgain, setDontShowAgain] = useState(false);
 
     useEffect(() => {

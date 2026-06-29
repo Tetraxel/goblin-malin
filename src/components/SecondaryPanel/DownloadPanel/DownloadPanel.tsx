@@ -2,7 +2,7 @@
 import { Box } from "ink";
 import fs from "fs";
 import path from "path";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { Task, TaskSnapshot } from "#base/task/task";
 import { StatusType } from "#base/task/task-status";
 import { useTheme } from "#base/themeContext";
@@ -26,14 +26,14 @@ interface DownloadPanelProps {
 
 export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, width, height }) => {
     const theme = useTheme();
-    const { focusState, setSourcesInnerFocus } = useFocusContext();
+    const { setSourcesInnerFocus } = useFocusActions();
+    const { activeWindow, secondaryPanel, isEditingField } = useFocusChrome();
 
-    const { sourcesPanel } = focusState.secondaryPanel;
+    const { sourcesPanel } = secondaryPanel;
     const { innerFocus } = sourcesPanel;
     const [selectedSourceIndex, setSelectedSourceIndex] = useState(0);
 
-    const isPanelActive =
-        focusState.activeWindow === "secondaryPanel" && focusState.secondaryPanel.subTab === "downloadSources";
+    const isPanelActive = activeWindow === "secondaryPanel" && secondaryPanel.subTab === "downloadSources";
 
     const typedTask = selectedTask as Task<MusicDownloadTaskAttributes> | null;
 
@@ -95,7 +95,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
 
     useShortcuts({
         id: "downloadPanel",
-        isActive: isPanelActive && innerFocus === "list" && !focusState.isEditingField,
+        isActive: isPanelActive && innerFocus === "list" && !isEditingField,
         priority: 100,
         shortcuts: [
             {

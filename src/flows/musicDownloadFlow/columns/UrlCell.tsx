@@ -5,7 +5,10 @@ import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import { Uri } from "#components/SecondaryPanel/MetadataPanel/Uri";
 import { formatTrackUri } from "#flows/musicDownloadFlow/utils/trackUri";
 
-export const UrlCell = React.memo(function UrlCell({ task, isSelected }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
+export const UrlCell = React.memo(function UrlCell({
+    task,
+    isSelected,
+}: ColumnComponentProps<MusicDownloadTaskAttributes>) {
     const primaryResult = task.attributes?.metadataGroups
         .flatMap((g) => g.results)
         .find((r) => r.isPrimaryInput && (r.metadata.url || r.metadata.uri));

@@ -3,7 +3,10 @@ import { Text } from "ink";
 import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
-export const YoutubeCell = React.memo(function YoutubeCell({ task, isSelected }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
+export const YoutubeCell = React.memo(function YoutubeCell({
+    task,
+    isSelected,
+}: ColumnComponentProps<MusicDownloadTaskAttributes>) {
     const group = task.attributes?.metadataGroups.find((g) => g.serviceKey === "youtube");
     const metadata = group?.results.find((r) => !r.isRejected)?.metadata;
     const fullUri = metadata?.uri;

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Box, Text } from "ink";
 import TextInput from "ink-text-input";
 import { useShortcuts } from "#hooks/useShortcuts";
-import { useFocusContext } from "#contexts/FocusContext";
+import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { FlowBase } from "#base/flow/flow-base";
 import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
@@ -35,9 +35,10 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
     openConfirmModal,
 }) => {
     const theme = useTheme();
-    const { focusState, switchBack, clearSelection } = useFocusContext();
-    const isActive = focusState.activeWindow === "sessionsModal";
-    const isVisible = isActive || focusState.previousWindow === "sessionsModal";
+    const { switchBack, clearSelection } = useFocusActions();
+    const { activeWindow, previousWindow } = useFocusChrome();
+    const isActive = activeWindow === "sessionsModal";
+    const isVisible = isActive || previousWindow === "sessionsModal";
 
     const [searchQuery, setSearchQuery] = useState("");
     const [modalFocus, setModalFocus] = useState<"search" | "list">("search");
