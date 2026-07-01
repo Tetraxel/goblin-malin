@@ -155,6 +155,21 @@ export const useFocusManager = ({
         isEditingField: false,
     }));
 
+    // Keep the selected column in range when the column set shrinks (e.g. switching
+    // Metadata→Download view drops the metadata/discovery columns). Without this the
+    // index points past the new set — no column is highlighted, and consumers that
+    // look it up (the contextual action bar) would read an undefined column. Adjust
+    // during render (React's "derive state on prop change" pattern) so it's corrected
+    // before paint, with no missing-highlight flash.
+    const [prevColumnCount, setPrevColumnCount] = useState(taskColumnCount);
+    if (prevColumnCount !== taskColumnCount) {
+        setPrevColumnCount(taskColumnCount);
+        const maxCol = taskColumnCount - 1;
+        if (taskColumnCount > 0 && focusState.taskList.selectedColumnIndex > maxCol) {
+            setFocusState((prev) => ({ ...prev, taskList: { ...prev.taskList, selectedColumnIndex: maxCol } }));
+        }
+    }
+
     const switchWindow = useCallback((window: FocusableWindow) => {
         setFocusState((prev) => ({
             ...prev,

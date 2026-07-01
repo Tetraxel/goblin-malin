@@ -395,11 +395,14 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         }
 
         // ── Column row (top) ──────────────────────────────────────────────────
+        // `column` can be undefined when the selected column index is stale — e.g.
+        // right after switching Metadata→Download view, the new (shorter) column set
+        // doesn't have that index yet. Degrade to an empty column row in that case.
         const columnActions: ContextualActions[] = [];
-        let columnLabel = column.label;
-        let columnColor = column.color;
+        let columnLabel = column?.label ?? "";
+        let columnColor = column?.color;
 
-        if (column.id === "toTag") {
+        if (column?.id === "toTag") {
             columnActions.push({
                 shortcuts: [{ key: "return" }],
                 label: "Toggle tagging",
@@ -412,7 +415,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             });
         }
 
-        if (column.id === "toDownload") {
+        if (column?.id === "toDownload") {
             columnActions.push({
                 shortcuts: [{ key: "return" }],
                 label: "Toggle downloading",
@@ -425,7 +428,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             });
         }
 
-        if (column.id === "url") {
+        if (column?.id === "url") {
             const primaryGroup = attrs?.metadataGroups.find((g) =>
                 g.results.some((r) => r.isPrimaryInput && (r.metadata.url || r.metadata.uri))
             );
@@ -441,7 +444,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             }
         }
 
-        if (column.id === "artist") {
+        if (column?.id === "artist") {
             const primary = attrs?.metadataGroups.flatMap((g) => g.results).find((r) => r.isPrimaryInput);
             columnActions.push({
                 shortcuts: [{ input: "c", ctrl: true }],
@@ -450,7 +453,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             });
         }
 
-        if (column.id === "track") {
+        if (column?.id === "track") {
             const primary = attrs?.metadataGroups.flatMap((g) => g.results).find((r) => r.isPrimaryInput);
             columnActions.push({
                 shortcuts: [{ input: "c", ctrl: true }],
@@ -459,7 +462,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             });
         }
 
-        if (column.id.startsWith("metadataService-")) {
+        if (column && column.id.startsWith("metadataService-")) {
             const serviceKey = column.id.replace("metadataService-", "");
             const display = providerDisplayRegistry.get(serviceKey);
             columnLabel = display.label;
@@ -467,7 +470,7 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
             columnActions.push(...this.buildMetadataServiceColumnActions(serviceKey, attrs, task));
         }
 
-        if (column.id.startsWith("discoveryService-")) {
+        if (column && column.id.startsWith("discoveryService-")) {
             const serviceKey = column.id.replace("discoveryService-", "");
             const display = providerDisplayRegistry.get(serviceKey);
             columnLabel = display.label;

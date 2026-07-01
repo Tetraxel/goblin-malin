@@ -167,6 +167,33 @@ class ShortcutRegistryClass {
         }
     }
 
+    /**
+     * Dispatch a function key (F1–F12) through active contexts.
+     * Called by ShortcutDispatcher's raw stdin listener because Ink zeroes `input`
+     * for function keys before delivering it to useInput handlers.
+     */
+    dispatchFuncKey(funcKeyNum: number): void {
+        if (this.rebindCallback) return;
+
+        const sorted = [...this.contexts.values()]
+            .filter((ctx) => ctx.isActive)
+            .sort((a, b) => b.priority - a.priority);
+
+        for (const ctx of sorted) {
+            for (const entry of ctx.shortcuts) {
+                if (entry.shortcut.funcKey === funcKeyNum) {
+                    try {
+                        void entry.handler();
+                    } catch (err) {
+                        console.error(`[shortcuts] unhandled error in ${ctx.contextId}.${entry.id}:`, err);
+                    }
+                    return;
+                }
+            }
+            if (ctx.exclusive) return;
+        }
+    }
+
     unregister(contextId: string): void {
         if (this.contexts.has(contextId)) {
             this.contexts.delete(contextId);

@@ -5,9 +5,28 @@ import { Task } from "#base/task/task";
 export type Shortcut = {
     key?: keyof Key;
     input?: string;
+    /** F1=1 … F12=12. Matches terminal-specific escape sequences automatically. */
+    funcKey?: number;
     ctrl?: boolean;
     shift?: boolean;
     meta?: boolean;
+};
+
+// xterm (VT100) sequences used by Windows Terminal, macOS Terminal, etc.
+// Linux console sends \x1b[11~–\x1b[14~for F1–F4 instead of the \x1bO* forms.
+const FUNC_KEY_SEQUENCES: Record<number, string[]> = {
+    1: ["\x1bOP", "\x1b[11~"],
+    2: ["\x1bOQ", "\x1b[12~"],
+    3: ["\x1bOR", "\x1b[13~"],
+    4: ["\x1bOS", "\x1b[14~"],
+    5: ["\x1b[15~"],
+    6: ["\x1b[17~"],
+    7: ["\x1b[18~"],
+    8: ["\x1b[19~"],
+    9: ["\x1b[20~"],
+    10: ["\x1b[21~"],
+    11: ["\x1b[23~"],
+    12: ["\x1b[24~"],
 };
 
 export type ContextualActions = {
@@ -79,12 +98,25 @@ export function getShortcutLiteral(shortcuts: Shortcut[]): string {
             if (shortcut.ctrl) modifiers.push("Ctrl");
             if (shortcut.shift) modifiers.push("Shift");
             if (shortcut.meta) modifiers.push("Meta");
+            const funcKeyName = shortcut.funcKey !== undefined ? `F${shortcut.funcKey}` : "";
             const keyName = shortcut.key ? (KEY_LABELS[shortcut.key] ?? shortcut.key.toUpperCase()) : "";
             const inputName = shortcut.input ? (shortcut.input === " " ? "Space" : shortcut.input.toUpperCase()) : "";
-            const base = keyName || inputName || "";
+            const base = funcKeyName || keyName || inputName || "";
             return [...modifiers, base].filter(Boolean).join("+");
         })
         .join(" / ");
+}
+
+/**
+ * Returns the function key number (1-12) for a raw escape sequence, or undefined
+ * if the data isn't a function key. Used by ShortcutDispatcher's raw stdin listener
+ * because Ink zeroes `input` for function keys before passing it to useInput handlers.
+ */
+export function detectFuncKey(rawData: string): number | undefined {
+    for (const [numStr, seqs] of Object.entries(FUNC_KEY_SEQUENCES)) {
+        if (seqs.includes(rawData)) return Number(numStr);
+    }
+    return undefined;
 }
 
 export function matchesShortcut(shortcut: Shortcut, input: string, key: Key): boolean {

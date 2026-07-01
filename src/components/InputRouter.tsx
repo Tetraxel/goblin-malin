@@ -5,6 +5,7 @@ import { useToolbarShortcuts, useTaskListShortcuts, usePromptShortcuts } from "#
 import { FlowBase } from "#base/flow/flow-base";
 import { Task } from "#base/task/task";
 import { useImportActions } from "#contexts/ImportActionsContext";
+import { statsDisplay } from "#base/statsDisplay";
 
 /**
  * Registers all global and window-specific keyboard shortcuts with the
@@ -87,6 +88,12 @@ export const InputRouter: React.FC<{
                 defaultShortcut: { input: "5" },
                 label: "Logs tab",
                 handler: () => setSecondaryTab("logs"),
+            },
+            {
+                id: "global.toggleStats",
+                defaultShortcut: { funcKey: 3 },
+                label: "Toggle stats",
+                handler: () => statsDisplay.toggle(),
             },
         ],
     });

@@ -1,0 +1,19 @@
+{
+    "terminal": { "cols": 128, "rows": 50 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "steps": [
+        { "type": "stable", "timeout": 8000 },
+        { "type": "waitForContent", "text": "Hooked", "timeout": 5000 },
+
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowRight", "repeat": 6 },
+        { "type": "stable" },
+        { "type": "snapshot", "name": "metadata-high-column" },
+
+        { "type": "key", "key": "2" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "Hooked" },
+        { "type": "snapshot", "name": "after-switch-to-download" }
+    ]
+}

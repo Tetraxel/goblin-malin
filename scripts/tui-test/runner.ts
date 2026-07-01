@@ -1,5 +1,6 @@
 import * as pty from "node-pty";
 import fs from "node:fs";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
@@ -61,6 +62,7 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
             ? scenario.dataDir
             : path.resolve(ROOT, scenario.dataDir)
         : undefined;
+    const slowMode = !!(process.env["GOBLIN_SLOW"] ?? scenario.env?.["GOBLIN_SLOW"]);
     Object.assign(ptyEnv, scenario.env ?? {}, {
         TERM: "xterm-256color",
         FORCE_COLOR: "1",
@@ -81,6 +83,19 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
         cwd: ROOT,
         env: ptyEnv,
     });
+
+    // GOBLIN_SLOW: constrain the PTY process to simulate slow/low-end hardware.
+    // Sets idle CPU priority + single-core affinity. Both settings are inherited
+    // by child processes (cmd → yarn → node), so the whole app runs under constraint.
+    if (slowMode) {
+        try { os.setPriority(ptyProcess.pid, os.constants.priority.PRIORITY_LOW); } catch {}
+        if (process.platform === "win32") {
+            spawnSync("powershell.exe", [
+                "-NoProfile", "-NonInteractive", "-Command",
+                `(Get-Process -Id ${ptyProcess.pid}).ProcessorAffinity = 1`,
+            ]);
+        }
+    }
 
     ptyProcess.onData((data: string) => {
         lastDataTime = Date.now();

@@ -4,6 +4,9 @@ import process from "node:process";
 import { App } from "./components/App";
 import { FullScreenBox } from "./components/FullScreenBox";
 import { globalLogger } from "./base/logger/logger";
+import { detectFuncKey } from "./types/actions";
+import { shortcutRegistry } from "./base/shortcuts/ShortcutRegistry";
+import { fpsTracker } from "./base/fpsTracker";
 
 async function write(content: string) {
     return new Promise<void>((resolve, reject) => {
@@ -77,7 +80,27 @@ export function start(): void {
         maxFps: 60,
         exitOnCtrlC: false,
     };
-    if (profile) options.onRender = profile.onInkRender;
+    options.onRender = (info) => {
+        fpsTracker.recordFrame(info.renderTime);
+        if (profile) profile.onInkRender(info);
+    };
+
+    // Ink zeroes `input` for function keys (they're in nonAlphanumericKeys) before
+    // passing them to useInput handlers. We tap stdin with prependListener so our
+    // handler fires first: read the raw chunk, dispatch any F-key shortcut, then
+    // unshift the chunk back so Ink can read it normally as well.
+    let isHandlingFKey = false;
+    process.stdin.prependListener("readable", () => {
+        if (isHandlingFKey) return; // prevent re-entry after unshift re-emits readable
+        const chunk = process.stdin.read() as string | Buffer | null;
+        if (chunk === null) return;
+        isHandlingFKey = true;
+        const str = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+        const funcKey = detectFuncKey(str);
+        if (funcKey !== undefined) shortcutRegistry.dispatchFuncKey(funcKey);
+        process.stdin.unshift(chunk as Parameters<typeof process.stdin.unshift>[0]);
+        isHandlingFKey = false;
+    });
 
     const instance = render(tree, options);
 
