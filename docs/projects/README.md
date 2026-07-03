@@ -25,3 +25,4 @@ These are not task lists — each project is a self-contained scope of work. Ind
 | P17 — TUI Test Harness                           | [p17/tasks.md](p17/tasks.md) |
 | P18 — Component Render Profiling                 | [p18/tasks.md](p18/tasks.md) |
 | P19 — Scroll & Render Performance                | [p19/tasks.md](p19/tasks.md) |
+| P20 — Performance & Scalability Roadmap          | [p20/tasks.md](p20/tasks.md) |
