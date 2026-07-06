@@ -45,8 +45,8 @@
         "scripts/save-install-source.mjs"
     ],
     "scripts": {
-        "dev": "tsx src/cli.ts",
-        "start": "ts-node src/index.ts",
+        "dev": "cross-env NODE_ENV=development tsx src/cli.ts",
+        "start": "cross-env NODE_ENV=production tsx src/cli.ts",
         "build": "tsup",
         "type-check": "tsc --noEmit",
         "probe:songlink": "node scripts/songlink-rate-probe.mjs",
@@ -104,6 +104,7 @@
         "@types/react": "^19.2.14",
         "@xterm/headless": "^6.0.0",
         "@yao-pkg/pkg": "^6.20.0",
+        "cross-env": "^10.1.0",
         "eslint": "^9.39.4",
         "eslint-plugin-react": "^7.37.5",
         "eslint-plugin-react-hooks": "^7.1.1",

@@ -144,11 +144,19 @@ export class YtDlpService extends DownloadService {
 
                 // Use the builder API so we can kill the process on abort
                 const client = await this.getClient();
+                // yt-dlp emits a progress event per stdout line (many per second). The
+                // UI only ever shows whole-percent progress, so quantize to integer and
+                // ignore ticks that don't change it — that collapses status updates,
+                // attribute writes and debug logs from ~10/s to at most one per percent.
+                let lastPercent = -1;
                 const dl = client.download(trackUrl, downloadOptions).on("progress", (progress) => {
-                    this.status.update({ progress: progress.percentage });
-                    onUpdate?.({ ...pendingSource, progress: progress.percentage });
+                    const percent = Math.floor(progress.percentage ?? 0);
+                    if (percent === lastPercent) return;
+                    lastPercent = percent;
+                    this.status.update({ progress: percent });
+                    onUpdate?.({ ...pendingSource, progress: percent });
                     this.logger.debug(
-                        `Download progress: ${progress.percentage}% ${progress.speed_str} (ETA: ${progress.eta_str})`
+                        `Download progress: ${percent}% ${progress.speed_str} (ETA: ${progress.eta_str})`
                     );
                 });
 

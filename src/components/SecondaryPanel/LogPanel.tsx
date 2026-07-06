@@ -8,7 +8,35 @@ import { inkTransport } from "#base/logger/ink-transport";
 import { LogLevel, LogMetadata } from "#base/logger/types";
 import { Task } from "#base/task/task";
 import { useTheme } from "#base/themeContext";
-import { formatLogRows } from "./logFormat";
+import { formatLogRows, LogRow } from "./logFormat";
+
+// Mirror of the transport's ring-buffer bound so the panel's own copy of the log
+// list can't grow without limit either.
+const MAX_PANEL_LOGS = 2000;
+
+// Module-level cache of formatted rows, keyed by log id, for the single log panel.
+// Formatting (ANSI wrap / inspect) is the expensive part and is pure per (log,
+// width), so a new batch only reformats its own entries instead of the whole
+// history on every line. Cleared wholesale when the width changes or it outgrows
+// the ring buffer.
+const rowCache: { width: number; map: Map<string, LogRow[]> } = { width: 0, map: new Map() };
+
+function formatRowsCached(logs: LogMetadata[], width: number): LogRow[] {
+    if (rowCache.width !== width) {
+        rowCache.width = width;
+        rowCache.map.clear();
+    }
+    if (rowCache.map.size > MAX_PANEL_LOGS * 2) rowCache.map.clear();
+    return logs.flatMap((log) => {
+        if (!log.id) return formatLogRows(log, width);
+        let rows = rowCache.map.get(log.id);
+        if (!rows) {
+            rows = formatLogRows(log, width);
+            rowCache.map.set(log.id, rows);
+        }
+        return rows;
+    });
+}
 
 const LEVEL_ORDER: Record<LogLevel, number> = {
     [LogLevel.DEBUG]: 0,
@@ -49,7 +77,11 @@ export const LogPanel = ({
     useEffect(() => {
         const unsubscribe = inkTransport.subscribe((incomingLogs) => {
             const normalized = incomingLogs as LogMetadata[];
-            setLogs((prevLogs) => [...prevLogs, ...normalized]);
+            setLogs((prevLogs) => {
+                const next = prevLogs.length === 0 ? normalized.slice() : [...prevLogs, ...normalized];
+                // Keep the panel's copy bounded to the most recent entries.
+                return next.length > MAX_PANEL_LOGS ? next.slice(next.length - MAX_PANEL_LOGS) : next;
+            });
         });
         return unsubscribe;
     }, []);
@@ -72,10 +104,11 @@ export const LogPanel = ({
     );
 
     // Flatten each log into its visual rows (header + wrapped message + details).
-    const allRows = useMemo(
-        () => filteredLogs.flatMap((log) => formatLogRows(log, innerWidth)),
-        [filteredLogs, innerWidth]
-    );
+    // Formatting is pure per (log, width) and log ids are unique, so cache the rows
+    // by id: a new batch only reformats its own entries instead of the whole
+    // history every time a line arrives. (A cached row can lag a task-attribute
+    // change made after the log was first formatted — negligible for ephemeral logs.)
+    const allRows = useMemo(() => formatRowsCached(filteredLogs, innerWidth), [filteredLogs, innerWidth]);
 
     // Reset scroll when the row set changes meaningfully or the panel loses focus.
     const [prevSelectedTask, setPrevSelectedTask] = useState(selectedTask);

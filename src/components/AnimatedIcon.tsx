@@ -35,15 +35,17 @@ interface AnimatedIconProps {
 }
 
 export const AnimatedIcon: React.FC<AnimatedIconProps> = ({ icon, interval = 500, color }) => {
-    // Instead of a local setInterval, we ask the global ticker for the count
-    const globalTick = useGlobalTicker(interval);
+    // When animations are disabled we don't subscribe to the ticker at all, so a
+    // static icon costs zero re-renders (previously it still ticked and re-rendered
+    // to frame 0 every interval).
+    const animationsEnabled = SettingsStore.getInstance().getAppSettings().general.animationsEnabled;
+    const globalTick = useGlobalTicker(interval, animationsEnabled);
 
     const frames = ANIMATION_FRAMES[icon];
 
     if (!frames || frames.length === 0) return null;
 
     // Use modulo to cycle through frames based on the global infinite counter
-    const animationsEnabled = SettingsStore.getInstance().getAppSettings().general.animationsEnabled;
     const frameIndex = animationsEnabled ? globalTick % frames.length : 0;
     const currentFrame = frames[frameIndex];
 
