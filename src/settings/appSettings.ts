@@ -11,6 +11,18 @@ export type AppSettings = {
         showWelcomeTutorial: boolean;
         checkForUpdates: boolean;
         cacheEnabled: boolean;
+        /**
+         * Concurrency budgets. `maxParallelTasks` caps how many tasks the orchestrator
+         * runs at once; the per-stage caps shape what those tasks may do simultaneously
+         * — metadata fetches hit rate-limited APIs (keep low), downloads are IO-bound
+         * (can scale higher). Raising `maxParallelTasks` + `maxParallelDownloads`
+         * together is how download throughput scales without hammering metadata APIs.
+         */
+        concurrency: {
+            maxParallelTasks: number;
+            maxParallelMetadata: number;
+            maxParallelDownloads: number;
+        };
     };
     logs: {
         /** Minimum level shown in the log panel (file transport always keeps debug). */
@@ -31,6 +43,13 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
         showWelcomeTutorial: true,
         checkForUpdates: true,
         cacheEnabled: true,
+        concurrency: {
+            // Defaults are >= the previous hardcoded cap of 3 everywhere, so no run
+            // gets slower; raise these to scale parallelism up.
+            maxParallelTasks: 4,
+            maxParallelMetadata: 3,
+            maxParallelDownloads: 4,
+        },
     },
     logs: {
         logLevel: LogLevel.INFO,

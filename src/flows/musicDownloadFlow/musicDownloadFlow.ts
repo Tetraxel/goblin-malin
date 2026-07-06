@@ -34,6 +34,7 @@ import { MusicBrainzDiscoveryService } from "./services/metadata-providers/music
 import { YtDlpService } from "./services/download-providers/ytdlp/YtDlpService";
 import { DownloadTask } from "./utils/downloadTask";
 import { taskIdFromUrl } from "./utils/taskId";
+import { applyStageConcurrency } from "./utils/stageLimiters";
 import { resolveTrackRecognition } from "./utils/resolveTrackRecognition";
 import { reviveTaskDates } from "./utils/reviveTaskDates";
 import { MusicDownloadTaskAttributes } from "./types";
@@ -154,11 +155,23 @@ export class MusicDownloadFlow extends FlowBase<MusicDownloadTaskAttributes> {
         this.downloadServiceRegistry.register("ytdlp", YtDlpService);
         // this.downloadServiceRegistry.register('soulseek', SoulseekService);
 
-        SettingsStore.getInstance().onSettingsChanged(() => this.notifyTaskSubscribers());
+        this.applyConcurrencySettings();
+        SettingsStore.getInstance().onSettingsChanged(() => {
+            this.applyConcurrencySettings();
+            this.notifyTaskSubscribers();
+        });
 
         // const defaultTasks = this.createTasksFromUrls([DEFAULT_TEST_URL], { toTag: true, toDownload: true });
         // this.orchestrator.addTasks(defaultTasks);
         // this.logger.info(`Imported default test URL: ${DEFAULT_TEST_URL}`);
+    }
+
+    /** Push the user's concurrency budgets into the orchestrator + stage limiters. */
+    private applyConcurrencySettings(): void {
+        const { maxParallelTasks, maxParallelMetadata, maxParallelDownloads } =
+            SettingsStore.getInstance().getAppSettings().general.concurrency;
+        this.orchestrator.setGlobalMaxConcurrent(maxParallelTasks);
+        applyStageConcurrency(maxParallelMetadata, maxParallelDownloads);
     }
 
     // ── FlowBase overrides ───────────────────────────────────────────────────

@@ -1,3 +1,5 @@
+import { notificationScheduler } from "../notificationScheduler";
+
 export enum StatusType {
     Default = "default",
     Processing = "processing",
@@ -30,6 +32,18 @@ const DEFAULT_ATTRIBUTES: StatusAttributes = {
     metadata: undefined,
 };
 
+function statusEqual(a: StatusAttributes, b: StatusAttributes): boolean {
+    return (
+        a.type === b.type &&
+        a.message === b.message &&
+        a.timeTracking === b.timeTracking &&
+        a.stepNumber === b.stepNumber &&
+        a.progress === b.progress &&
+        a.startTime === b.startTime &&
+        a.metadata === b.metadata
+    );
+}
+
 export class TaskStatus {
     private attributes: StatusAttributes = DEFAULT_ATTRIBUTES;
     private subscribers: Set<(status: StatusAttributes, elapsed?: number) => void> = new Set();
@@ -44,30 +58,45 @@ export class TaskStatus {
 
     // Replace all status attributes
     public set(status: StatusAttributes = DEFAULT_ATTRIBUTES): StatusAttributes {
+        const prev = this.attributes;
         this.attributes = DEFAULT_ATTRIBUTES;
-        return this.update(status);
+        return this.update(status, prev);
     }
 
     // Update partial status attributes
-    public update(partial: Partial<StatusAttributes> = DEFAULT_ATTRIBUTES): StatusAttributes {
+    public update(
+        partial: Partial<StatusAttributes> = DEFAULT_ATTRIBUTES,
+        // Attributes to diff against for the change check. Defaults to the current
+        // attributes; `set()` passes the pre-reset ones so a replace is still diffed
+        // against the real previous state.
+        prevForCompare: StatusAttributes = this.attributes
+    ): StatusAttributes {
         const wasTracking = this.attributes.timeTracking;
 
-        this.attributes = {
+        const next: StatusAttributes = {
             ...this.attributes,
             ...partial,
         };
 
         // Start tracking if enabled
         if (partial.timeTracking && !wasTracking) {
-            this.attributes.startTime = new Date();
+            next.startTime = new Date();
         }
 
         // Stop tracking if disabled
         if (partial.timeTracking === false) {
-            this.attributes.startTime = null;
+            next.startTime = null;
         }
 
-        this.notifySubscribers();
+        this.attributes = next;
+
+        // Skip the notification (and the React commit + Ink full-tree repaint it
+        // triggers) when nothing visible changed. Download progress fires many
+        // identical updates per second once quantized to integer percent — this
+        // collapses them to at most one commit per actual change.
+        if (!statusEqual(prevForCompare, next)) {
+            this.notifySubscribers();
+        }
         return this.attributes;
     }
 
@@ -89,6 +118,13 @@ export class TaskStatus {
     }
 
     private notifySubscribers(): void {
-        this.subscribers.forEach((callback) => callback(this.get()));
+        // Coalesced to one flush per frame (see notificationScheduler). Progress ticks
+        // and other rapid status changes collapse to a single commit per frame.
+        notificationScheduler.schedule(this.emitToSubscribers);
     }
+
+    private emitToSubscribers = (): void => {
+        const snapshot = this.get();
+        this.subscribers.forEach((callback) => callback(snapshot));
+    };
 }

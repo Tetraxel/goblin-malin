@@ -19,6 +19,11 @@ export class SessionManager {
     private persistTimer: ReturnType<typeof setTimeout> | null = null;
     private pendingSnapshots: SessionTaskSnapshot[] | null = null;
     private readonly DEBOUNCE_MS = 800;
+    // Cap how long a persist can be starved. The debounce resets on every change, so a
+    // busy run (metadata + downloads notifying constantly) could otherwise never write
+    // until it went quiet — losing durability and then landing one big write at the end.
+    private readonly MAX_WAIT_MS = 5000;
+    private firstPendingAt: number | null = null;
 
     static getInstance(): SessionManager {
         if (!SessionManager.instance) SessionManager.instance = new SessionManager();
@@ -63,8 +68,19 @@ export class SessionManager {
         if (this.isLoading) return;
 
         this.pendingSnapshots = snapshots as SessionTaskSnapshot[];
+        const now = Date.now();
+        if (this.firstPendingAt === null) this.firstPendingAt = now;
+
+        // Force a flush once the oldest pending change has waited MAX_WAIT_MS, even if
+        // changes keep arriving; otherwise fall back to the trailing debounce.
+        const waited = now - this.firstPendingAt;
+        if (waited >= this.MAX_WAIT_MS) {
+            this.flushPending();
+            return;
+        }
         if (this.persistTimer) clearTimeout(this.persistTimer);
-        this.persistTimer = setTimeout(() => this.flushPending(), this.DEBOUNCE_MS);
+        const delay = Math.min(this.DEBOUNCE_MS, this.MAX_WAIT_MS - waited);
+        this.persistTimer = setTimeout(() => this.flushPending(), delay);
     }
 
     /** Write any debounced snapshots immediately to the *current* session. */
@@ -74,6 +90,7 @@ export class SessionManager {
             clearTimeout(this.persistTimer);
             this.persistTimer = null;
         }
+        this.firstPendingAt = null;
         const snapshots = this.pendingSnapshots ?? [];
         this.pendingSnapshots = null;
         this._doPersist(snapshots);
@@ -85,6 +102,7 @@ export class SessionManager {
             clearTimeout(this.persistTimer);
             this.persistTimer = null;
         }
+        this.firstPendingAt = null;
         this.pendingSnapshots = null;
     }
 
