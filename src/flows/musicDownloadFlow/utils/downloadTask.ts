@@ -18,6 +18,7 @@ import {
 import { runWithoutCache } from "#utils/cache";
 import { cleanAndTagFlac } from "#utils/metadata";
 import { SafeAction } from "#utils/decorators";
+import { metadataLimiter, downloadLimiter } from "./stageLimiters";
 import { computeConfidenceScore } from "./confidence";
 import { computeCompiledMetadata } from "./compiledMetadata";
 import { compiledMetadataToTags } from "./compiledMetadataToTags";
@@ -197,18 +198,25 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
             throwIfAborted(signal);
 
             if (this.getAttributes()?.toTag) {
-                // If primary metadata is not fetched -> fetch it
-                if (!this.getPrimaryMetadata()) {
-                    await this.startPrimaryMetadataFetching();
-                }
-                throwIfAborted(signal);
-                await this.startMetadataDiscovering();
+                // Gate the metadata stage behind the shared metadata budget so many
+                // in-flight tasks don't fan out into as many concurrent API calls.
+                await metadataLimiter.run(async () => {
+                    throwIfAborted(signal);
+                    // If primary metadata is not fetched -> fetch it
+                    if (!this.getPrimaryMetadata()) {
+                        await this.startPrimaryMetadataFetching();
+                    }
+                    throwIfAborted(signal);
+                    await this.startMetadataDiscovering();
+                });
             }
 
             throwIfAborted(signal);
 
             if (this.getAttributes()?.toDownload) {
-                await this.startDownloads(signal);
+                // Gate the download stage behind the shared download budget (concurrent
+                // yt-dlp processes) — the lever that scales download parallelism.
+                await downloadLimiter.run(() => this.startDownloads(signal));
             }
             this.updateAttributes({ state: "finished" });
         } catch (error) {

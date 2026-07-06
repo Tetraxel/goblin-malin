@@ -27,13 +27,45 @@ export class SessionStore {
         }
     }
 
+    private writing = false;
+    private dirty = false;
+
     private writeToDisk(file: SessionsFile): void {
-        fs.mkdirSync(path.dirname(SESSIONS_PATH), { recursive: true });
-        const tmp = SESSIONS_PATH + ".tmp";
-        fs.writeFileSync(tmp, JSON.stringify(file, null, 2), "utf-8");
-        fs.renameSync(tmp, SESSIONS_PATH);
+        // Update the in-memory cache + notify the UI synchronously so reads and the
+        // sessions list stay instant; push the actual file write to a coalesced async
+        // flush. The old synchronous `writeFileSync` of the whole file (every session,
+        // pretty-printed) stalled the input thread on every debounced persist.
         this.cache = file;
         this.emitter.emit("change");
+        this.dirty = true;
+        void this.flushToDisk();
+    }
+
+    /**
+     * Drain pending writes to disk without ever running two writes concurrently.
+     * The `dirty`/`writing` pair coalesces a burst of edits into the minimum number
+     * of atomic writes (temp file + rename), each off the main thread.
+     */
+    private async flushToDisk(): Promise<void> {
+        if (this.writing) return; // an in-flight flush will pick up the latest `dirty`
+        this.writing = true;
+        try {
+            await fs.promises.mkdir(path.dirname(SESSIONS_PATH), { recursive: true });
+            while (this.dirty) {
+                this.dirty = false;
+                const snapshot = this.cache;
+                if (!snapshot) break;
+                const tmp = SESSIONS_PATH + ".tmp";
+                // Compact JSON: smaller payload → faster stringify + write.
+                await fs.promises.writeFile(tmp, JSON.stringify(snapshot), "utf-8");
+                await fs.promises.rename(tmp, SESSIONS_PATH);
+            }
+        } catch {
+            // Persistence failures must not crash the UI; the next write retries.
+            this.dirty = true;
+        } finally {
+            this.writing = false;
+        }
     }
 
     private getCached(): SessionsFile {

@@ -1,3 +1,5 @@
+import { notificationScheduler } from "../notificationScheduler";
+
 export enum StatusType {
     Default = "default",
     Processing = "processing",
@@ -116,6 +118,13 @@ export class TaskStatus {
     }
 
     private notifySubscribers(): void {
-        this.subscribers.forEach((callback) => callback(this.get()));
+        // Coalesced to one flush per frame (see notificationScheduler). Progress ticks
+        // and other rapid status changes collapse to a single commit per frame.
+        notificationScheduler.schedule(this.emitToSubscribers);
     }
+
+    private emitToSubscribers = (): void => {
+        const snapshot = this.get();
+        this.subscribers.forEach((callback) => callback(snapshot));
+    };
 }

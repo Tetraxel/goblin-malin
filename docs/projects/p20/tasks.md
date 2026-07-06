@@ -221,9 +221,55 @@ fluidity. Levers, in escalating order of effort:
 | Phase | Items | Effort | Expected effect |
 | ----- | ----- | ------ | --------------- |
 | **P0 — stop the bleeding** | F1 (throttle+dedupe progress), F2 (shared 250 ms tick), F3 (ring buffer + batched log notify), F7 (prod NODE_ENV) | ~1–2 days | Background commits drop from ~20–50/s to ≤5/s while downloading; each commit ~1.5–2× cheaper for end users. This is most of the perceived latency. |
-| **P1 — structural correctness** | F6 (notification scheduler → 1 commit/frame), F5 (event-driven orchestrator + per-stage concurrency), F4 (per-session async writes + max-wait) | ~1 week | O(1) commits per frame regardless of parallelism; no polling heartbeat; no sync-write stalls; concurrency becomes a user setting. Unlocks the scale target. |
+| **P1 — structural correctness** ✅ | F6 (notification scheduler → 1 commit/frame), F5 (event-driven orchestrator + per-stage concurrency), F4 (async coalesced writes + max-wait) | ~1 week | O(1) commits per frame regardless of parallelism; no polling heartbeat; no sync-write stalls; concurrency is a user setting. Unlocks the scale target. **Done — see "P1 implementation status" below.** |
 | **P2 — lower the floor** | F8.1 (node-count reduction), F3 row cache, F8.2 (adaptive maxFps) | ~1 week, incremental | Halves the per-commit cost; keeps worst case bounded. |
 | **P3 — radical, evidence-gated** | F8.3 engine/UI process split; (F8.4 renderer swap only if proven necessary) | multi-week | Hard guarantee: UI thread never blocked by engine work; hundreds of parallel tasks; enables detached daemon mode. |
+
+## P1 — implementation status (done)
+
+Landed as commit "P1 structural correctness". Scope notes and where each lever lives:
+
+**F6 — Notification scheduler** ✅ `src/base/notificationScheduler.ts` (new). `Task`,
+`TaskStatus`, `FlowBase` and `FlowOrchestrator` now mark themselves dirty via a stable
+bound `emitToSubscribers` and the scheduler flushes every dirty source *once* per
+~16 ms frame. Data mutation stays synchronous (e.g. `Task._snapshotCache` is still
+invalidated at mutation time, so `get()` and P19's `React.memo` bail are unaffected);
+only the render fan-out defers. `setSyncMode(true)` for tests. Result: N concurrent
+async sources → 1 flush/frame.
+
+**F5 — Event-driven orchestrator** ✅ `src/base/flow/flow-orchestrator.ts` rewritten.
+The 100 ms polling loop + per-iteration no-op notifications are gone; a completion-
+driven `pump()` fills free slots the instant a task settles and notifies only on real
+transitions (batch start / new launches / batch completion). O(1) task identity via a
+`taskIds` Set (import dedup was O(n²)). Dead commented code (~350 lines) deleted.
+Per-stage concurrency via `src/utils/semaphore.ts` (new) + `stageLimiters.ts` (new):
+the metadata and download pipeline stages in `DownloadTask.start()` each acquire a
+shared budget, so raising the task cap scales downloads without multiplying metadata
+API calls. All three budgets are user-configurable (`appSettings.general.concurrency`,
+defaults `tasks 4 / metadata 3 / downloads 4` — ≥ the old hardcoded 3 everywhere, so
+no run gets slower), applied to the orchestrator + limiters on init and on settings
+change.
+
+**F4 — Session persistence** ✅ `sessionStore.ts` write is now async + coalesced
+(cache + UI `emit` update synchronously; the atomic temp-file write is off the main
+thread and never runs two at once) with compact JSON — this removes the input-thread
+stall, the actual latency bug. `sessionManager.ts` debounce gained a 5 s max-wait so a
+busy run persists periodically instead of starving then landing one giant write.
+*Scoped:* kept the single-file format (async write already removes the stall); the
+per-session-file / SQLite split for write-amplification at large session counts is
+deferred to P2/P3 and noted below.
+
+**Verification.** `yarn type-check` + `yarn lint` clean (only pre-existing warnings).
+New deterministic unit tests (`tests/unit/`): `semaphore` (concurrency bound,
+release-on-throw, `setLimit`), `notificationScheduler` (coalescing, next-frame
+re-schedule, sync mode, throwing-subscriber isolation), and `flow-orchestrator` (cap +
+real parallelism timing, abort drain-without-leak, no-candidate resolve, duplicate-id
+reject, duplicate-call ignore). Full suite green (17 tests incl. e2e smoke + profile).
+
+**Deferred from F5/F4 (follow-ups):** per-*flow* concurrency caps are intentionally not
+enforced (they'd fight the scale goal — the global cap + per-stage limiters shape it
+instead); concurrency settings have no Settings-UI row yet (file-configurable only);
+per-session files / SQLite for session write-amplification.
 
 ## Measurement (use what P17/P18 built)
 

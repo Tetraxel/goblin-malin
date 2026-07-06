@@ -1,6 +1,7 @@
 import { StatusAttributes, TaskStatus } from "./task-status";
 import { TaskPrompt, UserPrompt } from "./task-prompt";
 import { Logger } from "../logger/logger";
+import { notificationScheduler } from "../notificationScheduler";
 
 export interface DownloadTaskData {
     id: string;
@@ -156,7 +157,16 @@ export class Task<TTaskAttributes = TaskAttributes> {
     }
 
     protected notifyTaskSubscribers(): void {
+        // Invalidate the snapshot synchronously so any code that reads `get()` before
+        // the deferred flush still sees fresh data (only the render fan-out defers).
         this._snapshotCache = null;
-        this.subscribers?.forEach((callback) => callback(this));
+        // Coalesce the subscriber fan-out to one flush per frame. `emitToSubscribers`
+        // is a stable bound reference, so repeated changes within a frame dedupe to a
+        // single notification — N parallel updates → O(1) commits/frame.
+        notificationScheduler.schedule(this.emitToSubscribers);
     }
+
+    private emitToSubscribers = (): void => {
+        this.subscribers.forEach((callback) => callback(this));
+    };
 }

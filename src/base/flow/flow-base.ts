@@ -1,4 +1,5 @@
 ﻿import { Logger } from "../logger/logger";
+import { notificationScheduler } from "../notificationScheduler";
 import { ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
 import { ContextualActionBar } from "#types/actions";
 import { ToolbarButtonHook } from "#components/Toolbar/Toolbar";
@@ -124,6 +125,12 @@ export class FlowBase<TaskAttributes = any> {
     }
 
     protected notifyTaskSubscribers(): void {
-        this.subscribers?.forEach((callback) => callback(this));
+        // Coalesced to one flush per frame — a burst of column-ratio changes during a
+        // held resize key, or a settings-change fan-out, becomes a single commit.
+        notificationScheduler.schedule(this.emitToSubscribers);
     }
+
+    private emitToSubscribers = (): void => {
+        this.subscribers.forEach((callback) => callback(this));
+    };
 }

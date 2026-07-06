@@ -1,4 +1,5 @@
 import { globalLogger, Logger } from "../logger/logger";
+import { notificationScheduler } from "../notificationScheduler";
 import { Task } from "../task/task";
 import { StatusType } from "../task/task-status";
 import { FlowBase } from "./flow-base";
@@ -19,7 +20,9 @@ export class FlowOrchestrator {
     private subscribers: Set<OrchestratorSubscriber> = new Set();
     private flows: Set<FlowBase> = new Set();
     private tasks: Task[] = [];
-    private activeTasks: Task[] = [];
+    // Mirror of `tasks` ids for O(1) membership checks (import dedup) instead of the
+    // O(n) `find` this used to do per added task (O(n²) on a bulk import).
+    private taskIds: Set<string> = new Set();
     // Tasks removed while running — kept here so getTasksInProgress() still
     // counts their concurrency slot until the background promise finishes.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,29 +73,35 @@ export class FlowOrchestrator {
     // ============ TASK QUEUE MANAGEMENT ============
 
     setGlobalMaxConcurrent(max: number): void {
-        this.globalMaxConcurrent = max;
+        const next = Math.max(1, Math.floor(max));
+        if (next === this.globalMaxConcurrent) return;
+        this.globalMaxConcurrent = next;
         this.notifySubscribers();
+    }
+
+    getGlobalMaxConcurrent(): number {
+        return this.globalMaxConcurrent;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     addTasks(tasks: Task<any>[]): void {
-        // check that none of the tasks are already in the queue
+        // O(1) duplicate check against the id mirror instead of scanning `this.tasks`.
         for (const task of tasks) {
-            const existingTask = this.tasks.find((existingTask) => existingTask.getId() === task.getId());
-            if (existingTask) {
-                // this.logger.warn(`Task ${task.getId()} is already in the queue`);
+            if (this.taskIds.has(task.getId())) {
                 throw new Error(`Task ${task.getId()} is already in the queue`);
             }
         }
 
         this.tasks = this.tasks.concat(tasks);
+        for (const task of tasks) this.taskIds.add(task.getId());
         this.notifySubscribers();
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setTasks(tasks: Task<any>[]): void {
         this.tasks = [...tasks];
-        this.activeTasks = [];
+        this.taskIds = new Set(tasks.map((t) => t.getId()));
+        this.removingTasks.clear();
         this.notifySubscribers();
     }
 
@@ -109,6 +118,7 @@ export class FlowOrchestrator {
             }
         }
         this.tasks = this.tasks.filter((t) => !idSet.has(t.getId()));
+        for (const id of ids) this.taskIds.delete(id);
         this.notifySubscribers();
     }
 
@@ -122,6 +132,16 @@ export class FlowOrchestrator {
             if (!t.running) this.removingTasks.delete(t);
         }
         return [...this.tasks.filter((task) => task.running), ...Array.from(this.removingTasks)];
+    }
+
+    /** In-progress count without materializing the array (hot path in the pump). */
+    private countInProgress(): number {
+        for (const t of this.removingTasks) {
+            if (!t.running) this.removingTasks.delete(t);
+        }
+        let count = this.removingTasks.size;
+        for (const task of this.tasks) if (task.running) count++;
+        return count;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -152,6 +172,13 @@ export class FlowOrchestrator {
             });
     }
 
+    /**
+     * Event-driven task pump. Replaces the old 100 ms polling loop: tasks are started
+     * up to `globalMaxConcurrent`, and each task's completion drives the next dispatch
+     * via its `.finally` — so the loop sleeps when idle (zero wakeups, zero no-op
+     * notifications) and reacts the instant a slot frees. Subscribers are notified only
+     * on real transitions (batch start, new launches, and batch completion).
+     */
     public async processTasks(filterIds?: Set<string>): Promise<void> {
         if (this.processing) {
             this.logger.warn("processTasks already running — ignoring duplicate call");
@@ -162,65 +189,63 @@ export class FlowOrchestrator {
         this.abortController = new AbortController();
         const signal = this.abortController.signal;
 
-        this.notifySubscribers();
-
-        const getCandidates = () => {
+        const candidates = (): Task[] => {
             const all = this.getTasksCandidates();
             return filterIds ? all.filter((t) => filterIds.has(t.getId())) : all;
         };
 
-        const promises: Promise<void>[] = [];
-        this.logger.info(`Processing ${getCandidates().length} tasks`);
+        this.logger.info(`Processing ${candidates().length} tasks`);
+        this.notifySubscribers();
 
-        try {
-            while (getCandidates().length > 0 || this.getTasksInProgress().length > 0) {
-                // Stop launching new tasks when aborted, but drain in-flight ones
-                while (
-                    !signal.aborted &&
-                    getCandidates().length > 0 &&
-                    this.getTasksInProgress().length < this.globalMaxConcurrent
-                ) {
-                    const task = getCandidates()[0];
+        return new Promise<void>((resolve) => {
+            let finished = false;
 
-                    if (!task) break;
-
-                    task.running = true;
-                    task.runnedAt = new Date();
-                    task.attempt += 1;
-
-                    // Start processing without awaiting (for parallel execution)
-                    const promise = this.processTask(task, signal);
-                    promises.push(promise);
-                }
-
+            const settle = (): void => {
+                if (finished) return;
+                finished = true;
+                this.clearQueuedStatus();
+                this.processing = false;
+                this.stopping = false;
+                this.abortController = undefined;
                 this.notifySubscribers();
+                resolve();
+            };
 
-                // If aborted and nothing in-flight, exit the drain loop
-                if (signal.aborted && this.getTasksInProgress().length === 0) break;
+            const maybeFinish = (): void => {
+                if (finished) return;
+                if (this.countInProgress() > 0) return; // still draining in-flight work
+                if (!signal.aborted && candidates().length > 0) return; // more to launch
+                settle();
+            };
 
-                // Wait for at least one task to complete before continuing
-                if (this.getTasksInProgress().length >= this.globalMaxConcurrent) {
-                    await Promise.race(promises);
-                } else if (signal.aborted && this.getTasksInProgress().length > 0) {
-                    // Still draining after abort — wait for one to finish
-                    await Promise.race(promises);
+            const pump = (): void => {
+                if (finished) return;
+                if (!signal.aborted) {
+                    const free = this.globalMaxConcurrent - this.countInProgress();
+                    if (free > 0) {
+                        const toStart = candidates().slice(0, free);
+                        for (const task of toStart) {
+                            task.running = true;
+                            task.runnedAt = new Date();
+                            task.attempt += 1;
+
+                            const promise = this.processTask(task, signal).finally(() => {
+                                // Slot freed — fill it, then re-check for batch completion.
+                                pump();
+                                maybeFinish();
+                            });
+                            // processTask already routes errors to task status; guard the
+                            // outer chain so an unexpected throw can't become unhandled.
+                            void promise.catch(() => {});
+                        }
+                        if (toStart.length > 0) this.notifySubscribers();
+                    }
                 }
+                maybeFinish();
+            };
 
-                this.notifySubscribers();
-
-                // Small delay to prevent tight loop
-                await new Promise((resolve) => setTimeout(resolve, 100));
-            }
-
-            // Wait for all remaining tasks to settle
-            await Promise.all(promises);
-        } finally {
-            this.clearQueuedStatus();
-            this.processing = false;
-            this.stopping = false;
-            this.abortController = undefined;
-            this.notifySubscribers();
-        }
+            pump();
+        });
     }
 
     public stopProcessing(): void {
@@ -258,286 +283,12 @@ export class FlowOrchestrator {
     }
 
     private notifySubscribers(): void {
-        this.subscribers?.forEach((callback) => callback(this));
+        // Coalesced to one flush per frame (see notificationScheduler); prevents the
+        // orchestrator from stacking commits when many tasks transition at once.
+        notificationScheduler.schedule(this.emitToSubscribers);
     }
 
-    // ============ TASK PROCESSING ============
-
-    // private async processAllFlows(): Promise<void> {
-    //     const allPromises: Promise<void>[] = [];
-
-    //     while (this.hasTasksInAnyQueue() || this.hasActiveTasksInAnyFlow()) {
-    //         // Process each enabled flow
-    //         for (const [flowId, queue] of this.queuesByFlow.entries()) {
-    //             // Skip if flow is disabled
-    //             if (!this.enabledFlows.has(flowId)) {
-    //                 continue;
-    //             }
-
-    //             const flowClass = this.registeredFlows.get(flowId);
-    //             if (!flowClass) continue;
-
-    //             const maxConcurrent = this.getMaxConcurrentForFlow(flowId);
-    //             const activeTasks = this.activeTasksByFlow.get(flowId)!;
-
-    //             while (queue.length > 0 && activeTasks.size < maxConcurrent) {
-    //                 if (this.getTotalActiveTasks() >= this.globalMaxConcurrent) {
-    //                     break;
-    //                 }
-
-    //                 const task = queue.shift()!;
-    //                 activeTasks.add(task.getId());
-
-    //                 const flowInstance = new (flowClass as any)(this.logger, task);
-
-    //                 const promise = this.processTask(flowInstance, task, flowId);
-    //                 allPromises.push(promise);
-    //             }
-    //         }
-
-    //         if (this.getTotalActiveTasks() >= this.globalMaxConcurrent) {
-    //             await Promise.race(allPromises.filter(p => p));
-    //         }
-
-    //         await new Promise(resolve => setTimeout(resolve, 100));
-    //     }
-
-    //     await Promise.all(allPromises);
-    // }
-
-    // private async processTask(
-    //     flowInstance: FlowBase,
-    //     task: Task,
-    //     flowId: string
-    // ): Promise<void> {
-    //     try {
-    //         await task.start();
-    //     } catch (error: any) {
-    //         task.getStatus().set({
-    //             type: StatusType.Error,
-    //             message: "Failed to process task"
-    //         });
-    //         this.logger.error(
-    //             `Failed to process ${ task.getId() }: ${ error.message }`,
-    //             { stack: error.stack }
-    //         );
-    //     } finally {
-    //         this.activeTasksByFlow.get(flowId)?.delete(task.getId());
-    //     }
-    // }
-
-    // ============ HELPER METHODS ============
-
-    // private getMaxConcurrentForFlow(flowId: string): number {
-    //     // const flowClass = this.registeredFlows.get(flowId);
-    //     // if (!flowClass) return 1;
-
-    //     // return instance.getMaxConcurrentTasks();
-    // }
-
-    // private getTotalActiveTasks(): number {
-    //     let total = 0;
-    //     for (const tasks of this.activeTasksByFlow.values()) {
-    //         total += tasks.size;
-    //     }
-    //     return total;
-    // }
-
-    // private hasTasksInAnyQueue(): boolean {
-    //     for (const queue of this.queuesByFlow.values()) {
-    //         if (queue.length > 0) return true;
-    //     }
-    //     return false;
-    // }
-
-    // private hasActiveTasksInAnyFlow(): boolean {
-    //     for (const tasks of this.activeTasksByFlow.values()) {
-    //         if (tasks.size > 0) return true;
-    //     }
-    //     return false;
-    // }
-
-    // ============ CONTROL METHODS ============
-
-    // getQueueStatus(): Map<string, { queued: number; active: number }> {
-    //     const status = new Map();
-    //     for (const [flowId, queue] of this.queuesByFlow.entries()) {
-    //         status.set(flowId, {
-    //             queued: queue.length,
-    //             active: this.activeTasksByFlow.get(flowId)?.size || 0
-    //         });
-    //     }
-    //     return status;
-    // }
+    private emitToSubscribers = (): void => {
+        this.subscribers.forEach((callback) => callback(this));
+    };
 }
-
-// export class FlowOrchestrator {
-//     private static instance: FlowOrchestrator;
-//     private globalMaxConcurrent: number = 3;
-//     private flowRegistry: FlowRegistry;
-//     private logger: Logger;
-
-//     // Track active tasks per flow
-//     private activeTasksByFlow: Map<string, Set<string>> = new Map();
-//     private queuesByFlow: Map<string, Task[]> = new Map();
-//     private processing: boolean = false;
-
-//     private constructor() {
-//         this.logger = globalLogger.createChild({ service: 'FlowOrchestrator' });
-//         this.flowRegistry = FlowRegistry.getInstance();
-//     }
-
-//     static getInstance(): FlowOrchestrator {
-//         if (!FlowOrchestrator.instance) {
-//             FlowOrchestrator.instance = new FlowOrchestrator();
-//         }
-//         return FlowOrchestrator.instance;
-//     }
-
-//     setGlobalMaxConcurrent(max: number): void {
-//         this.globalMaxConcurrent = max;
-//     }
-
-//     addToQueue(tasks: Task[]): void {
-//         // Group tasks by flow
-//         for (const task of tasks) {
-//             const flowId = task.getFlowId();
-//             if (!this.queuesByFlow.has(flowId)) {
-//                 this.queuesByFlow.set(flowId, []);
-//                 this.activeTasksByFlow.set(flowId, new Set());
-//             }
-//             this.queuesByFlow.get(flowId)!.push(task);
-//         }
-//     }
-
-//     async startProcessing(): Promise<void> {
-//         if (this.processing) {
-//             this.logger.warn('Processing already in progress');
-//             return;
-//         }
-
-//         this.processing = true;
-//         await this.processAllFlows();
-//         this.processing = false;
-//     }
-
-//     private async processAllFlows(): Promise<void> {
-//         const allPromises: Promise<void>[] = [];
-
-//         while (this.hasTasksInAnyQueue() || this.hasActiveTasksInAnyFlow()) {
-//             // Process each flow
-//             for (const [flowId, queue] of this.queuesByFlow.entries()) {
-//                 const flowDef = this.flowRegistry.get(flowId);
-//                 if (!flowDef) continue;
-
-//                 const maxConcurrent = this.getMaxConcurrentForFlow(flowId);
-//                 const activeTasks = this.activeTasksByFlow.get(flowId)!;
-
-//                 // Start new tasks up to the limit
-//                 while (queue.length > 0 && activeTasks.size < maxConcurrent) {
-//                     // Check global limit
-//                     if (this.getTotalActiveTasks() >= this.globalMaxConcurrent) {
-//                         break;
-//                     }
-
-//                     const task = queue.shift()!;
-//                     activeTasks.add(task.getId());
-
-//                     const flowInstance = this.flowRegistry.createFlowInstance(
-//                         flowId,
-//                         this.logger,
-//                         task
-//                     );
-
-//                     if (!flowInstance) {
-//                         this.logger.error(`Failed to create flow instance for ${ flowId }`);
-//                         continue;
-//                     }
-
-//                     const promise = this.processTask(flowInstance, task, flowId);
-//                     allPromises.push(promise);
-//                 }
-//             }
-
-//             // Wait for at least one task to complete if at capacity
-//             if (this.getTotalActiveTasks() >= this.globalMaxConcurrent) {
-//                 await Promise.race(allPromises.filter(p => p));
-//             }
-
-//             await new Promise(resolve => setTimeout(resolve, 100));
-//         }
-
-//         await Promise.all(allPromises);
-//     }
-
-//     private async processTask(
-//         flowInstance: FlowBase,
-//         task: Task,
-//         flowId: string
-//     ): Promise<void> {
-//         try {
-//             await flowInstance.start();
-//         } catch (error: any) {
-//             task.getStatus().set({
-//                 type: StatusType.Error,
-//                 message: "Failed to process task"
-//             });
-//             this.logger.error(
-//                 `Failed to process ${ task.getId() }: ${ error.message } `,
-//                 { stack: error.stack }
-//             );
-//         } finally {
-//             this.activeTasksByFlow.get(flowId)?.delete(task.getId());
-//         }
-//     }
-
-//     private getMaxConcurrentForFlow(flowId: string): number {
-//         const flowDef = this.flowRegistry.get(flowId);
-//         if (!flowDef) return 1;
-
-//         // Create a temporary instance to get max concurrent
-//         // Or store this in FlowDefinition
-//         const tempTask = new Task({
-//             id: 'temp',
-//             flowId,
-//             initialInput: ''
-//         });
-//         const instance = new flowDef.classReference(this.logger, tempTask);
-//         return instance.getMaxConcurrentTasks();
-//     }
-
-//     private getTotalActiveTasks(): number {
-//         let total = 0;
-//         for (const tasks of this.activeTasksByFlow.values()) {
-//             total += tasks.size;
-//         }
-//         return total;
-//     }
-
-//     private hasTasksInAnyQueue(): boolean {
-//         for (const queue of this.queuesByFlow.values()) {
-//             if (queue.length > 0) return true;
-//         }
-//         return false;
-//     }
-
-//     private hasActiveTasksInAnyFlow(): boolean {
-//         for (const tasks of this.activeTasksByFlow.values()) {
-//             if (tasks.size > 0) return true;
-//         }
-//         return false;
-//     }
-
-//     async stopFlow(flowId: string): Promise<void> {
-//         const queue = this.queuesByFlow.get(flowId);
-//         if (queue) {
-//             queue.length = 0; // Clear queue
-//         }
-//         // Active tasks will complete naturally
-//     }
-
-//     stop(): void {
-//         this.queuesByFlow.clear();
-//         this.processing = false;
-//     }
-// }
