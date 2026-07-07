@@ -14,12 +14,12 @@
 
 ## Provider extensibility
 
-> **Philosophy**: We don't want to hardcode metadata/download providers! They must be interchangeable and extensible. The app should be able to support any number of metadata and download providers without requiring changes to the core flow logic or UI components.
+> **Philosophy**: We don't want to hardcode metadata/download providers! They must be interchangeable and extensible. The app should be able to support any number of metadata and download providers without requiring changes to the core pipeline logic or UI components.
 
 Adding a new provider should require changes in only two places:
 
 1. A new service class file (the implementation)
-2. One `.register(MyService)` call in `MusicDownloadFlow`'s constructor
+2. One `.register(MyService)` call in `initMusicApp()` (`src/flows/musicDownloadFlow/init.ts`)
 
 Display metadata (label, color, acronym, color variants) must **not** be hardcoded in components. Each service class declares `static readonly display: ProviderDisplay`. `ServiceRegistry.register()` reads it automatically and calls `providerDisplayRegistry.register()`. Components call `providerDisplayRegistry.get(key)` for display info.
 
