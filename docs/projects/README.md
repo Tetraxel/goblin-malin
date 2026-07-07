@@ -45,13 +45,15 @@ The product wave: with the foundation in place, these projects target what users
 | P26 — Search-Based & Text Import               | Import without URLs: type a song name, or paste tracklists / M3U / rekordbox CSV — with confidence-gated auto-match. | [p26/tasks.md](p26/tasks.md) |
 | P27 — Audio Verification & Auto-MB IDs         | Catch wrong downloads (live versions, DJ sets) via duration + optional acoustic fingerprint; auto-fill missing MusicBrainz release IDs (release blocker). | [p27/tasks.md](p27/tasks.md) |
 | P28 — Provider Expansion: Deezer & SoundCloud  | Deezer metadata/discovery (keyless API, fills the empty BPM column via ISRC lookup) and SoundCloud import + direct download. | [p28/tasks.md](p28/tasks.md) |
+| P29 — Remove the Flow Abstraction              | De-abstract the single-flow architecture: delete `FlowBase`/flow registry/dead selector, split `MusicDownloadFlow` into plain modules, collapse duplicated mode state, and replace flow→React state mirroring with pure derivations. | [p29/tasks.md](p29/tasks.md) |
 
 ### Recommended order
 
-1. **P25** then **P24** — the release blockers. P25 is small and structural (one wiring change in `ServiceBase` + an aggregate); P24 makes the app installable by strangers and turns the #1 silent failure (stale cookies) into a guided fix.
-2. **P21** — the biggest workflow multiplier; independent of everything else.
-3. **P22** — the biggest quality win, and the first real second download provider exercising the P5 panel.
-4. **P23** — becomes important the moment P21 makes bulk imports easy (re-imported playlists must not re-download).
-5. **P26**, **P28**, **P27** — in any order; P27 benefits from P22's shared ffprobe work and P24's doctor, P28 benefits from P22's provenance labels.
+1. **P29** — do the flow-abstraction removal first: it deletes the seams every other project builds on (task creation, contextual actions, settings items), so landing it early avoids refactoring each feature twice.
+2. **P25** then **P24** — the release blockers. P25 is small and structural (one wiring change in `ServiceBase` + an aggregate); P24 makes the app installable by strangers and turns the #1 silent failure (stale cookies) into a guided fix.
+3. **P21** — the biggest workflow multiplier; independent of everything else.
+4. **P22** — the biggest quality win, and the first real second download provider exercising the P5 panel.
+5. **P23** — becomes important the moment P21 makes bulk imports easy (re-imported playlists must not re-download).
+6. **P26**, **P28**, **P27** — in any order; P27 benefits from P22's shared ffprobe work and P24's doctor, P28 benefits from P22's provenance labels.
 
 Cross-project seams to keep in mind: the ffprobe file probe is shared by P22/T22.5 and P27/T27.1 (build once); the doctor (P24) hosts the optional-binary checks P27 needs; P21's collection contract is where SoundCloud sets (P28) plug in later.
