@@ -7,7 +7,8 @@ export const SpotifyCell = React.memo(function SpotifyCell({
     task,
     isSelected,
 }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
-    const group = task.attributes?.metadataGroups.find((g) => g.serviceKey === "spotify");
+    const attrs = task.attributes;
+    const group = attrs?.kind === "track" ? attrs.metadataGroups.find((g) => g.serviceKey === "spotify") : undefined;
     const metadata = group?.results.find((r) => !r.isRejected)?.metadata;
     const fullUri = metadata?.uri;
     const uri = fullUri?.split("::").pop();

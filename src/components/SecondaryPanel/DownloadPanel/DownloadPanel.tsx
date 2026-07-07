@@ -54,13 +54,17 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
         });
     }, [typedTask]);
 
-    const downloadSources: TrackDownloadSource[] = snapshot?.attributes?.downloadSources ?? [];
+    // A collection (album/playlist) task has no download sources of its own —
+    // select a child track to see its downloads.
+    const downloadSources: TrackDownloadSource[] =
+        snapshot?.attributes?.kind === "track" ? snapshot.attributes.downloadSources : [];
 
     const savedSource: TrackDownloadSource | null = downloadSources.find((s) => s.savedFile != null) ?? null;
 
-    const compiled: CompiledMetadata | null = snapshot?.attributes
-        ? computeCompiledMetadata(snapshot.attributes.metadataGroups, snapshot.attributes.metadataOverride)
-        : null;
+    const compiled: CompiledMetadata | null =
+        snapshot?.attributes?.kind === "track"
+            ? computeCompiledMetadata(snapshot.attributes.metadataGroups, snapshot.attributes.metadataOverride)
+            : null;
 
     const { outputDir } = getSaveSettings();
 
@@ -174,7 +178,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     async function handleRelocateFile() {
         if (!typedTask) return;
         const attrs = typedTask.getAttributes();
-        if (!attrs) return;
+        if (attrs?.kind !== "track") return;
         const sourceIdx = downloadNavIndex >= 0 ? downloadNavIndex : 0;
         const source = attrs.downloadSources[sourceIdx];
         if (!source) return;

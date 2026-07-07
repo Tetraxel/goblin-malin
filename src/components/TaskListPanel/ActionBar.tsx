@@ -8,6 +8,7 @@ import { ColumnDefinition } from "./TaskListPanel";
 import { buildContextualActionBar } from "#flows/musicDownloadFlow/contextualActions";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import type { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import type { CollectionTask } from "#flows/musicDownloadFlow/utils/collectionTask";
 import { Hint } from "../Hint";
 
 export const ActionBar: React.FC<{
@@ -30,7 +31,7 @@ export const ActionBar: React.FC<{
 
     const bar =
         isTaskListActive && selectedTask
-            ? buildContextualActionBar(selectedTask as unknown as DownloadTask, {
+            ? buildContextualActionBar(selectedTask as unknown as DownloadTask | CollectionTask, {
                   columns,
                   columnIndex: taskList.selectedColumnIndex,
                   taskIndex: selectedIndex,

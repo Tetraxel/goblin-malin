@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { Text } from "ink";
 import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
@@ -8,10 +8,14 @@ export const TrackCell = React.memo(function TrackCell({
     task,
     isSelected,
 }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
-    const groups = task.attributes?.metadataGroups ?? [];
-    const overrides = task.attributes?.metadataOverride ?? {};
-    const compiled = computeCompiledMetadata(groups, overrides);
-    const trackName = compiled.trackName;
+    const attrs = task.attributes;
+
+    const trackName =
+        attrs?.kind === "collection"
+            ? attrs.totalCount !== undefined
+                ? `${attrs.totalCount} track${attrs.totalCount === 1 ? "" : "s"}`
+                : ""
+            : computeCompiledMetadata(attrs?.metadataGroups ?? [], attrs?.metadataOverride ?? {}).trackName;
 
     return (
         <Text color={isSelected ? "green" : "white"} underline={isSelected} wrap="truncate-end">

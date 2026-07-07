@@ -321,6 +321,7 @@ export type TrackDownloadSource = {
 //----------------------//
 
 export type TrackDownloadTask = {
+    kind: "track";
     state: "pending" | "running" | "finished" | "failed" | "stopped";
     /**
      * Structured uri set at import time from the recognized URL. Refined once primary
@@ -330,6 +331,8 @@ export type TrackDownloadTask = {
     uri?: TrackUriParts;
     /** Registry key of the metadata service that recognized the input URL (e.g. "spotify", "youtube"). */
     recognizedServiceKey?: string;
+    /** Set when this track was created by a CollectionTask's expansion — the parent's task id. */
+    parentTaskId?: string;
     primaryMetadataInProgress?: boolean;
     metadataDiscoveringInProgress?: boolean;
     primaryMetadataFetched?: boolean;
@@ -341,23 +344,42 @@ export type TrackDownloadTask = {
     metadataGroups: MetadataGroupState[];
     metadataOverride: MetadataOverrides;
     downloadSources: TrackDownloadSource[];
-    parentAlbumDownloadTask?: AlbumDownloadTask;
     discoveryAnchors?: Record<string, DiscoveryAnchor>;
 };
 
-export type TracksDownloadTask = {
-    state: "pending" | "running" | "finished" | "failed" | "stopped";
-    toTag?: boolean;
-    toDownload?: boolean;
-    userInput: UserInput;
-    metadataGroups: MetadataGroupState[];
-    metadataOverride: MetadataOverrides;
-    downloadSources: TrackDownloadSource[];
-    tracks: TrackDownloadTask[];
+//----------------------//
+//      COLLECTION      //
+//----------------------//
+
+export type CollectionLiveRefresh = {
+    enabled: boolean;
+    lastFetchedAt?: Date;
 };
 
-export type AlbumDownloadTask = TracksDownloadTask;
-// export type PlaylistDownloadTask = TracksDownloadTask
-// export type LivePlaylistDownloadTask = PlaylistDownloadTask
+// A parent task for an album/playlist URL. Doesn't fetch track metadata itself —
+// fetching (via CollectionTask.start()/refetch()) spawns real TrackDownloadTask
+// children (tagged parentTaskId) into the same flat orchestrator queue.
+export type CollectionDownloadTask = {
+    kind: "collection";
+    collectionKind: "album" | "playlist";
+    state: "pending" | "running" | "finished" | "failed" | "stopped";
+    userInput: UserInput;
+    /** Registry key of the metadata service that recognized the input URL. */
+    recognizedServiceKey?: string;
+    name?: string;
+    ownerName?: string;
+    totalCount?: number;
+    truncated?: boolean;
+    /** Ids of child TrackDownloadTasks created by this collection, in discovery order. */
+    childTaskIds: string[];
+    /** Hides childTaskIds rows in the task list when true. */
+    collapsed?: boolean;
+    /** Inherited by every child created from this point on (fresh expand or refetch). */
+    toTag?: boolean;
+    toDownload?: boolean;
+    /** Playlists only — periodic re-fetch via liveRefreshScheduler. */
+    live?: CollectionLiveRefresh;
+    error?: string;
+};
 
-export type MusicDownloadTaskAttributes = TrackDownloadTask; // | AlbumDownloadTask
+export type MusicDownloadTaskAttributes = TrackDownloadTask | CollectionDownloadTask;

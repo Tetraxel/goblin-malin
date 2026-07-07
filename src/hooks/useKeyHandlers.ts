@@ -10,6 +10,7 @@ import { ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
 import { buildContextualActionBar } from "#flows/musicDownloadFlow/contextualActions";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import type { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import type { CollectionTask } from "#flows/musicDownloadFlow/utils/collectionTask";
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ export function useTaskListShortcuts(tasks: Task[], columns: ColumnDefinition<Mu
     // column values) changes without changing the task object reference, which would fool useMemo.
     const contextualShortcuts: ShortcutDef[] = (() => {
         if (!selectedTask) return [];
-        const bar = buildContextualActionBar(selectedTask as unknown as DownloadTask, {
+        const bar = buildContextualActionBar(selectedTask as unknown as DownloadTask | CollectionTask, {
             columns,
             columnIndex: taskList.selectedColumnIndex,
         });

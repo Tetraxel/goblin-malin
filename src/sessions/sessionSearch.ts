@@ -11,6 +11,12 @@ export function sessionMatchesQuery(session: StoredSession, q: string): boolean 
         const url = attrs?.userInput?.url ?? task.initialInput ?? "";
         if (url.toLowerCase().includes(lower)) return true;
 
+        if (attrs?.kind === "collection") {
+            if (attrs.name?.toLowerCase().includes(lower)) return true;
+            if (attrs.ownerName?.toLowerCase().includes(lower)) return true;
+            continue;
+        }
+
         for (const group of attrs?.metadataGroups ?? []) {
             for (const result of group.results) {
                 if (result.metadata.trackName?.toLowerCase().includes(lower)) return true;
@@ -59,6 +65,13 @@ export function getSessionMatches(session: StoredSession, q: string, limit = 4):
         if (matches.length >= limit) break;
         const attrs = task.attributes;
         add("URL", attrs?.userInput?.url ?? task.initialInput);
+
+        if (attrs?.kind === "collection") {
+            add("Track", attrs.name);
+            add("Artist", attrs.ownerName);
+            continue;
+        }
+
         for (const group of attrs?.metadataGroups ?? []) {
             for (const result of group.results) {
                 add("Track", result.metadata.trackName);
@@ -89,7 +102,10 @@ export function deriveSessionName(snapshots: SessionTaskSnapshot[]): string {
     if (!first) return `Session ${new Date().toLocaleDateString("en-US")}`;
 
     const attrs = first.attributes;
-    if (attrs) {
+    if (attrs?.kind === "collection") {
+        if (attrs.name) return attrs.name;
+        if (attrs.userInput?.url) return attrs.userInput.url;
+    } else if (attrs) {
         for (const group of attrs.metadataGroups) {
             const primary = group.results.find((r) => r.isPrimaryInput);
             const result = primary ?? group.results[0];

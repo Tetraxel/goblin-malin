@@ -8,6 +8,8 @@ import { ShortcutRegistryProvider } from "#base/shortcuts/ShortcutRegistry";
 import { TaskOrchestrator } from "#base/task/orchestrator";
 import { Task, TaskAttributes } from "#base/task/task";
 import { computeColumns, PrimaryMode } from "#flows/musicDownloadFlow/taskColumns";
+import { buildVisibleTaskOrder } from "#flows/musicDownloadFlow/utils/buildVisibleTaskOrder";
+import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import { getInstance } from "#utils/mpvPlayer";
 import { getAssetPath } from "#utils/appPaths";
 import { AppInner } from "./AppInner";
@@ -103,19 +105,40 @@ export const App: React.FC = () => {
         return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
     }, [tasks, orchestrator]);
 
+    // Collapse/expand (and other collection-only attribute changes) don't add or
+    // remove tasks, so the orchestrator subscription above never fires for them —
+    // bump a dedicated counter so buildVisibleTaskOrder recomputes. Scoped to
+    // collection tasks only (rare, low-frequency) rather than every task, so this
+    // doesn't re-render the whole tree on every metadata/download progress tick.
+    const [collapseVersion, setCollapseVersion] = useState(0);
+    useEffect(() => {
+        const collectionTasks = tasks.filter(
+            (t) => (t.getAttributes() as MusicDownloadTaskAttributes | undefined)?.kind === "collection"
+        );
+        const unsubscribes = collectionTasks.map((t) => t.subscribe(() => setCollapseVersion((v) => v + 1)));
+        return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
+    }, [tasks]);
+
+    // Grouping/collapse is purely a display-order concern — the orchestrator keeps
+    // owning a flat, content-agnostic task list (see buildVisibleTaskOrder).
+    const visibleTasks = useMemo(
+        () => buildVisibleTaskOrder(tasks),
+        [tasks, collapseVersion] // eslint-disable-line react-hooks/exhaustive-deps
+    );
+
     return (
         <ThemeProvider>
             <ShortcutRegistryProvider>
                 <FocusProvider
                     toolbarButtonCount={TOOLBAR_BUTTONS.length + (updateInfo ? 1 : 0)}
-                    taskCount={tasks.length}
+                    taskCount={visibleTasks.length}
                     taskColumnCount={columns.length}
                     primaryMode={primaryMode}
                     onPrimaryModeChange={setPrimaryMode}
                 >
                     <ToolbarActionsProvider>
                         <AppInner
-                            tasks={tasks}
+                            tasks={visibleTasks}
                             columns={columns}
                             terminalHeight={terminalHeight}
                             terminalWidth={terminalWidth}

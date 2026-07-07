@@ -240,9 +240,12 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
         const first = session.tasks[0];
         if (!first) return "";
         const attrs = first.attributes;
+        if (attrs?.kind === "collection") {
+            return attrs.name ?? attrs.userInput?.url ?? "";
+        }
         if (attrs) {
             for (const group of attrs.metadataGroups) {
-                const r = group.results.find((r) => r.isPrimaryInput) ?? group.results[0];
+                const r = group.results.find((result) => result.isPrimaryInput) ?? group.results[0];
                 if (r) {
                     const artist = r.metadata.artists[0]?.name;
                     const track = r.metadata.trackName;

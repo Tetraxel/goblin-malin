@@ -8,8 +8,9 @@ import { runWithoutCache } from "#utils/cache";
 import { startOptionsBridge } from "#base/bridges/startOptionsBridge";
 import { deleteConfirmBridge } from "#base/bridges/deleteConfirmBridge";
 import { DownloadTask } from "./utils/downloadTask";
+import { CollectionTask } from "./utils/collectionTask";
 import { runSelected } from "./runController";
-import { MusicDownloadTaskAttributes } from "./types";
+import { MusicDownloadTaskAttributes, TrackDownloadTask, CollectionDownloadTask } from "./types";
 
 // Suppress the re-throw from @SafeAction — logging is already handled by the decorator.
 const fire = (p: Promise<void>): void => {
@@ -25,9 +26,27 @@ function toOpenableUri(url: string): string {
 /**
  * Build the two-row contextual action bar (column actions + task actions) for
  * the selected task/column. Callers pass the columns they currently render so
- * there is exactly one column source (App's memo).
+ * there is exactly one column source (App's memo). Dispatches on task kind —
+ * album/playlist parent tasks get a different action set (start/restart/refetch/
+ * collapse/live) than track tasks.
  */
 export function buildContextualActionBar(
+    task: DownloadTask | CollectionTask,
+    attributes: {
+        columns: ColumnDefinition<MusicDownloadTaskAttributes>[];
+        columnIndex: number;
+        taskIndex?: number;
+        taskCount?: number;
+        selectedCount?: number;
+    }
+): ContextualActionBar {
+    if (task.getAttributes()?.kind === "collection") {
+        return buildCollectionContextualActionBar(task as CollectionTask, attributes);
+    }
+    return buildTrackContextualActionBar(task as DownloadTask, attributes);
+}
+
+function buildTrackContextualActionBar(
     task: DownloadTask,
     attributes: {
         columns: ColumnDefinition<MusicDownloadTaskAttributes>[];
@@ -242,7 +261,7 @@ export function buildContextualActionBar(
 
 function buildMetadataServiceColumnActions(
     serviceKey: string,
-    attrs: MusicDownloadTaskAttributes | undefined,
+    attrs: TrackDownloadTask | undefined,
     task: DownloadTask
 ): ContextualActions[] {
     const display = providerDisplayRegistry.get(serviceKey);
@@ -275,7 +294,7 @@ function buildMetadataServiceColumnActions(
 
 function buildDiscoveryServiceColumnActions(
     serviceKey: string,
-    attrs: MusicDownloadTaskAttributes | undefined,
+    attrs: TrackDownloadTask | undefined,
     task: DownloadTask
 ): ContextualActions[] {
     const display = providerDisplayRegistry.get(serviceKey);
@@ -317,4 +336,160 @@ function buildDiscoveryServiceColumnActions(
     });
 
     return actions;
+}
+
+// ── Collection (album/playlist parent) action bar ──────────────────────────
+
+function toggleCollectionFlag(task: CollectionTask, flag: "toTag" | "toDownload"): void {
+    const attrs = task.getAttributes();
+    if (!attrs) return;
+    const next = !attrs[flag];
+    task.updateAttributes({ [flag]: next } as Partial<CollectionDownloadTask>);
+    // A playlist/album's checkbox is also the template new tracks inherit — cascade
+    // the same value to its existing children so toggling it doesn't feel partial.
+    const children = TaskOrchestrator.getInstance()
+        .getTasks()
+        .filter((t) => attrs.childTaskIds.includes(t.getId()));
+    for (const child of children) {
+        (child as unknown as DownloadTask).updateAttributes({ [flag]: next } as Partial<TrackDownloadTask>);
+    }
+}
+
+function buildCollectionContextualActionBar(
+    task: CollectionTask,
+    attributes: {
+        columns: ColumnDefinition<MusicDownloadTaskAttributes>[];
+        columnIndex: number;
+        taskIndex?: number;
+        taskCount?: number;
+        selectedCount?: number;
+    }
+): ContextualActionBar {
+    const orchestrator = TaskOrchestrator.getInstance();
+    const column = attributes.columns[attributes.columnIndex];
+    const attrs = task.getAttributes();
+    const hasBeenRun = attrs?.state !== "pending" && attrs?.state !== "stopped";
+    const hasChildren = (attrs?.childTaskIds.length ?? 0) > 0;
+    const isPlaylist = attrs?.collectionKind === "playlist";
+
+    const asCollection = (t: { getAttributes: () => unknown }) => t as unknown as CollectionTask;
+
+    // ── Task row (bottom) ─────────────────────────────────────────────────
+    const taskActions: ContextualActions[] = [
+        {
+            shortcuts: [{ input: "r" }],
+            label: hasBeenRun ? "Restart" : "Start",
+            description: hasBeenRun ? "Re-fetch the track list from scratch" : "Fetch the track list",
+            multiSelectAllowed: true,
+            onClick: () => fire(hasBeenRun ? task.restart() : task.start()),
+            onClickBatch: (tasks) => {
+                for (const t of tasks) {
+                    const c = asCollection(t);
+                    const a = c.getAttributes();
+                    const run = a?.state !== "pending" && a?.state !== "stopped" ? c.restart() : c.start();
+                    fire(run);
+                }
+            },
+        },
+    ];
+
+    if (hasBeenRun) {
+        taskActions.push({
+            shortcuts: [{ input: "f" }],
+            label: "Refetch",
+            description: "Check for newly added tracks without resetting existing ones",
+            onClick: () => fire(task.refetch()),
+        });
+    }
+
+    if (hasChildren) {
+        taskActions.push({
+            shortcuts: [{ input: "c" }],
+            label: attrs?.collapsed ? "Expand" : "Collapse",
+            onClick: () => task.toggleCollapsed(),
+        });
+    }
+
+    if (isPlaylist) {
+        taskActions.push({
+            shortcuts: [{ input: "l" }],
+            label: attrs?.live?.enabled === false ? "Enable live refresh" : "Disable live refresh",
+            description: "Periodically re-fetch this playlist for new tracks",
+            onClick: () => task.toggleLive(),
+        });
+    }
+
+    taskActions.push({
+        shortcuts: [{ key: "delete" }],
+        label: "Delete",
+        description: hasChildren ? "Remove this and its tracks from the list" : "Remove this from the list",
+        multiSelectAllowed: true,
+        onClick: () => {
+            const ids = [task.getId(), ...(attrs?.childTaskIds ?? [])];
+            deleteConfirmBridge.request({ taskCount: ids.length, apply: () => orchestrator.removeTasks(ids) });
+        },
+        onClickBatch: (tasks) => {
+            const ids = tasks.flatMap((t) => [t.getId(), ...(asCollection(t).getAttributes()?.childTaskIds ?? [])]);
+            deleteConfirmBridge.request({ taskCount: ids.length, apply: () => orchestrator.removeTasks(ids) });
+        },
+    });
+
+    // ── Column row (top) ──────────────────────────────────────────────────
+    const columnActions: ContextualActions[] = [];
+    const columnLabel = column?.label ?? "";
+    const columnColor = column?.color;
+
+    if (column?.id === "toTag") {
+        columnActions.push({
+            shortcuts: [{ key: "return" }],
+            label: "Toggle tagging (+ existing tracks)",
+            multiSelectAllowed: true,
+            onClick: () => toggleCollectionFlag(task, "toTag"),
+            onClickBatch: (tasks) => tasks.forEach((t) => toggleCollectionFlag(asCollection(t), "toTag")),
+        });
+    }
+
+    if (column?.id === "toDownload") {
+        columnActions.push({
+            shortcuts: [{ key: "return" }],
+            label: "Toggle downloading (+ existing tracks)",
+            multiSelectAllowed: true,
+            onClick: () => toggleCollectionFlag(task, "toDownload"),
+            onClickBatch: (tasks) => tasks.forEach((t) => toggleCollectionFlag(asCollection(t), "toDownload")),
+        });
+    }
+
+    if (column?.id === "url") {
+        const url = attrs?.userInput.url ?? "";
+        columnActions.push({
+            shortcuts: [{ input: "c", ctrl: true }],
+            label: "Copy source URL",
+            onClick: () => clipboard.writeSync(url),
+        });
+        if (url) {
+            const display = providerDisplayRegistry.get(attrs?.recognizedServiceKey ?? "unknown");
+            columnActions.push({
+                shortcuts: [{ key: "return" }],
+                label: `Open in ${display.label}`,
+                onClick: () => {
+                    open(toOpenableUri(url)).catch(() => {});
+                },
+            });
+        }
+    }
+
+    const { selectedCount, taskIndex, taskCount } = attributes;
+    const taskRowLabel =
+        selectedCount != null && selectedCount > 1
+            ? `${selectedCount} selected tasks`
+            : taskIndex != null && taskCount != null
+              ? `Task ${taskIndex + 1}/${taskCount}`
+              : "Task";
+
+    return {
+        rows: [
+            { text: columnLabel, textColor: columnColor, actions: columnActions },
+            { text: taskRowLabel, actions: taskActions },
+        ],
+    };
 }

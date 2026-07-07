@@ -98,3 +98,32 @@ When multiple boxes have overflow, it make the child text overflow, even above p
   </Box>
 </Box>
 ```
+
+### Don't indent with space characters
+
+Building indentation/spacing by prepending literal spaces to a string (e.g. `"  ↳ " + name`) breaks once the
+column narrows below the string's own width — the leading spaces don't participate in `wrap="truncate-end"`
+or flex-shrink the way layout properties do, so text clips or overlaps unpredictably on small screens.
+
+Use `marginLeft`/`paddingLeft` (or a fixed-`width` `Box` spacer) instead — **and give every fixed/decorative
+element its own `flexShrink={0}`**, not just the outer row. A bare `<Text>` sibling in a row defaults to
+`flexShrink={1}`, so once the row is too narrow for it + its sibling, Yoga shrinks it to **zero width and it
+vanishes silently** — the row's `marginLeft`/`gap` still reserve their spacing, so you get blank space where
+the glyph should be, easy to mistake for a rendering/font issue instead of a missing `flexShrink={0}`:
+
+```
+// before — the "↳" can vanish on a narrow column, leaving blank space in its place
+<Box flexDirection="row" gap={1} marginLeft={1}>
+  <Text>↳</Text>
+  <Text wrap="truncate-end">{name}</Text>
+</Box>
+
+// after — wrap every fixed element in its own flexShrink={0} Box; only the
+// text that should actually truncate (wrap="truncate-end") is left shrinkable
+<Box flexDirection="row" gap={1} marginLeft={1}>
+  <Box flexShrink={0}>
+    <Text>↳</Text>
+  </Box>
+  <Text wrap="truncate-end">{name}</Text>
+</Box>
+```

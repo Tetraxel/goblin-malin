@@ -135,6 +135,29 @@ export function buildFlowSettingsItems(
         }
     }
 
+    // ── Collections (albums/playlists) ─────────────────────────────
+    items.push({ kind: "sectionHeader", label: "Collections" });
+    items.push({
+        kind: "textInput",
+        indent: 0,
+        label: "Max tracks imported per album/playlist",
+        get: () => String(flowSettings.collections.defaultMaxTracks),
+        set: (v) => {
+            const n = Math.max(1, Math.round(Number(v)));
+            if (Number.isFinite(n)) onChange({ collections: { defaultMaxTracks: n } });
+        },
+    });
+    items.push({
+        kind: "textInput",
+        indent: 0,
+        label: "Live playlist refresh interval (seconds)",
+        get: () => String(flowSettings.collections.defaultLiveRefreshIntervalSeconds),
+        set: (v) => {
+            const n = Math.max(1, Math.round(Number(v)));
+            if (Number.isFinite(n)) onChange({ collections: { defaultLiveRefreshIntervalSeconds: n } });
+        },
+    });
+
     // ── Download ──────────────────────────────────────────────────
     items.push({ kind: "sectionHeader", label: "Download" });
     // items.push({

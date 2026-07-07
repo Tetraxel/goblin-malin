@@ -1,6 +1,6 @@
-import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import { MusicDownloadTaskAttributes, TrackDownloadTask, CollectionDownloadTask } from "#flows/musicDownloadFlow/types";
 
-export function reviveTaskDates(attrs: MusicDownloadTaskAttributes): MusicDownloadTaskAttributes {
+function reviveTrackDates(attrs: TrackDownloadTask): TrackDownloadTask {
     return {
         ...attrs,
         metadataGroups: attrs.metadataGroups.map((group) => ({
@@ -22,4 +22,23 @@ export function reviveTaskDates(attrs: MusicDownloadTaskAttributes): MusicDownlo
             localFile: source.localFile ? { ...source.localFile } : undefined,
         })),
     };
+}
+
+function reviveCollectionDates(attrs: CollectionDownloadTask): CollectionDownloadTask {
+    return {
+        ...attrs,
+        live: attrs.live
+            ? {
+                  ...attrs.live,
+                  lastFetchedAt: attrs.live.lastFetchedAt ? new Date(attrs.live.lastFetchedAt) : undefined,
+              }
+            : undefined,
+    };
+}
+
+// Callers must normalize legacy snapshots (predating the `kind` discriminant) to
+// `kind: "track"` before calling this — see taskFactory.createTasksFromSnapshots.
+export function reviveTaskDates(attrs: MusicDownloadTaskAttributes): MusicDownloadTaskAttributes {
+    if (attrs.kind === "collection") return reviveCollectionDates(attrs);
+    return reviveTrackDates(attrs);
 }

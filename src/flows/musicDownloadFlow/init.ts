@@ -2,6 +2,7 @@ import { globalLogger } from "#base/logger/logger";
 import { SettingsStore } from "#settings/settingsStore";
 import { TaskOrchestrator } from "#base/task/orchestrator";
 import { applyStageConcurrency } from "./utils/stageLimiters";
+import { liveRefreshScheduler } from "./utils/liveRefreshScheduler";
 import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
 import { SpotifyService } from "./services/metadata-providers/spotify/SpotifyService";
 import { YoutubeService } from "./services/metadata-providers/youtube/YoutubeService";
@@ -35,6 +36,8 @@ export function initMusicApp(): void {
 
     applyConcurrencySettings();
     SettingsStore.getInstance().onSettingsChanged(applyConcurrencySettings);
+
+    liveRefreshScheduler.start();
 }
 
 /** Push the user's concurrency budgets into the orchestrator + stage limiters. */

@@ -72,8 +72,16 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
 
     // Stable identities while the task snapshot is unchanged (e.g. navigating
     // fields/sources), so `compiled` and the memoized rows below can bail.
-    const groups: MetadataGroupState[] = useMemo(() => snapshot?.attributes?.metadataGroups ?? [], [snapshot]);
-    const overrides: MetadataOverrides = useMemo(() => snapshot?.attributes?.metadataOverride ?? {}, [snapshot]);
+    // A collection (album/playlist) task has no metadata sources of its own —
+    // select a child track to see its metadata.
+    const groups: MetadataGroupState[] = useMemo(
+        () => (snapshot?.attributes?.kind === "track" ? snapshot.attributes.metadataGroups : []),
+        [snapshot]
+    );
+    const overrides: MetadataOverrides = useMemo(
+        () => (snapshot?.attributes?.kind === "track" ? snapshot.attributes.metadataOverride : {}),
+        [snapshot]
+    );
     const compiled = useMemo(() => computeCompiledMetadata(groups, overrides), [groups, overrides]);
 
     const [splitRatio, setSplitRatio] = useState(0.6);
@@ -211,8 +219,16 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
                     onGroupsChange={handleGroupsChange}
                     onToggleDiscoverySources={() => setShowDiscoverySources(!showDiscoverySources)}
                     onRefetchResult={handleRefetchResult}
-                    isFetchingPrimarySource={snapshot?.attributes?.primaryMetadataInProgress ?? false}
-                    isDiscovering={snapshot?.attributes?.metadataDiscoveringInProgress ?? false}
+                    isFetchingPrimarySource={
+                        snapshot?.attributes?.kind === "track"
+                            ? (snapshot.attributes.primaryMetadataInProgress ?? false)
+                            : false
+                    }
+                    isDiscovering={
+                        snapshot?.attributes?.kind === "track"
+                            ? (snapshot.attributes.metadataDiscoveringInProgress ?? false)
+                            : false
+                    }
                 />
                 <MetadataDetailPanel
                     source={selectedResult ?? "compiled"}

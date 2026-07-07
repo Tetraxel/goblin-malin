@@ -5,6 +5,8 @@ import { useTheme } from "#base/themeContext";
 import { StatusAttributes, StatusType } from "#base/task/task-status";
 import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { AnimatedIcon, Icon } from "#components/AnimatedIcon";
+import { useGlobalTicker } from "#hooks/useGlobalTicker";
+import { formatRelativeTime } from "#utils/string";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
 function getStatusIcon(status: StatusType): React.ReactNode | null {
@@ -71,9 +73,21 @@ export const StatusCell = React.memo(function StatusCell({
     isSelected,
 }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
     const theme = useTheme();
+    const attrs = task.attributes;
+    const liveFetchedAt =
+        attrs?.kind === "collection" && attrs.collectionKind === "playlist" && task.status.type === StatusType.Success
+            ? attrs.live?.lastFetchedAt
+            : undefined;
+    // Only a finished, live-refreshing playlist row ticks — cost is bounded to visible
+    // rows. The returned frame count isn't read; subscribing is what forces the periodic
+    // re-render that keeps the "Fetched Xs ago" text below current.
+    useGlobalTicker(1000, liveFetchedAt !== undefined);
+
     const statusColor = getStatusColor(task.status.type, theme);
-    const statusText = getStatusText(task.status);
     const iconComponent = getStatusIcon(task.status.type);
+    const statusText = liveFetchedAt
+        ? `Fetched ${formatRelativeTime(Date.now() - liveFetchedAt.getTime())}`
+        : getStatusText(task.status);
 
     return (
         <Box flexGrow={1}>

@@ -7,7 +7,7 @@ import { ServiceScope } from "#base/service-scope";
 import { StatusAttributes, StatusType } from "#base/task/task-status";
 import { throwIfAborted } from "#utils/errors";
 import {
-    MusicDownloadTaskAttributes,
+    TrackDownloadTask,
     TrackMetadata,
     TrackDownloadSource,
     MetadataGroupState,
@@ -36,7 +36,7 @@ function normalizeDiscoveryResult(raw: unknown): DiscoveryResult {
     return raw as DiscoveryResult;
 }
 
-export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
+export class DownloadTask extends Task<TrackDownloadTask> {
     private metadataServices: ServiceScope<DownloadTask, MetadataService>;
     private discoveryServices: ServiceScope<DownloadTask, DiscoveryMetadataService>;
     private downloadServices: ServiceScope<DownloadTask, DownloadService>;
@@ -59,7 +59,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
     }: {
         id: string;
         initialInput?: string;
-        attributes?: MusicDownloadTaskAttributes;
+        attributes?: TrackDownloadTask;
         logger: Logger;
         initialStatus?: StatusAttributes;
         metadataServiceRegistry: ServiceRegistry<DownloadTask, MetadataService>;

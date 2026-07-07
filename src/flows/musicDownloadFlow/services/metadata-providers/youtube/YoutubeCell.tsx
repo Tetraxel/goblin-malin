@@ -7,7 +7,8 @@ export const YoutubeCell = React.memo(function YoutubeCell({
     task,
     isSelected,
 }: ColumnComponentProps<MusicDownloadTaskAttributes>) {
-    const group = task.attributes?.metadataGroups.find((g) => g.serviceKey === "youtube");
+    const attrs = task.attributes;
+    const group = attrs?.kind === "track" ? attrs.metadataGroups.find((g) => g.serviceKey === "youtube") : undefined;
     const metadata = group?.results.find((r) => !r.isRejected)?.metadata;
     const fullUri = metadata?.uri;
     const uri = fullUri?.split("::").pop();

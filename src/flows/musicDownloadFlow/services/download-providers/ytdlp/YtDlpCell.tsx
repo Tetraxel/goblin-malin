@@ -5,7 +5,9 @@ import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
 export const YtDlpCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, isSelected }) => {
-    const downloadSource = task.attributes?.downloadSources.find((d) => d.provider === "ytdlp");
+    const attrs = task.attributes;
+    const downloadSource =
+        attrs?.kind === "track" ? attrs.downloadSources.find((d) => d.provider === "ytdlp") : undefined;
     const saved = downloadSource?.savedFile;
     const display = saved
         ? path.basename(saved.path)

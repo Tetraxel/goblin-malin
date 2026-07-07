@@ -1,6 +1,7 @@
 ﻿import YTMusic, { type SongFull, type VideoFull, type ArtistFull, type AlbumFull } from "ytmusic-api";
 import { Logger } from "#base/logger/logger";
-import { ParsedUrl } from "#base/urlParser";
+import { ParsedUrl, CollectionExpansion } from "#base/urlParser";
+import { Task } from "#base/task/task";
 import { StatusType } from "#base/task/task-status";
 import { ProviderDisplay } from "#base/providerDisplay";
 import { ProviderSettingsSchema } from "#base/providerSettings";
@@ -182,11 +183,19 @@ export class YoutubeService extends MetadataService {
         const host = parsed.hostname.replace(/^www\./, "");
 
         if (host === "music.youtube.com") {
+            if (parsed.pathname === "/playlist") {
+                const id = parsed.searchParams.get("list") ?? undefined;
+                return id ? { platform: "youtube", type: "playlist", id } : null;
+            }
             if (!parsed.pathname.startsWith("/watch")) return null;
             return { platform: "youtube", type: "track", id: parsed.searchParams.get("v") ?? undefined };
         }
 
         if (host === "youtube.com" || host.endsWith(".youtube.com")) {
+            if (parsed.pathname === "/playlist") {
+                const id = parsed.searchParams.get("list") ?? undefined;
+                return id ? { platform: "youtube", type: "playlist", id } : null;
+            }
             if (parsed.pathname !== "/watch") return null;
             return { platform: "youtube", type: "track", id: parsed.searchParams.get("v") ?? undefined };
         }
@@ -197,6 +206,38 @@ export class YoutubeService extends MetadataService {
         }
 
         return null;
+    }
+
+    /**
+     * Resolve a playlist URL to its track listing. Deliberately NOT wrapped in
+     * @Cached() — a live-refreshing playlist must see fresh results on every
+     * refetch. `getPlaylistVideos` handles its own pagination internally (no
+     * limit/offset params on the client). YouTube Music albums aren't recognized
+     * by parseUrl (browse-id URLs, not `?list=` — ambiguous to parse reliably), so
+     * this only ever runs for playlists.
+     */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    static async expandCollection(url: string, logger: Logger, task: Task<any>): Promise<CollectionExpansion> {
+        const parsed = YoutubeService.parseUrl(url);
+        if (!parsed?.id || parsed.type !== "playlist") {
+            throw new Error(`Not a YouTube playlist URL: ${url}`);
+        }
+
+        const instance = new YoutubeService(task as unknown as DownloadTask, logger);
+        const client = await instance.getClient();
+
+        const [playlist, videos] = await Promise.all([
+            client.getPlaylist(parsed.id),
+            client.getPlaylistVideos(parsed.id),
+        ]);
+
+        return {
+            kind: "playlist",
+            name: playlist.name,
+            ownerName: playlist.artist?.name ?? undefined,
+            trackUrls: videos.map((v) => `https://music.youtube.com/watch?v=${v.videoId}`),
+            totalCount: playlist.videoCount,
+        };
     }
 
     @Cached()

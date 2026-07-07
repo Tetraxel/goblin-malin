@@ -2,7 +2,8 @@
 import { ProviderDisplay } from "#base/providerDisplay";
 import { ProviderSettingsSchema } from "#base/providerSettings";
 import { SetupWizardConfig } from "#base/setupWizard";
-import { ParsedUrl } from "#base/urlParser";
+import { ParsedUrl, CollectionExpansion } from "#base/urlParser";
+import { Task } from "#base/task/task";
 import { Cached } from "#utils/cache";
 import { Logger } from "#base/logger/logger";
 import { StatusType } from "#base/task/task-status";
@@ -253,6 +254,84 @@ export class SpotifyService extends MetadataService {
         const playlistMatch = path.match(/\/playlist\/([a-zA-Z0-9]+)/);
         if (playlistMatch) return { platform: "spotify", type: "playlist", id: playlistMatch[1] };
         return null;
+    }
+
+    /**
+     * Resolve an album/playlist URL to its track listing. Deliberately NOT wrapped in
+     * @Cached() — a live-refreshing playlist must see fresh results on every refetch,
+     * and the app-level disk cache has no invalidation for that. `task` only needs to
+     * be Task-shaped (getStatus/getPrompt/logger) — a CollectionTask qualifies without
+     * being a DownloadTask, so the cast below is safe.
+     */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    static async expandCollection(url: string, logger: Logger, task: Task<any>): Promise<CollectionExpansion> {
+        const parsed = SpotifyService.parseUrl(url);
+        if (!parsed?.id || (parsed.type !== "album" && parsed.type !== "playlist")) {
+            throw new Error(`Not a Spotify album/playlist URL: ${url}`);
+        }
+
+        // Reuses the instance's resolveAuth()/getClient() (incl. the setup wizard and
+        // the cross-instance runExclusive dedup) so this shares auth state with every
+        // regular track fetch instead of duplicating it.
+        const instance = new SpotifyService(task as unknown as DownloadTask, logger);
+        const client = await instance.getClient();
+
+        return parsed.type === "playlist"
+            ? SpotifyService.expandPlaylist(client, parsed.id)
+            : SpotifyService.expandAlbum(client, parsed.id);
+    }
+
+    private static async expandPlaylist(client: SpotifyApi, id: string): Promise<CollectionExpansion> {
+        const playlist = await client.playlists.getPlaylist(id, undefined, "name,owner.display_name,tracks.total");
+        const total = playlist.tracks.total;
+
+        const PAGE_SIZE = 50;
+        const trackUrls: string[] = [];
+        let skipped = 0;
+        for (let offset = 0; offset < total; offset += PAGE_SIZE) {
+            const page = await client.playlists.getPlaylistItems(id, undefined, undefined, PAGE_SIZE, offset);
+            for (const item of page.items) {
+                // Local files and episodes aren't fetchable tracks — skip and count them.
+                if (item.is_local || item.track?.type !== "track") {
+                    skipped++;
+                    continue;
+                }
+                trackUrls.push(`https://open.spotify.com/track/${item.track.id}`);
+            }
+            if (page.items.length < PAGE_SIZE) break;
+        }
+
+        return {
+            kind: "playlist",
+            name: playlist.name,
+            ownerName: playlist.owner?.display_name,
+            trackUrls,
+            totalCount: total - skipped,
+        };
+    }
+
+    private static async expandAlbum(client: SpotifyApi, id: string): Promise<CollectionExpansion> {
+        const album = await client.albums.get(id);
+        const total = album.total_tracks;
+
+        const PAGE_SIZE = 50;
+        const trackUrls: string[] = [];
+        for (let offset = 0; offset < total; offset += PAGE_SIZE) {
+            const page = await client.albums.tracks(id, undefined, PAGE_SIZE, offset);
+            for (const track of page.items) {
+                if (track.is_local) continue;
+                trackUrls.push(`https://open.spotify.com/track/${track.id}`);
+            }
+            if (page.items.length < PAGE_SIZE) break;
+        }
+
+        return {
+            kind: "album",
+            name: album.name,
+            ownerName: album.artists[0]?.name,
+            trackUrls,
+            totalCount: trackUrls.length,
+        };
     }
 
     private async fetchViaUrlInfo(url: string, trackId: string, isFallback: boolean): Promise<TrackMetadata> {

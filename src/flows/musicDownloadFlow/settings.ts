@@ -25,6 +25,12 @@ export type MusicDownloadFlowSettings = {
     ui: {
         columnRatios: Record<string, number>; // columnId → fraction of available width (0–1)
     };
+    collections: {
+        /** How often a live-enabled playlist re-fetches its track list, in seconds. */
+        defaultLiveRefreshIntervalSeconds: number;
+        /** Cap on tracks imported from one album/playlist expansion. */
+        defaultMaxTracks: number;
+    };
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -72,6 +78,10 @@ export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSetting
     },
     ui: {
         columnRatios: {},
+    },
+    collections: {
+        defaultLiveRefreshIntervalSeconds: 120,
+        defaultMaxTracks: 500,
     },
 };
 

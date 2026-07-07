@@ -1,0 +1,34 @@
+{
+    "terminal": { "cols": 160, "rows": 40 },
+    "dataDir": "scripts/tui-test/fixtures/collection-import",
+    "steps": [
+        { "type": "stable", "timeout": 8000 },
+        { "type": "assert", "contains": "[PLAYLIST]" },
+        { "type": "assert", "contains": "Running 2026" },
+        { "type": "assert", "contains": "[ALBUM]" },
+        { "type": "assert", "contains": "Presence" },
+        { "type": "snapshot", "name": "initial" },
+
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "Collapse" },
+        { "type": "assert", "contains": "Disable live refresh" },
+        { "type": "snapshot", "name": "playlist-selected" },
+
+        { "type": "key", "key": "c" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "Expand" },
+        { "type": "snapshot", "name": "playlist-collapsed" },
+
+        { "type": "key", "key": "c" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "Collapse" },
+        { "type": "snapshot", "name": "playlist-expanded-again" },
+
+        { "type": "key", "key": "l" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "Enable live refresh" },
+        { "type": "snapshot", "name": "live-disabled" }
+    ]
+}

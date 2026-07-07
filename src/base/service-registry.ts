@@ -3,7 +3,7 @@ import { ServiceBase } from "./service-base";
 import { ServiceScope } from "./service-scope";
 import { Task } from "./task/task";
 import { ProviderDisplay, providerDisplayRegistry } from "./providerDisplay";
-import { ParsedUrl, urlParserRegistry } from "./urlParser";
+import { ParsedUrl, CollectionExpansion, urlParserRegistry } from "./urlParser";
 import { ProviderSettingsSchema } from "./providerSettings";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,6 +17,8 @@ type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> =
     new (task: TTask, logger: Logger): TService;
     display?: ProviderDisplay;
     parseUrl?: (url: string) => ParsedUrl | null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expandCollection?: (url: string, logger: Logger, task: Task<any>) => Promise<CollectionExpansion>;
     defaultSettings?: ProviderSettingsSchema;
 };
 

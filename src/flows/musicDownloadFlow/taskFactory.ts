@@ -2,84 +2,80 @@ import { globalLogger } from "#base/logger/logger";
 import { TaskOrchestrator } from "#base/task/orchestrator";
 import { TaskSnapshot } from "#base/task/task";
 import { DownloadTask } from "./utils/downloadTask";
+import { CollectionTask } from "./utils/collectionTask";
+import { buildTrackTask, reviveTrackTask } from "./utils/buildTrackTask";
 import { taskIdFromUrl } from "./utils/taskId";
-import { resolveTrackRecognition } from "./utils/resolveTrackRecognition";
+import { resolveCollectionRecognition } from "./utils/resolveCollectionRecognition";
 import { reviveTaskDates } from "./utils/reviveTaskDates";
-import { MusicDownloadTaskAttributes } from "./types";
-import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
-import { getMusicSettings } from "./settings";
+import { MusicDownloadTaskAttributes, TrackDownloadTask, CollectionDownloadTask } from "./types";
+import { metadataServiceRegistry } from "./registries";
 
 const logger = globalLogger.createChild({ service: "MusicDownload" });
 
-// Enabled-state checks read the live settings on every call so a settings
-// change applies to running tasks without recreating them.
-const isMetadataServiceEnabled = (key: string): boolean =>
-    getMusicSettings().metadata.providers[key]?.enabled !== false;
-const isDiscoveryServiceEnabled = (key: string): boolean =>
-    getMusicSettings().metadata.discoveryProviders[key]?.enabled !== false;
-const isDownloadServiceEnabled = (key: string): boolean =>
-    getMusicSettings().download.providers[key]?.enabled !== false;
+export type MusicTask = DownloadTask | CollectionTask;
 
-export function createTasksFromUrls(
-    urls: string[],
-    opts: { toTag?: boolean; toDownload?: boolean } = {}
-): DownloadTask[] {
+export function createTasksFromUrls(urls: string[], opts: { toTag?: boolean; toDownload?: boolean } = {}): MusicTask[] {
     const { toTag = true, toDownload = false } = opts;
     return urls.map((url) => {
-        // Recognize the URL once, at import time, so the task carries its uri from
-        // the start (before any fetch). Absent ⇒ "Unknown".
-        const recognition = resolveTrackRecognition(url, metadataServiceRegistry);
-        return new DownloadTask({
-            id: taskIdFromUrl(url),
-            initialInput: url,
-            attributes: {
+        // Collections are recognized the same way tracks are — purely from parseUrl,
+        // no network call. A recognized album/playlist becomes a parent task; its
+        // track list is only fetched once the task is started.
+        const collection = resolveCollectionRecognition(url, metadataServiceRegistry);
+        if (collection) {
+            const attributes: CollectionDownloadTask = {
+                kind: "collection",
+                collectionKind: collection.collectionKind,
                 state: "pending",
                 userInput: { type: "url", url },
-                uri: recognition?.uri,
-                recognizedServiceKey: recognition?.serviceKey,
-                metadataGroups: [],
-                metadataOverride: {},
-                downloadSources: [],
+                recognizedServiceKey: collection.serviceKey,
+                childTaskIds: [],
+                collapsed: false,
                 toTag,
                 toDownload,
-            },
-            logger,
-            metadataServiceRegistry,
-            discoveryServiceRegistry,
-            downloadServiceRegistry,
-            isMetadataServiceEnabled,
-            isDiscoveryServiceEnabled,
-            isDownloadServiceEnabled,
-        });
+                live: collection.collectionKind === "playlist" ? { enabled: true } : undefined,
+            };
+            return new CollectionTask({ id: taskIdFromUrl(url), initialInput: url, attributes, logger });
+        }
+        return buildTrackTask(url, { toTag, toDownload });
     });
 }
 
-export function createTasksFromSnapshots(snapshots: TaskSnapshot[]): DownloadTask[] {
+export function createTasksFromSnapshots(snapshots: TaskSnapshot[]): MusicTask[] {
     return snapshots.map((snap) => {
         const rawAttrs = snap.attributes as MusicDownloadTaskAttributes | undefined;
-        const attributes = rawAttrs ? reviveTaskDates(rawAttrs) : undefined;
-        return new DownloadTask({
+
+        if (rawAttrs?.kind === "collection") {
+            const attributes = reviveTaskDates(rawAttrs) as CollectionDownloadTask;
+            return new CollectionTask({
+                id: snap.id,
+                initialInput: snap.initialInput,
+                attributes,
+                initialStatus: snap.status,
+                logger,
+            });
+        }
+
+        // Legacy snapshots predate the `kind` discriminant — treat those (and any
+        // snapshot that isn't a collection) as a track.
+        const normalized: TrackDownloadTask | undefined = rawAttrs
+            ? ({ ...rawAttrs, kind: "track" } as TrackDownloadTask)
+            : undefined;
+        const attributes = normalized ? (reviveTaskDates(normalized) as TrackDownloadTask) : undefined;
+        return reviveTrackTask({
             id: snap.id,
             initialInput: snap.initialInput,
             attributes,
             initialStatus: snap.status,
-            logger,
-            metadataServiceRegistry,
-            discoveryServiceRegistry,
-            downloadServiceRegistry,
-            isMetadataServiceEnabled,
-            isDiscoveryServiceEnabled,
-            isDownloadServiceEnabled,
         });
     });
 }
 
 /** Add tasks to the queue, skipping ids already present (or duplicated in the batch). */
-export function importTasks(tasks: DownloadTask[]): void {
+export function importTasks(tasks: MusicTask[]): void {
     const orchestrator = TaskOrchestrator.getInstance();
     const existingIds = new Set(orchestrator.getTasks().map((t) => t.getId()));
     const seen = new Set<string>();
-    const newTasks: DownloadTask[] = [];
+    const newTasks: MusicTask[] = [];
     let skippedCount = 0;
 
     for (const task of tasks) {
