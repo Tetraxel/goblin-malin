@@ -7,12 +7,10 @@ import { MetadataPanel } from "./MetadataPanel/MetadataPanel";
 import { DownloadPanel } from "./DownloadPanel/DownloadPanel";
 import { TabBar } from "../TabBar";
 import { Task } from "#base/task/task";
-import { FlowBase } from "#base/flow/flow-base";
 
 interface SecondaryPanelProps {
     tasks: Task[];
     width: number;
-    flow: FlowBase | undefined;
 }
 
 export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) => {

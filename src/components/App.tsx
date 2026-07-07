@@ -1,22 +1,17 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ToolbarButtonHook } from "./Toolbar/Toolbar";
-import { ColumnDefinition } from "./TaskListPanel/TaskListPanel";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useScreenSize } from "#hooks/useScreenSize";
+import { useSettingsVersion } from "#hooks/useSettingsVersion";
 import { FocusProvider } from "#contexts/FocusContext";
 import { ToolbarActionsProvider } from "#contexts/ToolbarActionsContext";
 import { ThemeProvider } from "#base/themeContext";
 import { ShortcutRegistryProvider } from "#base/shortcuts/ShortcutRegistry";
-import { MusicDownloadFlow } from "#flows/musicDownloadFlow/musicDownloadFlow";
-import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
+import { TaskOrchestrator } from "#base/task/orchestrator";
 import { Task, TaskAttributes } from "#base/task/task";
-import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
-import { globalLogger } from "#base/logger/logger";
+import { computeColumns, PrimaryMode } from "#flows/musicDownloadFlow/taskColumns";
 import { getInstance } from "#utils/mpvPlayer";
 import { getAssetPath } from "#utils/appPaths";
 import { AppInner } from "./AppInner";
-import { useSettingsButton } from "./Toolbar/useSettingsButton";
-import { useSessionsButton } from "./Toolbar/useSessionsButton";
-import { useExitButton } from "./Toolbar/useExitButton";
+import { TOOLBAR_BUTTONS } from "./Toolbar/toolbarButtons";
 import { checkForUpdate, UpdateInfo } from "#updater/updateChecker";
 import { SettingsStore } from "#settings/settingsStore";
 import { SessionManager } from "#sessions/sessionManager";
@@ -34,18 +29,20 @@ export const App: React.FC = () => {
 
     const [tasks, setTasks] = useState<Task<TaskAttributes>[]>([]);
     const { height: terminalHeight, width: terminalWidth } = useScreenSize();
-    const orchestrator = FlowOrchestrator.getInstance();
-    const [activeFlowId, setActiveFlowId] = useState<string | undefined>(() => {
-        orchestrator.registerFlow(MusicDownloadFlow, true);
-        return orchestrator.getEnabledFlows()?.[0].id;
-    });
-    const [toolbarButtons, setToolbarButtons] = useState<ToolbarButtonHook[]>([]);
-    const [columns, setColumns] = useState<ColumnDefinition<MusicDownloadTaskAttributes>[]>([]);
-    const currentFlow = activeFlowId ? orchestrator.getFlow(activeFlowId) : undefined;
+    const orchestrator = TaskOrchestrator.getInstance();
+
+    // The display mode is plain React state here — the single source of truth.
+    // Columns derive from it (and from the current settings) with no subscription.
+    const [primaryMode, setPrimaryMode] = useState<PrimaryMode>("metadata");
+    const settingsVersion = useSettingsVersion();
+    const columns = useMemo(
+        () => computeColumns(primaryMode),
+        [primaryMode, settingsVersion] // eslint-disable-line react-hooks/exhaustive-deps
+    );
 
     const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
     const [pendingUpdate, setPendingUpdate] = useState<UpdateInfo | null>(null);
-    const isOrchestratorIdle = useCallback((orch: FlowOrchestrator) => orch.getTasksInProgress().length === 0, []);
+    const isOrchestratorIdle = useCallback((orch: TaskOrchestrator) => orch.getTasksInProgress().length === 0, []);
 
     useEffect(() => {
         const store = SettingsStore.getInstance();
@@ -53,7 +50,7 @@ export const App: React.FC = () => {
         return store.onSettingsChanged(() => {
             setCacheEnabled(store.getAppSettings().general.cacheEnabled);
         });
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         const settings = SettingsStore.getInstance().getAppSettings();
@@ -78,44 +75,16 @@ export const App: React.FC = () => {
         });
     }, [pendingUpdate, orchestrator, isOrchestratorIdle]);
 
-    // [!] This is important to allow dynamic updates of buttons and columns when the flow changes
+    // Restore the last session once at startup (gated by the reopenLastSession setting).
     useEffect(() => {
-        if (!currentFlow) return;
-        globalLogger.debug(`Active flow changed: ${currentFlow?.displayName}`);
-        // Subscribe to currentFlow changes to update buttons and columns dynamically
-        const unsubscribe = currentFlow.subscribe((_updatedFlow) => {
-            const buttons = [
-                ...(currentFlow.getToolbarButtons() ?? []),
-                useSessionsButton,
-                useSettingsButton,
-                useExitButton,
-            ];
-            setToolbarButtons(buttons);
-            const newColumns = currentFlow.getColumns() ?? [];
-            setColumns((prev) => {
-                // Avoid handing TaskRow a new array reference when column ids and ratios
-                // haven't changed (e.g. on task-status updates that fire the flow subscriber
-                // but don't touch column layout). Keeps React.memo guards intact.
-                const structurallyEqual =
-                    newColumns.length === prev.length &&
-                    newColumns.every((c, i) => c.id === prev[i]?.id && c.widthRatio === prev[i]?.widthRatio);
-                return structurallyEqual ? prev : newColumns;
-            });
-        });
-        return unsubscribe;
-    }, [currentFlow, currentFlow?.id]);
-
-    // Init SessionManager once the active flow is ready
-    useEffect(() => {
-        if (!currentFlow) return;
-        SessionManager.getInstance().init(currentFlow, orchestrator);
-    }, [currentFlow?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+        SessionManager.getInstance().init();
+    }, []);
 
     useEffect(() => {
         const unsubscribe = orchestrator.subscribe((orch) => {
-            const currentFlowTasks = orch.getTasks();
-            setTasks(currentFlowTasks);
-            SessionManager.getInstance().persistCurrent(currentFlowTasks.map((t) => t.get()));
+            const currentTasks = orch.getTasks();
+            setTasks(currentTasks);
+            SessionManager.getInstance().persistCurrent(currentTasks.map((t) => t.get()));
         });
         return unsubscribe;
     }, [orchestrator, orchestrator.id]);
@@ -134,28 +103,20 @@ export const App: React.FC = () => {
         return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
     }, [tasks, orchestrator]);
 
-    const filteredTasks = useMemo(
-        () => tasks.filter((task) => task.getFlowId() === activeFlowId),
-        [tasks, activeFlowId]
-    );
-
     return (
         <ThemeProvider>
             <ShortcutRegistryProvider>
                 <FocusProvider
-                    toolbarButtonCount={toolbarButtons.length + (updateInfo ? 1 : 0)}
-                    taskCount={filteredTasks.length}
+                    toolbarButtonCount={TOOLBAR_BUTTONS.length + (updateInfo ? 1 : 0)}
+                    taskCount={tasks.length}
                     taskColumnCount={columns.length}
+                    primaryMode={primaryMode}
+                    onPrimaryModeChange={setPrimaryMode}
                 >
                     <ToolbarActionsProvider>
                         <AppInner
                             tasks={tasks}
-                            filteredTasks={filteredTasks}
-                            toolbarButtons={toolbarButtons}
                             columns={columns}
-                            currentFlow={currentFlow}
-                            orchestrator={orchestrator}
-                            setActiveFlowId={setActiveFlowId}
                             terminalHeight={terminalHeight}
                             terminalWidth={terminalWidth}
                             updateInfo={updateInfo}

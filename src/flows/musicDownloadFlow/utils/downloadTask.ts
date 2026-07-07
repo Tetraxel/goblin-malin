@@ -48,7 +48,6 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         id,
         initialInput,
         attributes,
-        flowId,
         logger,
         initialStatus,
         metadataServiceRegistry,
@@ -61,7 +60,6 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         id: string;
         initialInput?: string;
         attributes?: MusicDownloadTaskAttributes;
-        flowId: string;
         logger: Logger;
         initialStatus?: StatusAttributes;
         metadataServiceRegistry: ServiceRegistry<DownloadTask, MetadataService>;
@@ -71,7 +69,7 @@ export class DownloadTask extends Task<MusicDownloadTaskAttributes> {
         isDiscoveryServiceEnabled: (key: string) => boolean;
         isDownloadServiceEnabled: (key: string) => boolean;
     }) {
-        super({ id, initialInput, attributes, flowId, logger, initialStatus });
+        super({ id, initialInput, attributes, logger, initialStatus });
 
         this.metadataServiceRegistry = metadataServiceRegistry;
         this.discoveryServiceRegistry = discoveryServiceRegistry;

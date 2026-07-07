@@ -1,8 +1,6 @@
 ﻿import { Box, Text } from "ink";
 import React, { useLayoutEffect } from "react";
 import { ToolbarButtonHook } from "./Toolbar";
-import { FlowBase } from "#base/flow/flow-base";
-import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
 import { useToolbarActionsRef } from "#contexts/ToolbarActionsContext";
 import { useTheme } from "#base/themeContext";
 import { AnimatedIcon, Icon } from "#components/AnimatedIcon";
@@ -11,22 +9,14 @@ export const ToolbarButtonInvoker = ({
     hook,
     isSelected,
     index,
-    flow,
-    orchestrator,
 }: {
     hook: ToolbarButtonHook;
     isSelected: boolean;
     index: number;
-    flow: FlowBase;
-    orchestrator: FlowOrchestrator;
 }) => {
     const theme = useTheme();
     const actionsRef = useToolbarActionsRef();
-    const { enabled, label, icon, inProgress, color, bold, italic, onPress } = hook({
-        isSelected,
-        flow,
-        orchestrator,
-    });
+    const { enabled, label, icon, inProgress, color, bold, italic, onPress } = hook({ isSelected });
 
     // Register the current onPress for this button index into the shared ref.
     // Runs on every render so the handler always sees the latest closure.

@@ -1,16 +1,19 @@
 ﻿import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
-import { FlowBase } from "#base/flow/flow-base";
 import { Task } from "#base/task/task";
 import { useTheme } from "#base/themeContext";
 import { useFocusChrome, useFocusTaskList } from "#contexts/FocusContext";
 import { ActionBarRow, getContextualShortcutIds } from "#types/actions";
+import { ColumnDefinition } from "./TaskListPanel";
+import { buildContextualActionBar } from "#flows/musicDownloadFlow/contextualActions";
+import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import type { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { Hint } from "../Hint";
 
 export const ActionBar: React.FC<{
     tasks: Task[];
-    flow: FlowBase | undefined;
-}> = ({ tasks, flow }) => {
+    columns: ColumnDefinition<MusicDownloadTaskAttributes>[];
+}> = ({ tasks, columns }) => {
     const theme = useTheme();
     const { activeWindow } = useFocusChrome();
     const taskList = useFocusTaskList();
@@ -26,8 +29,9 @@ export const ActionBar: React.FC<{
     }, [selectedTask]);
 
     const bar =
-        isTaskListActive && flow && selectedTask
-            ? flow.getContextualActionBar(selectedTask, {
+        isTaskListActive && selectedTask
+            ? buildContextualActionBar(selectedTask as unknown as DownloadTask, {
+                  columns,
                   columnIndex: taskList.selectedColumnIndex,
                   taskIndex: selectedIndex,
                   taskCount: tasks.length,

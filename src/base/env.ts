@@ -131,7 +131,7 @@ export class Env {
 
     private persistProviderDisabled(config: SetupWizardConfig): void {
         if (!config.providerKey || !config.providerType) return;
-        SettingsStore.getInstance().patchFlowSettings(this.task.getFlowId(), {
+        SettingsStore.getInstance().patchMusicSettings({
             [config.providerType]: { providers: { [config.providerKey]: { enabled: false } } },
         });
         this.logger.info(`Disabled provider '${config.providerKey}' in settings.`);

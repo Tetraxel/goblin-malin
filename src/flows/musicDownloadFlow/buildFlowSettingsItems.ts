@@ -1,9 +1,11 @@
 ﻿import { DeepPartial } from "#utils/types";
 import { ProviderConstructorLike, ProviderSettingsSchema } from "#base/providerSettings";
+import { ServiceRegistry } from "#base/service-registry";
 import { SetupWizardConfig } from "#base/setupWizard";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { SettingsItem } from "#settings/buildSettingsItems";
 import { MusicDownloadFlowSettings } from "./settings";
+import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
 import { clearTempDownloads } from "./saveSettings";
 
 export type ProviderEntry = {
@@ -202,4 +204,27 @@ export function buildFlowSettingsItems(
     }
 
     return items;
+}
+
+/** Settings rows for the music downloader, sourced from the live provider registries. */
+export function buildMusicSettingsItems(
+    settings: Record<string, unknown>,
+    onChange: (patch: Record<string, unknown>) => void,
+    onOpenWizard?: (config: SetupWizardConfig, onDisable?: () => void) => void
+): SettingsItem[] {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const toEntries = (registry: ServiceRegistry<any, any>): ProviderEntry[] =>
+        Array.from(registry.getAllConstructors().keys()).map((key) => ({
+            key,
+            ctor: registry.getConstructor(key) as ProviderConstructorLike,
+        }));
+
+    return buildFlowSettingsItems(
+        settings as MusicDownloadFlowSettings,
+        toEntries(metadataServiceRegistry),
+        toEntries(downloadServiceRegistry),
+        toEntries(discoveryServiceRegistry),
+        onChange as (patch: DeepPartial<MusicDownloadFlowSettings>) => void,
+        onOpenWizard
+    );
 }

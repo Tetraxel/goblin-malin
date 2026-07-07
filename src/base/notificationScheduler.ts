@@ -1,7 +1,7 @@
 /**
  * Coalesces subscriber notifications into a single flush per animation frame.
  *
- * Why this exists: `Task`, `TaskStatus` and `FlowOrchestrator` each notify their
+ * Why this exists: `Task`, `TaskStatus` and `TaskOrchestrator` each notify their
  * subscribers synchronously on every state change. Those subscribers are React
  * components (via `setState`), so each notification triggers a React commit +
  * Ink's full-tree repaint (Yoga layout + ANSI diff — the dominant per-frame cost).

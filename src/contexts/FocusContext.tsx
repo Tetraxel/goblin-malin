@@ -42,6 +42,8 @@ export const FocusProvider: React.FC<{
     toolbarButtonCount: number;
     taskCount: number;
     taskColumnCount: number;
+    primaryMode: "metadata" | "download";
+    onPrimaryModeChange: (mode: "metadata" | "download") => void;
 }> = ({ children, ...config }) => {
     const fm = useFocusManager(config);
     const fs = fm.focusState;
@@ -53,7 +55,6 @@ export const FocusProvider: React.FC<{
             switchWindow: fm.switchWindow,
             switchBack: fm.switchBack,
             handleTabPress: fm.handleTabPress,
-            switchMode: fm.switchMode,
             resizePanels: fm.resizePanels,
             setPrimaryMode: fm.setPrimaryMode,
             setSecondaryTab: fm.setSecondaryTab,
@@ -74,7 +75,6 @@ export const FocusProvider: React.FC<{
             fm.switchWindow,
             fm.switchBack,
             fm.handleTabPress,
-            fm.switchMode,
             fm.resizePanels,
             fm.setPrimaryMode,
             fm.setSecondaryTab,

@@ -1,7 +1,6 @@
 ﻿import React, { useMemo } from "react";
 import { Box, Text } from "ink";
 import { Task, TaskSnapshot } from "#base/task/task";
-import { FlowBase } from "#base/flow/flow-base";
 import { useTheme } from "#base/themeContext";
 import { useFocusChrome, useFocusTaskList } from "#contexts/FocusContext";
 import { Shortcut, ContextualActions, ContextualActionBar } from "#types/actions";
@@ -9,7 +8,7 @@ import { ActionBar } from "./ActionBar";
 import { DynamicHintBar } from "#components/DynamicHintBar/DynamicHintBar";
 import { TaskRow } from "./TaskRow";
 import { useTaskHeaderShortcuts } from "#hooks/useKeyHandlers";
-import { globalLogger } from "#base/logger/logger";
+import { saveColumnRatios } from "#flows/musicDownloadFlow/taskColumns";
 
 export type { Shortcut, ContextualActions, ContextualActionBar };
 
@@ -18,7 +17,6 @@ export type ColumnComponentProps<TAttributes> = {
     taskReference: Task<TAttributes>;
     width: number;
     isSelected: boolean;
-    flow: FlowBase;
 };
 
 // React.ComponentType accepts both plain function components and React.memo-wrapped ones.
@@ -98,8 +96,7 @@ export const TaskListPanel: React.FC<{
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tasks: Task<any>[];
     width: number;
-    flow: FlowBase;
-}> = ({ columns, tasks, width, flow }) => {
+}> = ({ columns, tasks, width }) => {
     const theme = useTheme();
     const { activeWindow, layout } = useFocusChrome();
     const taskListFocus = useFocusTaskList();
@@ -288,7 +285,7 @@ export const TaskListPanel: React.FC<{
                       : c.width;
             allRatios[c.id] = w / resizableWidth;
         });
-        flow.setColumnRatios(allRatios);
+        saveColumnRatios(allRatios);
     });
 
     return (
@@ -356,7 +353,6 @@ export const TaskListPanel: React.FC<{
                                 isMultiSelected={isMultiSelected}
                                 selectedColumnIndex={selectedColumnIndex}
                                 columns={calculatedColumns}
-                                flow={flow}
                             />
                         );
                     })
@@ -367,7 +363,7 @@ export const TaskListPanel: React.FC<{
             {isWindowActive && taskListFocus.isHeaderFocused ? (
                 <DynamicHintBar width={width - 2} isActive={true} />
             ) : (
-                <ActionBar tasks={tasks} flow={flow} />
+                <ActionBar tasks={tasks} columns={columns} />
             )}
         </Box>
     );

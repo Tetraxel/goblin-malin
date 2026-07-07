@@ -1,13 +1,14 @@
 import React, { useMemo, useState } from "react";
 import { Box, Text } from "ink";
 import { useShortcuts } from "#hooks/useShortcuts";
-import { FlowBase } from "#base/flow/flow-base";
 import { useTheme } from "#base/themeContext";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { SettingsStore } from "#settings/settingsStore";
 import { AppSettings } from "#settings/appSettings";
 import { buildGlobalSettingsItems } from "#settings/buildGlobalSettingsItems";
 import { filterSettingsItems, isInteractive, SettingsItem } from "#settings/buildSettingsItems";
+import { getMusicSettings, saveMusicSettings } from "#flows/musicDownloadFlow/settings";
+import { buildMusicSettingsItems } from "#flows/musicDownloadFlow/buildFlowSettingsItems";
 import { deepMerge } from "#utils/deepMerge";
 import { DeepPartial } from "#utils/types";
 import { shortcutRegistry } from "#base/shortcuts/ShortcutRegistry";
@@ -25,16 +26,10 @@ type ActiveTab = "settings" | "shortcuts";
 interface SettingsModalProps {
     terminalHeight: number;
     terminalWidth: number;
-    currentFlow: FlowBase | undefined;
     openConfirmModal: (config: ConfirmModalConfig) => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({
-    terminalHeight,
-    terminalWidth,
-    currentFlow,
-    openConfirmModal,
-}) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, terminalWidth, openConfirmModal }) => {
     const theme = useTheme();
     const { switchBack, openWizard } = useFocusActions();
     const { activeWindow, previousWindow, returningFromWindow } = useFocusChrome();
@@ -87,19 +82,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         const globalItems = buildGlobalSettingsItems(appDraft, (patch) =>
             setAppDraft((prev) => deepMerge(prev, patch as DeepPartial<AppSettings>))
         );
-        const fullFlowSettings = deepMerge(
-            (currentFlow?.getFlowSettings?.() ?? {}) as Record<string, unknown>,
-            flowPatch
+        const fullMusicSettings = deepMerge(getMusicSettings() as unknown as Record<string, unknown>, flowPatch);
+        const musicItems = buildMusicSettingsItems(
+            fullMusicSettings,
+            (patch) => setFlowPatch((prev) => deepMerge(prev, patch) as Record<string, unknown>),
+            openWizard
         );
-        const flowItems =
-            currentFlow?.buildFlowSettingsItems?.(
-                fullFlowSettings,
-                (patch) => setFlowPatch((prev) => deepMerge(prev, patch) as Record<string, unknown>),
-                openWizard
-            ) ?? [];
-        return [...globalItems, ...flowItems];
+        return [...globalItems, ...musicItems];
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [appDraft, flowPatch, currentFlow, returningFromWindow]);
+    }, [appDraft, flowPatch, returningFromWindow]);
 
     const filteredItems = useMemo(() => filterSettingsItems(allItems, searchQuery), [allItems, searchQuery]);
     const safeSelectedIndex = Math.min(selectedIndex, Math.max(0, filteredItems.length - 1));
@@ -116,12 +107,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
     function commitAndExit() {
         SettingsStore.getInstance().writeAppSettings(appDraft);
-        if (currentFlow?.saveFlowSettings) {
-            const fullFlowSettings = deepMerge(
-                (currentFlow.getFlowSettings?.() ?? {}) as Record<string, unknown>,
-                flowPatch
-            );
-            currentFlow.saveFlowSettings(fullFlowSettings);
+        if (Object.keys(flowPatch).length > 0) {
+            saveMusicSettings(deepMerge(getMusicSettings() as unknown as Record<string, unknown>, flowPatch));
         }
         switchBack();
     }
