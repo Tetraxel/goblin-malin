@@ -1,12 +1,12 @@
 ﻿import { useState, useCallback } from "react";
 import { PendingImport } from "./ImportModal";
-import { FlowBase } from "#base/flow/flow-base";
 import { useFocusChrome } from "#contexts/FocusContext";
 import { globalLogger } from "#base/logger/logger";
 import { readClipboard } from "./clipboard";
 import { detectUrls } from "./detectUrls";
+import { createTasksFromUrls, importTasks } from "#flows/musicDownloadFlow/taskFactory";
 
-export function useImportFlow(currentFlow: FlowBase | undefined) {
+export function useImportFlow() {
     const { activeWindow } = useFocusChrome();
     const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
 
@@ -45,16 +45,15 @@ export function useImportFlow(currentFlow: FlowBase | undefined) {
 
     const handleImportConfirm = useCallback(
         ({ fetchMetadata, download }: { fetchMetadata: boolean; download: boolean }) => {
-            if (!pendingImport || !currentFlow) {
+            if (!pendingImport) {
                 setPendingImport(null);
                 return;
             }
             const urls = pendingImport.urls.map((d) => d.raw);
-            const tasks = currentFlow.createTasksFromUrls(urls, { toTag: fetchMetadata, toDownload: download });
-            currentFlow.importTasks(tasks);
+            importTasks(createTasksFromUrls(urls, { toTag: fetchMetadata, toDownload: download }));
             setPendingImport(null);
         },
-        [pendingImport, currentFlow]
+        [pendingImport]
     );
 
     const handleImportCancel = useCallback(() => {

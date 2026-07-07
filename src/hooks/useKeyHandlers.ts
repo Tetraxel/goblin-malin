@@ -1,12 +1,15 @@
 import { useFocusActions, useFocusChrome, useFocusTaskList } from "#contexts/FocusContext";
 import { useToolbarActionsRef } from "#contexts/ToolbarActionsContext";
-import { FlowBase } from "#base/flow/flow-base";
 import { Task } from "#base/task/task";
 import { PromptType } from "#base/task/task-prompt";
 import { useActivePrompt } from "#components/PromptModal/useActivePrompt";
 import { useShortcuts, ShortcutDef } from "#hooks/useShortcuts";
 import { getContextualShortcutIds } from "#types/actions";
 import { globalLogger } from "#base/logger/logger";
+import { ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
+import { buildContextualActionBar } from "#flows/musicDownloadFlow/contextualActions";
+import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import type { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 
@@ -51,7 +54,7 @@ export function useToolbarShortcuts(): void {
 
 // ── Task list ─────────────────────────────────────────────────────────────────
 
-export function useTaskListShortcuts(tasks: Task[], flow: FlowBase | undefined): void {
+export function useTaskListShortcuts(tasks: Task[], columns: ColumnDefinition<MusicDownloadTaskAttributes>[]): void {
     const { moveTaskSelection, resizePanels, toggleTaskSelection, selectAllTasks, clearSelection } = useFocusActions();
     const { activeWindow } = useFocusChrome();
     const taskList = useFocusTaskList();
@@ -60,12 +63,13 @@ export function useTaskListShortcuts(tasks: Task[], flow: FlowBase | undefined):
     const selectedTask = tasks[taskList.selectedTaskIndex];
     const multiCount = taskList.selectedTaskIds.size;
 
-    // Derive contextual action shortcuts from the flow's action bar for the current task/column.
+    // Derive contextual action shortcuts from the action bar for the current task/column.
     // Computed inline (no memo) so the action bar is always fresh — task internal state (status,
     // column values) changes without changing the task object reference, which would fool useMemo.
     const contextualShortcuts: ShortcutDef[] = (() => {
-        if (!flow || !selectedTask) return [];
-        const bar = flow.getContextualActionBar(selectedTask, {
+        if (!selectedTask) return [];
+        const bar = buildContextualActionBar(selectedTask as unknown as DownloadTask, {
+            columns,
             columnIndex: taskList.selectedColumnIndex,
         });
         if (!bar) return [];

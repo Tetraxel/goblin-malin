@@ -2,8 +2,9 @@ import React from "react";
 import { useFocusActions, useFocusChrome, useFocusSecondaryPanel } from "#contexts/FocusContext";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useToolbarShortcuts, useTaskListShortcuts, usePromptShortcuts } from "#hooks/useKeyHandlers";
-import { FlowBase } from "#base/flow/flow-base";
 import { Task } from "#base/task/task";
+import { ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
+import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import { useImportActions } from "#contexts/ImportActionsContext";
 import { statsDisplay } from "#base/statsDisplay";
 
@@ -13,9 +14,9 @@ import { statsDisplay } from "#base/statsDisplay";
  */
 export const InputRouter: React.FC<{
     tasks: Task[];
-    flow: FlowBase | undefined;
-}> = ({ tasks, flow }) => {
-    const { handleTabPress, switchMode, setPrimaryMode, setSecondaryTab } = useFocusActions();
+    columns: ColumnDefinition<MusicDownloadTaskAttributes>[];
+}> = ({ tasks, columns }) => {
+    const { handleTabPress, setPrimaryMode, setSecondaryTab } = useFocusActions();
     const { activeWindow, isEditingField } = useFocusChrome();
     const secondaryPanel = useFocusSecondaryPanel();
     const { openImportFlow } = useImportActions();
@@ -57,19 +58,13 @@ export const InputRouter: React.FC<{
                 id: "global.mode1",
                 defaultShortcut: { input: "1" },
                 label: "Metadata mode",
-                handler: () => {
-                    if (flow) switchMode(flow, "1");
-                    setPrimaryMode("metadata");
-                },
+                handler: () => setPrimaryMode("metadata"),
             },
             {
                 id: "global.mode2",
                 defaultShortcut: { input: "2" },
                 label: "Download mode",
-                handler: () => {
-                    if (flow) switchMode(flow, "2");
-                    setPrimaryMode("download");
-                },
+                handler: () => setPrimaryMode("download"),
             },
             {
                 id: "global.tab3",
@@ -99,7 +94,7 @@ export const InputRouter: React.FC<{
     });
 
     useToolbarShortcuts();
-    useTaskListShortcuts(tasks, flow);
+    useTaskListShortcuts(tasks, columns);
     usePromptShortcuts(tasks);
 
     return null;

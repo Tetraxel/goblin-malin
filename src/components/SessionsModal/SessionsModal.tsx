@@ -4,8 +4,6 @@ import TextInput from "ink-text-input";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
-import { FlowBase } from "#base/flow/flow-base";
-import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
 import { SessionStore } from "#sessions/sessionStore";
 import { SessionManager } from "#sessions/sessionManager";
 import { StoredSession } from "#sessions/types";
@@ -22,18 +20,10 @@ const MODAL_OVERHEAD = 14;
 interface SessionsModalProps {
     terminalHeight: number;
     terminalWidth: number;
-    currentFlow: FlowBase | undefined;
-    orchestrator: FlowOrchestrator;
     openConfirmModal: (config: ConfirmModalConfig) => void;
 }
 
-export const SessionsModal: React.FC<SessionsModalProps> = ({
-    terminalHeight,
-    terminalWidth,
-    currentFlow,
-    orchestrator,
-    openConfirmModal,
-}) => {
+export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, terminalWidth, openConfirmModal }) => {
     const theme = useTheme();
     const { switchBack, clearSelection } = useFocusActions();
     const { activeWindow, previousWindow } = useFocusChrome();
@@ -70,8 +60,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
     }
 
     function doLoad(session: StoredSession) {
-        if (!currentFlow) return;
-        manager.loadSession(session.id, currentFlow, orchestrator);
+        manager.loadSession(session.id);
         clearSelection();
         switchBack();
     }
@@ -105,7 +94,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
             accentColor: theme.status.error,
             onConfirm: (i) => {
                 if (i === 0) {
-                    manager.deleteSession(session.id, orchestrator);
+                    manager.deleteSession(session.id);
                     clearSelection();
                     setSelectedIndex(0);
                 }
@@ -203,7 +192,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
                 label: "New session",
                 handler: () => {
                     if (renamingId) return;
-                    manager.newSession(orchestrator);
+                    manager.newSession();
                     clearSelection();
                     switchBack();
                 },
@@ -214,8 +203,8 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({
                 label: "Duplicate",
                 handler: () => {
                     if (renamingId || modalFocus !== "list") return;
-                    if (selectedSession && currentFlow) {
-                        manager.duplicateSession(selectedSession.id, currentFlow, orchestrator);
+                    if (selectedSession) {
+                        manager.duplicateSession(selectedSession.id);
                         clearSelection();
                         switchBack();
                     }

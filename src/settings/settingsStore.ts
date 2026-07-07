@@ -13,7 +13,12 @@ type StoredSettings = {
     general: AppSettings["general"];
     logs: AppSettings["logs"];
     keybindings: AppSettings["keybindings"];
-    flows: Record<string, Record<string, unknown>>;
+    music: Record<string, unknown>;
+};
+
+/** Pre-P20b file shape: music settings lived under flows["music-downloader"]. */
+type LegacyStoredSettings = StoredSettings & {
+    flows?: Record<string, Record<string, unknown>>;
 };
 
 export class SettingsStore {
@@ -29,13 +34,19 @@ export class SettingsStore {
     private readFromDisk(): StoredSettings {
         try {
             const raw = fs.readFileSync(SETTINGS_PATH, "utf-8");
-            return JSON.parse(raw) as StoredSettings;
+            const parsed = JSON.parse(raw) as LegacyStoredSettings;
+            // Silent migration from the pre-P20b shape; persisted on the next write.
+            if (parsed.music === undefined && parsed.flows) {
+                parsed.music = parsed.flows["music-downloader"] ?? {};
+            }
+            delete parsed.flows;
+            return { ...parsed, music: parsed.music ?? {} };
         } catch {
             return {
                 general: DEFAULT_APP_SETTINGS.general,
                 logs: DEFAULT_APP_SETTINGS.logs,
                 keybindings: {},
-                flows: {},
+                music: {},
             };
         }
     }
@@ -87,24 +98,19 @@ export class SettingsStore {
         this.writeAppSettings({ ...current, keybindings });
     }
 
-    // ── Flow settings ──────────────────────────────────────────────────────────
+    // ── Music downloader settings ──────────────────────────────────────────────
 
-    getFlowSettings<T extends Record<string, unknown>>(flowId: string, defaults: T): T {
-        const stored = (this.getCached().flows?.[flowId] ?? {}) as DeepPartial<T>;
+    getMusicSettings<T extends Record<string, unknown>>(defaults: T): T {
+        const stored = (this.getCached().music ?? {}) as DeepPartial<T>;
         return deepMerge(defaults, stored);
     }
 
-    writeFlowSettings(flowId: string, settings: Record<string, unknown>): void {
-        const current = this.getCached();
-        this.writeToDisk({
-            ...current,
-            flows: { ...(current.flows ?? {}), [flowId]: settings },
-        });
+    writeMusicSettings(settings: Record<string, unknown>): void {
+        this.writeToDisk({ ...this.getCached(), music: settings });
     }
 
-    patchFlowSettings(flowId: string, patch: DeepPartial<Record<string, unknown>>): void {
-        const current = this.getFlowSettings<Record<string, unknown>>(flowId, {});
-        this.writeFlowSettings(flowId, deepMerge(current, patch));
+    patchMusicSettings(patch: DeepPartial<Record<string, unknown>>): void {
+        this.writeMusicSettings(deepMerge(this.getMusicSettings({}), patch));
     }
 
     // ── Change notifications ───────────────────────────────────────────────────

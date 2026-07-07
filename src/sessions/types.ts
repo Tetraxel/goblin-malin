@@ -6,7 +6,8 @@ export type SessionTaskSnapshot = TaskSnapshot<MusicDownloadTaskAttributes>;
 export interface StoredSession {
     id: string;
     name: string;
-    flowId: string;
+    /** Legacy field from the flow era — ignored on read, no longer written. */
+    flowId?: string;
     createdAt: string;
     updatedAt: string;
     tasks: SessionTaskSnapshot[];

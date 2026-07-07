@@ -1,6 +1,8 @@
 ﻿import * as os from "os";
 import * as path from "path";
 import { ServiceRegistry } from "#base/service-registry";
+import { SettingsStore } from "#settings/settingsStore";
+import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
 
 /** Per-provider runtime values (stored in JSON). Keys match ProviderSettingsSchema fields. */
 export type StoredProviderSettings = Record<string, boolean | string>;
@@ -52,7 +54,7 @@ function getPlatformDefaultMusicOutputDir(): string {
 
 const MEDIA_OUTPUT_DIR = getPlatformDefaultMusicOutputDir();
 
-/** Flow-level defaults (without provider contributions — those come from registered services). */
+/** Base defaults (without provider contributions — those come from registered services). */
 export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSettings = {
     metadata: {
         autoChooseBestSource: false,
@@ -72,3 +74,28 @@ export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSetting
         columnRatios: {},
     },
 };
+
+/** Full defaults, including each registered provider's declared setting defaults. */
+export function computeDefaultMusicSettings(): MusicDownloadFlowSettings {
+    return {
+        ...BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS,
+        metadata: {
+            ...BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS.metadata,
+            providers: extractProviderDefaults(metadataServiceRegistry),
+            discoveryProviders: extractProviderDefaults(discoveryServiceRegistry),
+        },
+        download: {
+            ...BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS.download,
+            providers: extractProviderDefaults(downloadServiceRegistry),
+        },
+    };
+}
+
+/** Live settings: stored values deep-merged over the computed defaults. */
+export function getMusicSettings(): MusicDownloadFlowSettings {
+    return SettingsStore.getInstance().getMusicSettings(computeDefaultMusicSettings());
+}
+
+export function saveMusicSettings(settings: Record<string, unknown>): void {
+    SettingsStore.getInstance().writeMusicSettings(settings);
+}

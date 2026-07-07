@@ -1,23 +1,17 @@
 import { useEffect, useState } from "react";
 import { ToolbarButtonHook } from "#components/Toolbar/Toolbar";
-import { FlowBase } from "#base/flow/flow-base";
-import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
+import { TaskOrchestrator } from "#base/task/orchestrator";
 import { Task } from "#base/task/task";
 import { StatusType } from "#base/task/task-status";
 import { useTheme } from "#base/themeContext";
 import { useFocusTaskList } from "#contexts/FocusContext";
+import { runAll, runSelected, stopAll } from "../runController";
 
-export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({
-    flow,
-    orchestrator,
-}: {
-    isSelected: boolean;
-    flow: FlowBase;
-    orchestrator: FlowOrchestrator;
-}) => {
+export const useRunAllButton: ToolbarButtonHook = () => {
     const theme = useTheme();
     const taskList = useFocusTaskList();
     const selectedIds = taskList.selectedTaskIds;
+    const orchestrator = TaskOrchestrator.getInstance();
 
     const [runnableTasks, setRunnableTasks] = useState<Task[]>([]);
     const [batchCount, setBatchCount] = useState(0);
@@ -28,18 +22,16 @@ export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({
 
     useEffect(() => {
         const unsubscribe = orchestrator.subscribe((o) => {
-            const flowTasks = o.getTasks().filter((t) => t.getFlowId() === flow.id);
+            const tasks = o.getTasks();
 
             // Tasks available to run (pending or stopped)
-            const runnable = flowTasks.filter(
+            const runnable = tasks.filter(
                 (task) => task.getAttributes()?.state === "pending" || task.getAttributes()?.state === "stopped"
             );
             setRunnableTasks(runnable);
 
             // Tasks actively in the current batch: running or queued for this batch
-            const batch = flowTasks.filter(
-                (task) => task.running || task.getStatus().get().type === StatusType.Pending
-            );
+            const batch = tasks.filter((task) => task.running || task.getStatus().get().type === StatusType.Pending);
             setBatchCount(batch.length);
 
             setIsProcessing(o.isProcessing());
@@ -50,13 +42,11 @@ export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({
         });
 
         return unsubscribe;
-    }, [orchestrator, flow.id]);
+    }, [orchestrator]);
 
     // Selected tasks that are actually in the runnable pool (or were already run — runSelected resets them)
     const selectedRunnableCount =
-        selectedIds.size > 0
-            ? orchestrator.getTasks().filter((t) => selectedIds.has(t.getId()) && t.getFlowId() === flow.id).length
-            : 0;
+        selectedIds.size > 0 ? orchestrator.getTasks().filter((t) => selectedIds.has(t.getId())).length : 0;
 
     const useSelectedMode = selectedIds.size > 0 && selectedRunnableCount > 0;
     const activeCount = useSelectedMode ? selectedRunnableCount : runnableTasks.length;
@@ -93,7 +83,7 @@ export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({
             color: theme.action.destructive,
             bold: true,
             enabled: true,
-            onPress: () => flow.stopAll(),
+            onPress: () => stopAll(),
         };
     }
 
@@ -106,7 +96,7 @@ export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({
             enabled: true,
             onPress: () => {
                 setRunMode("selected");
-                flow.runSelected(selectedIds);
+                runSelected(selectedIds);
             },
         };
     }
@@ -119,7 +109,7 @@ export const useRunAllButton: ToolbarButtonHook<FlowBase> = ({
         enabled: true,
         onPress: () => {
             setRunMode("all");
-            flow.runAll();
+            runAll();
         },
     };
 };

@@ -1,7 +1,6 @@
 ﻿import React from "react";
 import { Box, Text } from "ink";
 import { Task } from "#base/task/task";
-import { FlowBase } from "#base/flow/flow-base";
 import { Theme } from "#base/theme";
 import { useTheme } from "#base/themeContext";
 import { useTask } from "#hooks/useTask";
@@ -34,7 +33,6 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
     isMultiSelected,
     selectedColumnIndex,
     columns,
-    flow,
 }: {
     taskReference: Task<TAttributes>;
     isActive: boolean;
@@ -42,7 +40,6 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
     isHighlighted: boolean;
     selectedColumnIndex: number;
     columns: CalculatedColumn<TAttributes>[];
-    flow: FlowBase;
 }) {
     const theme = useTheme();
     const task = useTask<TAttributes>(taskReference);
@@ -85,7 +82,6 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
                             taskReference={taskReference}
                             width={column.width}
                             isSelected={isCellActive}
-                            flow={flow}
                         />
                     </Box>
                 );

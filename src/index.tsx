@@ -7,6 +7,7 @@ import { globalLogger } from "./base/logger/logger";
 import { detectFuncKey } from "./types/actions";
 import { shortcutRegistry } from "./base/shortcuts/ShortcutRegistry";
 import { fpsTracker } from "./base/fpsTracker";
+import { initMusicApp } from "./flows/musicDownloadFlow/init";
 
 async function write(content: string) {
     return new Promise<void>((resolve, reject) => {
@@ -48,6 +49,9 @@ export function start(): void {
     console.log = (...args: unknown[]) => globalLogger.info(args.join(" "));
     console.error = (...args: unknown[]) => globalLogger.error(args.join(" "));
     console.warn = (...args: unknown[]) => globalLogger.warn(args.join(" "));
+
+    // Register providers + apply concurrency budgets before the first render.
+    initMusicApp();
 
     process.on("unhandledRejection", (reason, promise) => {
         globalLogger.error("Unhandled Rejection", { promise, reason });

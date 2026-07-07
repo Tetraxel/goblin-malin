@@ -23,7 +23,6 @@ export type TaskSnapshot<TTAttributes = TaskAttributes> = {
 
 export class Task<TTaskAttributes = TaskAttributes> {
     public readonly id: string;
-    protected flowId: string;
     protected initialInput?: string;
     protected attributes?: TTaskAttributes;
     protected logger: Logger;
@@ -46,19 +45,16 @@ export class Task<TTaskAttributes = TaskAttributes> {
         id,
         initialInput,
         attributes,
-        flowId,
         logger,
         initialStatus,
     }: {
         id: string;
         initialInput?: string;
         attributes?: TTaskAttributes;
-        flowId: string;
         logger: Logger;
         initialStatus?: StatusAttributes;
     }) {
         this.id = id;
-        this.flowId = flowId;
         this.initialInput = initialInput;
         this.attributes = attributes;
         this.logger = logger.createChild({
@@ -89,10 +85,6 @@ export class Task<TTaskAttributes = TaskAttributes> {
 
     public getId(): string {
         return this.id;
-    }
-
-    public getFlowId(): string {
-        return this.flowId;
     }
 
     public getInitialInput() {

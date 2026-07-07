@@ -1,24 +1,21 @@
 import { globalLogger, Logger } from "../logger/logger";
 import { notificationScheduler } from "../notificationScheduler";
-import { Task } from "../task/task";
-import { StatusType } from "../task/task-status";
-import { FlowBase } from "./flow-base";
+import { Task } from "./task";
+import { StatusType } from "./task-status";
 
-// This interface represents the class itself, not the instance
-export interface FlowClass {
-    getInstance(logger: Logger, defaultEnabled: boolean, orchestrator: FlowOrchestrator): FlowBase;
-}
+type OrchestratorSubscriber = (orchestrator: TaskOrchestrator) => void;
 
-// New subscriber type for the orchestrator
-type OrchestratorSubscriber = (orchestrator: FlowOrchestrator) => void;
-
-export class FlowOrchestrator {
-    public readonly id = "flow-orchestrator";
-    private static instance: FlowOrchestrator;
+/**
+ * The task engine: holds the task queue and runs it with a completion-driven
+ * pump under a global concurrency cap. Purely generic over Task — it knows
+ * nothing about what the tasks do.
+ */
+export class TaskOrchestrator {
+    public readonly id = "task-orchestrator";
+    private static instance: TaskOrchestrator;
     private globalMaxConcurrent: number = 3;
     private logger: Logger;
     private subscribers: Set<OrchestratorSubscriber> = new Set();
-    private flows: Set<FlowBase> = new Set();
     private tasks: Task[] = [];
     // Mirror of `tasks` ids for O(1) membership checks (import dedup) instead of the
     // O(n) `find` this used to do per added task (O(n²) on a bulk import).
@@ -32,42 +29,14 @@ export class FlowOrchestrator {
     private abortController?: AbortController;
 
     private constructor() {
-        this.logger = globalLogger.createChild({ service: "FlowOrchestrator" });
+        this.logger = globalLogger.createChild({ service: "TaskOrchestrator" });
     }
 
-    static getInstance(): FlowOrchestrator {
-        if (!FlowOrchestrator.instance) {
-            FlowOrchestrator.instance = new FlowOrchestrator();
+    static getInstance(): TaskOrchestrator {
+        if (!TaskOrchestrator.instance) {
+            TaskOrchestrator.instance = new TaskOrchestrator();
         }
-        return FlowOrchestrator.instance;
-    }
-
-    registerFlow(flowClass: FlowClass, defaultEnabled: boolean = false): void {
-        const flow = flowClass.getInstance(this.logger, defaultEnabled, this);
-        const id = flow.id;
-        const displayName = flow.displayName;
-        const author = flow.author;
-
-        if (!id || !displayName || !author) {
-            throw new Error(`Flow class must have unique id, displayName, and author`);
-        }
-
-        this.flows.add(flow);
-        this.logger.info(`Registered flow: ${displayName} (${id})`);
-
-        this.notifySubscribers();
-    }
-
-    getFlow(flowId: string): FlowBase | undefined {
-        return Array.from(this.flows).find((flow) => flow.id === flowId);
-    }
-
-    getAllFlows(): Array<FlowBase> {
-        return Array.from(this.flows);
-    }
-
-    getEnabledFlows(): Array<FlowBase> {
-        return this.getAllFlows().filter((flow) => flow.enabled);
+        return TaskOrchestrator.instance;
     }
 
     // ============ TASK QUEUE MANAGEMENT ============
@@ -173,11 +142,11 @@ export class FlowOrchestrator {
     }
 
     /**
-     * Event-driven task pump. Replaces the old 100 ms polling loop: tasks are started
-     * up to `globalMaxConcurrent`, and each task's completion drives the next dispatch
-     * via its `.finally` — so the loop sleeps when idle (zero wakeups, zero no-op
-     * notifications) and reacts the instant a slot frees. Subscribers are notified only
-     * on real transitions (batch start, new launches, and batch completion).
+     * Event-driven task pump. Tasks are started up to `globalMaxConcurrent`, and each
+     * task's completion drives the next dispatch via its `.finally` — so the loop
+     * sleeps when idle (zero wakeups, zero no-op notifications) and reacts the instant
+     * a slot frees. Subscribers are notified only on real transitions (batch start,
+     * new launches, and batch completion).
      */
     public async processTasks(filterIds?: Set<string>): Promise<void> {
         if (this.processing) {

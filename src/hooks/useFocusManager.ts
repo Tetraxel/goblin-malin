@@ -1,6 +1,5 @@
 ﻿import { useState, useCallback, useMemo } from "react";
 import { useScreenSize } from "./useScreenSize";
-import { FlowBase } from "#base/flow/flow-base";
 import { SetupWizardConfig } from "#base/setupWizard";
 
 export type CursorPosition =
@@ -91,14 +90,25 @@ export interface FocusState {
     isEditingField: boolean;
 }
 
+// The internal state omits primaryMode — the mode lives in App (it drives the
+// column derivation above the FocusProvider) and is injected into the derived
+// state below so consumers keep reading it from the secondaryPanel slice.
+type InternalFocusState = Omit<FocusState, "secondaryPanel"> & {
+    secondaryPanel: Omit<FocusState["secondaryPanel"], "primaryMode">;
+};
+
 export const useFocusManager = ({
     toolbarButtonCount,
     taskCount,
     taskColumnCount,
+    primaryMode,
+    onPrimaryModeChange,
 }: {
     toolbarButtonCount: number;
     taskCount: number;
     taskColumnCount: number;
+    primaryMode: "metadata" | "download";
+    onPrimaryModeChange: (mode: "metadata" | "download") => void;
 }) => {
     const { height: terminalHeight, width: terminalWidth } = useScreenSize();
 
@@ -111,7 +121,7 @@ export const useFocusManager = ({
         return { taskListHeight, secondaryPanelHeight: contentHeight - taskListHeight, contentHeight };
     }, [terminalHeight, manualTaskListHeight]);
 
-    const [focusState, setFocusState] = useState<FocusState>(() => ({
+    const [focusState, setFocusState] = useState<InternalFocusState>(() => ({
         activeWindow: "toolbar",
         previousWindow: undefined,
         returningFromWindow: undefined,
@@ -136,7 +146,6 @@ export const useFocusManager = ({
         layout: initLayout(terminalHeight),
         prompt: {},
         secondaryPanel: {
-            primaryMode: "metadata",
             subTab: "metadataSources",
             selectedRowIndex: 0,
             scrollOffset: 0,
@@ -208,33 +217,29 @@ export const useFocusManager = ({
         });
     }, []);
 
-    const switchMode = useCallback((flow: FlowBase | undefined, input: string) => {
-        if (!flow || typeof flow.switchMode !== "function") {
-            return;
-        }
-        flow.switchMode(input);
-    }, []);
-
     const resizePanels = useCallback((direction: "grow" | "shrink") => {
         const delta = direction === "grow" ? 2 : -2;
         setManualTaskListHeight((prev) => prev + delta);
     }, []);
 
-    const setPrimaryMode = useCallback((mode: "metadata" | "download") => {
-        setFocusState((prev) => {
-            const currentSubTab = prev.secondaryPanel.subTab;
-            const newSubTab =
-                currentSubTab === "logs" ? "logs" : mode === "metadata" ? "metadataSources" : "downloadSources";
-            return {
-                ...prev,
-                secondaryPanel: {
-                    ...prev.secondaryPanel,
-                    primaryMode: mode,
-                    subTab: newSubTab,
-                },
-            };
-        });
-    }, []);
+    const setPrimaryMode = useCallback(
+        (mode: "metadata" | "download") => {
+            onPrimaryModeChange(mode);
+            setFocusState((prev) => {
+                const currentSubTab = prev.secondaryPanel.subTab;
+                const newSubTab =
+                    currentSubTab === "logs" ? "logs" : mode === "metadata" ? "metadataSources" : "downloadSources";
+                return {
+                    ...prev,
+                    secondaryPanel: {
+                        ...prev.secondaryPanel,
+                        subTab: newSubTab,
+                    },
+                };
+            });
+        },
+        [onPrimaryModeChange]
+    );
 
     const setSecondaryTab = useCallback((tab: "metadataSources" | "downloadSources" | "logs") => {
         setFocusState((prev) => ({
@@ -419,9 +424,20 @@ export const useFocusManager = ({
         () => ({ ...focusState.logPanel, width: terminalWidth }),
         [focusState.logPanel, terminalWidth]
     );
+    // Inject the lifted primaryMode so consumers keep reading it from the slice.
+    const secondaryPanelSlice = useMemo(
+        () => ({ ...focusState.secondaryPanel, primaryMode }),
+        [focusState.secondaryPanel, primaryMode]
+    );
     const derivedFocusState: FocusState = useMemo(
-        () => ({ ...focusState, layout, taskList: taskListSlice, logPanel: logPanelSlice }),
-        [focusState, layout, taskListSlice, logPanelSlice]
+        () => ({
+            ...focusState,
+            layout,
+            taskList: taskListSlice,
+            logPanel: logPanelSlice,
+            secondaryPanel: secondaryPanelSlice,
+        }),
+        [focusState, layout, taskListSlice, logPanelSlice, secondaryPanelSlice]
     );
 
     return {
@@ -429,7 +445,6 @@ export const useFocusManager = ({
         switchWindow,
         switchBack,
         handleTabPress,
-        switchMode,
         resizePanels,
         setPrimaryMode,
         setSecondaryTab,

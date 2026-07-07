@@ -1,9 +1,9 @@
 import { EventEmitter } from "events";
 import { randomUUID } from "crypto";
-import { FlowBase } from "#base/flow/flow-base";
-import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
+import { TaskOrchestrator } from "#base/task/orchestrator";
 import { TaskSnapshot } from "#base/task/task";
 import { SettingsStore } from "#settings/settingsStore";
+import { createTasksFromSnapshots } from "#flows/musicDownloadFlow/taskFactory";
 import { SessionStore } from "./sessionStore";
 import { StoredSession, SessionTaskSnapshot } from "./types";
 import { deriveSessionName } from "./sessionSearch";
@@ -30,19 +30,19 @@ export class SessionManager {
         return SessionManager.instance;
     }
 
-    init(flow: FlowBase, orchestrator: FlowOrchestrator): void {
+    init(): void {
         const settings = SettingsStore.getInstance().getAppSettings();
         if (settings.general.reopenLastSession) {
             const last = this.store.getLastSession();
             if (last) {
-                this.loadSession(last.id, flow, orchestrator);
+                this.loadSession(last.id);
                 return;
             }
         }
         this.currentSessionId = null;
     }
 
-    loadSession(id: string, flow: FlowBase, orchestrator: FlowOrchestrator): void {
+    loadSession(id: string): void {
         const session = this.store.getById(id);
         if (!session) return;
 
@@ -52,10 +52,8 @@ export class SessionManager {
 
         this.isLoading = true;
         try {
-            if (flow.createTasksFromSnapshots) {
-                const tasks = flow.createTasksFromSnapshots(session.tasks);
-                orchestrator.setTasks(tasks);
-            }
+            const tasks = createTasksFromSnapshots(session.tasks);
+            TaskOrchestrator.getInstance().setTasks(tasks);
             this.currentSessionId = id;
             this.store.setLastSessionId(id);
             this.emitter.emit("change");
@@ -117,7 +115,6 @@ export class SessionManager {
             const session: StoredSession = {
                 id,
                 name: deriveSessionName(snapshots),
-                flowId: "music-downloader",
                 createdAt: now,
                 updatedAt: now,
                 tasks: snapshots,
@@ -134,14 +131,14 @@ export class SessionManager {
         this.emitter.emit("change");
     }
 
-    newSession(orchestrator: FlowOrchestrator): void {
+    newSession(): void {
         this.flushPending();
-        orchestrator.setTasks([]);
+        TaskOrchestrator.getInstance().setTasks([]);
         this.currentSessionId = null;
         this.emitter.emit("change");
     }
 
-    duplicateSession(id: string, flow: FlowBase, orchestrator: FlowOrchestrator): void {
+    duplicateSession(id: string): void {
         this.flushPending();
         const session = this.store.getById(id);
         if (!session) return;
@@ -156,17 +153,17 @@ export class SessionManager {
             renamed: false,
         };
         this.store.upsertSession(newSession);
-        this.loadSession(newId, flow, orchestrator);
+        this.loadSession(newId);
     }
 
-    deleteSession(id: string, orchestrator?: FlowOrchestrator): void {
+    deleteSession(id: string): void {
         // Drop a pending write for the current session before deleting it, otherwise the
         // debounced flush would re-create the record we just removed.
         if (this.currentSessionId === id) this.cancelPending();
         this.store.deleteSession(id);
         if (this.currentSessionId === id) {
             this.currentSessionId = null;
-            orchestrator?.setTasks([]);
+            TaskOrchestrator.getInstance().setTasks([]);
             this.emitter.emit("change");
         }
     }

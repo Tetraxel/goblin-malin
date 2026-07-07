@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, test } from "vitest";
-import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
+import { TaskOrchestrator } from "#base/task/orchestrator";
 import { Task } from "#base/task/task";
 import { globalLogger } from "#base/logger/logger";
 import { notificationScheduler } from "#base/notificationScheduler";
@@ -22,7 +22,7 @@ class FakeTask extends Task<{ state?: string }> {
         private ms: number,
         private shared: Shared
     ) {
-        super({ id, flowId: "test-flow", logger: globalLogger });
+        super({ id, logger: globalLogger });
     }
 
     override async start(signal?: AbortSignal): Promise<void> {
@@ -49,13 +49,13 @@ class FakeTask extends Task<{ state?: string }> {
     }
 }
 
-const orchestrator = FlowOrchestrator.getInstance();
+const orchestrator = TaskOrchestrator.getInstance();
 
 beforeEach(() => {
     orchestrator.setTasks([]);
 });
 
-describe("FlowOrchestrator — event-driven pump", () => {
+describe("TaskOrchestrator — event-driven pump", () => {
     test("runs tasks in parallel up to the cap and completes them all", async () => {
         orchestrator.setGlobalMaxConcurrent(2);
         const shared: Shared = { active: 0, peak: 0, started: 0 };

@@ -1,12 +1,10 @@
 import React from "react";
 import { Box, Text } from "ink";
 import stringWidth from "string-width";
-import { FlowOrchestrator } from "#base/flow/flow-orchestrator";
-import { FlowBase } from "#base/flow/flow-base";
 import { useTheme } from "#base/themeContext";
 import { useFocusChrome, useFocusSecondaryPanel } from "#contexts/FocusContext";
 import { ToolbarButtonInvoker } from "./ToolbarButtonInvoker";
-import { FlowSelector } from "./FlowSelector";
+import { TOOLBAR_BUTTONS } from "./toolbarButtons";
 import { Separator } from "../Separator";
 import { TabBar } from "../TabBar";
 import { UpdateInfo } from "#updater/updateChecker";
@@ -14,15 +12,7 @@ import { UpdateBadge } from "./UpdateBadge";
 import { useCurrentSessionName } from "./useCurrentSessionName";
 import { APP_VERSION } from "#constants";
 
-export type ToolbarButtonHook<TFlow = FlowBase> = ({
-    isSelected,
-    flow,
-    orchestrator,
-}: {
-    isSelected: boolean;
-    flow: TFlow;
-    orchestrator: FlowOrchestrator;
-}) => {
+export type ToolbarButtonHook = ({ isSelected }: { isSelected: boolean }) => {
     enabled: boolean;
     label?: string;
     icon?: string;
@@ -33,23 +23,7 @@ export type ToolbarButtonHook<TFlow = FlowBase> = ({
     onPress?: () => void;
 };
 
-export const Toolbar = ({
-    buttons,
-    width,
-    flows,
-    onFlowChange,
-    flow,
-    orchestrator,
-    updateInfo,
-}: {
-    buttons: ToolbarButtonHook[];
-    width: number;
-    flows: ReturnType<FlowOrchestrator["getAllFlows"]>;
-    onFlowChange: (flowId: string) => void;
-    flow: FlowBase;
-    orchestrator: FlowOrchestrator;
-    updateInfo?: UpdateInfo | null;
-}) => {
+export const Toolbar = ({ width, updateInfo }: { width: number; updateInfo?: UpdateInfo | null }) => {
     const theme = useTheme();
     const { activeWindow, toolbar } = useFocusChrome();
     const isActive = activeWindow === "toolbar";
@@ -95,19 +69,10 @@ export const Toolbar = ({
                 </Box>
 
                 <Box height={height} marginRight={1} flexGrow={1} flexShrink={0}>
-                    {buttons.map((hook, index) => {
+                    {TOOLBAR_BUTTONS.map((hook, index) => {
                         const isSelected = isActive && toolbar.selectedButtonIndex === index;
 
-                        return (
-                            <ToolbarButtonInvoker
-                                key={index}
-                                hook={hook}
-                                isSelected={isSelected}
-                                index={index}
-                                flow={flow}
-                                orchestrator={orchestrator}
-                            />
-                        );
+                        return <ToolbarButtonInvoker key={index} hook={hook} isSelected={isSelected} index={index} />;
                     })}
                 </Box>
 
@@ -119,7 +84,6 @@ export const Toolbar = ({
                     height={height}
                     flexShrink={1}
                 >
-                    {/* <FlowSelector flows={flows} currentFlow={flow} onFlowChange={onFlowChange} /> */}
                     {currentSessionName && !isScreenSmall && (
                         <>
                             <Text color={theme.text.heading} bold={true} wrap="truncate-end">
@@ -131,8 +95,8 @@ export const Toolbar = ({
                     {updateInfo ? (
                         <UpdateBadge
                             version={updateInfo.latestVersion}
-                            isSelected={isActive && toolbar.selectedButtonIndex === buttons.length}
-                            index={buttons.length}
+                            isSelected={isActive && toolbar.selectedButtonIndex === TOOLBAR_BUTTONS.length}
+                            index={TOOLBAR_BUTTONS.length}
                         />
                     ) : (
                         <Text dimColor>v{APP_VERSION}</Text>

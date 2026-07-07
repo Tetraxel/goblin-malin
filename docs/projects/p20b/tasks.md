@@ -1,4 +1,4 @@
-# P29 — Remove the Flow Abstraction: Tasks
+﻿# P20b — Remove the Flow Abstraction: Tasks
 
 ## Context
 
@@ -35,18 +35,18 @@ If a second "flow" ever really materializes, nothing here forecloses it: the eng
 
 ## Tasks
 
-### T29.1 — One source of truth for display mode
+### T20b.1 — One source of truth for display mode
 
 - Delete `displayMode` / `getDisplayMode()` / `setDisplayMode()` / `switchMode()` from the flow. `FocusContext.primaryMode` becomes the only mode state.
 - `InputRouter` handlers for `1`/`2` call only `setPrimaryMode(...)`; delete `useFocusManager.switchMode` (and its `typeof` guard).
-- Column computation becomes a function of the mode: `computeColumns(mode, …)` (T29.3) — callers pass `primaryMode` down instead of the flow reading its own field.
+- Column computation becomes a function of the mode: `computeColumns(mode, …)` (T20b.3) — callers pass `primaryMode` down instead of the flow reading its own field.
 - Anything else reading `flow.getDisplayMode()` (SecondaryPanel already uses `primaryMode`) switches to the context value.
 
 _Depends on: nothing_
 
 ---
 
-### T29.2 — Columns & toolbar buttons as pure derivations
+### T20b.2 — Columns & toolbar buttons as pure derivations
 
 Replace App.tsx's flow-subscription → `setState` mirroring:
 
@@ -54,11 +54,11 @@ Replace App.tsx's flow-subscription → `setState` mirroring:
 - `const columns = useMemo(() => computeColumns(primaryMode), [primaryMode, settingsVersion])` — with a small new `useSettingsVersion()` hook (subscribe to `SettingsStore.onSettingsChanged`, bump a counter). This replaces the flow pub-sub channel *and* the structural-equality workaround: memoization now comes from honest `useMemo` inputs. Column-ratio saves (`setColumnRatios`) already go through the settings store, so they retrigger the memo naturally.
 - Delete `FlowBase.subscribe`/`notifyTaskSubscribers` and App's `toolbarButtons`/`columns` state + effect.
 
-_Depends on: T29.1, T29.3 (the `computeColumns` module)_
+_Depends on: T20b.1, T20b.3 (the `computeColumns` module)_
 
 ---
 
-### T29.3 — De-class `MusicDownloadFlow` into plain modules
+### T20b.3 — De-class `MusicDownloadFlow` into plain modules
 
 Split the 689-line god class ([musicDownloadFlow.ts](../../../src/flows/musicDownloadFlow/musicDownloadFlow.ts)) by responsibility — same folder, no behavior change:
 
@@ -74,59 +74,59 @@ Split the 689-line god class ([musicDownloadFlow.ts](../../../src/flows/musicDow
 
 Singleton state the class carried (`instance`, `tasks` mirror, `maxConcurrentTasks` — declared but ignored since P20) is deleted; the orchestrator already owns the task list.
 
-_Depends on: T29.1_
+_Depends on: T20b.1_
 
 ---
 
-### T29.4 — Slim the orchestrator to a task engine
+### T20b.4 — Slim the orchestrator to a task engine
 
 - Delete from [flow-orchestrator.ts](../../../src/base/flow/flow-orchestrator.ts): `flows` set, `registerFlow`, `getFlow`, `getAllFlows`, `getEnabledFlows`, `FlowClass`. Everything else (pump, add/remove/set tasks, abort, subscribe) is untouched.
 - Rename `FlowOrchestrator` → `TaskOrchestrator`, move to `src/base/task/orchestrator.ts` next to `task.ts` (mechanical; `id: "flow-orchestrator"` → `"task-orchestrator"`).
 - Delete `flow-base.ts`.
 
-_Depends on: T29.2, T29.3 (last consumers of the flow surface)_
+_Depends on: T20b.2, T20b.3 (last consumers of the flow surface)_
 
 ---
 
-### T29.5 — Un-thread the flow from the component tree
+### T20b.5 — Un-thread the flow from the component tree
 
-- Delete props `currentFlow` / `flow` / `flows` / `onFlowChange` / `setActiveFlowId` from `AppInner`, `Toolbar`, `ToolbarButtonInvoker` (+ the `ToolbarButtonHook<TFlow>` type param), `TaskListPanel`, `TaskRow`, `ActionBar`, `SecondaryPanel`, `InputRouter`; consumers import the T29.3 modules directly (`buildContextualActionBar` in `ActionBar`/`useTaskListShortcuts`, `saveColumnRatios` in `TaskListPanel`, `taskFactory` in `useImportFlow`).
+- Delete props `currentFlow` / `flow` / `flows` / `onFlowChange` / `setActiveFlowId` from `AppInner`, `Toolbar`, `ToolbarButtonInvoker` (+ the `ToolbarButtonHook<TFlow>` type param), `TaskListPanel`, `TaskRow`, `ActionBar`, `SecondaryPanel`, `InputRouter`; consumers import the T20b.3 modules directly (`buildContextualActionBar` in `ActionBar`/`useTaskListShortcuts`, `saveColumnRatios` in `TaskListPanel`, `taskFactory` in `useImportFlow`).
 - `SettingsModal`: the `currentFlow?.getFlowSettings?.()` optional-chaining dance becomes direct imports from `settings.ts`/`buildFlowSettingsItems` — no optionality left to defend against.
 - `sessionManager.init(flow, orchestrator)` → `init(orchestrator)`, calling `taskFactory.createTasksFromSnapshots` directly (drop the `if (flow.createTasksFromSnapshots)` guard and the hardcoded `flowId` literal); same for `loadSession`/`duplicateSession` and `SessionsModal`.
 - Delete `FlowSelector.tsx` and `useImportButton.ts` (dead), App's `activeFlowId`/`currentFlow`/`filteredTasks` (components receive `tasks` directly).
 
-_Depends on: T29.3, T29.4_
+_Depends on: T20b.3, T20b.4_
 
 ---
 
-### T29.6 — `Task.flowId` & stored-data cleanup
+### T20b.6 — `Task.flowId` & stored-data cleanup
 
 - Remove `flowId`/`getFlowId()` from `Task` and every constructor call; delete the always-true `getFlowId() === flow.id` filters (`useRunAllButton`, App, `runSelected`'s guard).
 - [env.ts](../../../src/base/env.ts): `patchFlowSettings(this.task.getFlowId(), …)` → the `settings.ts` module key.
 - `settings.json` compat: keep `SettingsStore`'s storage section but read/write it under a fixed key; one-time silent migration on load (`flows["music-downloader"]` → `music`), so existing users lose nothing.
 - `sessions.json` compat: `StoredSession.flowId` becomes optional — ignored on read, no longer written. (Early-dev data-model caveat in the README covers older readers.)
 
-_Depends on: T29.5_
+_Depends on: T20b.5_
 
 ---
 
-### T29.7 — Housekeeping (optional, recommended)
+### T20b.7 — Housekeeping (optional, recommended)
 
 - Move `startOptionsBridge.ts` / `deleteConfirmBridge.ts` out of `src/base/flow/` (they're generic plain-TS→modal bridges, nothing flow-specific) to `src/base/bridges/`; then delete the empty `src/base/flow/` directory.
 - **Optional folder rename**: `src/flows/musicDownloadFlow/` → `src/music/` with a `#music/*` alias. Mechanical, but note: the P21–P28 plan docs reference current paths — if renamed, sweep `docs/projects/` in the same commit (grep `src/flows/musicDownloadFlow`). Skipping the rename is fine; removing the class is the substance, the folder name is cosmetics.
 
-_Depends on: T29.4, T29.5_
+_Depends on: T20b.4, T20b.5_
 
 ---
 
-### T29.8 — Verification & regression gate
+### T20b.8 — Verification & regression gate
 
 - After **each** task (they're independently landable in order): `yarn type-check`, `yarn lint`, `yarn test` (unit + e2e smoke + render-profile budgets), and the tui-test scenarios — the harness boots through the real entry point, so it exercises the new `initMusicApp` bootstrap for free.
 - Behavior checklist (manual or scenario-backed): import, run all / run selected, mode switch `1`/`2`, column resize persists, contextual actions per column, settings save (flow section), session save/reopen/duplicate, restart-without-cache.
 - Final grep gate — zero hits in `src/` for: `FlowBase`, `FlowClass`, `registerFlow`, `getAllFlows`, `getEnabledFlows`, `getFlowId`, `activeFlowId`, `currentFlow`, `FlowSelector`, `switchMode`.
 - Expected net effect: **~400+ lines deleted** (flow-base, registry surface, selector, dead button, mirroring effects, no-op filters), two state channels collapsed into one (mode), one fewer pub-sub system, zero optional-member guards on the main render path.
 
-_Depends on: T29.1–T29.7_
+_Depends on: T20b.1–T20b.7_
 
 ---
 
@@ -134,13 +134,30 @@ _Depends on: T29.1–T29.7_
 
 | Task  | What                                                             | Depends on    |
 | ----- | ----------------------------------------------------------------- | ------------- |
-| T29.1 | `primaryMode` becomes the only display-mode state                 | —             |
-| T29.2 | Columns/toolbar as `useMemo` derivations; delete flow pub-sub     | T29.1, T29.3  |
-| T29.3 | Split `MusicDownloadFlow` into plain modules + explicit `init`    | T29.1         |
-| T29.4 | `TaskOrchestrator` (engine only); delete `flow-base.ts`           | T29.2, T29.3  |
-| T29.5 | Remove flow props/guards from the component tree; delete dead code| T29.3, T29.4  |
-| T29.6 | Drop `Task.flowId`; settings/sessions key migration               | T29.5         |
-| T29.7 | Relocate bridges; optional folder rename (+ docs sweep)           | T29.4, T29.5  |
-| T29.8 | Per-step verification, behavior checklist, grep gate              | T29.1–T29.7   |
+| T20b.1 | `primaryMode` becomes the only display-mode state                 | —             |
+| T20b.2 | Columns/toolbar as `useMemo` derivations; delete flow pub-sub     | T20b.1, T20b.3  |
+| T20b.3 | Split `MusicDownloadFlow` into plain modules + explicit `init`    | T20b.1         |
+| T20b.4 | `TaskOrchestrator` (engine only); delete `flow-base.ts`           | T20b.2, T20b.3  |
+| T20b.5 | Remove flow props/guards from the component tree; delete dead code| T20b.3, T20b.4  |
+| T20b.6 | Drop `Task.flowId`; settings/sessions key migration               | T20b.5         |
+| T20b.7 | Relocate bridges; optional folder rename (+ docs sweep)           | T20b.4, T20b.5  |
+| T20b.8 | Per-step verification, behavior checklist, grep gate              | T20b.1–T20b.7   |
 
-**Sequencing note:** if adopted, do P29 *before* implementing P21–P28 — they touch the same seams (`createTasksFromUrls`, contextual actions, settings items), and building them on the de-classed modules avoids refactoring each one twice. The P21–P28 docs' file references stay greppable either way.
+**Sequencing note:** if adopted, do P20b *before* implementing P21–P28 — they touch the same seams (`createTasksFromUrls`, contextual actions, settings items), and building them on the de-classed modules avoids refactoring each one twice. The P21–P28 docs' file references stay greppable either way.
+
+---
+
+## Implementation status (done)
+
+All tasks landed in one commit. Where each piece lives:
+
+- **T20b.1** ✅ `primaryMode` is React state in `App.tsx`, passed into `FocusProvider` (`onPrimaryModeChange`); `useFocusManager` keeps `subTab` derivation in `setPrimaryMode` and injects the mode back into the `secondaryPanel` slice so consumers (Toolbar's tab bar) are unchanged. `switchMode` deleted everywhere.
+- **T20b.2** ✅ `columns = useMemo(computeColumns(primaryMode), [primaryMode, settingsVersion])` with the new `src/hooks/useSettingsVersion.ts`; `TOOLBAR_BUTTONS` module constant in `src/components/Toolbar/toolbarButtons.ts`. The flow-subscription mirroring effect and its structural-equality workaround are gone.
+- **T20b.3** ✅ New modules in `src/flows/musicDownloadFlow/`: `registries.ts`, `taskFactory.ts`, `runController.ts`, `taskColumns.ts`, `contextualActions.ts`, `init.ts` (+ accessors in `settings.ts`, `buildMusicSettingsItems` wrapper in `buildFlowSettingsItems.ts`). `initMusicApp()` is called from `index.tsx start()` — no more registration inside a `useState` initializer. `musicDownloadFlow.ts` deleted (689 lines).
+- **T20b.4** ✅ `TaskOrchestrator` at `src/base/task/orchestrator.ts` — flow registry surface deleted; the P20 pump untouched. `flow-base.ts` / `flow-settings.ts` deleted.
+- **T20b.5** ✅ All `flow`/`currentFlow`/`orchestrator` props removed from `AppInner`, `Toolbar`, `ToolbarButtonInvoker`, `TaskListPanel`, `TaskRow`, `ActionBar`, `SecondaryPanel`, `InputRouter`, `SessionsModal`, `SettingsModal`, `useImportFlow`, `useKeyHandlers`; `ColumnComponentProps.flow` dropped (no cell used it). `FlowSelector.tsx` and `useImportButton.ts` deleted. The action-bar builder takes the caller's `columns` so there is exactly one column source.
+- **T20b.6** ✅ `Task.flowId`/`getFlowId()` removed; `env.ts` uses `patchMusicSettings`; `settings.json` migrates `flows["music-downloader"]` → `music` silently on load; `StoredSession.flowId` optional (ignored on read, no longer written).
+- **T20b.7** ✅ Bridges moved to `src/base/bridges/`; `src/base/flow/` removed. The optional folder rename (`src/flows/musicDownloadFlow/` → `src/music/`) was **skipped** as allowed — P21–P28 doc references stay valid.
+- **T20b.8** ✅ `yarn type-check` clean; `yarn lint` clean (2 pre-existing WelcomeModal warnings); vitest 17/17 (unit + e2e smoke + render-profile budgets); `switch-view-column` harness scenario verifies `1`/`2` mode switching end-to-end; grep gate returns zero hits for `FlowBase|FlowClass|registerFlow|getAllFlows|getEnabledFlows|getFlowId|activeFlowId|currentFlow|FlowSelector|switchMode|FlowOrchestrator|base/flow`.
+
+**Deviations from the plan:** `PrimaryMode` type lives in `taskColumns.ts` (focus manager keeps inline unions to avoid a hooks→flows import); the settings-items wrapper stayed in `buildFlowSettingsItems.ts` instead of a new file; `SettingsModal` only rewrites music settings when the draft patch is non-empty (previously it always rewrote them on save).
