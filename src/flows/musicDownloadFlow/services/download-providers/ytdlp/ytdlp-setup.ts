@@ -13,6 +13,24 @@ interface GitHubRelease {
     }>;
 }
 
+// Executable suffix for locally-stored binaries: ".exe" on Windows, none elsewhere.
+function binExt(): string {
+    return process.platform === "win32" ? ".exe" : "";
+}
+
+// The yt-dlp GitHub release asset to download for the current platform. The macOS
+// and Linux assets are standalone PyInstaller builds and need no Python runtime.
+function ytDlpAssetName(): string {
+    switch (process.platform) {
+        case "win32":
+            return "yt-dlp.exe";
+        case "darwin":
+            return "yt-dlp_macos";
+        default:
+            return "yt-dlp";
+    }
+}
+
 /**
  * Ensure a yt-dlp binary is available and return its path.
  *
@@ -25,7 +43,7 @@ export async function ensureYtDlpSetup(autoDownloadBinary = true): Promise<strin
     // Updates disabled: reuse an existing binary and skip the latest-version
     // check entirely. Fall through to the normal download only if none exists.
     if (!autoDownloadBinary) {
-        const existingBinary = await findExistingBinary("yt-dlp_", ".exe");
+        const existingBinary = await findExistingBinary("yt-dlp_", binExt());
         if (existingBinary) {
             globalLogger.info(`Auto-download disabled; using existing yt-dlp at ${existingBinary}`);
             return existingBinary;
@@ -49,7 +67,7 @@ export async function ensureYtDlpSetup(autoDownloadBinary = true): Promise<strin
             throw new Error("yt-dlp release not found");
         }
 
-        const binaryName = `yt-dlp_${latestVersion}.exe`;
+        const binaryName = `yt-dlp_${latestVersion}${binExt()}`;
         const binaryPath = path.join(getBinDir(), binaryName);
 
         // Check if binary exists
@@ -68,13 +86,18 @@ export async function ensureYtDlpSetup(autoDownloadBinary = true): Promise<strin
         await cleanupOldVersions("yt-dlp_", binaryName);
 
         // Download the binary
-        const downloadUrl = `https://github.com/yt-dlp/yt-dlp/releases/download/${latestVersion}/yt-dlp.exe`;
+        const downloadUrl = `https://github.com/yt-dlp/yt-dlp/releases/download/${latestVersion}/${ytDlpAssetName()}`;
         await downloadFile(downloadUrl, binaryPath);
+
+        // On non-Windows platforms the downloaded binary is not executable by default.
+        if (process.platform !== "win32") {
+            await fs.chmod(binaryPath, 0o755);
+        }
 
         globalLogger.info(`Successfully downloaded yt-dlp ${latestVersion} to ${binaryPath}`);
         return binaryPath;
     } catch {
-        const existingBinary = await findExistingBinary("yt-dlp_", ".exe");
+        const existingBinary = await findExistingBinary("yt-dlp_", binExt());
         if (existingBinary) {
             globalLogger.info(`Using existing yt-dlp at ${existingBinary}`);
             return existingBinary;
@@ -143,7 +166,7 @@ async function cleanupOldVersions(prefix: string, currentVersion: string): Promi
     try {
         const files = await fs.readdir(getBinDir());
         const oldVersions = files.filter(
-            (file) => file.startsWith(prefix) && file.endsWith(".exe") && file !== currentVersion
+            (file) => file.startsWith(prefix) && file.endsWith(binExt()) && file !== currentVersion
         );
 
         for (const file of oldVersions) {

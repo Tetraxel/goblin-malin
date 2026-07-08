@@ -15,6 +15,11 @@ interface GitHubRelease {
     published_at: string;
 }
 
+// Executable suffix for locally-stored binaries: ".exe" on Windows, none elsewhere.
+function binExt(): string {
+    return process.platform === "win32" ? ".exe" : "";
+}
+
 /**
  * Ensure an ffmpeg binary is available and return its path.
  *
@@ -27,7 +32,7 @@ export async function ensureFfmpeg(autoDownloadBinary = true): Promise<string> {
     // Updates disabled: reuse an existing binary and skip the latest-version
     // check entirely. Fall through to the normal download only if none exists.
     if (!autoDownloadBinary) {
-        const existingBinary = await findExistingBinary("ffmpeg_", ".exe");
+        const existingBinary = await findExistingBinary("ffmpeg_", binExt());
         if (existingBinary) {
             globalLogger.info(`Auto-download disabled; using existing ffmpeg at ${existingBinary}`);
             return existingBinary;
@@ -36,33 +41,19 @@ export async function ensureFfmpeg(autoDownloadBinary = true): Promise<string> {
     }
 
     try {
-        let release: GitHubRelease | null = null;
+        // Resolve the download source + a version identifier for the current platform.
+        const source = await resolveFfmpegSource();
 
-        // Try to get the latest version from GitHub
-        try {
-            release = await getLatestFfmpegRelease();
-        } catch (error) {
-            globalLogger.warn(`Failed to fetch latest ffmpeg release: ${error}`);
-            globalLogger.info("Attempting to use existing binary…");
-        }
-
-        // If GitHub API failed, try to find existing binary
-        if (!release) {
-            throw new Error("ffmpeg release not found");
-        }
-
-        // Use published_at date to create a unique version identifier
-        const versionDate = new Date(release.published_at).toISOString().split("T")[0];
-        const binaryName = `ffmpeg_${versionDate}.exe`;
+        const binaryName = `ffmpeg_${source.versionId}${binExt()}`;
         const binaryPath = path.join(getBinDir(), binaryName);
 
         // Check if binary exists
         try {
             await fs.access(binaryPath);
-            globalLogger.info(`ffmpeg ${versionDate} already installed at ${binaryPath}`);
+            globalLogger.info(`ffmpeg ${source.versionId} already installed at ${binaryPath}`);
             return binaryPath;
         } catch {
-            globalLogger.info(`ffmpeg ${versionDate} not found, downloading…`);
+            globalLogger.info(`ffmpeg ${source.versionId} not found, downloading…`);
         }
 
         // Create bin directory if it doesn't exist
@@ -71,45 +62,99 @@ export async function ensureFfmpeg(autoDownloadBinary = true): Promise<string> {
         // Clean up old ffmpeg versions (optional)
         await cleanupOldVersions("ffmpeg_", binaryName);
 
-        // Download and extract the ZIP file
-        const zipName = "ffmpeg-master-latest-win64-gpl.zip";
-        const downloadUrl = `https://github.com/BtbN/FFmpeg-Builds/releases/download/${release.tag_name}/${zipName}`;
-        const zipPath = path.join(getBinDir(), zipName);
+        // Download and extract the ZIP file. The temp name uses a hyphen so it can
+        // never be picked up by findExistingBinary()/cleanupOldVersions(), which
+        // match the "ffmpeg_" (underscore) prefix — important on non-Windows where
+        // the executable has no extension to distinguish it from the archive.
+        const zipPath = path.join(getBinDir(), "ffmpeg-download.zip");
+        await downloadFile(source.downloadUrl, zipPath);
 
-        await downloadFile(downloadUrl, zipPath);
-
-        // Extract ffmpeg.exe from the ZIP
-        globalLogger.debug("Extracting ffmpeg.exe…");
+        // Extract the ffmpeg executable from the ZIP
+        globalLogger.debug("Extracting ffmpeg…");
         const zip = new AdmZip(zipPath);
-        const zipEntries = zip.getEntries();
-
-        // Find the ffmpeg.exe entry in the zip
-        const ffmpegEntry = zipEntries.find((entry) => entry.entryName.endsWith("bin/ffmpeg.exe"));
+        const ffmpegEntry = zip.getEntries().find((entry) => entry.entryName.endsWith(source.entrySuffix));
 
         if (!ffmpegEntry) {
-            throw new Error("ffmpeg.exe not found in the downloaded archive");
+            throw new Error("ffmpeg executable not found in the downloaded archive");
         }
 
-        // Extract to the target location
+        // Extract flat, then rename the extracted file to include the version
         zip.extractEntryTo(ffmpegEntry, getBinDir(), false, true);
-
-        // Rename the extracted file to include version
-        const extractedPath = path.join(getBinDir(), "ffmpeg.exe");
+        const extractedPath = path.join(getBinDir(), path.basename(ffmpegEntry.entryName));
         await fs.rename(extractedPath, binaryPath);
+
+        // On non-Windows platforms the extracted binary is not executable by default.
+        if (process.platform !== "win32") {
+            await fs.chmod(binaryPath, 0o755);
+        }
 
         // Clean up the zip file
         await fs.unlink(zipPath);
 
-        globalLogger.info(`Successfully downloaded ffmpeg ${versionDate} to ${binaryPath}`);
+        globalLogger.info(`Successfully downloaded ffmpeg ${source.versionId} to ${binaryPath}`);
         return binaryPath;
-    } catch {
-        const existingBinary = await findExistingBinary("ffmpeg_", ".exe");
+    } catch (error) {
+        const existingBinary = await findExistingBinary("ffmpeg_", binExt());
         if (existingBinary) {
             globalLogger.info(`Using existing ffmpeg at ${existingBinary}`);
             return existingBinary;
         }
+        // Last resort on non-Windows: rely on a system ffmpeg from PATH (e.g.
+        // installed via `brew install ffmpeg`). ytdlp-nodejs accepts a bare
+        // command name for ffmpegPath.
+        if (process.platform !== "win32") {
+            globalLogger.warn(`ffmpeg setup failed (${error}); falling back to system ffmpeg on PATH`);
+            return "ffmpeg";
+        }
         throw new Error("Failed to fetch latest version from GitHub and no existing binary found");
     }
+}
+
+interface FfmpegSource {
+    versionId: string;
+    downloadUrl: string;
+    // An archive entry whose name ends with this string is the ffmpeg executable.
+    entrySuffix: string;
+}
+
+/**
+ * Resolve where to download ffmpeg for the current platform and how to name the
+ * cached copy. Windows uses BtbN's win64 GPL build; macOS uses evermeet.cx's
+ * static build (x86_64, which also runs on Apple Silicon via Rosetta 2).
+ */
+async function resolveFfmpegSource(): Promise<FfmpegSource> {
+    if (process.platform === "darwin") {
+        return {
+            versionId: await getEvermeetFfmpegVersion(),
+            downloadUrl: "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip",
+            entrySuffix: "ffmpeg",
+        };
+    }
+
+    const release = await getLatestFfmpegRelease();
+    return {
+        // Use published_at date to create a unique version identifier
+        versionId: new Date(release.published_at).toISOString().split("T")[0],
+        downloadUrl: `https://github.com/BtbN/FFmpeg-Builds/releases/download/${release.tag_name}/ffmpeg-master-latest-win64-gpl.zip`,
+        entrySuffix: "bin/ffmpeg.exe",
+    };
+}
+
+/**
+ * Fetch the current ffmpeg version string from evermeet.cx. Falls back to a
+ * date-based identifier if the info endpoint is unavailable, so caching/naming
+ * still works.
+ */
+async function getEvermeetFfmpegVersion(): Promise<string> {
+    try {
+        const info = await httpsGetJson<{ version?: string }>("https://evermeet.cx/ffmpeg/info/ffmpeg/release");
+        if (info.version) {
+            return info.version;
+        }
+    } catch (error) {
+        globalLogger.warn(`Failed to fetch evermeet ffmpeg version: ${error}`);
+    }
+    return new Date().toISOString().split("T")[0];
 }
 
 async function findExistingBinary(prefix: string, suffix: string): Promise<string | null> {
@@ -135,34 +180,28 @@ async function findExistingBinary(prefix: string, suffix: string): Promise<strin
 }
 
 async function getLatestFfmpegRelease(): Promise<GitHubRelease> {
+    return httpsGetJson<GitHubRelease>("https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest");
+}
+
+// Fetch and JSON-parse a URL. Used for the GitHub and evermeet.cx metadata APIs.
+async function httpsGetJson<T>(url: string): Promise<T> {
     return new Promise((resolve, reject) => {
         https
-            .get(
-                "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest",
-                {
-                    headers: {
-                        "User-Agent": "Node.js ffmpeg installer",
-                    },
-                },
-                (res) => {
-                    let data = "";
-
-                    res.on("data", (chunk) => {
-                        data += chunk;
-                    });
-
-                    res.on("end", () => {
-                        try {
-                            const release: GitHubRelease = JSON.parse(data);
-                            resolve(release);
-                        } catch (error) {
-                            reject(new Error(`Failed to parse GitHub API response: ${error}`));
-                        }
-                    });
-                }
-            )
+            .get(url, { headers: { "User-Agent": "Node.js ffmpeg installer" } }, (res) => {
+                let data = "";
+                res.on("data", (chunk) => {
+                    data += chunk;
+                });
+                res.on("end", () => {
+                    try {
+                        resolve(JSON.parse(data) as T);
+                    } catch (error) {
+                        reject(new Error(`Failed to parse response from ${url}: ${error}`));
+                    }
+                });
+            })
             .on("error", (error) => {
-                reject(new Error(`Failed to fetch latest version: ${error}`));
+                reject(new Error(`Failed to fetch ${url}: ${error}`));
             });
     });
 }
@@ -172,7 +211,7 @@ async function cleanupOldVersions(prefix: string, currentVersion: string): Promi
     try {
         const files = await fs.readdir(getBinDir());
         const oldVersions = files.filter(
-            (file) => file.startsWith(prefix) && file.endsWith(".exe") && file !== currentVersion
+            (file) => file.startsWith(prefix) && file.endsWith(binExt()) && file !== currentVersion
         );
 
         for (const file of oldVersions) {
