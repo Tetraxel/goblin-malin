@@ -63,6 +63,26 @@ pnpm add -g  goblin-malin
 goblin-malin.exe
 ```
 
+### Installation on macOS
+
+Install with any of the package managers above, e.g.:
+
+```bash
+npm install -g goblin-malin
+goblin-malin
+```
+
+`yt-dlp` and `ffmpeg` are downloaded automatically on first run (ffmpeg comes
+from [evermeet.cx](https://evermeet.cx/ffmpeg/)). To enable in-app audio
+playback, install [`mpv`](https://mpv.io/) — it is picked up from your `PATH`:
+
+```bash
+brew install mpv
+```
+
+> Optional: `brew install ffmpeg` if you'd rather use a system ffmpeg than the
+> auto-downloaded one.
+
 ## Steps
 
 - Import with `Ctrl+V` URLs from compatible streaming platforms :
