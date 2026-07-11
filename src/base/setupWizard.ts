@@ -10,6 +10,8 @@ export interface WizardField {
     label: string;
     hint?: string;
     required?: boolean;
+    /** Mask the value with asterisks while editing and displaying (e.g. passwords). */
+    secret?: boolean;
 }
 
 export interface WizardMode {

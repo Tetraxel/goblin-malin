@@ -143,6 +143,10 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
         (typedTask as unknown as DownloadTask)?.rejectDownloadSource(idx, !source.isRejected);
     }
 
+    function handleRetrySource(idx: number) {
+        (typedTask as unknown as DownloadTask)?.retryDownloadSource(idx);
+    }
+
     function handleConfirmDiff() {
         if (isDiffMode) {
             // Source-switch diff: confirm the new source selection
@@ -223,6 +227,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                     onSelectSource={setSelectedSourceIndex}
                     onRequestSelect={handleRequestSelect}
                     onRejectSource={handleRejectSource}
+                    onRetrySource={handleRetrySource}
                     onInnerFocusSwitch={() => setSourcesInnerFocus("detail")}
                 />
                 <DownloadSourceDetail

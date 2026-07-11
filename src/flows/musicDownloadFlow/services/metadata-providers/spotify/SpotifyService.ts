@@ -83,7 +83,7 @@ export class SpotifyService extends MetadataService {
     static readonly defaultSettings: ProviderSettingsSchema = {
         enabled: { label: "Enable", defaultValue: true, kind: "checkbox" },
         fallbackToWeb: {
-            label: "Fallback on Spotify Web if API is unavailable",
+            label: "Fallback on scraped Spotify Web if API is unavailable",
             defaultValue: true,
             kind: "checkbox",
         },
@@ -130,7 +130,7 @@ export class SpotifyService extends MetadataService {
             },
             {
                 id: "scrape",
-                label: "Scrape Spotify Web page (reads public page)",
+                label: "Scraped Spotify Web page (reads public page)",
                 description: "Limited metadata (no album, no ISRC).\nMay break if Spotify changes embed page.",
                 fields: [],
             },

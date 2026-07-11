@@ -21,7 +21,9 @@ export function StateBadge({ source }: { source: TrackDownloadSource }) {
             return <Text color={theme.status.error}>FAILED</Text>;
         case "searching":
             return <Text color={theme.status.downloading}>SEARCHING</Text>;
+        case "skipped":
+            return <Text color={theme.status.skipped}>NOT NEEDED</Text>;
         default:
-            return <Text color={theme.status.skipped}>PENDING</Text>;
+            return <Text color={theme.status.pending}>PENDING</Text>;
     }
 }

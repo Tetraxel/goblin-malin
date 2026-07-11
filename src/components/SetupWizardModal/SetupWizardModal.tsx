@@ -15,7 +15,7 @@ import { Hint } from "../Hint";
 
 type InteractiveItemUnion =
     | { kind: "link"; text: string; url: string }
-    | { kind: "field"; envVar: string; label: string; hint?: string }
+    | { kind: "field"; envVar: string; label: string; hint?: string; secret?: boolean }
     | { kind: "mode"; id: string; label: string };
 
 function buildInteractiveItems(config: SetupWizardConfig, selectedMode?: string): InteractiveItemUnion[] {
@@ -39,7 +39,13 @@ function buildInteractiveItems(config: SetupWizardConfig, selectedMode?: string)
         }
         // Then the fields of the active mode
         for (const field of activeMode.fields) {
-            items.push({ kind: "field", envVar: field.envVar, label: field.label, hint: field.hint });
+            items.push({
+                kind: "field",
+                envVar: field.envVar,
+                label: field.label,
+                hint: field.hint,
+                secret: field.secret,
+            });
         }
         return items;
     }
@@ -59,6 +65,7 @@ function buildInteractiveItems(config: SetupWizardConfig, selectedMode?: string)
             envVar: field.envVar,
             label: field.label,
             hint: field.hint,
+            secret: field.secret,
         });
     }
     return items;
@@ -363,6 +370,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
             flexDirection="column"
             justifyContent="center"
             alignItems="center"
+            backgroundColor={theme.ui.background}
         >
             <Box
                 flexDirection="column"
@@ -481,10 +489,15 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
                                             onSubmit={() => setEditingField(null)}
                                             placeholder={field.hint ?? ""}
                                             focus={true}
+                                            mask={field.secret ? "*" : undefined}
                                         />
                                     ) : (
                                         <Text dimColor={!fieldValues[field.envVar]}>
-                                            {fieldValues[field.envVar] || field.hint || ""}
+                                            {fieldValues[field.envVar]
+                                                ? field.secret
+                                                    ? "*".repeat(fieldValues[field.envVar].length)
+                                                    : fieldValues[field.envVar]
+                                                : (field.hint ?? "")}
                                         </Text>
                                     )}
                                 </Box>

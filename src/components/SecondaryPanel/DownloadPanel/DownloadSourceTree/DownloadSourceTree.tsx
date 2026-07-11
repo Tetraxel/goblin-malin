@@ -18,6 +18,7 @@ interface DownloadSourceTreeProps {
     onSelectSource: (index: number) => void;
     onRequestSelect: (index: number) => void;
     onRejectSource: (index: number) => void;
+    onRetrySource: (index: number) => void;
     onInnerFocusSwitch: () => void;
 }
 
@@ -43,9 +44,18 @@ function getProviderDisplay(provider: string): {
     return { label: display.acronym, color: display.color };
 }
 
+function metadataKeyOf(source: TrackDownloadSource): string {
+    const m = source.track;
+    return m.uri ?? `${m.platform}::${m.id}`;
+}
+
 function buildTreeItems(sources: TrackDownloadSource[]): TreeItem[] {
     const items: TreeItem[] = [];
     const seenProviders = new Set<string>();
+    // Consecutive sources under the same provider that used the identical metadata
+    // (the common case — one search/lookup feeds every candidate row) share a single
+    // "used …" header instead of repeating it before every row.
+    let lastMetadataKey: string | undefined;
     sources.forEach((source, i) => {
         if (!seenProviders.has(source.provider)) {
             seenProviders.add(source.provider);
@@ -56,8 +66,13 @@ function buildTreeItems(sources: TrackDownloadSource[]): TreeItem[] {
                 label,
                 color,
             });
+            lastMetadataKey = undefined;
         }
-        items.push({ type: "metadata-header", source, sourceIndex: i });
+        const metadataKey = metadataKeyOf(source);
+        if (metadataKey !== lastMetadataKey) {
+            items.push({ type: "metadata-header", source, sourceIndex: i });
+            lastMetadataKey = metadataKey;
+        }
         items.push({ type: "file-row", source, sourceIndex: i });
     });
     return items;
@@ -72,6 +87,7 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     onSelectSource,
     onRequestSelect,
     onRejectSource,
+    onRetrySource,
     onInnerFocusSwitch,
 }) => {
     const theme = useTheme();
@@ -80,7 +96,14 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
         .filter((item): item is Extract<TreeItem, { type: "file-row" }> => item.type === "file-row")
         .map((item) => item.sourceIndex);
 
-    const canPlay = sources[selectedSourceIndex]?.localFile?.state === "found";
+    const selectedSource = sources[selectedSourceIndex];
+    const canPlay = selectedSource?.localFile?.state === "found";
+    // A source only carries retryPayload if its provider supports re-attempting it
+    // on demand (e.g. a Soulseek candidate that was "skipped" or "failed") — gate on
+    // the data being present rather than hardcoding which providers/states qualify.
+    const canRetry =
+        selectedSource?.retryPayload != null &&
+        (selectedSource.state === "skipped" || selectedSource.state === "failed");
 
     useShortcuts({
         id: "downloadSourceTree",
@@ -132,6 +155,14 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                 },
             },
             {
+                id: "downloadSourceTree.retry",
+                defaultShortcut: { input: "w" },
+                label: "Download",
+                handler: () => {
+                    if (canRetry) onRetrySource(selectedSourceIndex);
+                },
+            },
+            {
                 id: "downloadSourceTree.playPause",
                 defaultShortcut: { input: " " },
                 label: "Play/Pause",
@@ -164,6 +195,7 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                 shortcutIds: [
                     "downloadSourceTree.select",
                     "downloadSourceTree.reject",
+                    ...(canRetry ? ["downloadSourceTree.retry"] : []),
                     ...(canPlay ? ["downloadSourceTree.playPause"] : []),
                 ],
             },

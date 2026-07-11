@@ -7,6 +7,7 @@ import { useTheme } from "#base/themeContext";
 import { TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { computeOutputFilename } from "#flows/musicDownloadFlow/utils/computeOutputPath";
+import { getProvenanceDisplay } from "#flows/musicDownloadFlow/utils/provenance";
 import { getInstance, PlayerStatus } from "#utils/mpvPlayer";
 import { formatBytes, formatDate, tagValue } from "#components/SecondaryPanel/DownloadPanel/utils";
 import { Uri } from "#components/SecondaryPanel/MetadataPanel/Uri";
@@ -283,7 +284,9 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     const displayDurationMs = durationMs > 0 ? durationMs : sourceDurationMs;
     const filename = source.localFile ? `${source.localFile.name}.${source.localFile.extension}` : "—";
     const sizeText = source.fileInfo ? formatBytes(source.fileInfo.sizeBytes) : "—";
-    const formatLabel = (source.fileInfo?.format ?? "flac").toUpperCase();
+    const provenance = getProvenanceDisplay(source.fileInfo);
+    const formatLabel = provenance.badge || (source.fileInfo?.format ?? "flac").toUpperCase();
+    const provenanceColor = provenance.tone === "warning" ? theme.status.warning : theme.status.success;
     const embeddedTags = source.fileInfo?.embeddedTags ?? {};
     const otherTagKeys = Object.keys(embeddedTags)
         .map((k) => k.toUpperCase())
@@ -331,9 +334,22 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                     )}
 
                     <Box paddingX={1} paddingBottom={1} height={1} flexShrink={0} flexDirection="row" overflow="hidden">
-                        <Text color={theme.text.secondary}>{"SOURCE  "}</Text>
-                        <Text color={dlProvider.color}>{dlProvider.label}</Text>
-                        <Text color={theme.text.secondary}>{" > "}</Text>
+                        <Box flexShrink={0}>
+                            <Text color={theme.text.secondary}>{"SOURCE  "}</Text>
+                        </Box>
+                        <Box flexShrink={0}>
+                            <Text color={dlProvider.color}>{dlProvider.label}</Text>
+                        </Box>
+                        {source.providerDetail && (
+                            <Box flexShrink={1} maxWidth={20} overflow="hidden">
+                                <Text color={theme.text.secondary} dimColor wrap="truncate-end">
+                                    {` (${source.providerDetail})`}
+                                </Text>
+                            </Box>
+                        )}
+                        <Box flexShrink={0}>
+                            <Text color={theme.text.secondary}>{" > "}</Text>
+                        </Box>
                         <Uri uri={sourceUri} platform={source.track.platform} noPaddingX />
                     </Box>
 
@@ -366,7 +382,14 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                                 </>
                             )}
                             <DetailRow label="File" value={filename} />
-                            <DetailRow label="Format" value={formatLabel} />
+                            <DetailRow
+                                label="Format"
+                                value={formatLabel}
+                                valueColor={provenance.badge ? provenanceColor : undefined}
+                            />
+                            {provenance.detail && (
+                                <DetailRow label="Quality" value={provenance.detail} valueColor={theme.status.warning} />
+                            )}
                             <DetailRow label="Size" value={sizeText} />
                             <DetailRow label="Duration" value={formatDuration(sourceDurationMs)} />
                             {compiled && (

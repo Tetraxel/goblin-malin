@@ -190,7 +190,7 @@ export class YtDlpService extends DownloadService {
 
             let fileInfo: FileInfo | undefined;
             try {
-                fileInfo = await readFileInfo(fullPath, trackMetadata.duration ?? 0);
+                fileInfo = await readFileInfo(fullPath, trackMetadata.duration ?? 0, "lossy-transcode", "Opus");
             } catch (err) {
                 this.logger.warn(`Failed to read file info for ${path.basename(fullPath)}`, { error: err });
             }

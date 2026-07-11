@@ -23,7 +23,10 @@ declare module "slsk-client" {
     }
 
     export function connect(
-        options: { user: string; pass: string },
+        // `timeout` (ms) guards the login handshake specifically — defaults to just
+        // 2000ms inside slsk-client itself, which is too short for a real server
+        // round-trip; always pass an explicit, more generous value.
+        options: { user: string; pass: string; timeout?: number },
         callback: (err: Error | null, client: SoulseekClient) => void
     ): void;
 }

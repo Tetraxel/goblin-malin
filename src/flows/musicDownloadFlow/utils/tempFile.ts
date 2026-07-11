@@ -36,3 +36,21 @@ export function findExistingTempFile(
     const match = fs.readdirSync(dir).find((f) => f.startsWith(prefix) && f.endsWith(`.${format}`));
     return match ? path.join(dir, match) : undefined;
 }
+
+/**
+ * Delete any leftover temp file(s) for this provider/track/format combo. For a
+ * provider whose results are deterministic (e.g. yt-dlp, same URL → same bytes),
+ * `findExistingTempFile` is the right optimization. For one whose results vary
+ * over time (e.g. Soulseek — available peers/files change), reusing an old temp
+ * file would silently skip a fresh attempt; call this instead before searching
+ * again, so retries don't just pile up unused files in the temp dir either.
+ */
+export function deleteExistingTempFiles(providerLabel: string, metadata: TrackMetadata, format: string, dir: string): void {
+    if (!metadata.uri || !fs.existsSync(dir)) return;
+    const prefix = getTempFilePrefix(providerLabel, metadata);
+    for (const file of fs.readdirSync(dir)) {
+        if (file.startsWith(prefix) && file.endsWith(`.${format}`)) {
+            fs.rmSync(path.join(dir, file), { force: true });
+        }
+    }
+}

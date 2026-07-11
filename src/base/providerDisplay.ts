@@ -4,6 +4,11 @@ export interface ProviderDisplay {
     color: string; // "#1ed760"   — primary color
     colorSubtle: string; // "#156b30"   — dark variant for attribution badges (FieldRow)
     colorBright: string; // "#1db954"   — bright variant for panel headers (MetadataDetailPanel)
+    // Mirrors DownloadService.usesCompiledMetadataForQuery — a download provider that
+    // searches freely (e.g. Soulseek) rather than resolving one metadata source's URL.
+    // MetadataHeader uses this to show "used Compiled Metadata (…)" instead of a
+    // specific platform URI that would overstate a dependency on that one source.
+    usesCompiledMetadata?: boolean;
 }
 
 const BUILTIN_PROVIDERS: Record<string, ProviderDisplay> = {

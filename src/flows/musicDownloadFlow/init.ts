@@ -9,6 +9,7 @@ import { YoutubeService } from "./services/metadata-providers/youtube/YoutubeSer
 import { SonglinkService } from "./services/metadata-providers/songlink/SonglinkService";
 import { MusicBrainzDiscoveryService } from "./services/metadata-providers/musicbrainz/MusicBrainzDiscoveryService";
 import { YtDlpService } from "./services/download-providers/ytdlp/YtDlpService";
+import { SoulseekService } from "./services/download-providers/soulseek/SoulseekService";
 
 let initialized = false;
 
@@ -32,7 +33,7 @@ export function initMusicApp(): void {
     discoveryServiceRegistry.register("musicBrainz", MusicBrainzDiscoveryService);
 
     downloadServiceRegistry.register("ytdlp", YtDlpService);
-    // downloadServiceRegistry.register('soulseek', SoulseekService);
+    downloadServiceRegistry.register("soulseek", SoulseekService);
 
     applyConcurrencySettings();
     SettingsStore.getInstance().onSettingsChanged(applyConcurrencySettings);

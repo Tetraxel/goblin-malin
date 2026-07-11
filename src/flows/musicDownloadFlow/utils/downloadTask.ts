@@ -23,10 +23,12 @@ import { computeConfidenceScore } from "./confidence";
 import { computeCompiledMetadata } from "./compiledMetadata";
 import { compiledMetadataToTags } from "./compiledMetadataToTags";
 import { computeOutputPath } from "./computeOutputPath";
+import { pickAutoSelectedIndex } from "./sourceSelection";
 import { MetadataService } from "../metadataService";
 import { DiscoveryMetadataService } from "../discoveryMetadataService";
 import { DownloadService } from "../downloadService";
 import { getSaveSettings } from "../saveSettings";
+import { getMusicSettings } from "../settings";
 
 // The @Cached() decorator persists results to a 90-day disk cache. Old cache entries
 // may still contain a plain TrackMetadata[] (the previous return format). Normalizing
@@ -703,6 +705,42 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         });
     }
 
+    /**
+     * Manually download one specific previously-found candidate on demand — e.g. a
+     * Soulseek source marked "skipped" (an earlier-ranked candidate already won) or
+     * "failed" that the user wants to try anyway. Only touches this one row; unlike
+     * `startDownloads()` it never re-selects a different source automatically.
+     */
+    @TaskScoped()
+    @SafeAction("Retry download source")
+    async retryDownloadSource(sourceIndex: number): Promise<void> {
+        const target = this.getAttributes()?.downloadSources[sourceIndex];
+        if (!target || target.retryPayload == null) return;
+
+        const service = this.downloadServices.get(target.provider);
+        if (!service.retryCandidate) {
+            this.logger.warn(`${target.provider} does not support retrying a specific source`);
+            return;
+        }
+
+        const patchSource = (patch: TrackDownloadSource) => {
+            const current = [...(this.getAttributes()?.downloadSources ?? [])];
+            if (!current[sourceIndex]) return;
+            current[sourceIndex] = { ...patch, selected: current[sourceIndex].selected };
+            this.updateAttributes({ downloadSources: current });
+        };
+
+        try {
+            const result = await service.retryCandidate(target.track, target.retryPayload, (source) =>
+                patchSource(source)
+            );
+            patchSource(result);
+        } catch (error) {
+            this.logger.warn(`Failed to retry download source ${sourceIndex}`, { error });
+            patchSource({ ...target, state: "failed" });
+        }
+    }
+
     updateLocalFile(sourceIndex: number, newPath: string): void {
         const sources = this.getAttributes()?.downloadSources ?? [];
         if (!sources[sourceIndex]) return;
@@ -835,29 +873,57 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                     continue;
                 }
 
+                // A free-text search provider (e.g. Soulseek) isn't really tied to
+                // whichever group happened to rank first — overlay the task's compiled
+                // (merged + user-overridden) fields so the query, and what the UI shows
+                // as "used …", reflect the actual current metadata instead of one
+                // arbitrary source's raw values.
+                if (downloadService.usesCompiledMetadataForQuery) {
+                    const compiled = computeCompiledMetadata(metadataGroups, this.getAttributes()?.metadataOverride ?? {});
+                    compatibleMetadata = {
+                        ...compatibleMetadata,
+                        trackName: compiled.trackName || compatibleMetadata.trackName,
+                        artists: compiled.artists.length > 0 ? compiled.artists : compatibleMetadata.artists,
+                        album: compiled.album ?? compatibleMetadata.album,
+                        duration: compiled.duration ?? compatibleMetadata.duration,
+                    };
+                }
+
                 this.logger.info(`Downloading using ${downloadService.id} from ${compatibleMetadata.apiProvider}`);
 
-                // Reserve a slot for this service. The service emits intermediate sources
+                // Reserve slot(s) for this service. The service emits intermediate sources
                 // (e.g. "downloading" + progress) via onUpdate so the UI can show the
                 // download in progress before it completes. `selected` is owned by this
-                // task, so it is preserved across intermediate updates.
-                let slotIndex = -1;
-                const onUpdate = (source: TrackDownloadSource) => {
-                    if (slotIndex === -1) {
-                        slotIndex = downloadSources.length;
+                // task, so it is preserved across intermediate updates. A service that
+                // tries multiple candidates for one track (e.g. Soulseek working through a
+                // ranked peer list) can address each with a stable `attemptId`: the first
+                // update for an id opens its own row, later updates with the same id
+                // update that exact row — so every real attempt (pending/downloading/
+                // failed/downloaded) shows as its own row instead of one shared status.
+                // Services that never pass an `attemptId` (e.g. yt-dlp) keep the original
+                // single-row behavior via the implicit `undefined` key.
+                const slotByAttemptId = new Map<string | undefined, number>();
+                let lastAttemptId: string | undefined;
+                const onUpdate = (source: TrackDownloadSource, options?: { attemptId?: string }) => {
+                    const attemptId = options?.attemptId;
+                    lastAttemptId = attemptId;
+                    const existingSlot = slotByAttemptId.get(attemptId);
+                    if (existingSlot === undefined) {
+                        slotByAttemptId.set(attemptId, downloadSources.length);
                         downloadSources.push(source);
                     } else {
-                        downloadSources[slotIndex] = { ...source, selected: downloadSources[slotIndex].selected };
+                        downloadSources[existingSlot] = { ...source, selected: downloadSources[existingSlot].selected };
                     }
                     this.updateAttributes({ downloadSources: [...downloadSources] });
                 };
 
                 // Download the track
                 const downloadSource = await downloadService.downloadTrack(compatibleMetadata, onUpdate, signal);
-                if (slotIndex === -1) {
+                const finalSlot = slotByAttemptId.get(lastAttemptId);
+                if (finalSlot === undefined) {
                     downloadSources.push(downloadSource);
                 } else {
-                    downloadSources[slotIndex] = { ...downloadSource, selected: downloadSources[slotIndex].selected };
+                    downloadSources[finalSlot] = { ...downloadSource, selected: downloadSources[finalSlot].selected };
                 }
                 this.updateAttributes({ downloadSources: [...downloadSources] });
                 this.logger.info(`Successfully downloaded using ${downloadService.id}`);
@@ -868,11 +934,13 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             }
         }
 
-        // Only the first successfully downloaded source is auto-selected
-        const firstDownloadedIdx = downloadSources.findIndex((s) => s.state === "downloaded");
+        // Auto-select the best downloaded source — lossless-first when preferLossless
+        // is on (the default), otherwise the first successfully downloaded source.
+        const preferLossless = getMusicSettings().download.preferLossless;
+        const autoSelectedIdx = pickAutoSelectedIndex(downloadSources, preferLossless);
         const sourcesWithSelection = downloadSources.map((s, i) => ({
             ...s,
-            selected: i === firstDownloadedIdx,
+            selected: i === autoSelectedIdx,
         }));
 
         this.updateAttributes({ downloadSources: sourcesWithSelection });

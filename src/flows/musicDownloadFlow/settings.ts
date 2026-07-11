@@ -15,6 +15,8 @@ export type MusicDownloadFlowSettings = {
     };
     download: {
         autoChooseBestSource: boolean;
+        /** When auto-selecting among multiple downloaded sources, prefer lossless over lossy/transcoded. */
+        preferLossless: boolean;
         autoSaveToOutputDir: boolean;
         autoDeleteTempAfter24h: boolean;
         autoRelocateMissingFiles: boolean;
@@ -69,6 +71,7 @@ export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSetting
     },
     download: {
         autoChooseBestSource: false,
+        preferLossless: true,
         autoSaveToOutputDir: true,
         autoDeleteTempAfter24h: false,
         autoRelocateMissingFiles: false,

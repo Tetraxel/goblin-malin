@@ -2,6 +2,7 @@
 import { Box, Text } from "ink";
 import { useTheme } from "#base/themeContext";
 import { TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import { getProvenanceDisplay } from "#flows/musicDownloadFlow/utils/provenance";
 import { formatBytes } from "#components/SecondaryPanel/DownloadPanel/utils";
 import { StateBadge } from "../StateBadge";
 
@@ -25,6 +26,13 @@ export function SourceFileRow({ source, sourceIndex, isSelected, isActive, width
     const localFile = source.localFile;
     const filename = localFile ? `${localFile.name}.${localFile.extension}` : null;
     const sizeText = source.fileInfo ? formatBytes(source.fileInfo.sizeBytes) : "";
+    const provenance = getProvenanceDisplay(source.fileInfo);
+    const provenanceColor =
+        provenance.tone === "success"
+            ? theme.status.success
+            : provenance.tone === "warning"
+              ? theme.status.warning
+              : theme.text.secondary;
 
     // While the file isn't downloaded yet there's no filename — show the anticipated
     // track name (dimmed) so the row is recognizable during download. The state badge
@@ -79,6 +87,18 @@ export function SourceFileRow({ source, sourceIndex, isSelected, isActive, width
                     </Text>
                 )}
             </Box>
+            {source.providerDetail && (
+                <Box maxWidth={20} paddingLeft={1} flexShrink={0} overflow="hidden">
+                    <Text color={theme.text.secondary} dimColor wrap="truncate-end">
+                        {`${source.providerDetail}`}
+                    </Text>
+                </Box>
+            )}
+            {provenance.badge !== "" && (
+                <Box minWidth={provenance.badge.length + 1} paddingLeft={1} flexShrink={0}>
+                    <Text color={provenanceColor}>{provenance.badge}</Text>
+                </Box>
+            )}
             {sizeText !== "" && (
                 <Box minWidth={sizeText.length + 1} paddingLeft={1} flexShrink={0}>
                     <Text color={theme.text.secondary}>{sizeText}</Text>

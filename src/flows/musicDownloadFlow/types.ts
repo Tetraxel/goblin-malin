@@ -286,15 +286,33 @@ export type LocalFile = {
     state: "found" | "not_found";
     path: string;
     name: string;
-    extension: "flac";
+    extension: "flac" | "mp3";
     sourceUrl?: string;
 };
+
+// How trustworthy a source's audio quality actually is, independent of its
+// container. "lossy-transcode" means a lossless container (e.g. FLAC) wraps
+// audio that was already lossy-compressed upstream (e.g. yt-dlp's FLAC is a
+// re-encode of YouTube's Opus stream) — the container lies about quality.
+export type Provenance = "lossless" | "lossy-transcode" | "lossy";
 
 export type FileInfo = {
     format: "flac" | "mp3" | "ogg";
     sizeBytes: number;
     durationMs: number;
     embeddedTags: Record<string, string | string[]>;
+    /** Real codec probed from the file itself (e.g. "flac", "mp3", "opus"), independent of container. */
+    codec?: string;
+    /** Real bitrate probed from the file itself. */
+    bitrateKbps?: number;
+    provenance?: Provenance;
+    /**
+     * For "lossy-transcode" sources: the known original lossy codec upstream of
+     * this file's container (e.g. "Opus" for yt-dlp). Not derivable by probing
+     * the file itself — it's been genuinely re-encoded — so it's supplied by
+     * the service that knows where the file actually came from.
+     */
+    sourceCodec?: string;
 };
 
 export type SavedFile = {
@@ -303,7 +321,15 @@ export type SavedFile = {
 };
 
 export type TrackDownloadSource = {
-    state: "pending" | "searching" | "downloading" | "downloaded" | "failed";
+    /**
+     * "pending": queued, will still be attempted.
+     * "skipped": a candidate a provider found and ranked but deliberately never
+     *            attempted because an earlier, better-ranked one already succeeded
+     *            (e.g. unattempted Soulseek candidates once one download wins).
+     *            Terminal — distinct from "pending" precisely so the UI doesn't
+     *            claim it's still queued or in progress.
+     */
+    state: "pending" | "searching" | "downloading" | "downloaded" | "failed" | "skipped";
     provider: DownloadProvider;
     track: TrackMetadata;
     localFile?: LocalFile;
@@ -314,6 +340,15 @@ export type TrackDownloadSource = {
     savedFile?: SavedFile;
     /** Download progress 0–100 while `state` is "downloading". */
     progress?: number;
+    /** Extra provider-specific origin detail (e.g. the Soulseek peer username this file came from). */
+    providerDetail?: string;
+    /**
+     * Opaque, provider-specific data needed to retry this exact candidate on demand
+     * (e.g. the Soulseek peer/file reference for a "skipped" or "failed" row) —
+     * meaningless outside the `DownloadService` that produced it; pass back to that
+     * same service's `retryCandidate()`.
+     */
+    retryPayload?: unknown;
 };
 
 //----------------------//

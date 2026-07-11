@@ -17,9 +17,34 @@ interface DownloadInProgressProps {
 export function DownloadInProgress({ source, width, height }: DownloadInProgressProps) {
     const theme = useTheme();
 
-    const isFailed = source.state === "failed";
-    const stateLabel = isFailed ? "FAILED" : source.state === "searching" ? "SEARCHING" : "DOWNLOADING";
-    const stateColor = isFailed ? theme.status.error : theme.status.downloading;
+    const progressText = source.progress != null && source.progress > 0 ? ` ${Math.round(source.progress)}%` : "";
+
+    const { stateLabel, stateColor, message } = ((): { stateLabel: string; stateColor: string; message: string } => {
+        switch (source.state) {
+            case "failed":
+                return { stateLabel: "FAILED", stateColor: theme.status.error, message: "✘ Download failed" };
+            case "searching":
+                return {
+                    stateLabel: "SEARCHING",
+                    stateColor: theme.status.downloading,
+                    message: "Searching for a source…",
+                };
+            case "skipped":
+                return {
+                    stateLabel: "NOT NEEDED",
+                    stateColor: theme.status.skipped,
+                    message: "A better-ranked source already downloaded successfully — this one was never attempted.",
+                };
+            case "pending":
+                return { stateLabel: "PENDING", stateColor: theme.status.pending, message: "Queued…" };
+            default:
+                return {
+                    stateLabel: "DOWNLOADING",
+                    stateColor: theme.status.downloading,
+                    message: `↓ Downloading…${progressText}`,
+                };
+        }
+    })();
 
     const innerWidth = width - 2;
     const headerDashes = Math.max(0, innerWidth - stateLabel.length - 2);
@@ -28,12 +53,6 @@ export function DownloadInProgress({ source, width, height }: DownloadInProgress
 
     const artist = source.track.artists?.[0]?.name ?? "";
     const trackLabel = artist ? `${artist} - ${source.track.trackName}` : source.track.trackName;
-    const progressText = source.progress != null && source.progress > 0 ? ` ${Math.round(source.progress)}%` : "";
-    const message = isFailed
-        ? "✘ Download failed"
-        : source.state === "searching"
-          ? "Searching for a source…"
-          : `↓ Downloading…${progressText}`;
 
     return (
         <Box flexDirection="column" width={width} height={height} overflow="hidden">
