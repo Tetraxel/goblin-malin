@@ -330,6 +330,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                             width={innerW}
                             isPlaying={isPlaying}
                             isPaused={isPaused}
+                            isFocused={isActive}
                         />
                     )}
 

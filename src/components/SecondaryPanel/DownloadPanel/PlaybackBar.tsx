@@ -9,11 +9,22 @@ interface PlaybackBarProps {
     width: number;
     isPlaying: boolean;
     isPaused: boolean;
+    /** The detail panel has keyboard focus, so this row is what Space/Shift+←/→ act on. */
+    isFocused?: boolean;
 }
 
-export function PlaybackBar({ positionMs, durationMs, width, isPlaying, isPaused }: PlaybackBarProps) {
+export function PlaybackBar({
+    positionMs,
+    durationMs,
+    width,
+    isPlaying,
+    isPaused,
+    isFocused = false,
+}: PlaybackBarProps) {
     const theme = useTheme();
     const active = isPlaying || isPaused;
+    // Focused rows elsewhere get cellActive; keep the idle bar readable on top of it.
+    const dim = !active && !isFocused;
     const effectiveWidth = Math.max(0, width - 2);
     const timeStr = "  " + (active ? formatDuration(positionMs) : "0:00") + " / " + formatDuration(durationMs);
     const barW = Math.max(6, effectiveWidth - 3 - timeStr.length);
@@ -30,16 +41,16 @@ export function PlaybackBar({ positionMs, durationMs, width, isPlaying, isPaused
             overflow="hidden"
             marginBottom={1}
             marginX={1}
-            backgroundColor={theme.ui.background}
+            backgroundColor={isFocused ? theme.ui.rowBackground.regular.cellActive : theme.ui.background}
         >
             <Box flexDirection="row" flexGrow={1} overflow="hidden">
-                <Text color={isPlaying ? theme.ui.progressFill : theme.text.secondary} dimColor={!active}>
+                <Text color={isPlaying ? theme.ui.progressFill : theme.text.secondary} dimColor={dim}>
                     {isPaused ? "⏸  " : "▶  "}
                 </Text>
-                <Text color={isPlaying ? theme.ui.progressFill : theme.text.secondary} dimColor={!active}>
+                <Text color={isPlaying ? theme.ui.progressFill : theme.text.secondary} dimColor={dim}>
                     {bar}
                 </Text>
-                <Text color={theme.text.secondary} dimColor={!active}>
+                <Text color={theme.text.secondary} dimColor={dim}>
                     {timeStr}
                 </Text>
             </Box>
