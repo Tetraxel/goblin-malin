@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import slsk from "slsk-client";
 import type { SlskFile, SoulseekClient } from "slsk-client";
-import { DownloadService } from "../../../downloadService";
+import { DownloadService, DownloadUpdateCallback } from "../../../downloadService";
 import { ProviderDisplay } from "#base/providerDisplay";
 import { ProviderSettingsSchema } from "#base/providerSettings";
 import { SetupWizardConfig } from "#base/setupWizard";
@@ -271,7 +271,7 @@ export class SoulseekService extends DownloadService {
 
     async downloadTrack(
         trackMetadata: TrackMetadata,
-        onUpdate?: (source: TrackDownloadSource, options?: { attemptId?: string }) => void,
+        onUpdate?: DownloadUpdateCallback,
         signal?: AbortSignal
     ): Promise<TrackDownloadSource> {
         const pendingSource: TrackDownloadSource = {
@@ -436,19 +436,33 @@ export class SoulseekService extends DownloadService {
     /**
      * Attempt exactly one candidate: download it, reject on duration mismatch, and
      * finalize on success. Returns null (having already emitted a "failed" onUpdate)
-     * on any non-abort failure, so callers can decide what to do next — the main
-     * sequential loop moves on to the next candidate; `retryCandidate` (one-off,
-     * user-triggered) just reports the failure back as its return value.
+     * on any non-abort failure — including this *one* candidate being cancelled via
+     * its row's `abort` handle (e.g. the user rejected it) — so callers can decide
+     * what to do next: the main sequential loop moves on to the next candidate;
+     * `retryCandidate` (one-off, user-triggered) just reports the failure back as
+     * its return value. Only a genuine task-level abort (the outer `signal`) is
+     * re-thrown, since that should stop the whole search, not just this candidate.
      */
     private async attemptSingleCandidate(
         trackMetadata: TrackMetadata,
         candidate: SlskFile,
         extension: Extension,
         tempDir: string,
-        onUpdate: ((source: TrackDownloadSource, options?: { attemptId?: string }) => void) | undefined,
+        onUpdate: DownloadUpdateCallback | undefined,
         attemptId: string | undefined,
         signal: AbortSignal | undefined
     ): Promise<TrackDownloadSource | null> {
+        // This candidate's own cancel handle, linked to the outer/task-level signal
+        // so a real task abort still cancels it too, but independently abortable via
+        // the row's `abort` option (e.g. rejectDownloadSource) without touching any
+        // other candidate or the search loop itself.
+        const candidateController = new AbortController();
+        const onOuterAbort = () => candidateController.abort();
+        signal?.addEventListener("abort", onOuterAbort, { once: true });
+
+        // No `progress` here — slsk-client's download() has no byte-level progress
+        // callback (unlike yt-dlp), so there's nothing real to report. StateBadge
+        // shows a plain "DOWNLOADING" without a percentage when progress is unset.
         onUpdate?.(
             {
                 state: "downloading",
@@ -456,11 +470,10 @@ export class SoulseekService extends DownloadService {
                 track: trackMetadata,
                 downloadedAt: new Date(),
                 selected: false,
-                progress: 50,
                 providerDetail: candidate.user,
                 retryPayload: candidate,
             },
-            { attemptId }
+            { attemptId, abort: () => candidateController.abort() }
         );
 
         const destPath = path.join(
@@ -469,7 +482,7 @@ export class SoulseekService extends DownloadService {
         );
 
         try {
-            await this.downloadCandidate(candidate, destPath, signal);
+            await this.downloadCandidate(candidate, destPath, candidateController.signal);
 
             if (trackMetadata.duration != null) {
                 const probed = await probeAudio(destPath);
@@ -497,7 +510,7 @@ export class SoulseekService extends DownloadService {
             return await this.finalizeDownload(trackMetadata, destPath, extension, candidate);
         } catch (error) {
             await fs.promises.unlink(destPath).catch(() => {});
-            if ((error as Error).name === "AbortError") throw error;
+            if ((error as Error).name === "AbortError" && signal?.aborted) throw error;
             this.logger.warn(`Candidate download failed from ${candidate.user}`, { error });
             onUpdate?.(
                 {
@@ -512,6 +525,8 @@ export class SoulseekService extends DownloadService {
                 { attemptId }
             );
             return null;
+        } finally {
+            signal?.removeEventListener("abort", onOuterAbort);
         }
     }
 
@@ -523,7 +538,7 @@ export class SoulseekService extends DownloadService {
     async retryCandidate(
         trackMetadata: TrackMetadata,
         retryPayload: unknown,
-        onUpdate?: (source: TrackDownloadSource, options?: { attemptId?: string }) => void,
+        onUpdate?: DownloadUpdateCallback,
         signal?: AbortSignal
     ): Promise<TrackDownloadSource> {
         const candidate = retryPayload as SlskFile;

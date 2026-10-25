@@ -81,6 +81,7 @@ export function SourceFileRow({ source, sourceIndex, isSelected, isActive, width
                     <Text
                         color={source.state === "failed" ? theme.status.error : theme.text.secondary}
                         dimColor
+                        strikethrough={source.isRejected}
                         wrap="truncate-end"
                     >
                         {trackLabel}
@@ -89,19 +90,23 @@ export function SourceFileRow({ source, sourceIndex, isSelected, isActive, width
             </Box>
             {source.providerDetail && (
                 <Box maxWidth={20} paddingLeft={1} flexShrink={0} overflow="hidden">
-                    <Text color={theme.text.secondary} dimColor wrap="truncate-end">
+                    <Text color={theme.text.secondary} dimColor strikethrough={source.isRejected} wrap="truncate-end">
                         {`${source.providerDetail}`}
                     </Text>
                 </Box>
             )}
             {provenance.badge !== "" && (
                 <Box minWidth={provenance.badge.length + 1} paddingLeft={1} flexShrink={0}>
-                    <Text color={provenanceColor}>{provenance.badge}</Text>
+                    <Text color={provenanceColor} dimColor={source.isRejected} strikethrough={source.isRejected}>
+                        {provenance.badge}
+                    </Text>
                 </Box>
             )}
             {sizeText !== "" && (
                 <Box minWidth={sizeText.length + 1} paddingLeft={1} flexShrink={0}>
-                    <Text color={theme.text.secondary}>{sizeText}</Text>
+                    <Text color={theme.text.secondary} dimColor={source.isRejected} strikethrough={source.isRejected}>
+                        {sizeText}
+                    </Text>
                 </Box>
             )}
             <Box paddingLeft={1} paddingRight={1} flexShrink={0}>

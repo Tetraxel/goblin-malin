@@ -26,7 +26,7 @@ import { computeOutputPath } from "./computeOutputPath";
 import { pickAutoSelectedIndex } from "./sourceSelection";
 import { MetadataService } from "../metadataService";
 import { DiscoveryMetadataService } from "../discoveryMetadataService";
-import { DownloadService } from "../downloadService";
+import { DownloadService, DownloadUpdateOptions } from "../downloadService";
 import { getSaveSettings } from "../saveSettings";
 import { getMusicSettings } from "../settings";
 
@@ -45,6 +45,11 @@ export class DownloadTask extends Task<TrackDownloadTask> {
     private metadataServiceRegistry: ServiceRegistry<DownloadTask, MetadataService>;
     private discoveryServiceRegistry: ServiceRegistry<DownloadTask, DiscoveryMetadataService>;
     private isMetadataServiceEnabled: (key: string) => boolean;
+    // Cancel handle for whichever download source row is currently in flight, keyed
+    // by its index in `downloadSources` — populated from onUpdate's `abort` option
+    // (see DownloadUpdateOptions) and consumed by rejectDownloadSource() so rejecting
+    // an actively-downloading row actually stops it instead of just hiding it.
+    private activeAbortBySourceIndex = new Map<number, () => void>();
 
     constructor({
         id,
@@ -703,6 +708,16 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 i === index ? { ...s, isRejected: rejected, selected: rejected ? false : s.selected } : s
             ),
         });
+        // Rejecting a row that's actively downloading (yt-dlp or one Soulseek
+        // candidate) should actually stop it, not just hide it while it keeps
+        // running in the background.
+        if (rejected) {
+            const abort = this.activeAbortBySourceIndex.get(index);
+            if (abort) {
+                abort();
+                this.activeAbortBySourceIndex.delete(index);
+            }
+        }
     }
 
     /**
@@ -730,13 +745,33 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             this.updateAttributes({ downloadSources: current });
         };
 
+        // Reuses the same activeAbortBySourceIndex map startDownloads() populates, so
+        // rejectDownloadSource() can cancel a manual retry exactly like any other
+        // in-flight row, without needing to know which path started it.
+        const retryController = new AbortController();
         try {
-            const result = await service.retryCandidate(target.track, target.retryPayload, (source) =>
-                patchSource(source)
+            const result = await service.retryCandidate(
+                target.track,
+                target.retryPayload,
+                (source, options) => {
+                    if (options?.abort) {
+                        this.activeAbortBySourceIndex.set(sourceIndex, options.abort);
+                    } else {
+                        this.activeAbortBySourceIndex.delete(sourceIndex);
+                    }
+                    patchSource(source);
+                },
+                retryController.signal
             );
+            this.activeAbortBySourceIndex.delete(sourceIndex);
             patchSource(result);
         } catch (error) {
-            this.logger.warn(`Failed to retry download source ${sourceIndex}`, { error });
+            this.activeAbortBySourceIndex.delete(sourceIndex);
+            // AbortError here means the user rejected this same row mid-retry —
+            // expected, not worth an error-level log.
+            if ((error as Error).name !== "AbortError") {
+                this.logger.warn(`Failed to retry download source ${sourceIndex}`, { error });
+            }
             patchSource({ ...target, state: "failed" });
         }
     }
@@ -846,7 +881,28 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.updateAttributes({ downloadSources: [], downloadsFetched: false });
 
         const downloadServices = this.downloadServices.getAllServices();
-        const downloadSources: TrackDownloadSource[] = [];
+
+        // Every row update round-trips through the live persisted attributes rather
+        // than a locally-accumulated array — a service call can be in flight for
+        // seconds (Soulseek candidates especially), during which the user can mutate
+        // a row directly (rejectDownloadSource, selectDownloadSource). A stale local
+        // copy would silently clobber that (e.g. a "failed" update arriving after an
+        // abort would wipe the `isRejected` flag that abort was supposed to set).
+        // Returns the slot index actually used (existing or newly appended).
+        const applyRowUpdate = (existingSlot: number | undefined, patch: TrackDownloadSource): number => {
+            const current = [...(this.getAttributes()?.downloadSources ?? [])];
+            let slotIndex: number;
+            if (existingSlot === undefined) {
+                slotIndex = current.length;
+                current.push(patch);
+            } else {
+                slotIndex = existingSlot;
+                const live = current[slotIndex];
+                current[slotIndex] = live ? { ...patch, selected: live.selected, isRejected: live.isRejected } : patch;
+            }
+            this.updateAttributes({ downloadSources: current });
+            return slotIndex;
+        };
 
         for (const downloadService of downloadServices) {
             throwIfAborted(signal);
@@ -904,31 +960,30 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 // single-row behavior via the implicit `undefined` key.
                 const slotByAttemptId = new Map<string | undefined, number>();
                 let lastAttemptId: string | undefined;
-                const onUpdate = (source: TrackDownloadSource, options?: { attemptId?: string }) => {
+                const onUpdate = (source: TrackDownloadSource, options?: DownloadUpdateOptions) => {
                     const attemptId = options?.attemptId;
                     lastAttemptId = attemptId;
-                    const existingSlot = slotByAttemptId.get(attemptId);
-                    if (existingSlot === undefined) {
-                        slotByAttemptId.set(attemptId, downloadSources.length);
-                        downloadSources.push(source);
+                    const slotIndex = applyRowUpdate(slotByAttemptId.get(attemptId), source);
+                    slotByAttemptId.set(attemptId, slotIndex);
+                    if (options?.abort) {
+                        this.activeAbortBySourceIndex.set(slotIndex, options.abort);
                     } else {
-                        downloadSources[existingSlot] = { ...source, selected: downloadSources[existingSlot].selected };
+                        this.activeAbortBySourceIndex.delete(slotIndex);
                     }
-                    this.updateAttributes({ downloadSources: [...downloadSources] });
                 };
 
                 // Download the track
                 const downloadSource = await downloadService.downloadTrack(compatibleMetadata, onUpdate, signal);
-                const finalSlot = slotByAttemptId.get(lastAttemptId);
-                if (finalSlot === undefined) {
-                    downloadSources.push(downloadSource);
-                } else {
-                    downloadSources[finalSlot] = { ...downloadSource, selected: downloadSources[finalSlot].selected };
-                }
-                this.updateAttributes({ downloadSources: [...downloadSources] });
+                const finalSlot = applyRowUpdate(slotByAttemptId.get(lastAttemptId), downloadSource);
+                this.activeAbortBySourceIndex.delete(finalSlot);
                 this.logger.info(`Successfully downloaded using ${downloadService.id}`);
             } catch (error) {
-                if ((error as Error).name === "AbortError") throw error;
+                // Only a genuine task-level abort (the signal passed into this whole
+                // startDownloads() call) should stop the loop entirely. A service can
+                // also throw AbortError when just *one row* was cancelled (e.g. the user
+                // rejected a source mid-download via its per-row `abort` handle) — that
+                // should only fail this one service's attempt, not the rest of the task.
+                if (signal?.aborted) throw error;
                 this.logger.warn(`Failed to download using ${downloadService.id}:`, { error });
                 // Continue to next download service
             }
@@ -936,9 +991,12 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
         // Auto-select the best downloaded source — lossless-first when preferLossless
         // is on (the default), otherwise the first successfully downloaded source.
+        // Read fresh rather than any locally-accumulated array, for the same reason
+        // applyRowUpdate does above.
+        const finalSources = this.getAttributes()?.downloadSources ?? [];
         const preferLossless = getMusicSettings().download.preferLossless;
-        const autoSelectedIdx = pickAutoSelectedIndex(downloadSources, preferLossless);
-        const sourcesWithSelection = downloadSources.map((s, i) => ({
+        const autoSelectedIdx = pickAutoSelectedIndex(finalSources, preferLossless);
+        const sourcesWithSelection = finalSources.map((s, i) => ({
             ...s,
             selected: i === autoSelectedIdx,
         }));
@@ -946,11 +1004,11 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.updateAttributes({ downloadSources: sourcesWithSelection });
         this.updateAttributes({ downloadsFetched: true });
 
-        if (downloadSources.length === 0) {
+        if (finalSources.length === 0) {
             this.logger.warn("No successful downloads");
         } else {
             this.logger.info(
-                `Completed downloads: ${downloadSources.filter((s) => s.state === "downloaded").length} successful, ${downloadSources.filter((s) => s.state === "failed").length} failed`
+                `Completed downloads: ${finalSources.filter((s) => s.state === "downloaded").length} successful, ${finalSources.filter((s) => s.state === "failed").length} failed`
             );
         }
     }

@@ -14,13 +14,18 @@ const track: TrackMetadata = {
     type: "track",
 };
 
-function source(state: TrackDownloadSource["state"], fileInfo?: Partial<FileInfo>): TrackDownloadSource {
+function source(
+    state: TrackDownloadSource["state"],
+    fileInfo?: Partial<FileInfo>,
+    isRejected?: boolean
+): TrackDownloadSource {
     return {
         state,
         provider: "ytdlp",
         track,
         downloadedAt: new Date(),
         selected: false,
+        isRejected,
         fileInfo: fileInfo
             ? { format: "flac", sizeBytes: 0, durationMs: 0, embeddedTags: {}, ...fileInfo }
             : undefined,
@@ -80,5 +85,18 @@ describe("pickAutoSelectedIndex", () => {
             source("skipped"),
         ];
         expect(pickAutoSelectedIndex(sources, true)).toBe(0);
+    });
+
+    test("a rejected source is never auto-selected, even if downloaded", () => {
+        const sources = [
+            source("downloaded", { provenance: "lossless" }, true),
+            source("downloaded", { provenance: "lossy", bitrateKbps: 192 }),
+        ];
+        expect(pickAutoSelectedIndex(sources, true)).toBe(1);
+    });
+
+    test("returns -1 when the only downloaded source is rejected", () => {
+        const sources = [source("downloaded", { provenance: "lossless" }, true)];
+        expect(pickAutoSelectedIndex(sources, true)).toBe(-1);
     });
 });

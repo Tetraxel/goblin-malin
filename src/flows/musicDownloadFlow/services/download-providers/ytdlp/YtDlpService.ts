@@ -1,7 +1,7 @@
 ﻿import fs from "fs";
 import path from "path";
 import { FormatOptions, QualityOptions, YtDlp } from "ytdlp-nodejs";
-import { DownloadService } from "../../../downloadService";
+import { DownloadService, DownloadUpdateCallback } from "../../../downloadService";
 import { ProviderDisplay } from "#base/providerDisplay";
 import { ProviderSettingsSchema } from "#base/providerSettings";
 import { StatusType } from "#base/task/task-status";
@@ -58,7 +58,7 @@ export class YtDlpService extends DownloadService {
 
     async downloadTrack(
         trackMetadata: TrackMetadata,
-        onUpdate?: (source: TrackDownloadSource) => void,
+        onUpdate?: DownloadUpdateCallback,
         signal?: AbortSignal
     ): Promise<TrackDownloadSource> {
         // Check if this service can handle the track's source
@@ -70,6 +70,14 @@ export class YtDlpService extends DownloadService {
 
         const trackUrl = trackMetadata.url;
 
+        // A dedicated controller so the row can be cancelled on its own (e.g. the
+        // user rejects it mid-download) without needing the task-level `signal` —
+        // linked to it so a real task-level abort still cascades down here too.
+        const rowAbortController = new AbortController();
+        const onOuterAbort = () => rowAbortController.abort();
+        signal?.addEventListener("abort", onOuterAbort, { once: true });
+        const reportAbort = () => rowAbortController.abort();
+
         // In-progress source emitted right away so the UI shows the download before it completes.
         const pendingSource: TrackDownloadSource = {
             state: "downloading",
@@ -79,7 +87,7 @@ export class YtDlpService extends DownloadService {
             selected: false,
             progress: 0,
         };
-        onUpdate?.(pendingSource);
+        onUpdate?.(pendingSource, { abort: reportAbort });
 
         try {
             this.logger.info(`Downloading track from ${trackMetadata.apiProvider}: ${trackMetadata.trackName}`);
@@ -154,24 +162,26 @@ export class YtDlpService extends DownloadService {
                     if (percent === lastPercent) return;
                     lastPercent = percent;
                     this.status.update({ progress: percent });
-                    onUpdate?.({ ...pendingSource, progress: percent });
+                    onUpdate?.({ ...pendingSource, progress: percent }, { abort: reportAbort });
                     this.logger.debug(
                         `Download progress: ${percent}% ${progress.speed_str} (ETA: ${progress.eta_str})`
                     );
                 });
 
                 const onAbort = () => dl.kill();
-                signal?.addEventListener("abort", onAbort, { once: true });
+                rowAbortController.signal.addEventListener("abort", onAbort, { once: true });
 
                 try {
                     await dl.run();
                 } finally {
-                    signal?.removeEventListener("abort", onAbort);
+                    rowAbortController.signal.removeEventListener("abort", onAbort);
+                    signal?.removeEventListener("abort", onOuterAbort);
                 }
 
-                // If aborted, delete the partial temp file to avoid it being treated as a
-                // complete cached download on the next run, then re-raise as AbortError.
-                if (signal?.aborted) {
+                // If aborted (task-level or just this row), delete the partial temp file
+                // to avoid it being treated as a complete cached download on the next
+                // run, then re-raise as AbortError.
+                if (rowAbortController.signal.aborted) {
                     await fs.promises.unlink(fullPath).catch(() => {});
                     throw makeAbortError();
                 }

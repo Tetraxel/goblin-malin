@@ -20,12 +20,13 @@ function provenanceRank(source: TrackDownloadSource): number {
  * is on: lossless first, then highest-bitrate lossy, then transcodes, with the
  * first-downloaded source as a tiebreaker. When off: the first successfully
  * downloaded source, in provider-registry order (previous/legacy behavior).
+ * A source the user rejected is never auto-selected, even if downloaded.
  *
- * Returns -1 if no source has `state === "downloaded"`.
+ * Returns -1 if no eligible source has `state === "downloaded"`.
  */
 export function pickAutoSelectedIndex(sources: TrackDownloadSource[], preferLossless: boolean): number {
     const downloadedIndices = sources.reduce<number[]>((acc, s, i) => {
-        if (s.state === "downloaded") acc.push(i);
+        if (s.state === "downloaded" && !s.isRejected) acc.push(i);
         return acc;
     }, []);
 

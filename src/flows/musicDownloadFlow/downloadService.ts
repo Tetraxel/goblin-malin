@@ -3,6 +3,20 @@ import { Logger } from "#base/logger/logger";
 import { TrackMetadata, TrackDownloadSource, APIProvider } from "./types";
 import { DownloadTask } from "./utils/downloadTask";
 
+export type DownloadUpdateOptions = {
+    attemptId?: string;
+    /**
+     * Lets the caller cancel *this specific* in-flight attempt on demand (e.g. the
+     * user rejects this row while it's downloading) — distinct from the `signal`
+     * passed into `downloadTrack`/`retryCandidate`, which cancels everything.
+     * Only meaningful while the row is actively in flight; omit once it settles
+     * into a terminal state.
+     */
+    abort?: () => void;
+};
+
+export type DownloadUpdateCallback = (source: TrackDownloadSource, options?: DownloadUpdateOptions) => void;
+
 /**
  * Abstract base class for download providers.
  * Handles downloading tracks from various sources.
@@ -50,7 +64,7 @@ export abstract class DownloadService extends ServiceBase {
      */
     abstract downloadTrack(
         trackMetadata: TrackMetadata,
-        onUpdate?: (source: TrackDownloadSource, options?: { attemptId?: string }) => void,
+        onUpdate?: DownloadUpdateCallback,
         signal?: AbortSignal
     ): Promise<TrackDownloadSource>;
 
@@ -67,7 +81,7 @@ export abstract class DownloadService extends ServiceBase {
     retryCandidate?(
         trackMetadata: TrackMetadata,
         retryPayload: unknown,
-        onUpdate?: (source: TrackDownloadSource, options?: { attemptId?: string }) => void,
+        onUpdate?: DownloadUpdateCallback,
         signal?: AbortSignal
     ): Promise<TrackDownloadSource>;
 }
