@@ -8,6 +8,8 @@ import { ActionBar } from "./ActionBar";
 import { DynamicHintBar } from "#components/DynamicHintBar/DynamicHintBar";
 import { TaskRow } from "./TaskRow";
 import { useTaskListMouse } from "./useTaskListMouse";
+import { useNowPlaying } from "#hooks/useNowPlaying";
+import { findPlayingTaskId } from "#flows/musicDownloadFlow/utils/playingTask";
 import { useTaskHeaderShortcuts } from "#hooks/useKeyHandlers";
 import { saveColumnRatios } from "#flows/musicDownloadFlow/taskColumns";
 
@@ -18,7 +20,11 @@ export type ColumnComponentProps<TAttributes> = {
     taskReference: Task<TAttributes>;
     width: number;
     isSelected: boolean;
+    /** Set while the player is playing this task's file in the background. */
+    playback?: PlaybackState;
 };
+
+export type PlaybackState = "playing" | "paused";
 
 // React.ComponentType accepts both plain function components and React.memo-wrapped ones.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -289,6 +295,16 @@ export const TaskListPanel: React.FC<{
         saveColumnRatios(allRatios);
     });
 
+    // Which task (if any) owns the file the player is playing. Recomputed only when the
+    // track changes — not on playback progress, and not on every scroll keystroke.
+    const nowPlaying = useNowPlaying();
+    const playingFile = nowPlaying?.filePath ?? null;
+    const playingTaskId = useMemo(
+        () => (playingFile ? findPlayingTaskId(tasks, playingFile) : undefined),
+        [tasks, playingFile]
+    );
+    const playbackState: PlaybackState = nowPlaying?.isPaused ? "paused" : "playing";
+
     const headerRef = useRef<DOMElement>(null);
     const rowsRef = useRef<DOMElement>(null);
     useTaskListMouse({
@@ -364,6 +380,7 @@ export const TaskListPanel: React.FC<{
                                 isActive={isRowActive}
                                 isMultiSelected={isMultiSelected}
                                 selectedColumnIndex={selectedColumnIndex}
+                                playback={task.getId() === playingTaskId ? playbackState : undefined}
                                 columns={calculatedColumns}
                             />
                         );

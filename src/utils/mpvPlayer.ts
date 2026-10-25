@@ -87,6 +87,14 @@ export class MpvPlayer extends EventEmitter {
             { stdio: "ignore", windowsHide: true }
         );
 
+        // The app exits through process.exit(), which leaves child processes running — and
+        // since playback now outlives the panel that started it, an orphaned mpv would keep
+        // playing after the app is gone.
+        const mpvProcess = this.mpvProcess;
+        process.once("exit", () => {
+            mpvProcess.kill();
+        });
+
         this.mpvProcess.on("exit", (code) => {
             this._started = false;
             this.socket?.destroy();

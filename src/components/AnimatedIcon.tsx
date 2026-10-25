@@ -9,6 +9,7 @@ export enum Icon {
     Hourglass = "hourglass",
     RedFlag = "redFlag",
     Warning = "warning",
+    Equalizer = "equalizer",
 }
 
 // Animation frames for different status types
@@ -18,6 +19,8 @@ const ANIMATION_FRAMES = {
     [Icon.RedFlag]: ["🚩", "  "],
     [Icon.Hourglass]: ["⏳", "⌛"],
     [Icon.Warning]: ["▵", " "],
+    // Always 3 columns wide, so a row doesn't shift as it animates.
+    [Icon.Equalizer]: ["▂▅▃", "▅▃▆", "▃▆▂", "▆▂▅"],
 };
 
 const ICON_COLOR: Record<Icon, string> = {
@@ -26,6 +29,7 @@ const ICON_COLOR: Record<Icon, string> = {
     [Icon.Hourglass]: "white",
     [Icon.RedFlag]: "white",
     [Icon.Warning]: "yellow",
+    [Icon.Equalizer]: "green",
 };
 
 interface AnimatedIconProps {

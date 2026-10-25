@@ -7,6 +7,7 @@ import { ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import { useImportActions } from "#contexts/ImportActionsContext";
 import { statsDisplay } from "#base/statsDisplay";
+import { getInstance } from "#utils/mpvPlayer";
 
 /**
  * Registers all global and window-specific keyboard shortcuts with the
@@ -83,6 +84,17 @@ export const InputRouter: React.FC<{
                 defaultShortcut: { input: "5" },
                 label: "Logs tab",
                 handler: () => setSecondaryTab("logs"),
+            },
+            {
+                id: "global.togglePlayback",
+                defaultShortcut: { input: "p", ctrl: true },
+                label: "Pause/resume playback",
+                // Playback continues in the background, so it needs a control that works from any panel.
+                handler: () => {
+                    const player = getInstance();
+                    const status = player.getStatus();
+                    if (status.isPlaying || status.isPaused) player.togglePause().catch(() => {});
+                },
             },
             {
                 id: "global.toggleStats",

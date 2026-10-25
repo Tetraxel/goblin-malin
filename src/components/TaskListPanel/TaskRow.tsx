@@ -4,7 +4,7 @@ import { Task } from "#base/task/task";
 import { Theme } from "#base/theme";
 import { useTheme } from "#base/themeContext";
 import { useTask } from "#hooks/useTask";
-import { CalculatedColumn } from "./TaskListPanel";
+import { CalculatedColumn, PlaybackState } from "./TaskListPanel";
 
 function getRowBackground(
     theme: Theme,
@@ -32,9 +32,11 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
     isHighlighted,
     isMultiSelected,
     selectedColumnIndex,
+    playback,
     columns,
 }: {
     taskReference: Task<TAttributes>;
+    playback?: PlaybackState;
     isActive: boolean;
     isMultiSelected: boolean;
     isHighlighted: boolean;
@@ -82,6 +84,7 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
                             taskReference={taskReference}
                             width={column.width}
                             isSelected={isCellActive}
+                            playback={playback}
                         />
                     </Box>
                 );

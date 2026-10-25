@@ -122,14 +122,9 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
         };
     }, [currentFilePath]);
 
-    useEffect(() => {
-        return () => {
-            const player = getInstance();
-            if (player.getStatus().filePath === currentFilePath) {
-                player.stop().catch(() => {});
-            }
-        };
-    }, [currentFilePath]);
+    // Playback is intentionally NOT stopped when this panel switches file or unmounts: music
+    // keeps playing in the background while you move between tasks and tabs (the playing task
+    // is flagged in the task list, and the player is the app-wide singleton).
 
     const canPlay = source?.localFile?.state === "found";
     const fileNotFoundNow = source?.localFile?.state === "not_found";
