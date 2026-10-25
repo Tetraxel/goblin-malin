@@ -57,7 +57,10 @@ export function useShortcuts({
         return defs.map((def) => ({
             id: def.id,
             defaultShortcut: def.defaultShortcut,
-            shortcut: keybindings[def.id] ?? def.defaultShortcut,
+            // A rebind captures a single key press, so carry the default's double-tap-ness over.
+            shortcut: keybindings[def.id]
+                ? { ...keybindings[def.id], ...(def.defaultShortcut.doubleTap && { doubleTap: true }) }
+                : def.defaultShortcut,
             label: def.label,
             // Handler is called outside render — reading the ref here is safe.
             handler: () => shortcutsRef.current.find((s) => s.id === def.id)?.handler(), // eslint-disable-line react-hooks/refs

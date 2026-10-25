@@ -10,6 +10,12 @@ export type Shortcut = {
     ctrl?: boolean;
     shift?: boolean;
     meta?: boolean;
+    /**
+     * Fires on the second press of the key within DOUBLE_TAP_MS. The first press still
+     * reaches whatever else is bound to it, and a double-tap binding wins over those
+     * on the second press regardless of context priority.
+     */
+    doubleTap?: boolean;
 };
 
 // xterm (VT100) sequences used by Windows Terminal, macOS Terminal, etc.
@@ -102,7 +108,8 @@ export function getShortcutLiteral(shortcuts: Shortcut[]): string {
             const keyName = shortcut.key ? (KEY_LABELS[shortcut.key] ?? shortcut.key.toUpperCase()) : "";
             const inputName = shortcut.input ? (shortcut.input === " " ? "Space" : shortcut.input.toUpperCase()) : "";
             const base = funcKeyName || keyName || inputName || "";
-            return [...modifiers, base].filter(Boolean).join("+");
+            const literal = [...modifiers, base].filter(Boolean).join("+");
+            return shortcut.doubleTap && literal ? `${literal} ${literal}` : literal;
         })
         .join(" / ");
 }

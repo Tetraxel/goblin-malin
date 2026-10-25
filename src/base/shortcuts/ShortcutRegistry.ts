@@ -2,6 +2,7 @@ import React from "react";
 import { Key } from "ink";
 import { Shortcut, matchesShortcut, getShortcutLiteral } from "#types/actions";
 import { cache } from "#utils/cache";
+import { LastPress, isDoubleTap } from "./doubleTap";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ class ShortcutRegistryClass {
     private subscribers = new Set<Subscriber>();
     private lastHintViewKey = "";
     private rebindCallback: RebindCallback | null = null;
+    private lastPress: LastPress | null = null;
     private knownStubs = new Map<string, ShortcutStub>(
         ((cache.get(STUBS_CACHE_KEY) as ShortcutStub[] | undefined) ?? []).map((s) => [s.id, s])
     );
@@ -152,18 +154,44 @@ class ShortcutRegistryClass {
             .filter((ctx) => ctx.isActive)
             .sort((a, b) => b.priority - a.priority);
 
+        const now = Date.now();
+        const previous = this.lastPress;
+        this.lastPress = { input, key, time: now };
+
+        // Double-tap bindings are checked before everything else: on the second tap they
+        // beat a higher-priority single-press binding for the same key (the first tap
+        // already went through to it). Exclusive contexts still block them.
         for (const ctx of sorted) {
             for (const entry of ctx.shortcuts) {
-                if (matchesShortcut(entry.shortcut, input, key)) {
-                    try {
-                        void entry.handler();
-                    } catch (err) {
-                        console.error(`[shortcuts] unhandled error in ${ctx.contextId}.${entry.id}:`, err);
-                    }
+                if (
+                    entry.shortcut.doubleTap &&
+                    matchesShortcut(entry.shortcut, input, key) &&
+                    isDoubleTap(entry.shortcut, previous, now)
+                ) {
+                    this.lastPress = null; // a third tap starts a new pair
+                    this.runHandler(ctx, entry);
+                    return;
+                }
+            }
+            if (ctx.exclusive) break;
+        }
+
+        for (const ctx of sorted) {
+            for (const entry of ctx.shortcuts) {
+                if (!entry.shortcut.doubleTap && matchesShortcut(entry.shortcut, input, key)) {
+                    this.runHandler(ctx, entry);
                     return;
                 }
             }
             if (ctx.exclusive) return;
+        }
+    }
+
+    private runHandler(ctx: ContextRegistration, entry: ShortcutEntry): void {
+        try {
+            void entry.handler();
+        } catch (err) {
+            console.error(`[shortcuts] unhandled error in ${ctx.contextId}.${entry.id}:`, err);
         }
     }
 

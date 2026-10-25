@@ -205,7 +205,10 @@ export const useFocusManager = ({
 
     const handleTabPress = useCallback(() => {
         setFocusState((prev) => {
-            const windows: FocusableWindow[] = ["toolbar", "taskList", "secondaryPanel"];
+            // The toolbar is deliberately not in the cycle — it's reached by clicking it or
+            // double-pressing Esc, so Tab flips straight between the two working panels
+            // (and from the toolbar lands on the task list).
+            const windows: FocusableWindow[] = ["taskList", "secondaryPanel"];
             const currentIndex = windows.indexOf(prev.activeWindow);
             const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % windows.length;
             const nextWindow = windows[nextIndex];
@@ -274,19 +277,22 @@ export const useFocusManager = ({
         [toolbarButtonCount]
     );
 
+    /** Pointer equivalent of arrowing onto a toolbar button. */
+    const selectToolbarButton = useCallback((index: number) => {
+        setFocusState((prev) => ({
+            ...prev,
+            activeWindow: "toolbar",
+            toolbar: { ...prev.toolbar, selectedButtonIndex: index },
+        }));
+    }, []);
+
     const moveTaskSelection = useCallback(
         (direction: "up" | "down" | "left" | "right") => {
             setFocusState((prev) => {
                 if (direction === "up" || direction === "down") {
                     if (direction === "up") {
-                        if (prev.taskList.isHeaderFocused) {
-                            return {
-                                ...prev,
-                                activeWindow: "toolbar",
-                                taskList: { ...prev.taskList, isHeaderFocused: false },
-                                toolbar: { ...prev.toolbar, selectedButtonIndex: 0 },
-                            };
-                        }
+                        // Up from the header stops there: the toolbar isn't reachable by arrows.
+                        if (prev.taskList.isHeaderFocused) return prev;
                         if (prev.taskList.selectedTaskIndex === 0) {
                             return { ...prev, taskList: { ...prev.taskList, isHeaderFocused: true } };
                         }
@@ -491,6 +497,7 @@ export const useFocusManager = ({
         setPrimaryMode,
         setSecondaryTab,
         moveToolbarSelection,
+        selectToolbarButton,
         moveTaskSelection,
         focusTaskListCell,
         scrollTaskList,

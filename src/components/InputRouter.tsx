@@ -16,7 +16,7 @@ export const InputRouter: React.FC<{
     tasks: Task[];
     columns: ColumnDefinition<MusicDownloadTaskAttributes>[];
 }> = ({ tasks, columns }) => {
-    const { handleTabPress, setPrimaryMode, setSecondaryTab } = useFocusActions();
+    const { handleTabPress, setPrimaryMode, setSecondaryTab, switchWindow } = useFocusActions();
     const { activeWindow, isEditingField } = useFocusChrome();
     const secondaryPanel = useFocusSecondaryPanel();
     const { openImportFlow } = useImportActions();
@@ -89,6 +89,22 @@ export const InputRouter: React.FC<{
                 defaultShortcut: { funcKey: 3 },
                 label: "Toggle stats",
                 handler: () => statsDisplay.toggle(),
+            },
+        ],
+    });
+
+    // Esc, Esc from either working panel hands focus to the toolbar. Low priority is fine:
+    // double-tap bindings are matched before single-press ones (see ShortcutRegistry.dispatch).
+    useShortcuts({
+        id: "navigation",
+        isActive: (activeWindow === "taskList" || activeWindow === "secondaryPanel") && !isEditingField,
+        priority: 50,
+        shortcuts: [
+            {
+                id: "navigation.focusToolbar",
+                defaultShortcut: { key: "escape", doubleTap: true },
+                label: "Focus toolbar",
+                handler: () => switchWindow("toolbar"),
             },
         ],
     });
