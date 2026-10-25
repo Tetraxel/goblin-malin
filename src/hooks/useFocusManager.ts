@@ -321,6 +321,48 @@ export const useFocusManager = ({
         [taskCount, taskColumnCount]
     );
 
+    /** Pointer equivalent of arrow-navigating to a cell: focus the task list and select it. */
+    const focusTaskListCell = useCallback(
+        (row: number | "header", column: number) => {
+            setFocusState((prev) => {
+                if (row !== "header" && taskCount === 0) return prev;
+                return {
+                    ...prev,
+                    activeWindow: "taskList",
+                    taskList: {
+                        ...prev.taskList,
+                        isHeaderFocused: row === "header",
+                        selectedTaskIndex:
+                            row === "header"
+                                ? prev.taskList.selectedTaskIndex
+                                : Math.max(0, Math.min(taskCount - 1, row)),
+                        selectedColumnIndex: Math.max(0, Math.min(taskColumnCount - 1, column)),
+                    },
+                };
+            });
+        },
+        [taskCount, taskColumnCount]
+    );
+
+    /**
+     * Mouse-wheel scroll: moves the selection, clamped (never leaves the list like arrow-up does).
+     * Focus stays where it is, so you can wheel through tasks while the secondary panel
+     * keeps the keyboard (e.g. Space to play each track) — unlike a click, which focuses the list.
+     */
+    const scrollTaskList = useCallback(
+        (delta: number) => {
+            setFocusState((prev) => {
+                if (taskCount === 0) return prev;
+                // Updater form, so several wheel events delivered in one stdin chunk accumulate.
+                const next = Math.max(0, Math.min(taskCount - 1, prev.taskList.selectedTaskIndex + delta));
+                // The header cursor only exists while the list itself is focused.
+                const isHeaderFocused = prev.activeWindow === "taskList" ? false : prev.taskList.isHeaderFocused;
+                return { ...prev, taskList: { ...prev.taskList, isHeaderFocused, selectedTaskIndex: next } };
+            });
+        },
+        [taskCount]
+    );
+
     const toggleTaskSelection = useCallback((taskId: string) => {
         setFocusState((prev) => {
             const newSet = new Set(prev.taskList.selectedTaskIds);
@@ -450,6 +492,8 @@ export const useFocusManager = ({
         setSecondaryTab,
         moveToolbarSelection,
         moveTaskSelection,
+        focusTaskListCell,
+        scrollTaskList,
         toggleTaskSelection,
         selectAllTasks,
         clearSelection,

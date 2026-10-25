@@ -41,10 +41,26 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     const [snapshot, setSnapshot] = useState<TaskSnapshot<MusicDownloadTaskAttributes> | undefined>(
         () => typedTask?.get() as TaskSnapshot<MusicDownloadTaskAttributes> | undefined
     );
+    const [isDiffMode, setIsDiffMode] = useState(false);
+    const [pendingSourceIndex, setPendingSourceIndex] = useState<number | null>(null);
+
     const [prevTypedTask, setPrevTypedTask] = useState(typedTask);
     if (prevTypedTask !== typedTask) {
         setPrevTypedTask(typedTask);
-        setSnapshot(typedTask?.get() as TaskSnapshot<MusicDownloadTaskAttributes> | undefined);
+        const nextSnapshot = typedTask?.get() as TaskSnapshot<MusicDownloadTaskAttributes> | undefined;
+        setSnapshot(nextSnapshot);
+        // The selected task can change under a focused panel (mouse-wheel scrolling the
+        // list), so don't carry the previous task's source cursor or half-finished diff
+        // over: land on the new task's chosen source.
+        const nextSources = nextSnapshot?.attributes?.kind === "track" ? nextSnapshot.attributes.downloadSources : [];
+        setSelectedSourceIndex(
+            Math.max(
+                0,
+                nextSources.findIndex((s) => s.selected)
+            )
+        );
+        setIsDiffMode(false);
+        setPendingSourceIndex(null);
     }
 
     useEffect(() => {
@@ -77,9 +93,6 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     const leftWidth = Math.floor(width * splitRatio) - 4;
     const rightWidth = width - leftWidth - 4;
     const listHeight = height - HINT_BAR_HEIGHT;
-
-    const [isDiffMode, setIsDiffMode] = useState(false);
-    const [pendingSourceIndex, setPendingSourceIndex] = useState<number | null>(null);
 
     // Auto-detect when compiled metadata would produce a different filename than what's on disk
     const previewFilename = compiled ? computeOutputFilename(compiled) : null;

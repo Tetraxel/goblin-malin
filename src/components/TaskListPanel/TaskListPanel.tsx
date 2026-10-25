@@ -1,5 +1,5 @@
-﻿import React, { useMemo } from "react";
-import { Box, Text } from "ink";
+﻿import React, { useMemo, useRef } from "react";
+import { Box, Text, type DOMElement } from "ink";
 import { Task, TaskSnapshot } from "#base/task/task";
 import { useTheme } from "#base/themeContext";
 import { useFocusChrome, useFocusTaskList } from "#contexts/FocusContext";
@@ -7,6 +7,7 @@ import { Shortcut, ContextualActions, ContextualActionBar } from "#types/actions
 import { ActionBar } from "./ActionBar";
 import { DynamicHintBar } from "#components/DynamicHintBar/DynamicHintBar";
 import { TaskRow } from "./TaskRow";
+import { useTaskListMouse } from "./useTaskListMouse";
 import { useTaskHeaderShortcuts } from "#hooks/useKeyHandlers";
 import { saveColumnRatios } from "#flows/musicDownloadFlow/taskColumns";
 
@@ -288,6 +289,17 @@ export const TaskListPanel: React.FC<{
         saveColumnRatios(allRatios);
     });
 
+    const headerRef = useRef<DOMElement>(null);
+    const rowsRef = useRef<DOMElement>(null);
+    useTaskListMouse({
+        rowsRef,
+        headerRef,
+        columnWidths: calculatedColumns.map((c) => c.width),
+        offset,
+        visibleRows: height,
+        tasks,
+    });
+
     return (
         <Box
             borderStyle="single"
@@ -301,7 +313,7 @@ export const TaskListPanel: React.FC<{
             flexGrow={1}
         >
             {/* Column headers */}
-            <Box flexDirection="row" paddingX={1} height={1} overflow="hidden" flexShrink={0}>
+            <Box ref={headerRef} flexDirection="row" paddingX={1} height={1} overflow="hidden" flexShrink={0}>
                 <Box width={2} height={1} flexShrink={0} />
                 {calculatedColumns.map((column, index) => {
                     const isActive =
@@ -329,7 +341,7 @@ export const TaskListPanel: React.FC<{
             </Box>
 
             {/* Task rows */}
-            <Box flexDirection="column" height={height} overflow="hidden" flexGrow={1}>
+            <Box ref={rowsRef} flexDirection="column" height={height} overflow="hidden" flexGrow={1}>
                 {tasks.length === 0 ? (
                     <Box paddingX={4} overflow="hidden">
                         <Text italic color={"gray"}>

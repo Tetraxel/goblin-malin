@@ -6,6 +6,7 @@ import { FullScreenBox } from "./components/FullScreenBox";
 import { globalLogger } from "./base/logger/logger";
 import { detectFuncKey } from "./types/actions";
 import { shortcutRegistry } from "./base/shortcuts/ShortcutRegistry";
+import { DISABLE_MOUSE, ENABLE_MOUSE, extractMouseEvents, mouseRegistry } from "./base/mouse/mouse";
 import { fpsTracker } from "./base/fpsTracker";
 import { initMusicApp } from "./flows/musicDownloadFlow/init";
 
@@ -20,7 +21,7 @@ async function write(content: string) {
 
 async function cleanUpOnExit(instance: Instance) {
     await instance.waitUntilExit();
-    await write("\x1b[?1049l");
+    await write(DISABLE_MOUSE + "\x1b[?1049l");
 }
 
 type WithFullScreen = (...args: Parameters<typeof render>) => {
@@ -67,6 +68,11 @@ export function start(): void {
     }
 
     process.stdout.write("\x1b[?1049h"); // enter alternate screen buffer
+    process.stdout.write(ENABLE_MOUSE);
+    // Exit buttons call process.exit() directly, so restore the terminal's mouse mode here
+    // rather than relying on render's waitUntilExit — a left-on mouse mode makes the
+    // shell print click reports as text.
+    process.once("exit", () => process.stdout.write(DISABLE_MOUSE));
 
     // In profile mode (TUI test harness), wrap the app in a single <Profiler>
     // to force ProfileMode tree-wide and forward Ink's per-frame render time.
@@ -100,6 +106,18 @@ export function start(): void {
         if (chunk === null) return;
         isHandlingFKey = true;
         const str = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+
+        // Mouse reports are consumed here and never handed to Ink — useInput would
+        // otherwise see them as typed text and could fire shortcuts. Anything typed
+        // in the same chunk is put back.
+        const { events, rest } = extractMouseEvents(str);
+        if (events.length > 0) {
+            for (const event of events) mouseRegistry.dispatch(event);
+            if (rest !== "") process.stdin.unshift(rest);
+            isHandlingFKey = false;
+            return;
+        }
+
         const funcKey = detectFuncKey(str);
         if (funcKey !== undefined) shortcutRegistry.dispatchFuncKey(funcKey);
         process.stdin.unshift(chunk as Parameters<typeof process.stdin.unshift>[0]);
@@ -109,7 +127,7 @@ export function start(): void {
     const instance = render(tree, options);
 
     instance.waitUntilExit().then(() => {
-        process.stdout.write("\x1b[?1049l"); // restore main screen buffer
+        process.stdout.write(DISABLE_MOUSE + "\x1b[?1049l"); // restore main screen buffer
     });
 }
 
