@@ -5,7 +5,9 @@ import { TaskSnapshot } from "#base/task/task";
 import { SettingsStore } from "#settings/settingsStore";
 import { createTasksFromSnapshots } from "#flows/musicDownloadFlow/taskFactory";
 import { SessionStore } from "./sessionStore";
-import { StoredSession, SessionTaskSnapshot } from "./types";
+import { globalLogger } from "#base/logger/logger";
+import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import { StoredSession, SessionTaskSnapshot, ArchivedTaskSnapshot } from "./types";
 import { deriveSessionName } from "./sessionSearch";
 
 export class SessionManager {
@@ -166,6 +168,101 @@ export class SessionManager {
             TaskOrchestrator.getInstance().setTasks([]);
             this.emitter.emit("change");
         }
+    }
+
+    // ── Archive ──────────────────────────────────────────────────────────────
+    // Archived tasks live in their session record (never in the orchestrator), so they
+    // can't run, be selected, or show in the task list. The store is the single source
+    // of truth: each operation writes it synchronously, and the debounced task persist
+    // re-reads the session at flush time, so it can't clobber `archived`.
+
+    /** Move idle tasks (and an album/playlist's tracks) out of the queue into the archive. Returns how many moved. */
+    archiveTasks(ids: string[]): number {
+        const orchestrator = TaskOrchestrator.getInstance();
+        const all = orchestrator.getTasks();
+        const idSet = new Set(ids);
+        for (const task of all) {
+            const attrs = task.getAttributes() as MusicDownloadTaskAttributes | undefined;
+            if (idSet.has(task.getId()) && attrs?.kind === "collection")
+                attrs.childTaskIds.forEach((id) => idSet.add(id));
+        }
+
+        const requested = all.filter((t) => idSet.has(t.getId()));
+        const toArchive = requested.filter((t) => !t.running);
+        if (toArchive.length < requested.length) {
+            globalLogger.warn(`Archive: skipped ${requested.length - toArchive.length} running task(s)`);
+        }
+        if (toArchive.length === 0) return 0;
+
+        this.flushPending();
+        // A brand-new queue has no session record yet to hold the archive.
+        if (this.currentSessionId === null) this._doPersist(all.map((t) => t.get() as SessionTaskSnapshot));
+        const session = this.currentSessionId ? this.store.getById(this.currentSessionId) : undefined;
+        if (!session) return 0;
+
+        const archivedAt = new Date().toISOString();
+        const entries: ArchivedTaskSnapshot[] = toArchive.map((t) => ({
+            archivedAt,
+            task: t.get() as SessionTaskSnapshot,
+        }));
+        const archivedIds = new Set(entries.map((e) => e.task.id));
+        this.store.upsertSession({
+            ...session,
+            archived: [...entries, ...(session.archived ?? []).filter((e) => !archivedIds.has(e.task.id))],
+            updatedAt: archivedAt,
+        });
+        orchestrator.removeTasks([...archivedIds]);
+        this.emitter.emit("change");
+        return entries.length;
+    }
+
+    /**
+     * Put an archived task (plus an archived album/playlist's tracks) back in the queue.
+     * Loads the task's own session first when it isn't the current one. Returns how many came back.
+     */
+    restoreArchived(sessionId: string, taskId: string): number {
+        if (sessionId !== this.currentSessionId) this.loadSession(sessionId);
+        if (this.currentSessionId !== sessionId) return 0;
+        this.flushPending();
+
+        const session = this.store.getById(sessionId);
+        const archived = session?.archived ?? [];
+        const group = this.withArchivedChildren(archived, taskId);
+        if (!session || group.length === 0) return 0;
+
+        const orchestrator = TaskOrchestrator.getInstance();
+        const live = new Set(orchestrator.getTasks().map((t) => t.getId()));
+        const restorable = group.filter((e) => !live.has(e.task.id));
+        if (restorable.length < group.length) {
+            globalLogger.warn("Archive: some tasks are already in the queue and were left archived");
+        }
+        if (restorable.length === 0) return 0;
+
+        orchestrator.addTasks(createTasksFromSnapshots(restorable.map((e) => e.task)));
+        const restoredIds = new Set(restorable.map((e) => e.task.id));
+        this.store.upsertSession({
+            ...session,
+            archived: archived.filter((e) => !restoredIds.has(e.task.id)),
+            updatedAt: new Date().toISOString(),
+        });
+        this.emitter.emit("change");
+        return restorable.length;
+    }
+
+    /** Permanently drop an archived task (and an archived album/playlist's tracks). */
+    deleteArchived(sessionId: string, taskId: string): void {
+        const session = this.store.getById(sessionId);
+        if (!session?.archived) return;
+        const doomed = new Set(this.withArchivedChildren(session.archived, taskId).map((e) => e.task.id));
+        this.store.upsertSession({ ...session, archived: session.archived.filter((e) => !doomed.has(e.task.id)) });
+    }
+
+    private withArchivedChildren(archived: ArchivedTaskSnapshot[], taskId: string): ArchivedTaskSnapshot[] {
+        const root = archived.find((e) => e.task.id === taskId);
+        if (!root) return [];
+        const attrs = root.task.attributes as MusicDownloadTaskAttributes | undefined;
+        const childIds = new Set(attrs?.kind === "collection" ? attrs.childTaskIds : []);
+        return [root, ...archived.filter((e) => e !== root && childIds.has(e.task.id))];
     }
 
     getCurrentSessionId(): string | null {

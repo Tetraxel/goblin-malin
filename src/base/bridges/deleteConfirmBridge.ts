@@ -1,6 +1,9 @@
 export type DeleteConfirmRequest = {
     taskCount: number;
+    /** Permanently remove the tasks. */
     apply: () => void;
+    /** Move the tasks to the archive instead (the dialog's default choice). */
+    archive: () => void;
 };
 
 type Opener = (request: DeleteConfirmRequest) => void;

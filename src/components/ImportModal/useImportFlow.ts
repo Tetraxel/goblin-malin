@@ -4,9 +4,14 @@ import { useFocusChrome } from "#contexts/FocusContext";
 import { globalLogger } from "#base/logger/logger";
 import { readClipboard } from "./clipboard";
 import { detectUrls } from "./detectUrls";
-import { createTasksFromUrls, importTasks } from "#flows/musicDownloadFlow/taskFactory";
+import { createTasksFromUrls, importTasks, MusicTask } from "#flows/musicDownloadFlow/taskFactory";
+import { useTheme } from "#base/themeContext";
+import { SessionStore } from "#sessions/sessionStore";
+import { getArchivedTaskIds } from "#sessions/archive";
+import { ConfirmModalConfig } from "#components/ConfirmModal/useConfirmModal";
 
-export function useImportFlow() {
+export function useImportFlow(openConfirmModal: (config: ConfirmModalConfig) => void) {
+    const theme = useTheme();
     const { activeWindow } = useFocusChrome();
     const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
 
@@ -43,6 +48,24 @@ export function useImportFlow() {
         [activeWindow]
     );
 
+    const askAboutArchived = useCallback(
+        (tasks: MusicTask[], archivedTasks: MusicTask[]) => {
+            const archivedIds = new Set(archivedTasks.map((t) => t.getId()));
+            const n = archivedTasks.length;
+            openConfirmModal({
+                title: "Already archived",
+                message: `${n} of ${tasks.length} URL${tasks.length === 1 ? " is" : "s are"} already in the archive (restore from Archive instead).`,
+                choices: [
+                    { label: "Skip archived", color: theme.action.primary },
+                    { label: "Import anyway", color: theme.status.warning },
+                ],
+                accentColor: theme.status.warning,
+                onConfirm: (i) => importTasks(i === 1 ? tasks : tasks.filter((t) => !archivedIds.has(t.getId()))),
+            });
+        },
+        [openConfirmModal, theme]
+    );
+
     const handleImportConfirm = useCallback(
         ({ fetchMetadata, download }: { fetchMetadata: boolean; download: boolean }) => {
             if (!pendingImport) {
@@ -50,10 +73,19 @@ export function useImportFlow() {
                 return;
             }
             const urls = pendingImport.urls.map((d) => d.raw);
-            importTasks(createTasksFromUrls(urls, { toTag: fetchMetadata, toDownload: download }));
+            const tasks = createTasksFromUrls(urls, { toTag: fetchMetadata, toDownload: download });
             setPendingImport(null);
+
+            // Task ids derive from the URL, so a re-imported track matches its archived self.
+            const archivedIds = getArchivedTaskIds(SessionStore.getInstance().getAll());
+            const archivedTasks = tasks.filter((t) => archivedIds.has(t.getId()));
+            if (archivedTasks.length === 0) {
+                importTasks(tasks);
+                return;
+            }
+            askAboutArchived(tasks, archivedTasks);
         },
-        [pendingImport]
+        [pendingImport, askAboutArchived]
     );
 
     const handleImportCancel = useCallback(() => {

@@ -10,12 +10,20 @@ import { deleteConfirmBridge } from "#base/bridges/deleteConfirmBridge";
 import { DownloadTask } from "./utils/downloadTask";
 import { CollectionTask } from "./utils/collectionTask";
 import { runSelected } from "./runController";
+import { globalLogger } from "#base/logger/logger";
+import { SessionManager } from "#sessions/sessionManager";
 import { MusicDownloadTaskAttributes, TrackDownloadTask, CollectionDownloadTask } from "./types";
 
 // Suppress the re-throw from @SafeAction — logging is already handled by the decorator.
 const fire = (p: Promise<void>): void => {
     p.catch(() => {});
 };
+
+/** Move tasks to the archive (reversible, so no confirmation); running tasks are skipped. */
+function archive(ids: string[]): void {
+    const count = SessionManager.getInstance().archiveTasks(ids);
+    if (count > 0) globalLogger.info(`Archived ${count} task${count === 1 ? "" : "s"}`);
+}
 
 function toOpenableUri(url: string): string {
     const m = url.match(/open\.spotify\.com\/(track|album|artist|playlist)\/([A-Za-z0-9]+)/);
@@ -114,18 +122,20 @@ function buildTrackContextualActionBar(
     ];
     taskActions.push({
         shortcuts: [{ key: "delete" }],
-        label: "Delete",
-        description: "Remove this task from the list",
+        label: "Archive / Delete",
+        description: "Archive this task, or remove it from the list for good",
         multiSelectAllowed: true,
         onClick: () =>
             deleteConfirmBridge.request({
                 taskCount: 1,
                 apply: () => orchestrator.removeTasks([task.getId()]),
+                archive: () => archive([task.getId()]),
             }),
         onClickBatch: (tasks) =>
             deleteConfirmBridge.request({
                 taskCount: tasks.length,
                 apply: () => orchestrator.removeTasks(tasks.map((t) => t.getId())),
+                archive: () => archive(tasks.map((t) => t.getId())),
             }),
     });
     if (attrs?.primaryMetadataFetched) {
@@ -421,16 +431,26 @@ function buildCollectionContextualActionBar(
 
     taskActions.push({
         shortcuts: [{ key: "delete" }],
-        label: "Delete",
-        description: hasChildren ? "Remove this and its tracks from the list" : "Remove this from the list",
+        label: "Archive / Delete",
+        description: hasChildren
+            ? "Archive this and its tracks, or remove them from the list for good"
+            : "Archive this, or remove it from the list for good",
         multiSelectAllowed: true,
         onClick: () => {
             const ids = [task.getId(), ...(attrs?.childTaskIds ?? [])];
-            deleteConfirmBridge.request({ taskCount: ids.length, apply: () => orchestrator.removeTasks(ids) });
+            deleteConfirmBridge.request({
+                taskCount: ids.length,
+                apply: () => orchestrator.removeTasks(ids),
+                archive: () => archive(ids),
+            });
         },
         onClickBatch: (tasks) => {
             const ids = tasks.flatMap((t) => [t.getId(), ...(asCollection(t).getAttributes()?.childTaskIds ?? [])]);
-            deleteConfirmBridge.request({ taskCount: ids.length, apply: () => orchestrator.removeTasks(ids) });
+            deleteConfirmBridge.request({
+                taskCount: ids.length,
+                apply: () => orchestrator.removeTasks(ids),
+                archive: () => archive(ids),
+            });
         },
     });
 

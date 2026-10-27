@@ -345,6 +345,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
                                         <Text dimColor>
                                             {formatDate(session.updatedAt)} · {session.tasks.length} track
                                             {session.tasks.length !== 1 ? "s" : ""}
+                                            {session.archived?.length ? ` (+${session.archived.length} archived)` : ""}
                                         </Text>
                                         {!isSearching && session.tasks.length > 0 && (
                                             <Text dimColor>

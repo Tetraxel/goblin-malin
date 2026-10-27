@@ -7,6 +7,7 @@ import { ImportModal } from "./ImportModal/ImportModal";
 import { StartModal } from "./StartModal/StartModal";
 import { SettingsModal } from "./SettingsModal/SettingsModal";
 import { SessionsModal } from "./SessionsModal/SessionsModal";
+import { ArchiveModal } from "./ArchiveModal/ArchiveModal";
 import { SetupWizardModal } from "./SetupWizardModal/SetupWizardModal";
 import { WelcomeModal } from "./WelcomeModal/WelcomeModal";
 import { UpdateModal } from "./UpdateModal/UpdateModal";
@@ -35,23 +36,26 @@ export const AppInner: React.FC<{
     updateInfo: UpdateInfo | null;
 }> = ({ tasks, columns, terminalHeight, terminalWidth, updateInfo }) => {
     const theme = useTheme();
-    const { pendingImport, openImportFlow, handleImportConfirm, handleImportCancel } = useImportFlow();
-    const { pendingStart, openStartFlow, handleStartConfirm, handleStartCancel } = useStartFlow();
     const { pendingConfig, openConfirmModal, handleConfirm, handleCancel } = useConfirmModal();
+    const { pendingImport, openImportFlow, handleImportConfirm, handleImportCancel } = useImportFlow(openConfirmModal);
+    const { pendingStart, openStartFlow, handleStartConfirm, handleStartCancel } = useStartFlow();
 
     const handleDeleteBridgeRequest = useCallback(
         (req: DeleteConfirmRequest) => {
             const count = req.taskCount;
+            const noun = count === 1 ? "task" : "tasks";
             openConfirmModal({
-                title: `Delete ${count === 1 ? "task" : "tasks"}`,
-                message: `Remove ${count} ${count === 1 ? "task" : "tasks"} from the queue?`,
+                title: `Remove ${noun}`,
+                message: `Archive ${count} ${noun} to keep metadata and sources, or delete for good?`,
                 choices: [
+                    { label: "Archive", color: theme.action.primary },
                     { label: "Delete", color: theme.status.error },
                     { label: "Cancel", color: theme.text.muted },
                 ],
-                accentColor: theme.status.error,
+                accentColor: theme.action.primary,
                 onConfirm: (i) => {
-                    if (i === 0) req.apply();
+                    if (i === 0) req.archive();
+                    else if (i === 1) req.apply();
                 },
             });
         },
@@ -105,6 +109,13 @@ export const AppInner: React.FC<{
                 />
 
                 <SessionsModal
+                    terminalHeight={terminalHeight}
+                    terminalWidth={terminalWidth}
+                    openConfirmModal={openConfirmModal}
+                />
+
+                <ArchiveModal
+                    tasks={tasks}
                     terminalHeight={terminalHeight}
                     terminalWidth={terminalWidth}
                     openConfirmModal={openConfirmModal}
