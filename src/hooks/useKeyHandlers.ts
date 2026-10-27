@@ -6,6 +6,8 @@ import { useActivePrompt } from "#components/PromptModal/useActivePrompt";
 import { useShortcuts, ShortcutDef } from "#hooks/useShortcuts";
 import { getContextualShortcutIds } from "#types/actions";
 import { globalLogger } from "#base/logger/logger";
+import { getInstance } from "#utils/mpvPlayer";
+import { firstPlayableFilePath } from "#flows/musicDownloadFlow/utils/playingTask";
 import { ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
 import { buildContextualActionBar } from "#flows/musicDownloadFlow/contextualActions";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
@@ -56,7 +58,7 @@ export function useToolbarShortcuts(): void {
 // ── Task list ─────────────────────────────────────────────────────────────────
 
 export function useTaskListShortcuts(tasks: Task[], columns: ColumnDefinition<MusicDownloadTaskAttributes>[]): void {
-    const { moveTaskSelection, resizePanels, toggleTaskSelection, selectAllTasks, clearSelection } = useFocusActions();
+    const { moveTaskSelection, resizePanels, selectAllTasks, clearSelection } = useFocusActions();
     const { activeWindow } = useFocusChrome();
     const taskList = useFocusTaskList();
     const isActive = activeWindow === "taskList";
@@ -159,12 +161,19 @@ export function useTaskListShortcuts(tasks: Task[], columns: ColumnDefinition<Mu
                 handler: () => clearSelection(),
             },
             {
-                id: "taskList.multiSelect",
+                id: "taskList.playFirstSource",
                 defaultShortcut: { input: " " },
-                label: "Multi-select",
+                label: "Play",
                 handler: () => {
-                    const task = tasks[taskList.selectedTaskIndex];
-                    if (task) toggleTaskSelection(task.getId());
+                    const filePath = firstPlayableFilePath(selectedTask?.getAttributes() as MusicDownloadTaskAttributes | undefined);
+                    if (!filePath) return;
+                    const player = getInstance();
+                    const status = player.getStatus();
+                    if (status.filePath === filePath && (status.isPlaying || status.isPaused)) {
+                        player.togglePause().catch(() => {});
+                    } else {
+                        player.play(filePath).catch(() => {});
+                    }
                 },
             },
             ...contextualShortcuts,

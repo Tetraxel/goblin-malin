@@ -259,6 +259,9 @@ export class MpvPlayer extends EventEmitter {
         this._durationMs = 0;
         this._isPaused = false;
         this.emit("stateChange", this.getStatus());
+        // mpv keeps its `pause` property across a "replace" load, so a track started while
+        // another was paused would load paused too.
+        await this.sendCommand(["set_property", "pause", false]);
         await this.sendCommand(["loadfile", filePath, "replace"]);
     }
 
