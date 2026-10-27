@@ -78,10 +78,13 @@ export const StatusCell = React.memo(function StatusCell({
         attrs?.kind === "collection" && attrs.collectionKind === "playlist" && task.status.type === StatusType.Success
             ? attrs.live?.lastFetchedAt
             : undefined;
-    // Only a finished, live-refreshing playlist row ticks — cost is bounded to visible
-    // rows. The returned frame count isn't read; subscribing is what forces the periodic
-    // re-render that keeps the "Fetched Xs ago" text below current.
-    useGlobalTicker(1000, liveFetchedAt !== undefined);
+    // Rows with a live clock tick once a second: a finished live playlist ("Fetched Xs ago")
+    // or a status with time tracking ("Discovering via Songlink (3s)"). The text is computed
+    // at render time and this memoized cell otherwise only re-renders when the task changes,
+    // so without the tick the clock freezes. Cost is bounded to visible rows. The returned
+    // frame count isn't read; subscribing is what forces the re-render.
+    const isTimed = task.status.timeTracking === true && !!task.status.startTime;
+    useGlobalTicker(1000, liveFetchedAt !== undefined || isTimed);
 
     const statusColor = getStatusColor(task.status.type, theme);
     const iconComponent = getStatusIcon(task.status.type);
