@@ -32,6 +32,10 @@
                     },
                     "musicBrainz": {
                         "enabled": true
+                    },
+                    "claude": {
+                        "enabled": false,
+                        "consentAsked": true
                     }
                 }
             },

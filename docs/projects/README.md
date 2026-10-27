@@ -47,6 +47,8 @@ The product wave: with the foundation in place, these projects target what users
 | P27 — Audio Verification & Auto-MB IDs        | Catch wrong downloads (live versions, DJ sets) via duration + optional acoustic fingerprint; auto-fill missing MusicBrainz release IDs (release blocker).               | [p27/tasks.md](p27/tasks.md) |
 | P28 — Provider Expansion: Deezer & SoundCloud | Deezer metadata/discovery (keyless API, fills the empty BPM column via ISRC lookup) and SoundCloud import + direct download.                                            | [p28/tasks.md](p28/tasks.md) |
 
+**P29 — Claude as a Fallback & Assistant** ([p29/tasks.md](p29/tasks.md)): Claude (through the user's own `claude -p` CLI) as the last-resort discovery provider — shipped — and later as an agent that picks the best source, fixes metadata and finds MusicBrainz releases.
+
 ### Recommended order
 
 1. **P20b** ✅ (done) — the flow-abstraction removal landed first: it rewired the seams every other project builds on (task creation, contextual actions, settings items), so the features below build directly on the de-classed modules.

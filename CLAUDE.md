@@ -21,6 +21,12 @@ Adding a new provider should require changes in only two places:
 1. A new service class file (the implementation)
 2. One `.register(MyService)` call in `initMusicApp()` (`src/flows/musicDownloadFlow/init.ts`)
 
+Optional static capabilities a service class can declare (all read generically — never branch on a provider key):
+
+- `static consent: { title, message }` — the provider sends data to a third party or spends the user's quota, so it is **off until the user allows it, once** (a confirm dialog shown on first use; `utils/discoveryConsent.ts`). Its `enabled` default must be `false`. Used by Songlink and Claude.
+- `static lastResort = true` (discovery services) — slow/costly; only runs when a platform is still missing after all regular discovery, and its results must pass the platform's own metadata fetch + a confidence check. Used by Claude.
+- `defaultSettings` entries can be `kind: "checkbox" | "textInput" | "select"`.
+
 Display metadata (label, color, acronym, color variants) must **not** be hardcoded in components. Each service class declares `static readonly display: ProviderDisplay`. `ServiceRegistry.register()` reads it automatically and calls `providerDisplayRegistry.register()`. Components call `providerDisplayRegistry.get(key)` for display info.
 
 Unregistered API platforms (youtubeMusic, deezer, appleMusic, etc.) that appear in `TrackMetadata.apiProvider` from external APIs have built-in defaults pre-loaded in `src/base/providerDisplay.ts`.
@@ -44,7 +50,7 @@ How it fits together:
 
 ## Active vs. disabled code
 
-Only two metadata services are registered: `spotify` and `youtube`. Only one download service is registered: `ytdlp`.
+Registered metadata services: `spotify`, `youtube`. Discovery services: `songlink` (opt-in), `musicBrainz`, `claude` (opt-in, last resort — see [docs/projects/p29/tasks.md](docs/projects/p29/tasks.md)). Download services: `ytdlp`, `soulseek`.
 
 ## Dev commands
 

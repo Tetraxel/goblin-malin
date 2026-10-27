@@ -4,6 +4,7 @@ import { TaskScoped } from "#base/task/taskContext";
 import { globalLogger, Logger } from "#base/logger/logger";
 import { ServiceRegistry } from "#base/service-registry";
 import { ServiceScope } from "#base/service-scope";
+import { providerDisplayRegistry } from "#base/providerDisplay";
 import { StatusAttributes, StatusType } from "#base/task/task-status";
 import { throwIfAborted } from "#utils/errors";
 import {
@@ -14,12 +15,14 @@ import {
     MetadataResultState,
     DiscoverySource,
     DiscoveryResult,
+    Platform,
 } from "#flows/musicDownloadFlow/types";
 import { runWithoutCache } from "#utils/cache";
 import { cleanAndTagFlac } from "#utils/metadata";
 import { SafeAction } from "#utils/decorators";
 import { metadataLimiter, downloadLimiter } from "./stageLimiters";
 import { computeConfidenceScore } from "./confidence";
+import { ensureDiscoveryConsent, getUnansweredConsentKeys } from "./discoveryConsent";
 import { computeCompiledMetadata } from "./compiledMetadata";
 import { compiledMetadataToTags } from "./compiledMetadataToTags";
 import { computeOutputPath } from "./computeOutputPath";
@@ -38,6 +41,11 @@ function normalizeDiscoveryResult(raw: unknown): DiscoveryResult {
     return raw as DiscoveryResult;
 }
 
+// A last-resort service (an AI guessing links) only gets a result into the list if, once the platform
+// has returned the real metadata, it scores at least this well against the primary track (0–100).
+// Title alone is worth 40, so a same-title cover by someone else does not pass.
+const LAST_RESORT_MIN_CONFIDENCE = 50;
+
 export class DownloadTask extends Task<TrackDownloadTask> {
     private metadataServices: ServiceScope<DownloadTask, MetadataService>;
     private discoveryServices: ServiceScope<DownloadTask, DiscoveryMetadataService>;
@@ -45,6 +53,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
     private metadataServiceRegistry: ServiceRegistry<DownloadTask, MetadataService>;
     private discoveryServiceRegistry: ServiceRegistry<DownloadTask, DiscoveryMetadataService>;
     private isMetadataServiceEnabled: (key: string) => boolean;
+    private isDiscoveryServiceEnabled: (key: string) => boolean;
     // Cancel handle for whichever download source row is currently in flight, keyed
     // by its index in `downloadSources` — populated from onUpdate's `abort` option
     // (see DownloadUpdateOptions) and consumed by rejectDownloadSource() so rejecting
@@ -81,6 +90,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.metadataServiceRegistry = metadataServiceRegistry;
         this.discoveryServiceRegistry = discoveryServiceRegistry;
         this.isMetadataServiceEnabled = isMetadataServiceEnabled;
+        this.isDiscoveryServiceEnabled = isDiscoveryServiceEnabled;
         this.metadataServices = metadataServiceRegistry.createScope(this, this.logger, isMetadataServiceEnabled);
         this.discoveryServices = discoveryServiceRegistry.createScope(this, this.logger, isDiscoveryServiceEnabled);
         this.downloadServices = downloadServiceRegistry.createScope(this, this.logger, isDownloadServiceEnabled);
@@ -429,105 +439,184 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 }
             }
 
-            // Phase B — DiscoveryMetadataService.discoverFromUri (like Songlink)
+            // Phase B — DiscoveryMetadataService.discoverFromUri (like Songlink).
+            // Consent-gated services (Songlink) ask the user before their first use.
+            for (const [key, ctor] of this.discoveryServiceRegistry.getAllConstructors()) {
+                if (ctor.consent && !ctor.lastResort) await this.awaitDiscoveryConsent(key);
+            }
             for (const discoveryService of this.discoveryServices.getAllServices()) {
-                try {
-                    const { tracks: allDiscovered, anchor } = normalizeDiscoveryResult(
-                        await discoveryService.discoverFromUri(primaryMetadata)
-                    );
+                if (this.isLastResortService(discoveryService)) continue;
+                await this.runDiscoveryService(discoveryService, primaryMetadata, primaryUri);
+            }
 
-                    // Store the anchor for Copy/Open contextual actions
-                    if (anchor) {
-                        const discoveryKey = this.findDiscoveryServiceKey(discoveryService.id);
-                        if (discoveryKey) {
-                            const currentAnchors = this.getAttributes()?.discoveryAnchors ?? {};
-                            this.updateAttributes({
-                                discoveryAnchors: { ...currentAnchors, [discoveryKey]: anchor },
-                            });
-                        }
-                    }
-
-                    // Exclude the primary platform — it's already handled
-                    const discovered = (allDiscovered ?? []).filter((m) => m.platform !== primaryMetadata.platform);
-
-                    for (const rudimentary of discovered) {
-                        const targetServiceKey = this.findServiceKeyForPlatform(rudimentary.platform);
-                        if (!targetServiceKey) continue;
-
-                        // A DiscoveryMetadataService must tag each result with its own key via fetchedBy.
-                        if (!rudimentary.fetchedBy) {
-                            this.logger.warn(
-                                `Discovery result missing fetchedBy from ${discoveryService.id}; skipping`
-                            );
-                            continue;
-                        }
-
-                        // Check dedup: same URI already in group from Phase A?
-                        const existingGroup = (this.getAttributes()?.metadataGroups ?? []).find(
-                            (g) => g.serviceKey === targetServiceKey
-                        );
-                        const existingResult =
-                            rudimentary.uri && existingGroup
-                                ? existingGroup.results.find((r) => r.metadata.uri === rudimentary.uri)
-                                : undefined;
-
-                        const discoverySource: DiscoverySource = {
-                            // `fetchedBy` is the discovery service's key (e.g. "songlink", "musicBrainz")
-                            discoveredBy: rudimentary.fetchedBy,
-                            fromUri: primaryUri,
-                            searchKeys: ["url"],
-                        };
-
-                        if (existingResult) {
-                            // Append discovery source to existing result
-                            const gIdx = (this.getAttributes()?.metadataGroups ?? []).findIndex(
-                                (g) => g.serviceKey === targetServiceKey
-                            );
-                            const rIdx =
-                                (this.getAttributes()?.metadataGroups ?? [])[gIdx]?.results.findIndex(
-                                    (r) => r.metadata.uri === rudimentary.uri
-                                ) ?? -1;
-                            if (gIdx >= 0 && rIdx >= 0) {
-                                const current = this.getAttributes()!.metadataGroups[gIdx].results[rIdx];
-                                this.updateResultInGroup(gIdx, rIdx, {
-                                    discoverySources: [...current.discoverySources, discoverySource],
-                                });
-                            }
-                        } else {
-                            // Try enrichment
-                            let finalMetadata = rudimentary;
-                            let fetchState: "error" | undefined;
-                            let fetchError: string | undefined;
-
-                            if (this.isMetadataServiceEnabled(targetServiceKey) && rudimentary.url) {
-                                try {
-                                    const service = this.metadataServices.get(targetServiceKey);
-                                    finalMetadata = await service.getTrackMetadata(rudimentary.url);
-                                } catch {
-                                    fetchState = "error";
-                                    fetchError = "Enrichment failed";
-                                    finalMetadata = rudimentary;
-                                }
-                            }
-
-                            this.addResultToGroup(
-                                finalMetadata,
-                                targetServiceKey,
-                                [discoverySource],
-                                false,
-                                fetchState,
-                                fetchError
-                            );
-                        }
-                    }
-                } catch (error) {
-                    this.logger.warn(`Phase B discovery failed for ${discoveryService.id}`, { error });
-                }
+            // Phase C — last-resort services (like Claude): slow and/or costly, so they only run when a
+            // platform is still missing after everything above, and only once the user has allowed them.
+            for (const [key, ctor] of this.discoveryServiceRegistry.getAllConstructors()) {
+                if (!ctor.lastResort) continue;
+                const wanted = this.getMissingPlatforms();
+                if (wanted.length === 0) break;
+                if (!(await this.awaitDiscoveryConsent(key))) continue;
+                if (!this.isDiscoveryServiceEnabled(key)) continue;
+                await this.runDiscoveryService(this.discoveryServices.get(key), primaryMetadata, primaryUri, wanted);
             }
         } finally {
             this.updateAttributes({ metadataDiscoveringInProgress: false });
         }
         this.updateAttributes({ metadataDiscovered: true });
+    }
+
+    // Runs one discovery service and merges what it found into the metadata groups.
+    // `wantedPlatforms` (last-resort services only) lists the platforms that still have no result.
+    private async runDiscoveryService(
+        discoveryService: DiscoveryMetadataService,
+        primaryMetadata: TrackMetadata,
+        primaryUri: string,
+        wantedPlatforms?: Platform[],
+        bypassCache = false
+    ): Promise<void> {
+        const lastResort = this.isLastResortService(discoveryService);
+        try {
+            const discover = () => discoveryService.discoverFromUri(primaryMetadata, { wantedPlatforms });
+            const {
+                tracks: allDiscovered,
+                anchor,
+                searchKeys,
+            } = normalizeDiscoveryResult(await (bypassCache ? runWithoutCache(discover) : discover()));
+
+            // Store the anchor for Copy/Open contextual actions
+            if (anchor) {
+                const discoveryKey = this.findDiscoveryServiceKey(discoveryService.id);
+                if (discoveryKey) {
+                    const currentAnchors = this.getAttributes()?.discoveryAnchors ?? {};
+                    this.updateAttributes({
+                        discoveryAnchors: { ...currentAnchors, [discoveryKey]: anchor },
+                    });
+                }
+            }
+
+            // Exclude the primary platform — it's already handled
+            const discovered = (allDiscovered ?? []).filter((m) => m.platform !== primaryMetadata.platform);
+
+            for (const rudimentary of discovered) {
+                const targetServiceKey = this.findServiceKeyForPlatform(rudimentary.platform);
+                if (!targetServiceKey) continue;
+
+                // A DiscoveryMetadataService must tag each result with its own key via fetchedBy.
+                if (!rudimentary.fetchedBy) {
+                    this.logger.warn(`Discovery result missing fetchedBy from ${discoveryService.id}; skipping`);
+                    continue;
+                }
+
+                // Check dedup: same URI already in group from Phase A?
+                const existingGroup = (this.getAttributes()?.metadataGroups ?? []).find(
+                    (g) => g.serviceKey === targetServiceKey
+                );
+                const existingResult =
+                    rudimentary.uri && existingGroup
+                        ? existingGroup.results.find((r) => r.metadata.uri === rudimentary.uri)
+                        : undefined;
+
+                const discoverySource: DiscoverySource = {
+                    // `fetchedBy` is the discovery service's key (e.g. "songlink", "musicBrainz")
+                    discoveredBy: rudimentary.fetchedBy,
+                    fromUri: primaryUri,
+                    searchKeys: searchKeys ?? ["url"],
+                };
+
+                if (existingResult) {
+                    // Append discovery source to existing result
+                    const gIdx = (this.getAttributes()?.metadataGroups ?? []).findIndex(
+                        (g) => g.serviceKey === targetServiceKey
+                    );
+                    const rIdx =
+                        (this.getAttributes()?.metadataGroups ?? [])[gIdx]?.results.findIndex(
+                            (r) => r.metadata.uri === rudimentary.uri
+                        ) ?? -1;
+                    if (gIdx >= 0 && rIdx >= 0) {
+                        const current = this.getAttributes()!.metadataGroups[gIdx].results[rIdx];
+                        this.updateResultInGroup(gIdx, rIdx, {
+                            discoverySources: [...current.discoverySources, discoverySource],
+                        });
+                    }
+                } else {
+                    // Try enrichment
+                    let finalMetadata = rudimentary;
+                    let fetchState: "error" | undefined;
+                    let fetchError: string | undefined;
+                    let enriched = false;
+
+                    if (this.isMetadataServiceEnabled(targetServiceKey) && rudimentary.url) {
+                        try {
+                            const service = this.metadataServices.get(targetServiceKey);
+                            finalMetadata = await service.getTrackMetadata(rudimentary.url);
+                            enriched = true;
+                        } catch {
+                            fetchState = "error";
+                            fetchError = "Enrichment failed";
+                            finalMetadata = rudimentary;
+                        }
+                    }
+
+                    // A last-resort service only proposes URLs. Trust none of it: the platform itself must
+                    // confirm the link exists, and what it returns must actually look like the primary track.
+                    if (lastResort) {
+                        const confidence = enriched ? computeConfidenceScore(finalMetadata, primaryMetadata) : 0;
+                        if (confidence < LAST_RESORT_MIN_CONFIDENCE) {
+                            this.logger.info(
+                                `Dropping ${discoveryService.id} result ${rudimentary.url}: ` +
+                                    (enriched
+                                        ? `only ${confidence}% match with the primary track`
+                                        : "could not verify it")
+                            );
+                            continue;
+                        }
+                    }
+
+                    this.addResultToGroup(
+                        finalMetadata,
+                        targetServiceKey,
+                        [discoverySource],
+                        false,
+                        fetchState,
+                        fetchError
+                    );
+                }
+            }
+        } catch (error) {
+            this.logger.warn(`Phase B discovery failed for ${discoveryService.id}`, { error });
+        }
+    }
+
+    private isLastResortService(service: DiscoveryMetadataService): boolean {
+        const key = this.findDiscoveryServiceKey(service.id);
+        return key ? this.discoveryServiceRegistry.getConstructor(key)?.lastResort === true : false;
+    }
+
+    // Platforms whose metadata service is enabled but which still have no result for this track.
+    private getMissingPlatforms(): Platform[] {
+        const groups = this.getAttributes()?.metadataGroups ?? [];
+        const missing: Platform[] = [];
+        for (const key of this.metadataServiceRegistry.getAllConstructors().keys()) {
+            if (!this.isMetadataServiceEnabled(key)) continue;
+            const group = groups.find((g) => g.serviceKey === key);
+            if (!group || group.results.length === 0) missing.push(key as Platform);
+        }
+        return missing.sort();
+    }
+
+    // Resolves whether the user lets this discovery service run. The first time, that means showing
+    // them a dialog; the task shows "waiting for you" meanwhile instead of looking stuck.
+    private async awaitDiscoveryConsent(key: string): Promise<boolean> {
+        const mustAsk = getUnansweredConsentKeys().includes(key);
+        if (mustAsk) {
+            const label = providerDisplayRegistry.get(key).label;
+            this.status.set({ type: StatusType.PendingUserAction, message: `Waiting for your answer: ${label}` });
+        }
+        try {
+            return await ensureDiscoveryConsent(key);
+        } finally {
+            if (mustAsk) this.status.clear();
+        }
     }
 
     // Find registry key by matching service instance id (service.id = constructor name)
@@ -593,54 +682,27 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         }
         const primaryUri = primaryMetadata.uri ?? primaryMetadata.url;
         try {
+            // Even an explicit [S] still needs the user's OK the first time for a consent-gated service.
+            if (!(await this.awaitDiscoveryConsent(serviceKey))) {
+                this.logger.info(`Re-discovery skipped for ${serviceKey}: not allowed by the user`);
+                return;
+            }
             const service = this.discoveryServices.get(serviceKey);
+            // A last-resort service is told what to look for: whatever is still missing, or — when
+            // nothing is — every other enabled platform (the user asked for a fresh look).
+            const lastResort = this.discoveryServiceRegistry.getConstructor(serviceKey)?.lastResort === true;
+            let wanted: Platform[] | undefined;
+            if (lastResort) {
+                wanted = this.getMissingPlatforms();
+                if (wanted.length === 0) {
+                    wanted = [...this.metadataServiceRegistry.getAllConstructors().keys()]
+                        .filter((k) => this.isMetadataServiceEnabled(k) && k !== primaryMetadata.platform)
+                        .sort() as Platform[];
+                }
+            }
             // Bypass the disk cache so [S] Re-search always fetches fresh data and stores
             // a valid anchor (stale cache entries from old code have the wrong shape).
-            const { tracks: allDiscovered, anchor } = normalizeDiscoveryResult(
-                await runWithoutCache(() => service.discoverFromUri(primaryMetadata))
-            );
-
-            if (anchor) {
-                const currentAnchors = this.getAttributes()?.discoveryAnchors ?? {};
-                this.updateAttributes({ discoveryAnchors: { ...currentAnchors, [serviceKey]: anchor } });
-            }
-
-            const discovered = (allDiscovered ?? []).filter((m) => m.platform !== primaryMetadata.platform);
-            for (const rudimentary of discovered) {
-                const targetServiceKey = this.findServiceKeyForPlatform(rudimentary.platform);
-                if (!targetServiceKey) continue;
-                if (!rudimentary.fetchedBy) continue;
-
-                const discoverySource = {
-                    discoveredBy: rudimentary.fetchedBy,
-                    fromUri: primaryUri,
-                    searchKeys: ["url"] as import("#flows/musicDownloadFlow/types").SearchKey[],
-                };
-
-                let finalMetadata = rudimentary;
-                let fetchState: "error" | undefined;
-                let fetchError: string | undefined;
-
-                if (this.isMetadataServiceEnabled(targetServiceKey) && rudimentary.url) {
-                    try {
-                        const enrichService = this.metadataServices.get(targetServiceKey);
-                        finalMetadata = await enrichService.getTrackMetadata(rudimentary.url);
-                    } catch {
-                        fetchState = "error";
-                        fetchError = "Enrichment failed";
-                        finalMetadata = rudimentary;
-                    }
-                }
-
-                this.addResultToGroup(
-                    finalMetadata,
-                    targetServiceKey,
-                    [discoverySource],
-                    false,
-                    fetchState,
-                    fetchError
-                );
-            }
+            await this.runDiscoveryService(service, primaryMetadata, primaryUri, wanted, true);
             this.logger.info(`Re-discovery completed for ${serviceKey}`);
         } catch (error) {
             this.logger.warn(
@@ -935,7 +997,10 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 // as "used …", reflect the actual current metadata instead of one
                 // arbitrary source's raw values.
                 if (downloadService.usesCompiledMetadataForQuery) {
-                    const compiled = computeCompiledMetadata(metadataGroups, this.getAttributes()?.metadataOverride ?? {});
+                    const compiled = computeCompiledMetadata(
+                        metadataGroups,
+                        this.getAttributes()?.metadataOverride ?? {}
+                    );
                     compatibleMetadata = {
                         ...compatibleMetadata,
                         trackName: compiled.trackName || compatibleMetadata.trackName,

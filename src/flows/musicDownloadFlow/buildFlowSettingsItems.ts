@@ -60,10 +60,31 @@ function providerItems(
     for (const [settingKey, def] of Object.entries(schema)) {
         if (def.kind === "checkbox") {
             const current = (stored[settingKey] as boolean) ?? def.defaultValue;
+            // Flipping a consent-gated provider's switch is an explicit answer: never ask again.
+            const answersConsent = ctor.consent !== undefined && settingKey === "enabled";
             items.push({
                 kind: "checkbox",
                 indent: 4,
                 label: def.label,
+                get: () => current,
+                set: (v) =>
+                    onChange({
+                        [section]: {
+                            [providerSubKey]: {
+                                [key]: answersConsent ? { [settingKey]: v, consentAsked: true } : { [settingKey]: v },
+                            },
+                        },
+                    } as DeepPartial<MusicDownloadFlowSettings>),
+            });
+        } else if (def.kind === "select") {
+            const storedValue = stored[settingKey] as string | undefined;
+            const current =
+                storedValue !== undefined && def.options.includes(storedValue) ? storedValue : def.defaultValue;
+            items.push({
+                kind: "select",
+                indent: 4,
+                label: def.label,
+                options: def.options,
                 get: () => current,
                 set: (v) =>
                     onChange({

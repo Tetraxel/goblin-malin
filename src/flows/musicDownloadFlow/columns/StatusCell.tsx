@@ -87,7 +87,12 @@ export const StatusCell = React.memo(function StatusCell({
     useGlobalTicker(1000, liveFetchedAt !== undefined || isTimed);
 
     const statusColor = getStatusColor(task.status.type, theme);
-    const iconComponent = getStatusIcon(task.status.type);
+    const iconComponent =
+        task.status.icon === "agent" ? (
+            <AnimatedIcon icon={Icon.Agent} interval={160} color={task.status.iconColor} />
+        ) : (
+            getStatusIcon(task.status.type)
+        );
     const statusText = liveFetchedAt
         ? `Fetched ${formatRelativeTime(Date.now() - liveFetchedAt.getTime())}`
         : getStatusText(task.status);

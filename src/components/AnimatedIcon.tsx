@@ -10,6 +10,7 @@ export enum Icon {
     RedFlag = "redFlag",
     Warning = "warning",
     Equalizer = "equalizer",
+    Agent = "agent",
 }
 
 // Animation frames for different status types
@@ -21,6 +22,8 @@ const ANIMATION_FRAMES = {
     [Icon.Warning]: ["▵", " "],
     // Always 3 columns wide, so a row doesn't shift as it animates.
     [Icon.Equalizer]: ["▂▅▃", "▅▃▆", "▃▆▂", "▆▂▅"],
+    // An AI agent at work. Ping-pongs so it "breathes" instead of snapping back to the start.
+    [Icon.Agent]: ["·", "✢", "✳", "✶", "✻", "✽", "✻", "✶", "✳", "✢"],
 };
 
 const ICON_COLOR: Record<Icon, string> = {
@@ -30,6 +33,7 @@ const ICON_COLOR: Record<Icon, string> = {
     [Icon.RedFlag]: "white",
     [Icon.Warning]: "yellow",
     [Icon.Equalizer]: "green",
+    [Icon.Agent]: "#d97757",
 };
 
 interface AnimatedIconProps {

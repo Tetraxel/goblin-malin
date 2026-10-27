@@ -4,7 +4,7 @@ import { ServiceScope } from "./service-scope";
 import { Task } from "./task/task";
 import { ProviderDisplay, providerDisplayRegistry } from "./providerDisplay";
 import { ParsedUrl, CollectionExpansion, urlParserRegistry } from "./urlParser";
-import { ProviderSettingsSchema } from "./providerSettings";
+import { ProviderConsent, ProviderSettingsSchema } from "./providerSettings";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ServiceFactory<TTask extends Task<any>, TService extends ServiceBase> = (
@@ -20,6 +20,10 @@ type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> =
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expandCollection?: (url: string, logger: Logger, task: Task<any>) => Promise<CollectionExpansion>;
     defaultSettings?: ProviderSettingsSchema;
+    // Must be explicitly allowed by the user (once) before the service is ever used.
+    consent?: ProviderConsent;
+    // Slow/expensive last resort: only run when the regular services left a gap.
+    lastResort?: boolean;
 };
 
 // Central registry for services, allowing dynamic registration and scoped instantiation

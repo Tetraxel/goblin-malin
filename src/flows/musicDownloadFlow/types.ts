@@ -108,6 +108,7 @@ export type APIProvider =
     | "boomplay"
     | "bandcamp"
     | "songlink"
+    | "claude"
     | "spotifyUrlInfo";
 
 export type TrackUri<PlatformString extends string = string> = `${Uppercase<PlatformString>}::TRACK::${string}`;
@@ -261,6 +262,9 @@ export type DiscoveryAnchor = {
 export type DiscoveryResult = {
     tracks: TrackMetadata[];
     anchor?: DiscoveryAnchor;
+    // Which fields of the source metadata drove the lookup. Defaults to ["url"] (a lookup by the
+    // source URL, like Songlink); a text-based lookup reports the fields it actually searched on.
+    searchKeys?: SearchKey[];
 };
 
 export type MetadataOverrides = Partial<{

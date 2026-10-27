@@ -24,6 +24,7 @@ import { useImportFlow } from "./ImportModal/useImportFlow";
 import { useStartFlow } from "./StartModal/useStartFlow";
 import { startOptionsBridge } from "#base/bridges/startOptionsBridge";
 import { deleteConfirmBridge, DeleteConfirmRequest } from "#base/bridges/deleteConfirmBridge";
+import { consentBridge, ConsentRequest } from "#base/bridges/consentBridge";
 import { ConfirmModal } from "./ConfirmModal/ConfirmModal";
 import { useConfirmModal } from "./ConfirmModal/useConfirmModal";
 import { useTheme } from "#base/themeContext";
@@ -62,6 +63,24 @@ export const AppInner: React.FC<{
         [openConfirmModal, theme]
     );
 
+    // Bridge: let discovery providers ask the user's permission before their first use.
+    const handleConsentRequest = useCallback(
+        (req: ConsentRequest) => {
+            openConfirmModal({
+                title: req.title,
+                message: req.message,
+                choices: [
+                    { label: "Allow", color: theme.status.success },
+                    { label: "Don't allow", color: theme.status.error },
+                ],
+                accentColor: req.color,
+                onConfirm: (i) => (i === 0 ? req.allow() : req.deny()),
+                onCancel: req.dismiss,
+            });
+        },
+        [openConfirmModal, theme]
+    );
+
     // Bridge: let plain-TS task actions open the start-options modal.
     useEffect(() => {
         startOptionsBridge.setOpener(openStartFlow);
@@ -73,6 +92,11 @@ export const AppInner: React.FC<{
         deleteConfirmBridge.setOpener(handleDeleteBridgeRequest);
         return () => deleteConfirmBridge.setOpener(null);
     }, [handleDeleteBridgeRequest]);
+
+    useEffect(() => {
+        consentBridge.setOpener(handleConsentRequest);
+        return () => consentBridge.setOpener(null);
+    }, [handleConsentRequest]);
 
     return (
         <ImportActionsProvider openImportFlow={openImportFlow}>

@@ -8,6 +8,7 @@ import { SpotifyService } from "./services/metadata-providers/spotify/SpotifySer
 import { YoutubeService } from "./services/metadata-providers/youtube/YoutubeService";
 import { SonglinkService } from "./services/metadata-providers/songlink/SonglinkService";
 import { MusicBrainzDiscoveryService } from "./services/metadata-providers/musicbrainz/MusicBrainzDiscoveryService";
+import { ClaudeDiscoveryService } from "./services/metadata-providers/claude/ClaudeDiscoveryService";
 import { YtDlpService } from "./services/download-providers/ytdlp/YtDlpService";
 import { SoulseekService } from "./services/download-providers/soulseek/SoulseekService";
 
@@ -31,6 +32,7 @@ export function initMusicApp(): void {
 
     discoveryServiceRegistry.register("songlink", SonglinkService);
     discoveryServiceRegistry.register("musicBrainz", MusicBrainzDiscoveryService);
+    discoveryServiceRegistry.register("claude", ClaudeDiscoveryService);
 
     downloadServiceRegistry.register("ytdlp", YtDlpService);
     downloadServiceRegistry.register("soulseek", SoulseekService);

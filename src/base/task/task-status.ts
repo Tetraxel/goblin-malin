@@ -12,9 +12,16 @@ export enum StatusType {
     NoStatus = "noStatus",
 }
 
+// Lets a status ask for a specific animated icon instead of the one its type implies.
+// "agent": an AI agent is working on the task (shown as the · ✢ ✳ ✶ ✻ ✽ spinner).
+export type StatusIcon = "agent";
+
 export interface StatusAttributes {
     type: StatusType;
     message: string;
+    icon?: StatusIcon;
+    // Brand color for the icon (e.g. the provider doing the work); falls back to the icon's own.
+    iconColor?: string;
     timeTracking?: boolean;
     stepNumber?: number;
     progress?: number;
@@ -36,6 +43,8 @@ function statusEqual(a: StatusAttributes, b: StatusAttributes): boolean {
     return (
         a.type === b.type &&
         a.message === b.message &&
+        a.icon === b.icon &&
+        a.iconColor === b.iconColor &&
         a.timeTracking === b.timeTracking &&
         a.stepNumber === b.stepNumber &&
         a.progress === b.progress &&

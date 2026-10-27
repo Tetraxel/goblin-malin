@@ -1,6 +1,6 @@
 import { Logger } from "#base/logger/logger";
 import { ProviderDisplay } from "#base/providerDisplay";
-import { ProviderSettingsSchema } from "#base/providerSettings";
+import { ProviderConsent, ProviderSettingsSchema } from "#base/providerSettings";
 import { StatusType } from "#base/task/task-status";
 import { Cached } from "#utils/cache";
 import type { TrackMetadata, DiscoveryResult } from "#flows/musicDownloadFlow/types";
@@ -42,7 +42,14 @@ export class SonglinkService extends DiscoveryMetadataService {
         colorBright: "#ff8c3a",
     };
     static readonly defaultSettings: ProviderSettingsSchema = {
-        enabled: { label: "Enable", defaultValue: true, kind: "checkbox" },
+        enabled: { label: "Enable", defaultValue: false, kind: "checkbox" },
+    };
+    static readonly consent: ProviderConsent = {
+        title: "Use Songlink to find tracks?",
+        message:
+            "Songlink (song.link) finds the same track on other streaming platforms.\n\n" +
+            "Each track's link is sent to api.song.link. Its free quota is about 19 lookups per hour, " +
+            "so large imports will hit that limit.\n\nChange this anytime in Settings.",
     };
     static readonly cellComponent = SonglinkCell;
 
