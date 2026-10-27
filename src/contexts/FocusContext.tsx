@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useMemo, ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useMemo, ReactNode } from "react";
+import { setMouseActiveWindow } from "#base/mouse/clickableWindows";
 import { useFocusManager, FocusState } from "#hooks/useFocusManager";
 
 type FocusManager = ReturnType<typeof useFocusManager>;
@@ -48,6 +49,10 @@ export const FocusProvider: React.FC<{
     const fm = useFocusManager(config);
     const fs = fm.focusState;
 
+    useEffect(() => {
+        setMouseActiveWindow(fs.activeWindow);
+    }, [fs.activeWindow]);
+
     // The action functions are all stable useCallbacks; bundling them in a memo
     // keyed on each one yields an object whose identity never changes in practice.
     const actions = useMemo<FocusActions>(
@@ -69,6 +74,7 @@ export const FocusProvider: React.FC<{
             setCursor: fm.setCursor,
             setShowDiscoverySources: fm.setShowDiscoverySources,
             setSourcesInnerFocus: fm.setSourcesInnerFocus,
+            focusSourcesPane: fm.focusSourcesPane,
             setDetailFieldIndex: fm.setDetailFieldIndex,
             setIsEditingField: fm.setIsEditingField,
             openWizard: fm.openWizard,
@@ -92,6 +98,7 @@ export const FocusProvider: React.FC<{
             fm.setCursor,
             fm.setShowDiscoverySources,
             fm.setSourcesInnerFocus,
+            fm.focusSourcesPane,
             fm.setDetailFieldIndex,
             fm.setIsEditingField,
             fm.openWizard,

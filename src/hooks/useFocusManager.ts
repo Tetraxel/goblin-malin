@@ -7,6 +7,9 @@ export type CursorPosition =
     | { type: "group"; groupIndex: number }
     | { type: "result"; groupIndex: number; resultIndex: number };
 
+/** A new value, or a function of the previous one so several wheel notches in one stdin read accumulate. */
+export type Updater<T> = T | ((prev: T) => T);
+
 // Fixed rows that never change regardless of terminal size.
 // toolbarRows = top separator + toolbar content + bottom separator.
 // ActionBar is now rendered inside TaskListPanel (not counted here).
@@ -398,12 +401,15 @@ export const useFocusManager = ({
         }));
     }, []);
 
-    const setCursor = useCallback((cursor: CursorPosition) => {
+    const setCursor = useCallback((cursor: Updater<CursorPosition>) => {
         setFocusState((prev) => ({
             ...prev,
             secondaryPanel: {
                 ...prev.secondaryPanel,
-                sourcesPanel: { ...prev.secondaryPanel.sourcesPanel, cursor },
+                sourcesPanel: {
+                    ...prev.secondaryPanel.sourcesPanel,
+                    cursor: typeof cursor === "function" ? cursor(prev.secondaryPanel.sourcesPanel.cursor) : cursor,
+                },
             },
         }));
     }, []);
@@ -428,12 +434,28 @@ export const useFocusManager = ({
         }));
     }, []);
 
-    const setSourceDetailFieldIndex = useCallback((index: number) => {
+    const setSourceDetailFieldIndex = useCallback((index: Updater<number>) => {
         setFocusState((prev) => ({
             ...prev,
             secondaryPanel: {
                 ...prev.secondaryPanel,
-                sourcesPanel: { ...prev.secondaryPanel.sourcesPanel, selectedFieldIndex: index },
+                sourcesPanel: {
+                    ...prev.secondaryPanel.sourcesPanel,
+                    selectedFieldIndex:
+                        typeof index === "function" ? index(prev.secondaryPanel.sourcesPanel.selectedFieldIndex) : index,
+                },
+            },
+        }));
+    }, []);
+
+    /** Pointer equivalent of Tab-ing to the secondary panel and arrowing to its list or detail pane. */
+    const focusSourcesPane = useCallback((pane: "list" | "detail") => {
+        setFocusState((prev) => ({
+            ...prev,
+            activeWindow: "secondaryPanel",
+            secondaryPanel: {
+                ...prev.secondaryPanel,
+                sourcesPanel: { ...prev.secondaryPanel.sourcesPanel, innerFocus: pane },
             },
         }));
     }, []);
@@ -508,6 +530,7 @@ export const useFocusManager = ({
         setCursor,
         setShowDiscoverySources,
         setSourcesInnerFocus,
+        focusSourcesPane,
         setDetailFieldIndex: setSourceDetailFieldIndex,
         setIsEditingField,
         openWizard,

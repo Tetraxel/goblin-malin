@@ -33,6 +33,7 @@ export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) 
         setDetailFieldIndex,
         setIsEditingField,
         setSecondaryTab,
+        focusSourcesPane,
     } = useFocusActions();
     const { activeWindow, layout, isEditingField } = useFocusChrome();
     const secondaryPanel = useFocusSecondaryPanel();
@@ -74,6 +75,7 @@ export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) 
                     setCursor={setCursor}
                     setShowDiscoverySources={setShowDiscoverySources}
                     setSourcesInnerFocus={setSourcesInnerFocus}
+                    focusSourcesPane={focusSourcesPane}
                     setDetailFieldIndex={setDetailFieldIndex}
                     setIsEditingField={setIsEditingField}
                 />

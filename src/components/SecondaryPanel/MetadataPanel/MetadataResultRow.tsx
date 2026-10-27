@@ -1,5 +1,7 @@
-import React from "react";
-import { Box, Text } from "ink";
+import React, { useRef } from "react";
+import { Box, Text, type DOMElement } from "ink";
+import { useClickTarget } from "#base/mouse/useMouseTarget";
+import type { CursorPosition } from "#hooks/useFocusManager";
 import { MetadataResultState } from "#flows/musicDownloadFlow/types";
 import { useTheme } from "#base/themeContext";
 import { Theme } from "#base/theme";
@@ -28,6 +30,10 @@ function confidenceBadge(result: MetadataResultState, theme: Theme): { text: str
 interface MetadataResultRowProps {
     result: MetadataResultState;
     serviceKey: string; // reserved for future per-provider styling
+    groupIndex: number;
+    resultIndex: number;
+    /** Click handler — must be referentially stable so the memo holds. */
+    onSelect: (cursor: CursorPosition) => void;
     isSelected: boolean;
     isActive: boolean;
     width: number;
@@ -37,12 +43,17 @@ interface MetadataResultRowProps {
 export const MetadataResultRow = React.memo(function MetadataResultRow({
     result,
     serviceKey: _serviceKey,
+    groupIndex,
+    resultIndex,
+    onSelect,
     isSelected,
     isActive,
     width,
     showDiscoverySources,
 }: MetadataResultRowProps) {
     const theme = useTheme();
+    const rowRef = useRef<DOMElement>(null);
+    useClickTarget(rowRef, () => onSelect({ type: "result", groupIndex, resultIndex }));
     const isDimmed = result.isRejected;
     const statusIcon = result.isRejected ? "✘" : result.isFavorited ? "★" : " ";
     const statusColor = result.isRejected
@@ -73,6 +84,7 @@ export const MetadataResultRow = React.memo(function MetadataResultRow({
         <Box flexDirection="column" width={width} overflow="hidden" flexShrink={0}>
             {/* Main result row */}
             <Box
+                ref={rowRef}
                 flexDirection="row"
                 width={width}
                 minWidth={width}
