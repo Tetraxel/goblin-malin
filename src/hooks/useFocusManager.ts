@@ -209,8 +209,8 @@ export const useFocusManager = ({
 
     const handleTabPress = useCallback(() => {
         setFocusState((prev) => {
-            // The toolbar is deliberately not in the cycle — it's reached by clicking it or
-            // double-pressing Esc, so Tab flips straight between the two working panels
+            // The toolbar is deliberately not in the cycle — it's reached by clicking it,
+            // double-pressing Esc, or pressing Up on the task list header, so Tab flips straight between the two working panels
             // (and from the toolbar lands on the task list).
             const windows: FocusableWindow[] = ["taskList", "secondaryPanel"];
             const currentIndex = windows.indexOf(prev.activeWindow);
@@ -295,8 +295,15 @@ export const useFocusManager = ({
             setFocusState((prev) => {
                 if (direction === "up" || direction === "down") {
                     if (direction === "up") {
-                        // Up from the header stops there: the toolbar isn't reachable by arrows.
-                        if (prev.taskList.isHeaderFocused) return prev;
+                        // Up from the header goes on to the toolbar (the mirror of Down from it).
+                        if (prev.taskList.isHeaderFocused) {
+                            return {
+                                ...prev,
+                                previousWindow: prev.activeWindow,
+                                activeWindow: "toolbar",
+                                returningFromWindow: undefined,
+                            };
+                        }
                         if (prev.taskList.selectedTaskIndex === 0) {
                             return { ...prev, taskList: { ...prev.taskList, isHeaderFocused: true } };
                         }
