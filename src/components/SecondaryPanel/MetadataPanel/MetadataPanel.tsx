@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Box } from "ink";
 import { useTheme } from "#base/themeContext";
 import { Task, TaskSnapshot } from "#base/task/task";
-import { CursorPosition } from "#hooks/useFocusManager";
+import { CursorPosition, Updater } from "#hooks/useFocusManager";
 import { MusicDownloadTaskAttributes, MetadataGroupState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
 import { computeCompiledMetadata, pickGroupRepresentative } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { navigableFields } from "#flows/musicDownloadFlow/utils/metadataFields";
@@ -28,10 +28,11 @@ interface MetadataPanelProps {
     sourcesPanel: SourcesPanelState;
     isPanelActive: boolean;
     isEditingField: boolean;
-    setCursor: (cursor: CursorPosition) => void;
+    setCursor: (cursor: Updater<CursorPosition>) => void;
     setShowDiscoverySources: (show: boolean) => void;
     setSourcesInnerFocus: (focus: "list" | "detail") => void;
-    setDetailFieldIndex: (index: number) => void;
+    focusSourcesPane: (pane: "list" | "detail") => void;
+    setDetailFieldIndex: (index: Updater<number>) => void;
     setIsEditingField: (editing: boolean) => void;
 }
 
@@ -45,6 +46,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
     setCursor,
     setShowDiscoverySources,
     setSourcesInnerFocus,
+    focusSourcesPane,
     setDetailFieldIndex,
     setIsEditingField,
 }) {
@@ -177,6 +179,38 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
         [typedTask]
     );
 
+    // Pointer handlers. While a field is being edited the inline input owns the panel, so
+    // clicks and wheel notches that would move the cursor or field underneath it are dropped.
+    // Stable identities (like the handlers above) so memoized rows keep bailing out.
+    const handleSelectCursor = useCallback(
+        (next: CursorPosition) => {
+            if (isEditingField) return;
+            focusSourcesPane("list");
+            setCursor(next);
+        },
+        [isEditingField, focusSourcesPane, setCursor]
+    );
+    const handleScrollCursor = useCallback(
+        (next: Updater<CursorPosition>) => {
+            if (!isEditingField) setCursor(next);
+        },
+        [isEditingField, setCursor]
+    );
+    const handleSelectField = useCallback(
+        (index: number) => {
+            if (isEditingField) return;
+            focusSourcesPane("detail");
+            setDetailFieldIndex(index);
+        },
+        [isEditingField, focusSourcesPane, setDetailFieldIndex]
+    );
+    const handleScrollField = useCallback(
+        (next: Updater<number>) => {
+            if (!isEditingField) setDetailFieldIndex(next);
+        },
+        [isEditingField, setDetailFieldIndex]
+    );
+
     const sortedGroups = [...groups].sort((a, b) => a.rank - b.rank);
     const selectedResult =
         cursor.type === "result"
@@ -215,6 +249,8 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
                     width={leftWidth}
                     height={listHeight}
                     onCursorChange={setCursor}
+                    onSelectCursor={handleSelectCursor}
+                    onScrollCursor={handleScrollCursor}
                     onInnerFocusSwitch={() => setSourcesInnerFocus("detail")}
                     onGroupsChange={handleGroupsChange}
                     onToggleDiscoverySources={() => setShowDiscoverySources(!showDiscoverySources)}
@@ -239,6 +275,8 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
                     width={rightWidth}
                     height={listHeight}
                     onOverrideChange={handleOverrideChange}
+                    onSelectField={handleSelectField}
+                    onScrollField={handleScrollField}
                     onInnerFocusSwitch={() => setSourcesInnerFocus("list")}
                     setIsEditingField={setIsEditingField}
                 />

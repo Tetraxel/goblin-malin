@@ -9,6 +9,7 @@ import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadat
 import { computeOutputFilename } from "#flows/musicDownloadFlow/utils/computeOutputPath";
 import { getProvenanceDisplay } from "#flows/musicDownloadFlow/utils/provenance";
 import { getInstance, PlayerStatus } from "#utils/mpvPlayer";
+import { togglePlayback as toggleFilePlayback } from "#utils/togglePlayback";
 import { formatBytes, formatDate, tagValue } from "#components/SecondaryPanel/DownloadPanel/utils";
 import { Uri } from "#components/SecondaryPanel/MetadataPanel/Uri";
 import { useShortcuts } from "#hooks/useShortcuts";
@@ -127,6 +128,21 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     // is flagged in the task list, and the player is the app-wide singleton).
 
     const canPlay = source?.localFile?.state === "found";
+    // Shared by the Space shortcut and a click on the playback bar. Only a file that is already
+    // loaded can be paused; starting one needs it to be on disk.
+    const togglePlayback = () => {
+        if (!currentFilePath) return;
+        const status = getInstance().getStatus();
+        const isLoaded = status.filePath === currentFilePath && (status.isPlaying || status.isPaused);
+        if (isLoaded || canPlay) toggleFilePlayback(currentFilePath);
+    };
+    const seekToFraction = (fraction: number) => {
+        const status = getInstance().getStatus();
+        if (status.filePath !== currentFilePath || status.durationMs <= 0) return;
+        getInstance()
+            .seekMs(Math.round(fraction * status.durationMs))
+            .catch(() => {});
+    };
     const fileNotFoundNow = source?.localFile?.state === "not_found";
 
     useShortcuts({
@@ -168,13 +184,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                 label: isPlaying ? "Pause" : isPaused ? "Resume" : "Play",
                 handler: () => {
                     if (isDiffMode) return;
-                    const player = getInstance();
-                    const status = player.getStatus();
-                    if (status.filePath === currentFilePath && (status.isPlaying || status.isPaused)) {
-                        player.togglePause().catch(() => {});
-                    } else if (currentFilePath && canPlay) {
-                        player.play(currentFilePath).catch(() => {});
-                    }
+                    togglePlayback();
                 },
             },
             {
@@ -326,6 +336,8 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                             isPlaying={isPlaying}
                             isPaused={isPaused}
                             isFocused={isActive}
+                            onToggle={togglePlayback}
+                            onSeek={seekToFraction}
                         />
                     )}
 

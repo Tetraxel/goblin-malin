@@ -1,21 +1,30 @@
-import React from "react";
-import { Box, Text } from "ink";
+import React, { useRef } from "react";
+import { Box, Text, type DOMElement } from "ink";
+import { useClickTarget } from "#base/mouse/useMouseTarget";
+import type { CursorPosition } from "#hooks/useFocusManager";
 import { MetadataGroupState } from "#flows/musicDownloadFlow/types";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
 
 interface MetadataGroupHeaderProps {
     group: MetadataGroupState;
+    groupIndex: number;
+    /** Click handler — must be referentially stable so the memo holds. */
+    onSelect: (cursor: CursorPosition) => void;
     isSelected: boolean;
     isActive: boolean;
 }
 
 export const MetadataGroupHeader = React.memo(function MetadataGroupHeader({
     group,
+    groupIndex,
+    onSelect,
     isSelected,
     isActive,
 }: MetadataGroupHeaderProps) {
     const theme = useTheme();
+    const rowRef = useRef<DOMElement>(null);
+    useClickTarget(rowRef, () => onSelect({ type: "group", groupIndex }));
     const display = providerDisplayRegistry.get(group.serviceKey);
     const focusColorBg = isActive
         ? theme.ui.rowBackground.regular.cellActive
@@ -36,6 +45,7 @@ export const MetadataGroupHeader = React.memo(function MetadataGroupHeader({
 
     return (
         <Box
+            ref={rowRef}
             flexDirection="row"
             flexGrow={1}
             flexShrink={0}

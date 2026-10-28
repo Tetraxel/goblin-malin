@@ -1,5 +1,7 @@
-﻿import React from "react";
-import { Box, Text } from "ink";
+﻿import React, { useRef } from "react";
+import { Box, Text, type DOMElement } from "ink";
+import { useClickTarget } from "#base/mouse/useMouseTarget";
+import type { CursorPosition } from "#hooks/useFocusManager";
 import { useTheme } from "#base/themeContext";
 import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { formatDuration } from "../utils";
@@ -9,6 +11,8 @@ const COMPILED_PREFIX = "🏆 Compiled Metadata: ";
 interface CompiledRowProps {
     compiled: CompiledMetadata;
     overrideCount: number;
+    /** Click handler — must be referentially stable so the memo holds. */
+    onSelect: (cursor: CursorPosition) => void;
     isSelected: boolean;
     isActive: boolean;
     width: number;
@@ -17,11 +21,14 @@ interface CompiledRowProps {
 export const MetadataCompiledRow = React.memo(function MetadataCompiledRow({
     compiled,
     overrideCount,
+    onSelect,
     isSelected,
     isActive,
     width,
 }: CompiledRowProps) {
     const theme = useTheme();
+    const rowRef = useRef<DOMElement>(null);
+    useClickTarget(rowRef, () => onSelect({ type: "compiled" }));
     const focusColorBg = isActive
         ? theme.ui.rowBackground.regular.cellActive
         : theme.ui.rowBackground.regular.highlighted;
@@ -35,6 +42,7 @@ export const MetadataCompiledRow = React.memo(function MetadataCompiledRow({
 
     return (
         <Box
+            ref={rowRef}
             flexDirection="row"
             height={1}
             flexShrink={0}

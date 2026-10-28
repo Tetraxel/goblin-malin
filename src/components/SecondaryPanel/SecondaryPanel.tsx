@@ -8,14 +8,33 @@ import { DownloadPanel } from "./DownloadPanel/DownloadPanel";
 import { TabBar } from "../TabBar";
 import { Task } from "#base/task/task";
 
+const SECONDARY_TABS = [
+    { key: "3", label: "Metadata Sources" },
+    { key: "4", label: "Download Sources" },
+    { key: "5", label: "Logs" },
+];
+
+const SUB_TAB_BY_KEY: Record<string, "metadataSources" | "downloadSources" | "logs"> = {
+    "3": "metadataSources",
+    "4": "downloadSources",
+    "5": "logs",
+};
+
 interface SecondaryPanelProps {
     tasks: Task[];
     width: number;
 }
 
 export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) => {
-    const { setCursor, setShowDiscoverySources, setSourcesInnerFocus, setDetailFieldIndex, setIsEditingField } =
-        useFocusActions();
+    const {
+        setCursor,
+        setShowDiscoverySources,
+        setSourcesInnerFocus,
+        setDetailFieldIndex,
+        setIsEditingField,
+        setSecondaryTab,
+        focusSourcesPane,
+    } = useFocusActions();
     const { activeWindow, layout, isEditingField } = useFocusChrome();
     const secondaryPanel = useFocusSecondaryPanel();
     const taskList = useFocusTaskList();
@@ -40,12 +59,9 @@ export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) 
         <Box flexDirection="column" height={height} overflow="hidden">
             <TabBar
                 width={width}
-                tabs={[
-                    { key: "3", label: "Metadata Sources" },
-                    { key: "4", label: "Download Sources" },
-                    { key: "5", label: "Logs" },
-                ]}
+                tabs={SECONDARY_TABS}
                 activeTabKey={activeTabKey}
+                onSelect={(key) => setSecondaryTab(SUB_TAB_BY_KEY[key])}
             />
 
             {subTab === "metadataSources" && (
@@ -59,6 +75,7 @@ export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) 
                     setCursor={setCursor}
                     setShowDiscoverySources={setShowDiscoverySources}
                     setSourcesInnerFocus={setSourcesInnerFocus}
+                    focusSourcesPane={focusSourcesPane}
                     setDetailFieldIndex={setDetailFieldIndex}
                     setIsEditingField={setIsEditingField}
                 />

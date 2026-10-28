@@ -1,11 +1,12 @@
-import React from "react";
-import { Box, Text } from "ink";
+import React, { useRef } from "react";
+import { Box, Text, type DOMElement } from "ink";
 import Spinner from "ink-spinner";
+import { useWheelTarget } from "#base/mouse/useMouseTarget";
 import { useTheme } from "#base/themeContext";
 import { MetadataGroupState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
 import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
-import { CursorPosition } from "#hooks/useFocusManager";
-import { useSourceListInput } from "./useSourceListInput";
+import { CursorPosition, Updater } from "#hooks/useFocusManager";
+import { stepCursor, useSourceListInput } from "./useSourceListInput";
 import { MetadataGroupHeader } from "./MetadataGroupHeader";
 import { MetadataResultRow } from "./MetadataResultRow";
 import { MetadataCompiledRow } from "./MetadataCompiledRow";
@@ -20,6 +21,10 @@ interface MetadataSourceListProps {
     width: number;
     height: number;
     onCursorChange: (cursor: CursorPosition) => void;
+    /** A row was clicked: focus the list and move the cursor there. Must be referentially stable. */
+    onSelectCursor: (cursor: CursorPosition) => void;
+    /** Mouse-wheel: move the cursor without moving keyboard focus. */
+    onScrollCursor: (cursor: Updater<CursorPosition>) => void;
     onInnerFocusSwitch: () => void;
     onGroupsChange: (groups: MetadataGroupState[]) => void;
     onToggleDiscoverySources: () => void;
@@ -46,6 +51,8 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
     width,
     height,
     onCursorChange,
+    onSelectCursor,
+    onScrollCursor,
     onInnerFocusSwitch,
     onGroupsChange,
     onToggleDiscoverySources,
@@ -55,6 +62,9 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
 }) => {
     const theme = useTheme();
     const sortedGroups = [...groups].sort((a, b) => a.rank - b.rank);
+
+    const listRef = useRef<DOMElement>(null);
+    useWheelTarget(listRef, (delta) => onScrollCursor((prev) => stepCursor(prev, sortedGroups, delta)));
 
     useSourceListInput({
         groups,
@@ -73,7 +83,7 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
     ).length;
 
     return (
-        <Box flexDirection="column" width={width} height={height} overflow="hidden">
+        <Box ref={listRef} flexDirection="column" width={width} height={height} overflow="hidden">
             <Box flexDirection="row" height={1} marginBottom={1} overflow="hidden">
                 <Text color="gray" italic wrap="truncate-end">
                     {" " + HEADER_LINE}
@@ -84,6 +94,7 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
                 <MetadataCompiledRow
                     compiled={compiled}
                     overrideCount={overrideCount}
+                    onSelect={onSelectCursor}
                     isSelected={cursor.type === "compiled"}
                     isActive={isActive}
                     width={width}
@@ -95,6 +106,8 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
                         <Box key={group.serviceKey} flexDirection="column" overflow="hidden">
                             <MetadataGroupHeader
                                 group={group}
+                                groupIndex={gIdx}
+                                onSelect={onSelectCursor}
                                 isSelected={cursor.type === "group" && cursor.groupIndex === gIdx}
                                 isActive={isActive}
                             />
@@ -103,6 +116,9 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
                                     key={rIdx}
                                     result={result}
                                     serviceKey={group.serviceKey}
+                                    groupIndex={gIdx}
+                                    resultIndex={rIdx}
+                                    onSelect={onSelectCursor}
                                     isSelected={
                                         cursor.type === "result" &&
                                         cursor.groupIndex === gIdx &&

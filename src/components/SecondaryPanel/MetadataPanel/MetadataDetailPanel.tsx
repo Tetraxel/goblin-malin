@@ -1,6 +1,8 @@
-import React, { useCallback, useState } from "react";
-import { Box, Text } from "ink";
+import React, { useCallback, useRef, useState } from "react";
+import { Box, Text, type DOMElement } from "ink";
 import clipboard from "clipboardy";
+import { useWheelTarget } from "#base/mouse/useMouseTarget";
+import type { Updater } from "#hooks/useFocusManager";
 import { MetadataResultState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
 import { CompiledMetadata, CompiledMetadataField } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { FIELDS, navigableFields } from "#flows/musicDownloadFlow/utils/metadataFields";
@@ -18,6 +20,10 @@ interface MetadataSourceDetailProps {
     width: number;
     height: number;
     onOverrideChange: (overrides: MetadataOverrides) => void;
+    /** A field row was clicked: focus the detail pane and move the field cursor there. Must be referentially stable. */
+    onSelectField: (index: number) => void;
+    /** Mouse-wheel: move the field cursor without moving keyboard focus. */
+    onScrollField: (index: Updater<number>) => void;
     onInnerFocusSwitch: () => void;
     setIsEditingField: (editing: boolean) => void;
 }
@@ -34,10 +40,16 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
     isActive,
     width,
     onOverrideChange,
+    onSelectField,
+    onScrollField,
     onInnerFocusSwitch,
     setIsEditingField,
 }) => {
     const theme = useTheme();
+    const panelRef = useRef<DOMElement>(null);
+    useWheelTarget(panelRef, (delta) =>
+        onScrollField((prev) => Math.max(0, Math.min(navigableFields.length - 1, prev + delta)))
+    );
     const [editingField, setEditingField] = useState<CompiledMetadataField | null>(null);
     const [editValue, setEditValue] = useState("");
     const [editError, setEditError] = useState(false);
@@ -178,7 +190,7 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
         : getPlatformBrightColor((source as MetadataResultState).metadata.apiProvider);
 
     return (
-        <Box flexDirection="column" width={width} flexGrow={1} overflow="hidden">
+        <Box ref={panelRef} flexDirection="column" width={width} flexGrow={1} overflow="hidden">
             <Box flexDirection="column" height={1} flexShrink={0} overflow="hidden">
                 <Box flexDirection="row">
                     <Text color={theme.text.secondary}>{borderLeft}</Text>
@@ -221,6 +233,8 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
                                     // rows keep stable props and stay memo-bailed while typing.
                                     editValue={isEditing ? editValue : ""}
                                     editError={isEditing ? editError : false}
+                                    navIndex={navigableFields.findIndex((f) => f.key === field.key)}
+                                    onSelect={onSelectField}
                                     onEditValueChange={setEditValue}
                                     onEditSubmit={handleEditSubmit}
                                 />

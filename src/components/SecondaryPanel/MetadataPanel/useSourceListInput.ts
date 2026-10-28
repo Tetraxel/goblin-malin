@@ -30,7 +30,7 @@ type FlatItem =
     | { kind: "group"; groupIndex: number }
     | { kind: "result"; groupIndex: number; resultIndex: number };
 
-function buildFlatOrder(sortedGroups: MetadataGroupState[]): FlatItem[] {
+export function buildFlatOrder(sortedGroups: MetadataGroupState[]): FlatItem[] {
     const items: FlatItem[] = [{ kind: "compiled" }];
     for (let gi = 0; gi < sortedGroups.length; gi++) {
         items.push({ kind: "group", groupIndex: gi });
@@ -42,13 +42,13 @@ function buildFlatOrder(sortedGroups: MetadataGroupState[]): FlatItem[] {
     return items;
 }
 
-function flatItemToCursor(item: FlatItem): CursorPosition {
+export function flatItemToCursor(item: FlatItem): CursorPosition {
     if (item.kind === "compiled") return { type: "compiled" };
     if (item.kind === "group") return { type: "group", groupIndex: item.groupIndex };
     return { type: "result", groupIndex: item.groupIndex, resultIndex: item.resultIndex };
 }
 
-function cursorToFlatIndex(cursor: CursorPosition, items: FlatItem[]): number {
+export function cursorToFlatIndex(cursor: CursorPosition, items: FlatItem[]): number {
     for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (cursor.type === "compiled" && item.kind === "compiled") return i;
@@ -62,6 +62,13 @@ function cursorToFlatIndex(cursor: CursorPosition, items: FlatItem[]): number {
             return i;
     }
     return 0;
+}
+
+/** The cursor `delta` rows away in the flat (compiled, group, results…) order, clamped to its ends. */
+export function stepCursor(cursor: CursorPosition, sortedGroups: MetadataGroupState[], delta: number): CursorPosition {
+    const items = buildFlatOrder(sortedGroups);
+    const index = Math.max(0, Math.min(items.length - 1, cursorToFlatIndex(cursor, items) + delta));
+    return flatItemToCursor(items[index]);
 }
 
 export function useSourceListInput({

@@ -15,6 +15,7 @@ import { DownloadSourceTree } from "./DownloadSourceTree/DownloadSourceTree";
 import { DownloadSourceDetail } from "./DownloadSourceDetail/DownloadSourceDetail";
 import { DynamicHintBar } from "#components/DynamicHintBar/DynamicHintBar";
 import { useShortcuts } from "#hooks/useShortcuts";
+import type { Updater } from "#hooks/useFocusManager";
 
 const HINT_BAR_HEIGHT = 2;
 
@@ -26,7 +27,7 @@ interface DownloadPanelProps {
 
 export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, width, height }) => {
     const theme = useTheme();
-    const { setSourcesInnerFocus } = useFocusActions();
+    const { setSourcesInnerFocus, focusSourcesPane } = useFocusActions();
     const { activeWindow, isEditingField } = useFocusChrome();
     const secondaryPanel = useFocusSecondaryPanel();
 
@@ -138,6 +139,18 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
         ],
     });
 
+    // Pointer handlers. A pending source-switch diff has to be confirmed or cancelled from the
+    // keyboard, so the mouse must not move the list underneath it.
+    function handleClickSource(idx: number) {
+        if (isDiffMode) return;
+        focusSourcesPane("list");
+        setSelectedSourceIndex(idx);
+    }
+
+    function handleScrollSource(next: Updater<number>) {
+        if (!isDiffMode) setSelectedSourceIndex(next);
+    }
+
     function handleRequestSelect(idx: number) {
         const hasSaved = downloadSources.some((s) => s.savedFile != null);
         const isAlreadySelected = downloadSources[idx]?.selected;
@@ -238,6 +251,8 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                     width={leftWidth}
                     height={listHeight}
                     onSelectSource={setSelectedSourceIndex}
+                    onClickSource={handleClickSource}
+                    onScrollSource={handleScrollSource}
                     onRequestSelect={handleRequestSelect}
                     onRejectSource={handleRejectSource}
                     onRetrySource={handleRetrySource}

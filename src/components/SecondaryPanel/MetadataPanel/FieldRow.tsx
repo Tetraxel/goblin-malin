@@ -1,6 +1,7 @@
-﻿import React from "react";
-import { Box, Text } from "ink";
+﻿import React, { useRef } from "react";
+import { Box, Text, type DOMElement } from "ink";
 import TextInput from "ink-text-input";
+import { useClickTarget } from "#base/mouse/useMouseTarget";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
 import { Theme } from "#base/theme";
@@ -40,6 +41,10 @@ export interface FieldRowProps {
     hasOverride: boolean;
     editValue: string;
     editError: boolean;
+    /** Index of this field among the navigable fields, or -1 if it can't take the cursor. */
+    navIndex: number;
+    /** Click handler — must be referentially stable so the memo holds. */
+    onSelect: (navIndex: number) => void;
     onEditValueChange: (value: string) => void;
     onEditSubmit: (value: string) => void;
 }
@@ -54,14 +59,21 @@ export const FieldRow = React.memo(function FieldRow({
     hasOverride,
     editValue,
     editError,
+    navIndex,
+    onSelect,
     onEditValueChange,
     onEditSubmit,
 }: FieldRowProps) {
     const theme = useTheme();
     const badge = attributionBadge(attribution, theme);
+    const rowRef = useRef<DOMElement>(null);
+    useClickTarget(rowRef, () => {
+        // A click inside the inline editor belongs to the input, not to field selection.
+        if (navIndex >= 0 && !isEditing) onSelect(navIndex);
+    });
 
     return (
-        <Box flexDirection="row" paddingX={1} flexShrink={0} flexGrow={1}>
+        <Box ref={rowRef} flexDirection="row" paddingX={1} flexShrink={0} flexGrow={1}>
             <Box width={2} minWidth={2} flexShrink={0}>
                 {isFocused && <Text color={theme.text.active}>{"☛"}</Text>}
             </Box>

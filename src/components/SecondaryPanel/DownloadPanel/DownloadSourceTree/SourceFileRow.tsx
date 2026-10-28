@@ -1,5 +1,6 @@
-﻿import React from "react";
-import { Box, Text } from "ink";
+﻿import React, { useRef } from "react";
+import { Box, Text, type DOMElement } from "ink";
+import { useClickTarget } from "#base/mouse/useMouseTarget";
 import { useTheme } from "#base/themeContext";
 import { TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 import { getProvenanceDisplay } from "#flows/musicDownloadFlow/utils/provenance";
@@ -12,10 +13,13 @@ interface SourceFileRowProps {
     isSelected: boolean;
     isActive: boolean;
     width: number;
+    onSelect: (sourceIndex: number) => void;
 }
 
-export function SourceFileRow({ source, sourceIndex, isSelected, isActive, width }: SourceFileRowProps) {
+export function SourceFileRow({ source, sourceIndex, isSelected, isActive, width, onSelect }: SourceFileRowProps) {
     const theme = useTheme();
+    const rowRef = useRef<DOMElement>(null);
+    useClickTarget(rowRef, () => onSelect(sourceIndex));
     const bg =
         isSelected && isActive
             ? theme.ui.rowBackground.regular.cellActive
@@ -42,6 +46,7 @@ export function SourceFileRow({ source, sourceIndex, isSelected, isActive, width
 
     return (
         <Box
+            ref={rowRef}
             flexDirection="row"
             width={width}
             minWidth={width}

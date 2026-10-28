@@ -1,9 +1,11 @@
-﻿import React from "react";
-import { Box, Text } from "ink";
+﻿import React, { useRef } from "react";
+import { Box, Text, type DOMElement } from "ink";
+import { useWheelTarget } from "#base/mouse/useMouseTarget";
 import { useTheme } from "#base/themeContext";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { TrackDownloadSource, DownloadProvider } from "#flows/musicDownloadFlow/types";
-import { getInstance } from "#utils/mpvPlayer";
+import type { Updater } from "#hooks/useFocusManager";
+import { togglePlayback } from "#utils/togglePlayback";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { ProviderHeader } from "./ProviderHeader";
 import { MetadataHeader } from "./MetadataHeader";
@@ -16,6 +18,10 @@ interface DownloadSourceTreeProps {
     width: number;
     height: number;
     onSelectSource: (index: number) => void;
+    /** A row was clicked: focus the list and select that source. */
+    onClickSource: (index: number) => void;
+    /** Mouse-wheel: move the selection without moving keyboard focus. */
+    onScrollSource: (index: Updater<number>) => void;
     onRequestSelect: (index: number) => void;
     onRejectSource: (index: number) => void;
     onRetrySource: (index: number) => void;
@@ -85,6 +91,8 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     width,
     height,
     onSelectSource,
+    onClickSource,
+    onScrollSource,
     onRequestSelect,
     onRejectSource,
     onRetrySource,
@@ -95,6 +103,15 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     const selectableIndices = treeItems
         .filter((item): item is Extract<TreeItem, { type: "file-row" }> => item.type === "file-row")
         .map((item) => item.sourceIndex);
+
+    const treeRef = useRef<DOMElement>(null);
+    useWheelTarget(treeRef, (delta) =>
+        onScrollSource((prev) => {
+            const pos = selectableIndices.indexOf(prev);
+            if (pos === -1) return selectableIndices[0] ?? prev;
+            return selectableIndices[Math.max(0, Math.min(selectableIndices.length - 1, pos + delta))];
+        })
+    );
 
     const selectedSource = sources[selectedSourceIndex];
     const canPlay = selectedSource?.localFile?.state === "found";
@@ -170,14 +187,7 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                     if (!canPlay) return;
                     const source = sources[selectedSourceIndex];
                     if (!source?.localFile?.path) return;
-                    const filePath = source.localFile.path;
-                    const player = getInstance();
-                    const status = player.getStatus();
-                    if (status.filePath === filePath && (status.isPlaying || status.isPaused)) {
-                        player.togglePause().catch(() => {});
-                    } else {
-                        player.play(filePath).catch(() => {});
-                    }
+                    togglePlayback(source.localFile.path);
                 },
             },
         ],
@@ -204,7 +214,15 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
 
     if (sources.length === 0) {
         return (
-            <Box flexDirection="column" width={width} height={height} overflow="hidden" paddingX={1} paddingY={1}>
+            <Box
+                ref={treeRef}
+                flexDirection="column"
+                width={width}
+                height={height}
+                overflow="hidden"
+                paddingX={1}
+                paddingY={1}
+            >
                 <Text color={theme.text.secondary} dimColor>
                     No download sources yet
                 </Text>
@@ -213,7 +231,7 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     }
 
     return (
-        <Box flexDirection="column" width={width} height={height} overflow="hidden">
+        <Box ref={treeRef} flexDirection="column" width={width} height={height} overflow="hidden">
             {treeItems.map((item, i) => {
                 if (item.type === "provider-header") {
                     const addMargin = treeItems.slice(0, i).some((t) => t.type === "provider-header");
@@ -234,6 +252,7 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                         isSelected={item.sourceIndex === selectedSourceIndex}
                         isActive={isActive}
                         width={width}
+                        onSelect={onClickSource}
                     />
                 );
             })}

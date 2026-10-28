@@ -2,7 +2,7 @@ import React from "react";
 import { Box, Text } from "ink";
 import stringWidth from "string-width";
 import { useTheme } from "#base/themeContext";
-import { useFocusChrome, useFocusSecondaryPanel } from "#contexts/FocusContext";
+import { useFocusActions, useFocusChrome, useFocusSecondaryPanel } from "#contexts/FocusContext";
 import { ToolbarButtonInvoker } from "./ToolbarButtonInvoker";
 import { TOOLBAR_BUTTONS } from "./toolbarButtons";
 import { Separator } from "../Separator";
@@ -110,6 +110,7 @@ export const Toolbar = ({ width, updateInfo }: { width: number; updateInfo?: Upd
 
 const PrimaryModeTabBar: React.FC<{ width: number; splitPos: number }> = ({ width, splitPos }) => {
     const { primaryMode } = useFocusSecondaryPanel();
+    const { setPrimaryMode } = useFocusActions();
 
     return (
         <TabBar
@@ -120,6 +121,7 @@ const PrimaryModeTabBar: React.FC<{ width: number; splitPos: number }> = ({ widt
             ]}
             activeTabKey={primaryMode === "metadata" ? "1" : "2"}
             splitPos={splitPos}
+            onSelect={(key) => setPrimaryMode(key === "1" ? "metadata" : "download")}
         />
     );
 };

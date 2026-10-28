@@ -1,6 +1,7 @@
-﻿import React from "react";
-import { Box, Text } from "ink";
+﻿import React, { useRef } from "react";
+import { Box, Text, type DOMElement } from "ink";
 import { useTheme } from "#base/themeContext";
+import { useTabBarMouse } from "./useTabBarMouse";
 
 export interface TabDef {
     key: string;
@@ -13,10 +14,18 @@ interface TabBarProps {
     activeTabKey: string;
     /** If provided, inserts a ┴ junction at this x position instead of a plain ├ */
     splitPos?: number;
+    /** Called with the tab's key when it is clicked. Tabs are not clickable without it. */
+    onSelect?: (key: string) => void;
 }
 
-export const TabBar: React.FC<TabBarProps> = ({ width, tabs, activeTabKey, splitPos }) => {
+export const TabBar: React.FC<TabBarProps> = ({ width, tabs, activeTabKey, splitPos, onSelect }) => {
     const theme = useTheme();
+    const tabRefs = useRef<(DOMElement | null)[]>([]);
+    useTabBarMouse(
+        tabRefs,
+        tabs.map((tab) => tab.key),
+        onSelect
+    );
     const tabsWidth =
         tabs.reduce((sum, tab) => sum + tab.key.length + tab.label.length + 3, 0) + Math.max(0, tabs.length - 1) * 2;
     const lineLen = splitPos !== undefined ? splitPos + 1 : 1;
@@ -36,10 +45,17 @@ export const TabBar: React.FC<TabBarProps> = ({ width, tabs, activeTabKey, split
                 return (
                     <React.Fragment key={tab.key}>
                         {i > 0 && <Text color={theme.ui.border}>{"  "}</Text>}
-                        <Text color={theme.text.primary} bold={isActive}>{`[${tab.key}] `}</Text>
-                        <Text color={isActive ? theme.action.primary : theme.ui.tabInactive} bold={isActive}>
-                            {tab.label}
-                        </Text>
+                        <Box
+                            flexShrink={0}
+                            ref={(node: DOMElement | null) => {
+                                tabRefs.current[i] = node;
+                            }}
+                        >
+                            <Text color={theme.text.primary} bold={isActive}>{`[${tab.key}] `}</Text>
+                            <Text color={isActive ? theme.action.primary : theme.ui.tabInactive} bold={isActive}>
+                                {tab.label}
+                            </Text>
+                        </Box>
                     </React.Fragment>
                 );
             })}
