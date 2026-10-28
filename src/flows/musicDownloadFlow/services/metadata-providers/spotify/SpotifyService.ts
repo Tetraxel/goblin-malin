@@ -4,6 +4,7 @@ import { ProviderSettingsSchema } from "#base/providerSettings";
 import { SetupWizardConfig } from "#base/setupWizard";
 import { ParsedUrl, CollectionExpansion } from "#base/urlParser";
 import { Task } from "#base/task/task";
+import { CollectionAccessError } from "#base/collectionAccessError";
 import { Cached } from "#utils/cache";
 import { Logger } from "#base/logger/logger";
 import { StatusType } from "#base/task/task-status";
@@ -282,6 +283,24 @@ export class SpotifyService extends MetadataService {
     }
 
     private static async expandPlaylist(client: SpotifyApi, id: string): Promise<CollectionExpansion> {
+        try {
+            return await SpotifyService.listPlaylist(client, id);
+        } catch (error) {
+            // The client-credentials login only sees public content: Spotify answers 404 (not 403)
+            // for a private playlist, and for its own editorial ones.
+            if (error instanceof Error && /\b404\b/.test(error.message)) {
+                throw new CollectionAccessError(
+                    "Spotify could not find this playlist (404). It may be private.",
+                    "Spotify returned \"not found\" for this playlist. This usually means it is private: " +
+                        "the app can only read public playlists. Make it public in Spotify " +
+                        "(playlist ⋯ menu → Make public), then refetch. Spotify-made playlists can also be unreadable."
+                );
+            }
+            throw error;
+        }
+    }
+
+    private static async listPlaylist(client: SpotifyApi, id: string): Promise<CollectionExpansion> {
         const playlist = await client.playlists.getPlaylist(id, undefined, "name,owner.display_name,tracks.total");
         const total = playlist.tracks.total;
 

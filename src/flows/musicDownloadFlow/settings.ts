@@ -32,6 +32,8 @@ export type MusicDownloadFlowSettings = {
         defaultLiveRefreshIntervalSeconds: number;
         /** Cap on tracks imported from one album/playlist expansion. */
         defaultMaxTracks: number;
+        /** Show a dialog explaining why an album/playlist can't be read (e.g. it is private). */
+        showAccessHints: boolean;
     };
 };
 
@@ -85,6 +87,7 @@ export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSetting
     collections: {
         defaultLiveRefreshIntervalSeconds: 120,
         defaultMaxTracks: 500,
+        showAccessHints: true,
     },
 };
 

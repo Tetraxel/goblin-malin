@@ -3,6 +3,9 @@ import { TaskScoped } from "#base/task/taskContext";
 import { TaskOrchestrator } from "#base/task/orchestrator";
 import { Logger } from "#base/logger/logger";
 import { StatusAttributes, StatusType } from "#base/task/task-status";
+import { CollectionAccessError } from "#base/collectionAccessError";
+import { collectionHintBridge } from "#base/bridges/collectionHintBridge";
+import { SettingsStore } from "#settings/settingsStore";
 import { SafeAction } from "#utils/decorators";
 import { throwIfAborted } from "#utils/errors";
 import { CollectionDownloadTask } from "../types";
@@ -11,6 +14,9 @@ import { getMusicSettings } from "../settings";
 import { metadataLimiter } from "./stageLimiters";
 import { buildTrackTask } from "./buildTrackTask";
 import { taskIdFromUrl } from "./taskId";
+
+// Tasks already warned this launch, so a live-refreshing playlist doesn't re-open the dialog every tick.
+const hintShownFor = new Set<string>();
 
 /**
  * Parent task for an album/playlist URL. Doesn't fetch track metadata itself —
@@ -77,6 +83,7 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
             const message = error instanceof Error ? error.message : String(error);
             this.updateAttributes({ state: "failed", error: message });
             this.status.set({ type: StatusType.Error, message: "Failed to fetch track list" });
+            this.showAccessHint(error);
             throw error;
         }
     }
@@ -114,8 +121,22 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
             const message = error instanceof Error ? error.message : String(error);
             this.updateAttributes({ error: message });
             this.status.set({ type: StatusType.Error, message: "Refetch failed" });
+            this.showAccessHint(error);
             throw error;
         }
+    }
+
+    /** Explain a CollectionAccessError in a dialog — once per task per launch, unless muted in settings. */
+    private showAccessHint(error: unknown): void {
+        if (!(error instanceof CollectionAccessError)) return;
+        if (!getMusicSettings().collections.showAccessHints || hintShownFor.has(this.getId())) return;
+        hintShownFor.add(this.getId());
+        collectionHintBridge.request({
+            label: this.getLogLabel() ?? "Playlist",
+            hint: error.hint,
+            muteForever: () =>
+                SettingsStore.getInstance().patchMusicSettings({ collections: { showAccessHints: false } }),
+        });
     }
 
     toggleCollapsed(): void {
