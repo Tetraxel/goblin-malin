@@ -26,6 +26,8 @@ export interface Theme {
                 highlighted: string;
                 activeDimmed: string;
                 cellActive: string;
+                /** Pointer is over a toolbar button or the playback bar and it isn't selected. */
+                hover: string;
             };
             multiSelected: {
                 base: string;
@@ -39,6 +41,8 @@ export interface Theme {
         selection: string;
         tabActive: string;
         tabInactive: string;
+        /** Label color of a tab under the pointer. */
+        tabHover: string;
         panelTitle: string;
         progressFill: string;
         progressEmpty: string;

@@ -21,7 +21,7 @@ interface TabBarProps {
 export const TabBar: React.FC<TabBarProps> = ({ width, tabs, activeTabKey, splitPos, onSelect }) => {
     const theme = useTheme();
     const tabRefs = useRef<(DOMElement | null)[]>([]);
-    useTabBarMouse(
+    const hoveredKey = useTabBarMouse(
         tabRefs,
         tabs.map((tab) => tab.key),
         onSelect
@@ -42,6 +42,7 @@ export const TabBar: React.FC<TabBarProps> = ({ width, tabs, activeTabKey, split
             <Text color={theme.ui.border}>{"  "}</Text>
             {tabs.map((tab, i) => {
                 const isActive = tab.key === activeTabKey;
+                const isHovered = tab.key === hoveredKey;
                 return (
                     <React.Fragment key={tab.key}>
                         {i > 0 && <Text color={theme.ui.border}>{"  "}</Text>}
@@ -52,7 +53,11 @@ export const TabBar: React.FC<TabBarProps> = ({ width, tabs, activeTabKey, split
                             }}
                         >
                             <Text color={theme.text.primary} bold={isActive}>{`[${tab.key}] `}</Text>
-                            <Text color={isActive ? theme.action.primary : theme.ui.tabInactive} bold={isActive}>
+                            <Text
+                                color={isActive ? theme.action.primary : isHovered ? theme.ui.tabHover : theme.ui.tabInactive}
+                                bold={isActive}
+                                underline={isHovered}
+                            >
                                 {tab.label}
                             </Text>
                         </Box>

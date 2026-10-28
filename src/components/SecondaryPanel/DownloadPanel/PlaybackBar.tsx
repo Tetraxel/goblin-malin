@@ -1,7 +1,7 @@
 ﻿import React, { useRef } from "react";
 import { Box, Text, type DOMElement } from "ink";
 import { getScreenBounds } from "#base/mouse/screenBounds";
-import { useClickTarget } from "#base/mouse/useMouseTarget";
+import { useClickTarget, useHoverTarget } from "#base/mouse/useMouseTarget";
 import { useTheme } from "#base/themeContext";
 import { formatDuration } from "../utils";
 
@@ -52,6 +52,7 @@ export function PlaybackBar({
             onToggle?.();
         }
     });
+    const isHovered = useHoverTarget(barRef);
     const ratio = active && durationMs > 0 ? Math.min(1, positionMs / durationMs) : 0;
     const filled = Math.floor(ratio * barW);
     const bar = "█".repeat(filled) + "░".repeat(barW - filled);
@@ -66,7 +67,13 @@ export function PlaybackBar({
             overflow="hidden"
             marginBottom={1}
             marginX={1}
-            backgroundColor={isFocused ? theme.ui.rowBackground.regular.cellActive : theme.ui.background}
+            backgroundColor={
+                isFocused
+                    ? theme.ui.rowBackground.regular.cellActive
+                    : isHovered
+                      ? theme.ui.rowBackground.regular.hover
+                      : theme.ui.background
+            }
         >
             <Box flexDirection="row" flexGrow={1} overflow="hidden">
                 <Text color={isPlaying ? theme.ui.progressFill : theme.text.secondary} dimColor={dim}>

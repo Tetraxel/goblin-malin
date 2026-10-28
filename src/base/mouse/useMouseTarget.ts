@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import type { DOMElement } from "ink";
 import { isMouseInputActive } from "./clickableWindows";
 import { mouseRegistry, type MouseEvent } from "./mouse";
@@ -29,6 +29,23 @@ export function useClickTarget(ref: RefObject<DOMElement | null>, onClick: (even
             latest.current(event);
         });
     }, [ref]);
+}
+
+/**
+ * Whether the pointer is over the element. Re-renders only the calling component, and only
+ * when the answer changes. Wheeling doesn't re-evaluate it, so it can lag until the next move.
+ */
+export function useHoverTarget(ref: RefObject<DOMElement | null>): boolean {
+    const [hovered, setHovered] = useState(false);
+
+    useEffect(() => {
+        return mouseRegistry.subscribe((event) => {
+            if (event.type !== "move") return;
+            setHovered(isMouseInputActive() && isInside(event, ref.current));
+        });
+    }, [ref]);
+
+    return hovered;
 }
 
 /**
