@@ -62,6 +62,7 @@ export class YoutubeService extends MetadataService {
 
             this.logger.info("Song data retrieved", { videoId: song.videoId, name: song.name });
             this.status.update({ progress: 100 });
+            this.status.clear();
 
             return song;
         } catch (error) {
@@ -95,6 +96,7 @@ export class YoutubeService extends MetadataService {
 
             this.logger.info("Video data retrieved", { videoId: video.videoId, name: video.name });
             this.status.update({ progress: 100 });
+            this.status.clear();
 
             return video;
         } catch (error) {
@@ -128,6 +130,7 @@ export class YoutubeService extends MetadataService {
 
             this.logger.info("Artist data retrieved", { artistId: artist.artistId, name: artist.name });
             this.status.update({ progress: 100 });
+            this.status.clear();
 
             return artist;
         } catch (error) {
@@ -161,6 +164,7 @@ export class YoutubeService extends MetadataService {
 
             this.logger.info("Album data retrieved", { albumId: album.albumId, name: album.name });
             this.status.update({ progress: 100 });
+            this.status.clear();
 
             return album;
         } catch (error) {
