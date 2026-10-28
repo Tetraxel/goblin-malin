@@ -58,6 +58,11 @@ export interface FocusState {
         selectedTaskIndex: number;
         selectedColumnIndex: number;
         selectedTaskIds: Set<string>;
+        /**
+         * Where a Ctrl+Shift range selection started, and what was selected before it — so the
+         * range can grow and shrink around the anchor without losing earlier Ctrl+click picks.
+         */
+        selectionAnchor: { index: number; base: Set<string> } | null;
         width: number;
         isHeaderFocused: boolean;
     };
@@ -137,6 +142,7 @@ export const useFocusManager = ({
             selectedTaskIndex: 0,
             selectedColumnIndex: 2,
             selectedTaskIds: new Set<string>(),
+            selectionAnchor: null,
             width: terminalWidth,
             isHeaderFocused: false,
         },
@@ -292,7 +298,12 @@ export const useFocusManager = ({
 
     const moveTaskSelection = useCallback(
         (direction: "up" | "down" | "left" | "right") => {
-            setFocusState((prev) => {
+            setFocusState((prevState) => {
+                // A plain move ends any range selection in progress.
+                const prev =
+                    prevState.taskList.selectionAnchor === null
+                        ? prevState
+                        : { ...prevState, taskList: { ...prevState.taskList, selectionAnchor: null } };
                 if (direction === "up" || direction === "down") {
                     if (direction === "up") {
                         // Up from the header goes on to the toolbar (the mirror of Down from it).
@@ -348,6 +359,7 @@ export const useFocusManager = ({
                     activeWindow: "taskList",
                     taskList: {
                         ...prev.taskList,
+                        selectionAnchor: null,
                         isHeaderFocused: row === "header",
                         selectedTaskIndex:
                             row === "header"
@@ -388,23 +400,58 @@ export const useFocusManager = ({
             } else {
                 newSet.add(taskId);
             }
-            return { ...prev, taskList: { ...prev.taskList, selectedTaskIds: newSet } };
+            return { ...prev, taskList: { ...prev.taskList, selectedTaskIds: newSet, selectionAnchor: null } };
         });
     }, []);
+
+    /**
+     * Ctrl+Shift range selection: selects every task between the anchor (where the range began —
+     * the cursor at the first press) and `target`, on top of whatever was selected before. The
+     * cursor follows the target. `target` is a row index (click) or a one-row step (keyboard).
+     */
+    const selectTaskRange = useCallback(
+        (target: number | "up" | "down", taskIds: string[], column?: number) => {
+            setFocusState((prev) => {
+                if (taskIds.length === 0) return prev;
+                const { selectedTaskIndex, selectedTaskIds } = prev.taskList;
+                const anchor = prev.taskList.selectionAnchor ?? { index: selectedTaskIndex, base: selectedTaskIds };
+                const toIndex = typeof target === "number" ? target : selectedTaskIndex + (target === "up" ? -1 : 1);
+                const to = Math.max(0, Math.min(taskIds.length - 1, toIndex));
+                const ids = new Set(anchor.base);
+                for (let i = Math.min(anchor.index, to); i <= Math.max(anchor.index, to); i++) ids.add(taskIds[i]);
+                return {
+                    ...prev,
+                    activeWindow: "taskList",
+                    taskList: {
+                        ...prev.taskList,
+                        isHeaderFocused: false,
+                        selectedTaskIndex: to,
+                        selectedColumnIndex:
+                            column === undefined
+                                ? prev.taskList.selectedColumnIndex
+                                : Math.max(0, Math.min(taskColumnCount - 1, column)),
+                        selectedTaskIds: ids,
+                        selectionAnchor: anchor,
+                    },
+                };
+            });
+        },
+        [taskColumnCount]
+    );
 
     const selectAllTasks = useCallback((taskIds: string[]) => {
         setFocusState((prev) => {
             const currentIds = prev.taskList.selectedTaskIds;
             const allSelected = taskIds.length > 0 && taskIds.every((id) => currentIds.has(id));
             const newSet = allSelected ? new Set<string>() : new Set(taskIds);
-            return { ...prev, taskList: { ...prev.taskList, selectedTaskIds: newSet } };
+            return { ...prev, taskList: { ...prev.taskList, selectedTaskIds: newSet, selectionAnchor: null } };
         });
     }, []);
 
     const clearSelection = useCallback(() => {
         setFocusState((prev) => ({
             ...prev,
-            taskList: { ...prev.taskList, selectedTaskIds: new Set<string>() },
+            taskList: { ...prev.taskList, selectedTaskIds: new Set<string>(), selectionAnchor: null },
         }));
     }, []);
 
@@ -449,7 +496,9 @@ export const useFocusManager = ({
                 sourcesPanel: {
                     ...prev.secondaryPanel.sourcesPanel,
                     selectedFieldIndex:
-                        typeof index === "function" ? index(prev.secondaryPanel.sourcesPanel.selectedFieldIndex) : index,
+                        typeof index === "function"
+                            ? index(prev.secondaryPanel.sourcesPanel.selectedFieldIndex)
+                            : index,
                 },
             },
         }));
@@ -532,6 +581,7 @@ export const useFocusManager = ({
         focusTaskListCell,
         scrollTaskList,
         toggleTaskSelection,
+        selectTaskRange,
         selectAllTasks,
         clearSelection,
         setCursor,

@@ -37,6 +37,8 @@ export const ActionBar: React.FC<{
                   taskIndex: selectedIndex,
                   taskCount: tasks.length,
                   selectedCount: multiCount > 1 ? multiCount : undefined,
+                  selectedTasks:
+                      multiCount > 1 ? tasks.filter((t) => taskList.selectedTaskIds.has(t.getId())) : undefined,
               })
             : null;
 
