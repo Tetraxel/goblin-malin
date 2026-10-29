@@ -23,6 +23,13 @@ export type ToolbarButtonHook = ({ isSelected }: { isSelected: boolean }) => {
     onPress?: () => void;
 };
 
+/**
+ * Terminal cell where the 😉 logo is drawn: the row below the top separator, after the
+ * left border and `paddingX`. The welcome intro shrinks its mascot onto it when closing,
+ * so keep this in sync with the layout below.
+ */
+export const TOOLBAR_LOGO_CELL = { x: 2, y: 1 } as const;
+
 export const Toolbar = ({ width, updateInfo }: { width: number; updateInfo?: UpdateInfo | null }) => {
     const theme = useTheme();
     const { activeWindow, toolbar } = useFocusChrome();
