@@ -19,7 +19,8 @@
             "regular": {
                 "highlighted": "#1a1a1a",
                 "activeDimmed": "#252525",
-                "cellActive": "#363636"
+                "cellActive": "#363636",
+                "hover": "#1c2733"
             },
             "multiSelected": {
                 "base": "#152222",
@@ -33,6 +34,7 @@
         "selection": "#58a6ff",
         "tabActive": "#58a6ff",
         "tabInactive": "#8b949e",
+        "tabHover": "#79c0ff",
         "panelTitle": "#e6edf3",
         "progressFill": "#56d364",
         "progressEmpty": "#484f58",

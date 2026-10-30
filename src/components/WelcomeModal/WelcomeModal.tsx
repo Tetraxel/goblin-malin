@@ -1,28 +1,25 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Text } from "ink";
 import { useShortcuts } from "#hooks/useShortcuts";
-import Gradient from "ink-gradient";
-import BigText from "ink-big-text";
+import { useShortcutLiteral } from "#hooks/useShortcutLiteral";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { SettingsStore } from "#settings/settingsStore";
 import { useTheme } from "#base/themeContext";
 import { Hint } from "../Hint";
-import { WithBackground } from "../WithBackground";
+import { TOOLBAR_LOGO_CELL } from "../Toolbar/Toolbar";
+import { IntroOutro, renderIntroCanvas, T } from "./intro/introScene";
+import { toRGB } from "./intro/ui";
 
-const STEPS = [
-    "Paste a track link from Spotify or YouTube",
-    "Metadata is fetched from the source platform",
-    "The track is searched across other platforms",
-    "Download providers pick the best match and download it",
-    "Review the file and choose where to save it",
-];
+// The intro needs fluid motion, so it runs its own ~30fps clock instead of the shared
+// 125ms useGlobalTicker (which is tuned for spinners). It only ticks while visible.
+const FRAME_MS = 33;
+// Pose shown when animations are disabled: the face fully revealed, eyes open.
+const STATIC_TIME = T.IDLE + 2;
+// Closing: the content fades out while the mascot shrinks onto the toolbar's 😉.
+const OUTRO_S = 1.2;
+const FOOTER_ROWS = 2;
 
-const SHORTCUTS: [string, string][] = [
-    ["TAB", "Cycle between panels"],
-    ["1–9", "Jump to a tab"],
-    ["CTRL+V", "Paste a track URL"],
-    ["R", "Run the selected task"],
-];
+const BLACK = "#000000";
 
 interface WelcomeModalProps {
     terminalHeight: number;
@@ -35,6 +32,9 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ terminalHeight, term
     const { activeWindow } = useFocusChrome();
     const isActive = activeWindow === "welcomeModal";
     const [dontShowAgain, setDontShowAgain] = useState(false);
+    const [time, setTime] = useState(0);
+    // Intro time at which closing started, or null while the intro plays.
+    const [closingAt, setClosingAt] = useState<number | null>(null);
 
     useEffect(() => {
         const settings = SettingsStore.getInstance().getAppSettings();
@@ -43,7 +43,16 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ terminalHeight, term
         }
     }, [switchWindow]);
 
-    const handleClose = useCallback(() => {
+    const animationsEnabled = SettingsStore.getInstance().getAppSettings().general.animationsEnabled;
+    useEffect(() => {
+        if (!isActive || !animationsEnabled) return;
+        const start = performance.now();
+        const timer = setInterval(() => setTime((performance.now() - start) / 1000), FRAME_MS);
+        return () => clearInterval(timer);
+    }, [isActive, animationsEnabled]);
+    const frameTime = animationsEnabled ? time : STATIC_TIME;
+
+    const finishClose = useCallback(() => {
         if (dontShowAgain) {
             const store = SettingsStore.getInstance();
             const current = store.getAppSettings();
@@ -52,8 +61,22 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ terminalHeight, term
                 general: { ...current.general, showWelcomeTutorial: false },
             });
         }
+        setClosingAt(null);
         switchBack();
     }, [dontShowAgain, switchBack]);
+
+    // First press plays the outro; a second press (or no animations) closes right away.
+    const handleClose = useCallback(() => {
+        if (!animationsEnabled || closingAt !== null) finishClose();
+        else setClosingAt(time);
+    }, [animationsEnabled, closingAt, time, finishClose]);
+
+    const outroK = closingAt === null ? null : Math.min(1, (time - closingAt) / OUTRO_S);
+    useEffect(() => {
+        if (closingAt === null) return;
+        const timer = setTimeout(finishClose, OUTRO_S * 1000);
+        return () => clearTimeout(timer);
+    }, [closingAt, finishClose]);
 
     useShortcuts({
         id: "welcomeModal",
@@ -76,90 +99,91 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ terminalHeight, term
         ],
     });
 
-    if (!isActive) return null;
+    // Keys shown inside the animation follow the live bindings, so remaps show up too.
+    const importLiteral = useShortcutLiteral("global.import");
+    const closeLiteral = useShortcutLiteral("welcomeModal.close");
+    const tourOptions = useMemo(
+        () => ({ importKeys: importLiteral.split("+"), closeKey: closeLiteral }),
+        [importLiteral, closeLiteral]
+    );
 
-    const modalWidth = Math.min(120, terminalWidth - 8);
-    const hasSmallScreen = terminalWidth < 120;
+    const canvasRows = Math.max(1, terminalHeight - FOOTER_ROWS);
+    const outro: IntroOutro | undefined = useMemo(
+        () =>
+            outroK === null
+                ? undefined
+                : {
+                      k: outroK,
+                      x: TOOLBAR_LOGO_CELL.x,
+                      y: TOOLBAR_LOGO_CELL.y,
+                      background: toRGB(theme.ui.background, [0, 0, 0]),
+                      extraRows: FOOTER_ROWS,
+                  },
+        [outroK, theme.ui.background]
+    );
+
+    const canvas = useMemo(
+        () => (isActive ? renderIntroCanvas(frameTime, terminalWidth, canvasRows, tourOptions, outro) : null),
+        [isActive, frameTime, terminalWidth, canvasRows, tourOptions, outro]
+    );
+
+    if (!isActive || !canvas) return null;
+
+    // Closing: only the opaque runs of each row are written, so the app shows through the
+    // outro's growing hole. No background colours here — they'd paint over the app.
+    if (outro) {
+        return (
+            <Box position="absolute" width={terminalWidth} height={terminalHeight} flexDirection="column">
+                {canvas.toSegments().map((segments, y) => (
+                    <Box key={y} flexDirection="row" height={1} flexShrink={0}>
+                        {segments.map((seg, i) => (
+                            <Box
+                                key={seg.x}
+                                flexShrink={0}
+                                width={seg.width}
+                                marginLeft={seg.x - (i === 0 ? 0 : segments[i - 1].x + segments[i - 1].width)}
+                            >
+                                <Text wrap="truncate">{seg.text}</Text>
+                            </Box>
+                        ))}
+                    </Box>
+                ))}
+            </Box>
+        );
+    }
 
     return (
         <Box
             position="absolute"
-            width="100%"
+            width={terminalWidth}
             height={terminalHeight}
             flexDirection="column"
-            justifyContent="center"
-            alignItems="center"
+            backgroundColor={BLACK}
         >
+            <Box flexDirection="column" flexShrink={0} height={canvasRows} overflow="hidden">
+                {canvas.toRows().map((row, i) => (
+                    <Text key={i} wrap="truncate">
+                        {row}
+                    </Text>
+                ))}
+            </Box>
+
             <Box
-                flexDirection="column"
-                borderStyle="round"
-                borderColor={theme.ui.modalBorder}
-                borderBackgroundColor={theme.ui.background}
-                paddingX={2}
-                paddingY={1}
+                flexDirection="row"
                 flexShrink={0}
-                width={modalWidth}
-                backgroundColor={theme.ui.background}
+                height={FOOTER_ROWS}
+                alignItems="center"
+                justifyContent="space-between"
+                paddingX={2}
+                backgroundColor={BLACK}
             >
-                <Box flexDirection="row" flexShrink={0} backgroundColor={theme.ui.background}>
-                    <Text bold color={theme.ui.modalBorder}>
-                        {"Welcome to "}
-                    </Text>
-
-                    <WithBackground color={theme.ui.background}>
-                        <Gradient name="rainbow">
-                            <Text bold>Goblin Malin 😉</Text>
-                        </Gradient>
-                    </WithBackground>
-                </Box>
-                {/* {!hasSmallScreen && (
-                    <Box overflow="hidden" flexShrink={0}>
-                        <WithBackground color={theme.ui.background}>
-                            <Gradient name="rainbow">
-                                <BigText text="Goblin Malin" />
-                            </Gradient>
-                        </WithBackground>
-                    </Box>
-                )} */}
-
-                <Box flexDirection="column" flexShrink={0}>
-                    <Text>Paste a Spotify or YouTube link — Goblin Malin handles the rest.</Text>
-                    <Text dimColor>{"Here's how it works:"}</Text>
-                </Box>
-
-                <Box flexDirection="column" marginTop={1} flexShrink={0}>
-                    {STEPS.map((step, i) => (
-                        <Box key={i} flexDirection="row">
-                            <Text color={theme.text.muted}>{`  ${i + 1}. `}</Text>
-                            <Text>{step}</Text>
-                        </Box>
-                    ))}
-                </Box>
-
-                <Box flexDirection="column" marginTop={1} flexShrink={0}>
-                    <Text bold color={theme.text.secondary}>
-                        Useful shortcuts:
-                    </Text>
-                    {SHORTCUTS.map(([shortcut, desc]) => (
-                        <Box key={shortcut} flexDirection="row" flexShrink={0}>
-                            <Box width={12} minWidth={12} flexShrink={0}>
-                                <Text bold color={theme.text.active}>
-                                    {`  [${shortcut}]`}
-                                </Text>
-                            </Box>
-                            <Text dimColor>{desc}</Text>
-                        </Box>
-                    ))}
-                </Box>
-
-                <Box marginTop={1} flexDirection="row" alignItems="center" flexShrink={0}>
+                <Box flexDirection="row" flexShrink={0}>
                     <Text color={dontShowAgain ? theme.text.active : theme.text.muted}>
                         {dontShowAgain ? "[x]" : "[ ]"}
                     </Text>
                     <Text dimColor>{" Don't show this again"}</Text>
                 </Box>
-
-                <Box marginTop={1} flexDirection="row" flexShrink={0}>
+                <Box flexDirection="row" flexShrink={0}>
                     <Hint label="Toggle" shortcutId="welcomeModal.toggle" />
                     <Hint label="Close" shortcutId="welcomeModal.close" />
                 </Box>

@@ -58,7 +58,7 @@ export function useToolbarShortcuts(): void {
 // ── Task list ─────────────────────────────────────────────────────────────────
 
 export function useTaskListShortcuts(tasks: Task[], columns: ColumnDefinition<MusicDownloadTaskAttributes>[]): void {
-    const { moveTaskSelection, resizePanels, selectAllTasks, clearSelection } = useFocusActions();
+    const { moveTaskSelection, resizePanels, selectAllTasks, clearSelection, selectTaskRange } = useFocusActions();
     const { activeWindow } = useFocusChrome();
     const taskList = useFocusTaskList();
     const isActive = activeWindow === "taskList";
@@ -74,6 +74,7 @@ export function useTaskListShortcuts(tasks: Task[], columns: ColumnDefinition<Mu
         const bar = buildContextualActionBar(selectedTask as unknown as DownloadTask | CollectionTask, {
             columns,
             columnIndex: taskList.selectedColumnIndex,
+            selectedTasks: multiCount > 1 ? tasks.filter((t) => taskList.selectedTaskIds.has(t.getId())) : undefined,
         });
         if (!bar) return [];
 
@@ -149,6 +150,26 @@ export function useTaskListShortcuts(tasks: Task[], columns: ColumnDefinition<Mu
                 handler: () => moveTaskSelection("right"),
             },
             {
+                id: "taskList.extendSelectionUp",
+                defaultShortcut: { key: "upArrow", ctrl: true, shift: true },
+                label: "Select range up",
+                handler: () =>
+                    selectTaskRange(
+                        "up",
+                        tasks.map((t) => t.getId())
+                    ),
+            },
+            {
+                id: "taskList.extendSelectionDown",
+                defaultShortcut: { key: "downArrow", ctrl: true, shift: true },
+                label: "Select range down",
+                handler: () =>
+                    selectTaskRange(
+                        "down",
+                        tasks.map((t) => t.getId())
+                    ),
+            },
+            {
                 id: "taskList.selectAll",
                 defaultShortcut: { input: "a", ctrl: true },
                 label: "Select all",
@@ -165,7 +186,9 @@ export function useTaskListShortcuts(tasks: Task[], columns: ColumnDefinition<Mu
                 defaultShortcut: { input: " " },
                 label: "Play",
                 handler: () => {
-                    const filePath = firstPlayableFilePath(selectedTask?.getAttributes() as MusicDownloadTaskAttributes | undefined);
+                    const filePath = firstPlayableFilePath(
+                        selectedTask?.getAttributes() as MusicDownloadTaskAttributes | undefined
+                    );
                     if (!filePath) return;
                     const player = getInstance();
                     const status = player.getStatus();

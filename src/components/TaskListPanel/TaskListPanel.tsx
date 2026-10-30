@@ -12,6 +12,7 @@ import { useNowPlaying } from "#hooks/useNowPlaying";
 import { findPlayingTaskId } from "#flows/musicDownloadFlow/utils/playingTask";
 import { useTaskHeaderShortcuts } from "#hooks/useKeyHandlers";
 import { saveColumnRatios } from "#flows/musicDownloadFlow/taskColumns";
+import { CollectionTask } from "#flows/musicDownloadFlow/utils/collectionTask";
 
 export type { Shortcut, ContextualActions, ContextualActionBar };
 
@@ -314,6 +315,13 @@ export const TaskListPanel: React.FC<{
         offset,
         visibleRows: height,
         tasks,
+        onCellClick: (task, column, xInCell) => {
+            // Clicking a collection's "▾ [PLAYLIST]" tag (cell padding 1 + arrow + gap + tag) folds/unfolds it.
+            if (columns[column]?.id !== "url" || !(task instanceof CollectionTask)) return;
+            const kind = task.getAttributes()?.collectionKind;
+            const tagWidth = (kind === "album" ? "[ALBUM]" : "[PLAYLIST]").length;
+            if (xInCell < 1 + 1 + 1 + tagWidth) task.toggleCollapsed();
+        },
     });
 
     return (

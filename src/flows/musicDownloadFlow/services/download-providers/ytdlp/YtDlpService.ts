@@ -1,6 +1,7 @@
 ﻿import fs from "fs";
 import path from "path";
 import { FormatOptions, QualityOptions, YtDlp } from "ytdlp-nodejs";
+import stripAnsi from "strip-ansi";
 import { DownloadService, DownloadUpdateCallback } from "../../../downloadService";
 import { ProviderDisplay } from "#base/providerDisplay";
 import { ProviderSettingsSchema } from "#base/providerSettings";
@@ -9,7 +10,14 @@ import { Logger } from "#base/logger/logger";
 import { getBinDir } from "#utils/appPaths";
 import { makeAbortError } from "#utils/errors";
 import { ensureFfmpeg } from "#utils/ffmpeg-setup";
-import { APIProvider, TrackMetadata, TrackDownloadSource, LocalFile, FileInfo } from "#flows/musicDownloadFlow/types";
+import {
+    APIProvider,
+    TrackMetadata,
+    TrackDownloadSource,
+    DownloadProgressInfo,
+    LocalFile,
+    FileInfo,
+} from "#flows/musicDownloadFlow/types";
 import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { readFileInfo } from "#flows/musicDownloadFlow/utils/readFileInfo";
 import { ensureYtDlpSetup } from "./ytdlp-setup";
@@ -79,6 +87,7 @@ export class YtDlpService extends DownloadService {
         const reportAbort = () => rowAbortController.abort();
 
         // In-progress source emitted right away so the UI shows the download before it completes.
+        const startedAt = Date.now();
         const pendingSource: TrackDownloadSource = {
             state: "downloading",
             provider: "ytdlp",
@@ -86,11 +95,30 @@ export class YtDlpService extends DownloadService {
             downloadedAt: new Date(),
             selected: false,
             progress: 0,
+            progressInfo: { startedAt },
         };
         onUpdate?.(pendingSource, { abort: reportAbort });
 
+        // What the detail panel shows under the progress bar: live stats plus this service's own
+        // output (plain lines - the Logs tab has the prefixed version of the same messages).
+        const MAX_LOG_LINES = 100;
+        const log: string[] = [];
+        let stats: Omit<DownloadProgressInfo, "startedAt" | "log"> = {};
+        let percent = 0;
+        const publish = (state: "downloading" | "failed" = "downloading") =>
+            onUpdate?.(
+                { ...pendingSource, state, progress: percent, progressInfo: { startedAt, ...stats, log: [...log] } },
+                state === "downloading" ? { abort: reportAbort } : undefined
+            );
+        const note = (line: string, level: "info" | "debug" | "warn" = "info") => {
+            this.logger[level](line);
+            log.push(line);
+            if (log.length > MAX_LOG_LINES) log.shift();
+            publish();
+        };
+
         try {
-            this.logger.info(`Downloading track from ${trackMetadata.apiProvider}: ${trackMetadata.trackName}`);
+            note(`Downloading track from ${trackMetadata.apiProvider}: ${trackMetadata.trackName}`);
             this.status.set({
                 type: StatusType.Processing,
                 message: `Downloading ${trackMetadata.trackName}`,
@@ -118,7 +146,7 @@ export class YtDlpService extends DownloadService {
             // Check if file already exists
             let localFile: LocalFile;
             if (existingPath) {
-                this.logger.info(`File already exists, skipping download: ${path.basename(fullPath)}`);
+                note(`File already exists, skipping download: ${path.basename(fullPath)}`);
                 localFile = {
                     state: "found",
                     path: fullPath,
@@ -144,29 +172,68 @@ export class YtDlpService extends DownloadService {
 
                 // Add cookies if the file exists
                 if (fs.existsSync(cookiesPath)) {
-                    this.logger.debug(`Using cookies from ${cookiesPath}`);
+                    note(`Using cookies from ${cookiesPath}`, "debug");
                     downloadOptions.cookies = cookiesPath;
                 } else {
-                    this.logger.warn("No cookies file found, proceeding without cookies");
+                    note("No cookies file found, proceeding without cookies", "warn");
                 }
 
                 // Use the builder API so we can kill the process on abort
                 const client = await this.getClient();
                 // yt-dlp emits a progress event per stdout line (many per second). The
                 // UI only ever shows whole-percent progress, so quantize to integer and
-                // ignore ticks that don't change it — that collapses status updates,
+                // ignore ticks that don't change it - that collapses status updates,
                 // attribute writes and debug logs from ~10/s to at most one per percent.
+                // A slow trickle (percent unchanged) still refreshes the stats twice a second.
                 let lastPercent = -1;
+                let lastPublish = 0;
                 const dl = client.download(trackUrl, downloadOptions).on("progress", (progress) => {
-                    const percent = Math.floor(progress.percentage ?? 0);
-                    if (percent === lastPercent) return;
-                    lastPercent = percent;
-                    this.status.update({ progress: percent });
-                    onUpdate?.({ ...pendingSource, progress: percent }, { abort: reportAbort });
-                    this.logger.debug(
-                        `Download progress: ${percent}% ${progress.speed_str} (ETA: ${progress.eta_str})`
-                    );
+                    percent = Math.floor(progress.percentage ?? 0);
+                    const now = Date.now();
+                    if (percent === lastPercent && now - lastPublish < 500) return;
+                    stats = {
+                        downloadedBytes: progress.downloaded,
+                        totalBytes: progress.total,
+                        speedBytesPerSec: progress.speed,
+                        etaSeconds: progress.eta,
+                    };
+                    lastPublish = now;
+                    if (percent !== lastPercent) {
+                        lastPercent = percent;
+                        this.status.update({ progress: percent });
+                        this.logger.debug(
+                            `Download progress: ${percent}% ${progress.speed_str} (ETA: ${progress.eta_str})`
+                        );
+                    }
+                    publish();
                 });
+
+                // yt-dlp's own messages ("[ExtractAudio] Destination: ..."). Chunks can split lines, and
+                // the progress / before-download templates are machine output: a marker line opens a JSON
+                // object that yt-dlp may pretty-print over many lines, so skip until its braces balance.
+                // One forwarder per stream, since each keeps its own partial line.
+                const makeLineForwarder = () => {
+                    let pending = "";
+                    let skipDepth = 0;
+                    const braceDelta = (text: string) => text.split("{").length - text.split("}").length;
+                    return (chunk: string) => {
+                        const lines = (pending + chunk).split(/\r?\n/);
+                        pending = lines.pop() ?? "";
+                        for (const raw of lines) {
+                            const line = stripAnsi(raw).trim();
+                            if (skipDepth > 0) {
+                                skipDepth = Math.max(0, skipDepth + braceDelta(line));
+                                continue;
+                            }
+                            if (line.includes("~ytdlp-progress-") || line.startsWith("__YTDLP_BEFORE_DL__:")) {
+                                skipDepth = Math.max(0, braceDelta(line));
+                                continue;
+                            }
+                            if (line) note(line, "debug");
+                        }
+                    };
+                };
+                dl.on("stdout", makeLineForwarder()).on("stderr", makeLineForwarder());
 
                 const onAbort = () => dl.kill();
                 rowAbortController.signal.addEventListener("abort", onAbort, { once: true });
@@ -186,7 +253,7 @@ export class YtDlpService extends DownloadService {
                     throw makeAbortError();
                 }
 
-                this.logger.info(`Successfully downloaded: ${path.basename(fullPath)}`);
+                note(`Successfully downloaded: ${path.basename(fullPath)}`);
                 localFile = {
                     state: "found",
                     path: fullPath,
@@ -223,7 +290,8 @@ export class YtDlpService extends DownloadService {
                 type: StatusType.Error,
                 message: `Failed to download ${trackMetadata.trackName}`,
             });
-            onUpdate?.({ ...pendingSource, state: "failed" });
+            log.push(`Failed: ${error instanceof Error ? error.message : String(error)}`);
+            publish("failed");
             throw error;
         }
     }

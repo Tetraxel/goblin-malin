@@ -25,6 +25,7 @@ import { useStartFlow } from "./StartModal/useStartFlow";
 import { startOptionsBridge } from "#base/bridges/startOptionsBridge";
 import { deleteConfirmBridge, DeleteConfirmRequest } from "#base/bridges/deleteConfirmBridge";
 import { consentBridge, ConsentRequest } from "#base/bridges/consentBridge";
+import { collectionHintBridge, CollectionHintRequest } from "#base/bridges/collectionHintBridge";
 import { ConfirmModal } from "./ConfirmModal/ConfirmModal";
 import { useConfirmModal } from "./ConfirmModal/useConfirmModal";
 import { useTheme } from "#base/themeContext";
@@ -81,6 +82,25 @@ export const AppInner: React.FC<{
         [openConfirmModal, theme]
     );
 
+    // Bridge: let collection tasks explain why a playlist can't be read (e.g. it is private).
+    const handleCollectionHint = useCallback(
+        (req: CollectionHintRequest) => {
+            openConfirmModal({
+                title: `Can't read "${req.label}"`,
+                message: req.hint,
+                choices: [
+                    { label: "OK", color: theme.action.primary },
+                    { label: "Don't show again", color: theme.text.muted },
+                ],
+                accentColor: theme.status.warning,
+                onConfirm: (i) => {
+                    if (i === 1) req.muteForever();
+                },
+            });
+        },
+        [openConfirmModal, theme]
+    );
+
     // Bridge: let plain-TS task actions open the start-options modal.
     useEffect(() => {
         startOptionsBridge.setOpener(openStartFlow);
@@ -92,6 +112,11 @@ export const AppInner: React.FC<{
         deleteConfirmBridge.setOpener(handleDeleteBridgeRequest);
         return () => deleteConfirmBridge.setOpener(null);
     }, [handleDeleteBridgeRequest]);
+
+    useEffect(() => {
+        collectionHintBridge.setOpener(handleCollectionHint);
+        return () => collectionHintBridge.setOpener(null);
+    }, [handleCollectionHint]);
 
     useEffect(() => {
         consentBridge.setOpener(handleConsentRequest);

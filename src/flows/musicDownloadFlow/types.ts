@@ -324,6 +324,21 @@ export type SavedFile = {
     savedAt: Date;
 };
 
+/**
+ * Live details of an in-flight download, filled by whichever service runs it — every field is
+ * optional so a service reports only what it knows. Dropped from the final "downloaded" source.
+ */
+export type DownloadProgressInfo = {
+    /** Epoch ms when the download started; the UI derives "elapsed" from it. */
+    startedAt: number;
+    downloadedBytes?: number;
+    totalBytes?: number;
+    speedBytesPerSec?: number;
+    etaSeconds?: number;
+    /** The service's own output, newest last — plain messages, no logger prefixes. */
+    log?: string[];
+};
+
 export type TrackDownloadSource = {
     /**
      * "pending": queued, will still be attempted.
@@ -344,6 +359,8 @@ export type TrackDownloadSource = {
     savedFile?: SavedFile;
     /** Download progress 0–100 while `state` is "downloading". */
     progress?: number;
+    /** Speed / ETA / size / service output while downloading (and the output kept on failure). */
+    progressInfo?: DownloadProgressInfo;
     /** Extra provider-specific origin detail (e.g. the Soulseek peer username this file came from). */
     providerDetail?: string;
     /**

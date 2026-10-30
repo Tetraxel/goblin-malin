@@ -10,14 +10,95 @@ import { deleteConfirmBridge } from "#base/bridges/deleteConfirmBridge";
 import { DownloadTask } from "./utils/downloadTask";
 import { CollectionTask } from "./utils/collectionTask";
 import { runSelected } from "./runController";
+import { metadataLimiter, downloadLimiter } from "./utils/stageLimiters";
+import type { Task } from "#base/task/task";
+import type { Semaphore } from "#utils/semaphore";
 import { globalLogger } from "#base/logger/logger";
 import { SessionManager } from "#sessions/sessionManager";
 import { MusicDownloadTaskAttributes, TrackDownloadTask, CollectionDownloadTask } from "./types";
 
 // Suppress the re-throw from @SafeAction — logging is already handled by the decorator.
-const fire = (p: Promise<void>): void => {
+const fire = (p: Promise<unknown>): void => {
     p.catch(() => {});
 };
+
+type BarAttributes = {
+    columns: ColumnDefinition<MusicDownloadTaskAttributes>[];
+    columnIndex: number;
+    taskIndex?: number;
+    taskCount?: number;
+    selectedCount?: number;
+    /** The multi-selected tasks (only when more than one is selected) — batch actions run on these. */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    selectedTasks?: Task<any>[];
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const isTrackTask = (t: Task<any>): t is DownloadTask =>
+    (t.getAttributes() as MusicDownloadTaskAttributes | undefined)?.kind === "track";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const isCollectionTask = (t: Task<any>): t is CollectionTask =>
+    (t.getAttributes() as MusicDownloadTaskAttributes | undefined)?.kind === "collection";
+
+/**
+ * Runs `run` on every eligible track of a batch, through the stage's shared limiter so a
+ * 30-track selection doesn't fan out into 30 simultaneous API calls / downloads.
+ */
+function runBatch(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tasks: Task<any>[],
+    limiter: Semaphore,
+    eligible: (t: DownloadTask) => boolean,
+    run: (t: DownloadTask) => Promise<unknown>
+): void {
+    for (const t of tasks.filter(isTrackTask)) {
+        if (eligible(t)) fire(limiter.run(() => run(t)));
+    }
+}
+
+/** One value per line, nothing else — empty values are skipped. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function copyLines(tasks: Task<any>[], valueOf: (t: DownloadTask) => string): void {
+    clipboard.writeSync(
+        tasks
+            .filter(isTrackTask)
+            .map(valueOf)
+            .filter((v) => v !== "")
+            .join("\n")
+    );
+}
+
+function copyAction(label: string, task: DownloadTask, valueOf: (t: DownloadTask) => string): ContextualActions {
+    return {
+        shortcuts: [{ input: "c", ctrl: true }],
+        label,
+        multiSelectAllowed: true,
+        onClick: () => clipboard.writeSync(valueOf(task)),
+        onClickBatch: (tasks) => copyLines(tasks, valueOf),
+    };
+}
+
+const primaryResultOf = (t: DownloadTask) =>
+    t
+        .getAttributes()
+        ?.metadataGroups.flatMap((g) => g.results)
+        .find((r) => r.isPrimaryInput);
+
+/** Registry key of the service that provided (or would recognize) the task's source URL. */
+function primaryServiceKeyOf(t: DownloadTask): string | undefined {
+    const attrs = t.getAttributes();
+    const primaryGroup = attrs?.metadataGroups.find((g) =>
+        g.results.some((r) => r.isPrimaryInput && (r.metadata.url || r.metadata.uri))
+    );
+    return primaryGroup?.serviceKey ?? attrs?.recognizedServiceKey;
+}
+
+function sourceUrlFor(t: DownloadTask, serviceKey: string | undefined): string {
+    const group = t.getAttributes()?.metadataGroups.find((g) => g.serviceKey === serviceKey);
+    const source = group?.results.find((r) => !r.isRejected) ?? group?.results[0];
+    return source?.metadata.url ?? "";
+}
 
 /** Move tasks to the archive (reversible, so no confirmation); running tasks are skipped. */
 function archive(ids: string[]): void {
@@ -40,13 +121,7 @@ function toOpenableUri(url: string): string {
  */
 export function buildContextualActionBar(
     task: DownloadTask | CollectionTask,
-    attributes: {
-        columns: ColumnDefinition<MusicDownloadTaskAttributes>[];
-        columnIndex: number;
-        taskIndex?: number;
-        taskCount?: number;
-        selectedCount?: number;
-    }
+    attributes: BarAttributes
 ): ContextualActionBar {
     if (task.getAttributes()?.kind === "collection") {
         return buildCollectionContextualActionBar(task as CollectionTask, attributes);
@@ -54,19 +129,13 @@ export function buildContextualActionBar(
     return buildTrackContextualActionBar(task as DownloadTask, attributes);
 }
 
-function buildTrackContextualActionBar(
-    task: DownloadTask,
-    attributes: {
-        columns: ColumnDefinition<MusicDownloadTaskAttributes>[];
-        columnIndex: number;
-        taskIndex?: number;
-        taskCount?: number;
-        selectedCount?: number;
-    }
-): ContextualActionBar {
+function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttributes): ContextualActionBar {
     const orchestrator = TaskOrchestrator.getInstance();
     const column = attributes.columns[attributes.columnIndex];
     const attrs = task.getAttributes();
+    // The tracks the actions below apply to: the whole multi-selection, or just this task.
+    const group: DownloadTask[] = attributes.selectedTasks ? attributes.selectedTasks.filter(isTrackTask) : [task];
+    const attrsOf = (t: DownloadTask) => t.getAttributes();
 
     // ── Task row (bottom) ─────────────────────────────────────────────────
     const state = attrs?.state;
@@ -138,34 +207,47 @@ function buildTrackContextualActionBar(
                 archive: () => archive(tasks.map((t) => t.getId())),
             }),
     });
-    if (attrs?.primaryMetadataFetched) {
+    if (group.some((t) => attrsOf(t)?.primaryMetadataFetched)) {
+        const refetch = (t: DownloadTask) => runWithoutCache(() => t.startPrimaryMetadataFetching());
         taskActions.push({
             shortcuts: [{ input: "f" }],
             label: "Re-fetch primary metadata",
-            onClick: () => fire(runWithoutCache(() => task.startPrimaryMetadataFetching())),
+            multiSelectAllowed: true,
+            onClick: () => fire(refetch(task)),
+            onClickBatch: (tasks) =>
+                runBatch(tasks, metadataLimiter, (t) => Boolean(attrsOf(t)?.primaryMetadataFetched), refetch),
         });
     }
-    if (attrs?.metadataDiscovered) {
+    if (group.some((t) => attrsOf(t)?.metadataDiscovered)) {
         taskActions.push({
             shortcuts: [{ input: "d" }],
             label: "Re-discover metadata providers",
+            multiSelectAllowed: true,
             onClick: () => fire(task.startMetadataDiscovering()),
+            onClickBatch: (tasks) =>
+                runBatch(
+                    tasks,
+                    metadataLimiter,
+                    (t) => Boolean(attrsOf(t)?.metadataDiscovered),
+                    (t) => t.startMetadataDiscovering()
+                ),
         });
     }
-    if (attrs?.downloadsFetched) {
+    const downloadable = (t: DownloadTask) => Boolean(attrsOf(t)?.downloadsFetched || attrsOf(t)?.metadataDiscovered);
+    const eligibleDownloads = group.filter(downloadable);
+    if (eligibleDownloads.length > 0) {
+        const download = (t: DownloadTask) => {
+            if (!attrsOf(t)?.downloadsFetched) t.updateAttributes({ toDownload: true });
+            return t.startDownloads();
+        };
         taskActions.push({
             shortcuts: [{ input: "w" }],
-            label: "Re-download all sources",
-            onClick: () => fire(task.startDownloads()),
-        });
-    } else if (attrs?.metadataDiscovered) {
-        taskActions.push({
-            shortcuts: [{ input: "w" }],
-            label: "Download sources",
-            onClick: () => {
-                task.updateAttributes({ toDownload: true });
-                fire(task.startDownloads());
-            },
+            label: eligibleDownloads.every((t) => attrsOf(t)?.downloadsFetched)
+                ? "Re-download all sources"
+                : "Download sources",
+            multiSelectAllowed: true,
+            onClick: () => fire(download(task)),
+            onClickBatch: (tasks) => runBatch(tasks, downloadLimiter, downloadable, download),
         });
     }
 
@@ -204,37 +286,23 @@ function buildTrackContextualActionBar(
     }
 
     if (column?.id === "url") {
-        const primaryGroup = attrs?.metadataGroups.find((g) =>
-            g.results.some((r) => r.isPrimaryInput && (r.metadata.url || r.metadata.uri))
-        );
-        const serviceKey = primaryGroup?.serviceKey ?? attrs?.recognizedServiceKey;
+        const serviceKey = primaryServiceKeyOf(task);
+        const urlOf = (t: DownloadTask) => sourceUrlFor(t, primaryServiceKeyOf(t)) || attrsOf(t)?.userInput.url || "";
         if (serviceKey) {
-            columnActions.push(...buildMetadataServiceColumnActions(serviceKey, attrs, task));
+            columnActions.push(
+                ...buildMetadataServiceColumnActions(serviceKey, task, { urlOf, serviceKeyOf: primaryServiceKeyOf })
+            );
         } else {
-            columnActions.push({
-                shortcuts: [{ input: "c", ctrl: true }],
-                label: "Copy source URL",
-                onClick: () => clipboard.writeSync(attrs?.userInput.url ?? ""),
-            });
+            columnActions.push(copyAction("Copy source URL", task, (t) => attrsOf(t)?.userInput.url ?? ""));
         }
     }
 
     if (column?.id === "artist") {
-        const primary = attrs?.metadataGroups.flatMap((g) => g.results).find((r) => r.isPrimaryInput);
-        columnActions.push({
-            shortcuts: [{ input: "c", ctrl: true }],
-            label: "Copy artist",
-            onClick: () => clipboard.writeSync(primary?.metadata.artists[0]?.name ?? ""),
-        });
+        columnActions.push(copyAction("Copy artist", task, (t) => primaryResultOf(t)?.metadata.artists[0]?.name ?? ""));
     }
 
     if (column?.id === "track") {
-        const primary = attrs?.metadataGroups.flatMap((g) => g.results).find((r) => r.isPrimaryInput);
-        columnActions.push({
-            shortcuts: [{ input: "c", ctrl: true }],
-            label: "Copy track title",
-            onClick: () => clipboard.writeSync(primary?.metadata.trackName ?? ""),
-        });
+        columnActions.push(copyAction("Copy track title", task, (t) => primaryResultOf(t)?.metadata.trackName ?? ""));
     }
 
     if (column && column.id.startsWith("metadataService-")) {
@@ -242,7 +310,7 @@ function buildTrackContextualActionBar(
         const display = providerDisplayRegistry.get(serviceKey);
         columnLabel = display.label;
         columnColor = display.color;
-        columnActions.push(...buildMetadataServiceColumnActions(serviceKey, attrs, task));
+        columnActions.push(...buildMetadataServiceColumnActions(serviceKey, task));
     }
 
     if (column && column.id.startsWith("discoveryService-")) {
@@ -250,7 +318,7 @@ function buildTrackContextualActionBar(
         const display = providerDisplayRegistry.get(serviceKey);
         columnLabel = display.label;
         columnColor = display.color;
-        columnActions.push(...buildDiscoveryServiceColumnActions(serviceKey, attrs, task));
+        columnActions.push(...buildDiscoveryServiceColumnActions(serviceKey, task));
     }
 
     const { selectedCount, taskIndex, taskCount } = attributes;
@@ -271,20 +339,19 @@ function buildTrackContextualActionBar(
 
 function buildMetadataServiceColumnActions(
     serviceKey: string,
-    attrs: TrackDownloadTask | undefined,
-    task: DownloadTask
+    task: DownloadTask,
+    {
+        urlOf = (t) => sourceUrlFor(t, serviceKey),
+        serviceKeyOf = () => serviceKey,
+    }: { urlOf?: (t: DownloadTask) => string; serviceKeyOf?: (t: DownloadTask) => string | undefined } = {}
 ): ContextualActions[] {
     const display = providerDisplayRegistry.get(serviceKey);
-    const group = attrs?.metadataGroups.find((g) => g.serviceKey === serviceKey);
+    const group = task.getAttributes()?.metadataGroups.find((g) => g.serviceKey === serviceKey);
     const source = group?.results.find((r) => !r.isRejected) ?? group?.results[0];
     const url = source?.metadata.url ?? "";
     const actions: ContextualActions[] = [];
     if (url) {
-        actions.push({
-            shortcuts: [{ input: "c", ctrl: true }],
-            label: `Copy ${display.label} URL`,
-            onClick: () => clipboard.writeSync(url),
-        });
+        actions.push(copyAction(`Copy ${display.label} URL`, task, urlOf));
         const openTarget = source?.metadata.nativeAppUriDesktop ?? toOpenableUri(url);
         actions.push({
             shortcuts: [{ key: "return" }],
@@ -297,26 +364,32 @@ function buildMetadataServiceColumnActions(
     actions.push({
         shortcuts: [{ input: "s" }],
         label: "Re-search",
+        multiSelectAllowed: true,
         onClick: () => fire(task.startSingleProviderSearch(serviceKey)),
+        onClickBatch: (tasks) =>
+            runBatch(
+                tasks,
+                metadataLimiter,
+                (t) => Boolean(serviceKeyOf(t)),
+                (t) => t.startSingleProviderSearch(serviceKeyOf(t)!)
+            ),
     });
     return actions;
 }
 
-function buildDiscoveryServiceColumnActions(
-    serviceKey: string,
-    attrs: TrackDownloadTask | undefined,
-    task: DownloadTask
-): ContextualActions[] {
+function buildDiscoveryServiceColumnActions(serviceKey: string, task: DownloadTask): ContextualActions[] {
     const display = providerDisplayRegistry.get(serviceKey);
-    const anchor = attrs?.discoveryAnchors?.[serviceKey];
+    const anchor = task.getAttributes()?.discoveryAnchors?.[serviceKey];
     const actions: ContextualActions[] = [];
 
     if (anchor?.url) {
-        actions.push({
-            shortcuts: [{ input: "c", ctrl: true }],
-            label: `Copy ${display.label} URL`,
-            onClick: () => clipboard.writeSync(anchor.url!),
-        });
+        actions.push(
+            copyAction(
+                `Copy ${display.label} URL`,
+                task,
+                (t) => t.getAttributes()?.discoveryAnchors?.[serviceKey]?.url ?? ""
+            )
+        );
     }
 
     if (anchor?.openUri) {
@@ -342,7 +415,15 @@ function buildDiscoveryServiceColumnActions(
     actions.push({
         shortcuts: [{ input: "s" }],
         label: "Re-search",
+        multiSelectAllowed: true,
         onClick: () => fire(task.startSingleProviderDiscovery(serviceKey)),
+        onClickBatch: (tasks) =>
+            runBatch(
+                tasks,
+                metadataLimiter,
+                () => true,
+                (t) => t.startSingleProviderDiscovery(serviceKey)
+            ),
     });
 
     return actions;
@@ -365,16 +446,7 @@ function toggleCollectionFlag(task: CollectionTask, flag: "toTag" | "toDownload"
     }
 }
 
-function buildCollectionContextualActionBar(
-    task: CollectionTask,
-    attributes: {
-        columns: ColumnDefinition<MusicDownloadTaskAttributes>[];
-        columnIndex: number;
-        taskIndex?: number;
-        taskCount?: number;
-        selectedCount?: number;
-    }
-): ContextualActionBar {
+function buildCollectionContextualActionBar(task: CollectionTask, attributes: BarAttributes): ContextualActionBar {
     const orchestrator = TaskOrchestrator.getInstance();
     const column = attributes.columns[attributes.columnIndex];
     const attrs = task.getAttributes();
@@ -408,7 +480,9 @@ function buildCollectionContextualActionBar(
             shortcuts: [{ input: "f" }],
             label: "Refetch",
             description: "Check for newly added tracks without resetting existing ones",
+            multiSelectAllowed: true,
             onClick: () => fire(task.refetch()),
+            onClickBatch: (tasks) => tasks.filter(isCollectionTask).forEach((t) => fire(t.refetch())),
         });
     }
 
@@ -416,7 +490,9 @@ function buildCollectionContextualActionBar(
         taskActions.push({
             shortcuts: [{ input: "c" }],
             label: attrs?.collapsed ? "Expand" : "Collapse",
+            multiSelectAllowed: true,
             onClick: () => task.toggleCollapsed(),
+            onClickBatch: (tasks) => tasks.filter(isCollectionTask).forEach((t) => t.toggleCollapsed()),
         });
     }
 
@@ -425,7 +501,9 @@ function buildCollectionContextualActionBar(
             shortcuts: [{ input: "l" }],
             label: attrs?.live?.enabled === false ? "Enable live refresh" : "Disable live refresh",
             description: "Periodically re-fetch this playlist for new tracks",
+            multiSelectAllowed: true,
             onClick: () => task.toggleLive(),
+            onClickBatch: (tasks) => tasks.filter(isCollectionTask).forEach((t) => t.toggleLive()),
         });
     }
 
@@ -484,7 +562,15 @@ function buildCollectionContextualActionBar(
         columnActions.push({
             shortcuts: [{ input: "c", ctrl: true }],
             label: "Copy source URL",
+            multiSelectAllowed: true,
             onClick: () => clipboard.writeSync(url),
+            onClickBatch: (tasks) =>
+                clipboard.writeSync(
+                    tasks
+                        .map((t) => (t.getAttributes() as MusicDownloadTaskAttributes | undefined)?.userInput.url ?? "")
+                        .filter((u) => u !== "")
+                        .join("\n")
+                ),
         });
         if (url) {
             const display = providerDisplayRegistry.get(attrs?.recognizedServiceKey ?? "unknown");

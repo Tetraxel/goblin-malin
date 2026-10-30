@@ -169,6 +169,13 @@ export function buildFlowSettingsItems(
         },
     });
     items.push({
+        kind: "checkbox",
+        indent: 0,
+        label: "Explain why a playlist can't be read (e.g. private)",
+        get: () => flowSettings.collections.showAccessHints,
+        set: (v) => onChange({ collections: { showAccessHints: v } }),
+    });
+    items.push({
         kind: "textInput",
         indent: 0,
         label: "Live playlist refresh interval (seconds)",
