@@ -22,10 +22,13 @@ import { setCacheEnabled } from "#utils/cache";
 export const App: React.FC = () => {
     useEffect(() => {
         const initWav = getAssetPath("sounds", "init.wav");
+        const { showWelcomeTutorial, animationsEnabled } = SettingsStore.getInstance().getAppSettings().general;
+        // The animated intro brings its own sounds, which this would play over.
+        const introPlays = showWelcomeTutorial && animationsEnabled;
         const player = getInstance();
         player
             .setVolume(50)
-            .then(() => player.play(initWav))
+            .then(() => (introPlays ? undefined : player.play(initWav)))
             .catch(() => {});
     }, []);
 

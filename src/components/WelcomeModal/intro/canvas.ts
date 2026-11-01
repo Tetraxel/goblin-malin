@@ -48,6 +48,37 @@ export function hsv(h: number, s: number, v: number): RGB {
     return [r * 255, g * 255, b * 255];
 }
 
+/** Every cell of a canvas, resolved to what the terminal shows. */
+export interface Frame {
+    cols: number;
+    rows: number;
+    ch: string[];
+    fg: Int32Array;
+    bg: Int32Array;
+    bold: Uint8Array;
+}
+
+// The colours and weight the terminal is currently set to while emitting ANSI.
+interface Pen {
+    fg: number;
+    bg: number;
+    bold: number;
+}
+
+const newPen = (): Pen => ({ fg: -2, bg: -2, bold: 0 });
+
+const RESET = "\x1b[0m";
+const NO_FG = -1;
+// Unchanged cells a diff run may swallow rather than moving the cursor.
+const MAX_RUN_GAP = 4;
+
+// Rounds each channel to 32 levels (keeping pure white): slow colour drifts then change a
+// cell's colour only every few frames, and neighbours share colours, so far fewer bytes
+// reach the terminal. The steps are invisible at half-block resolution.
+const LEVEL = Uint8Array.from({ length: 256 }, (_, v) => (v >= 248 ? 255 : v & 0xf8));
+const quantize = (p: number): number =>
+    (LEVEL[(p >> 16) & 0xff] << 16) | (LEVEL[(p >> 8) & 0xff] << 8) | LEVEL[p & 0xff];
+
 /** A run of opaque cells in one row, starting at column `x`, `width` cells wide. */
 export interface Segment {
     x: number;
@@ -173,14 +204,53 @@ export class Canvas {
         for (let i = 0; i < this.glyph.length; i++) if (this.glyph[i]) this.glyphFg[i] = f(this.glyphFg[i]);
     }
 
+    /** Flattens both layers into one resolved cell per terminal position. */
+    private snapshot(): Frame {
+        const n = this.cols * this.rows;
+        const frame: Frame = {
+            cols: this.cols,
+            rows: this.rows,
+            ch: new Array<string>(n),
+            fg: new Int32Array(n),
+            bg: new Int32Array(n),
+            bold: new Uint8Array(n),
+        };
+        const canvasBg = quantize(this.bg);
+        for (let cy = 0; cy < this.rows; cy++) {
+            for (let cx = 0; cx < this.cols; cx++) {
+                const i = cy * this.cols + cx;
+                const top = this.px[cy * 2 * this.pw + cx];
+                const bot = this.px[(cy * 2 + 1) * this.pw + cx];
+                const g = this.glyph[i];
+                if (g) {
+                    frame.ch[i] = g;
+                    frame.fg[i] = quantize(this.glyphFg[i]);
+                    frame.bg[i] = top !== EMPTY ? quantize(top) : bot !== EMPTY ? quantize(bot) : canvasBg;
+                    frame.bold[i] = this.glyphBold[i];
+                } else if (top === EMPTY && bot === EMPTY) {
+                    frame.ch[i] = " ";
+                    frame.fg[i] = NO_FG; // a space has no ink: never force a colour change for it
+                    frame.bg[i] = canvasBg;
+                } else {
+                    frame.ch[i] = "▀";
+                    frame.fg[i] = top === EMPTY ? canvasBg : quantize(top);
+                    frame.bg[i] = bot === EMPTY ? canvasBg : quantize(bot);
+                }
+            }
+        }
+        return frame;
+    }
+
     toRows(): string[] {
+        const frame = this.snapshot();
         const out: string[] = [];
-        for (let cy = 0; cy < this.rows; cy++) out.push(this.renderSpan(cy, 0, this.cols));
+        for (let cy = 0; cy < this.rows; cy++) out.push(renderSpan(frame, cy, 0, this.cols, newPen()) + RESET);
         return out;
     }
 
     /** Each row as runs of opaque cells, skipping holes. */
     toSegments(): Segment[][] {
+        const frame = this.snapshot();
         const out: Segment[][] = [];
         for (let cy = 0; cy < this.rows; cy++) {
             const row: Segment[] = [];
@@ -189,56 +259,80 @@ export class Canvas {
                 while (cx < this.cols && this.hole?.[cy * this.cols + cx]) cx++;
                 const start = cx;
                 while (cx < this.cols && !this.hole?.[cy * this.cols + cx]) cx++;
-                if (cx > start) row.push({ x: start, width: cx - start, text: this.renderSpan(cy, start, cx) });
+                if (cx > start) {
+                    const text = renderSpan(frame, cy, start, cx, newPen()) + RESET;
+                    row.push({ x: start, width: cx - start, text });
+                }
             }
             out.push(row);
         }
         return out;
     }
 
-    /** ANSI truecolor string for cells [x0, x1) of row `cy`. */
-    private renderSpan(cy: number, x0: number, x1: number): string {
-        let line = "";
-        let curFg = -2;
-        let curBg = -2;
-        let curBold = 0;
-        for (let cx = x0; cx < x1; cx++) {
-            const top = this.px[cy * 2 * this.pw + cx];
-            const bot = this.px[(cy * 2 + 1) * this.pw + cx];
-            const g = this.glyph[cy * this.cols + cx];
+    /**
+     * The ANSI that turns `previous` into this canvas: only the cells that changed, each
+     * run positioned absolutely. A null or differently-sized `previous` repaints it all.
+     * Returns "" when nothing changed.
+     */
+    diffFrom(previous: Frame | null): { ansi: string; frame: Frame } {
+        const frame = this.snapshot();
+        const prev = previous && previous.cols === frame.cols && previous.rows === frame.rows ? previous : null;
+        const same = (i: number) =>
+            prev !== null &&
+            prev.ch[i] === frame.ch[i] &&
+            prev.bg[i] === frame.bg[i] &&
+            prev.bold[i] === frame.bold[i] &&
+            prev.fg[i] === frame.fg[i];
 
-            let ch: string;
-            let fg: number;
-            let bg: number;
-            const bold = g ? this.glyphBold[cy * this.cols + cx] : 0;
-            if (g) {
-                ch = g;
-                fg = this.glyphFg[cy * this.cols + cx];
-                bg = top !== EMPTY ? top : bot !== EMPTY ? bot : this.bg;
-            } else if (top === EMPTY && bot === EMPTY) {
-                ch = " ";
-                fg = curFg; // irrelevant for a space — don't force a colour change
-                bg = this.bg;
-            } else {
-                ch = "▀";
-                fg = top === EMPTY ? this.bg : top;
-                bg = bot === EMPTY ? this.bg : bot;
+        const pen = newPen();
+        let ansi = "";
+        for (let cy = 0; cy < this.rows; cy++) {
+            const base = cy * this.cols;
+            let cx = 0;
+            while (cx < this.cols) {
+                while (cx < this.cols && same(base + cx)) cx++;
+                if (cx >= this.cols) break;
+                const start = cx;
+                // Runs swallow short unchanged gaps: re-sending a few cells is cheaper
+                // than a cursor move and a new colour.
+                let end = cx + 1;
+                let gap = 0;
+                for (cx = end; cx < this.cols && gap <= MAX_RUN_GAP; cx++) {
+                    if (same(base + cx)) gap++;
+                    else {
+                        gap = 0;
+                        end = cx + 1;
+                    }
+                }
+                cx = end;
+                ansi += `\x1b[${cy + 1};${start + 1}H` + renderSpan(frame, cy, start, end, pen);
             }
-
-            if (bold !== curBold) {
-                line += bold ? "\x1b[1m" : "\x1b[22m";
-                curBold = bold;
-            }
-            if (fg !== curFg && fg >= 0) {
-                line += `\x1b[38;2;${(fg >> 16) & 0xff};${(fg >> 8) & 0xff};${fg & 0xff}m`;
-                curFg = fg;
-            }
-            if (bg !== curBg) {
-                line += `\x1b[48;2;${(bg >> 16) & 0xff};${(bg >> 8) & 0xff};${bg & 0xff}m`;
-                curBg = bg;
-            }
-            line += ch;
         }
-        return line + "\x1b[0m";
+        return { ansi: ansi && ansi + RESET, frame };
     }
+}
+
+/** ANSI truecolor string for cells [x0, x1) of row `cy`, starting from the `pen` state. */
+function renderSpan(frame: Frame, cy: number, x0: number, x1: number, pen: Pen): string {
+    let line = "";
+    for (let cx = x0; cx < x1; cx++) {
+        const i = cy * frame.cols + cx;
+        const fg = frame.fg[i];
+        const bg = frame.bg[i];
+        const bold = frame.bold[i];
+        if (bold !== pen.bold) {
+            line += bold ? "\x1b[1m" : "\x1b[22m";
+            pen.bold = bold;
+        }
+        if (fg !== pen.fg && fg !== NO_FG) {
+            line += `\x1b[38;2;${(fg >> 16) & 0xff};${(fg >> 8) & 0xff};${fg & 0xff}m`;
+            pen.fg = fg;
+        }
+        if (bg !== pen.bg) {
+            line += `\x1b[48;2;${(bg >> 16) & 0xff};${(bg >> 8) & 0xff};${bg & 0xff}m`;
+            pen.bg = bg;
+        }
+        line += frame.ch[i];
+    }
+    return line;
 }

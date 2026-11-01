@@ -50,6 +50,9 @@ export function drawLogo(
     const local = t - start;
     if (local < 0) return;
     const frame = Math.floor(t * 30);
+    // The shimmer repaints every letter cell, so it steps at 12fps: it looks just as smooth
+    // on such a slow drift, and most frames then cost almost nothing.
+    const sheenT = Math.floor(t * 12) / 12;
 
     lines.forEach((line, li) => {
         const { size } = line;
@@ -81,7 +84,7 @@ export function drawLogo(
                         const ch = SCRAMBLE[Math.floor(hash(seed * 17 + frame) * SCRAMBLE.length)];
                         const dx = (hash(seed + 3) - 0.5) * 24 * gone;
                         const dy = -(4 + hash(seed + 5) * 10) * gone;
-                        const c = scale(sheen(px, py, t, canvas), 1 - k * k);
+                        const c = scale(sheen(px, py, sheenT, canvas), 1 - k * k);
                         canvas.setGlyph(px + size / 2 + dx, (py + size / 2) / 2 + dy, ch, c, true);
                         continue;
                     }
@@ -89,7 +92,7 @@ export function drawLogo(
                     if (since < 0) {
                         // Scramble phase: one random glyph per font dot, flickering.
                         const ch = SCRAMBLE[Math.floor(hash(seed * 31 + frame) * SCRAMBLE.length)];
-                        const c = sheen(px, py + size / 2, t, canvas);
+                        const c = sheen(px, py + size / 2, sheenT, canvas);
                         canvas.setGlyph(px + size / 2, (py + size / 2) / 2, ch, c, true);
                         continue;
                     }
@@ -104,7 +107,7 @@ export function drawLogo(
                         for (let ox = 0; ox < size; ox++) {
                             // Darker towards the bottom of each dot gives the letters some volume.
                             const shade = 1 - (oy / size) * 0.25 - (gy / GLYPH_H) * 0.2;
-                            const c = scale(sheen(px + ox, py + oy, t, canvas), shade);
+                            const c = scale(sheen(px + ox, py + oy, sheenT, canvas), shade);
                             canvas.setPixel(px + ox, py + oy, mix(c, WHITE, flash), 1);
                         }
                     }

@@ -30,7 +30,7 @@ export const T = {
     FINALE: 7.2 + TOUR_DURATION,
 } as const;
 
-const FINALE = {
+export const FINALE = {
     WIPE: 0.6,
     BACK: 0.9,
     WINK: T.FINALE + 1.0,
@@ -47,8 +47,6 @@ export interface IntroOutro {
     y: number;
     /** Colour to fade towards (the app's background). */
     background: RGB;
-    /** Rows below the scene (the footer) that the outro covers too. */
-    extraRows: number;
 }
 
 /** Linear keyframes [time, value], eased between neighbours. */
@@ -182,18 +180,18 @@ export function outroBackground(outro?: IntroOutro): RGB {
 
 /**
  * Renders one frame of the intro at time `t` (seconds). The scene is laid out for
- * `cols` × `rows`; during the outro the canvas grows by `outro.extraRows` to also cover
- * the footer, without moving anything.
+ * `cols` × `rows`, with `footerRows` more rows below it for the footer line.
  */
 export function renderIntroCanvas(
     t: number,
     cols: number,
     rows: number,
+    footerRows: number,
     options: TourOptions,
     outro?: IntroOutro
 ): Canvas {
     const fadeK = outro ? outroFade(outro.k) : 0;
-    const canvas = new Canvas(cols, rows + (outro?.extraRows ?? 0), outroBackground(outro));
+    const canvas = new Canvas(cols, rows + footerRows, outroBackground(outro));
     const { cx, cy, r, lines } = layout(cols, rows);
     const tour = tourLayout(cols, rows);
     const pose = mascotPose(t, cx, cy, r, tour.mascot);
@@ -205,6 +203,7 @@ export function renderIntroCanvas(
     drawLogo(canvas, lines, t, T.LOGO_IN, T.LOGO_DURATION, T.TOUR);
     if (t >= T.FINALE) drawLogo(canvas, lines, t, FINALE.LOGO_IN, T.LOGO_DURATION);
     drawTourWithWipeOut(canvas, t, tour, options);
+    drawFooter(canvas, options, rows);
     drawDust(canvas, t, 0.8 * progress(t, T.DUST_IN, 1.2) + 0.2 * progress(t, T.WINK, 0.5));
 
     // Particles live in cell space (half the pixel height).
@@ -267,6 +266,27 @@ function drawTourWithWipeOut(canvas: Canvas, t: number, tour: TourLayout, option
             canvas.setGlyph(lineX - 1, y, "▒", fade(accent, 0.6));
             canvas.setGlyph(lineX - 2, y, "░", fade(accent, 0.3));
         }
+    }
+}
+
+/** Don't-show-again state on the left, key hints on the right. */
+function drawFooter(canvas: Canvas, options: TourOptions, y: number): void {
+    const { dontShowAgain, toggleKey, colors } = options.footer;
+    const box = dontShowAgain ? "[x]" : "[ ]";
+    drawText(canvas, 2, y, box, dontShowAgain ? colors.active : colors.muted);
+    drawText(canvas, 2 + box.length + 1, y, "Don't show this again", colors.muted);
+
+    let x = canvas.cols - 2;
+    const hints = [
+        [options.closeKey, "Close"],
+        [toggleKey, "Toggle"],
+    ];
+    for (const [key, label] of hints) {
+        const keyText = `[${key}]`;
+        x -= keyText.length + 1 + label.length;
+        drawText(canvas, x, y, keyText, colors.active, { bold: true });
+        drawText(canvas, x + keyText.length + 1, y, label, colors.hint);
+        x -= 2;
     }
 }
 

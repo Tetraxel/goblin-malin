@@ -67,7 +67,7 @@ const SCENES: Scene[] = [
 ];
 const STEP_COUNT = SCENES.length;
 
-const sceneStart = (i: number): number => SCENES.slice(0, i).reduce((acc, s) => acc + s.duration, 0);
+export const sceneStart = (i: number): number => SCENES.slice(0, i).reduce((acc, s) => acc + s.duration, 0);
 
 /** Length of the whole tour, in seconds. */
 export const TOUR_DURATION = sceneStart(SCENES.length);
@@ -75,9 +75,9 @@ export const TOUR_DURATION = sceneStart(SCENES.length);
 const WIPE = 0.45;
 
 // Key moments, in tour time.
-const PASTE = { press1: 1.0, land1: 1.85, press2: 2.7, land2: 3.55, fly: 0.8 };
+export const PASTE = { press1: 1.0, land1: 1.85, press2: 2.7, land2: 3.55, fly: 0.8 };
 const FETCH0 = sceneStart(1);
-const FETCH = {
+export const FETCH = {
     start: FETCH0 + 0.2,
     source: FETCH0 + 0.4,
     fields: FETCH0 + 0.9,

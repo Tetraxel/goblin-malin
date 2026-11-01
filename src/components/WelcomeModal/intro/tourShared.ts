@@ -9,6 +9,15 @@ export interface TourOptions {
     importKeys: string[];
     /** Live binding that closes the intro (e.g. "Esc"). */
     closeKey: string;
+    footer: IntroFooter;
+}
+
+/** The line under the animation. */
+export interface IntroFooter {
+    dontShowAgain: boolean;
+    /** Live binding that toggles "don't show again". */
+    toggleKey: string;
+    colors: { active: RGB; muted: RGB; hint: RGB };
 }
 
 export interface Rect {
