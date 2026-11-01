@@ -29,12 +29,22 @@ function archName(): "x86_64" | "i686" | "aarch64" {
     }
 }
 
+let pendingMpv: Promise<string> | null = null;
+
 /**
  * Returns the path to the mpv binary to use.
  * On Windows: downloads from shinchiro/mpv-winbuild-cmake if not already present.
  * On other platforms: returns "mpv" (system PATH).
  */
-export async function ensureMpv(): Promise<string> {
+export function ensureMpv(): Promise<string> {
+    // The player and the intro's sounds both ask at startup: only one may download it.
+    pendingMpv ??= locateMpv().finally(() => {
+        pendingMpv = null;
+    });
+    return pendingMpv;
+}
+
+async function locateMpv(): Promise<string> {
     if (process.platform !== "win32") {
         return "mpv";
     }
