@@ -455,7 +455,7 @@ const EntryDetail: React.FC<{ entry: ArchivedEntry }> = ({ entry }) => {
             </Box>
             <Box flexShrink={0}>
                 <Text dimColor wrap="truncate-end">
-                    {`Archived ${formatDay(entry.archivedAt)} from "${entry.sessionName}"`}
+                    {`Archived ${formatDay(entry.archivedAt)}`}
                 </Text>
             </Box>
         </>

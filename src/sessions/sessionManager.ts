@@ -218,11 +218,10 @@ export class SessionManager {
 
     /**
      * Put an archived task (plus an archived album/playlist's tracks) back in the queue.
-     * Loads the task's own session first when it isn't the current one. Returns how many came back.
+     * Archives are per session, so only the current session's can be restored. Returns how many came back.
      */
     restoreArchived(sessionId: string, taskId: string): number {
-        if (sessionId !== this.currentSessionId) this.loadSession(sessionId);
-        if (this.currentSessionId !== sessionId) return 0;
+        if (sessionId !== this.currentSessionId) return 0;
         this.flushPending();
 
         const session = this.store.getById(sessionId);
@@ -267,6 +266,11 @@ export class SessionManager {
 
     getCurrentSessionId(): string | null {
         return this.currentSessionId;
+    }
+
+    /** The stored record of the current session — undefined for a brand-new queue not yet persisted. */
+    getCurrentSession(): StoredSession | undefined {
+        return this.currentSessionId ? this.store.getById(this.currentSessionId) : undefined;
     }
 
     onChanged(callback: () => void): () => void {

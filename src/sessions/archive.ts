@@ -90,37 +90,34 @@ function derive(entry: ArchivedTaskSnapshot): Derived {
 }
 
 /**
- * All archived tasks across every session, newest first. Children of an archived
- * collection are folded into their parent row (counted in `childCount`) so an album
- * doesn't flood the list; a child archived on its own still gets its own row.
+ * The archived tasks of one session, newest first. Children of an archived collection
+ * are folded into their parent row (counted in `childCount`) so an album doesn't flood
+ * the list; a child archived on its own still gets its own row.
  */
-export function buildArchivedEntries(sessions: StoredSession[]): ArchivedEntry[] {
+export function buildArchivedEntries(session: StoredSession | undefined): ArchivedEntry[] {
+    const archived = session?.archived ?? [];
+    if (!session || archived.length === 0) return [];
+
+    const childIdsByParent = new Map<string, Set<string>>();
+    const foldedIds = new Set<string>();
+    for (const a of archived) {
+        const attrs = a.task.attributes as MusicDownloadTaskAttributes | undefined;
+        if (attrs?.kind !== "collection") continue;
+        const children = new Set(attrs.childTaskIds.filter((id) => archived.some((o) => o.task.id === id)));
+        childIdsByParent.set(a.task.id, children);
+        children.forEach((id) => foldedIds.add(id));
+    }
+
     const entries: ArchivedEntry[] = [];
-
-    for (const session of sessions) {
-        const archived = session.archived ?? [];
-        if (archived.length === 0) continue;
-
-        const childIdsByParent = new Map<string, Set<string>>();
-        const foldedIds = new Set<string>();
-        for (const a of archived) {
-            const attrs = a.task.attributes as MusicDownloadTaskAttributes | undefined;
-            if (attrs?.kind !== "collection") continue;
-            const children = new Set(attrs.childTaskIds.filter((id) => archived.some((o) => o.task.id === id)));
-            childIdsByParent.set(a.task.id, children);
-            children.forEach((id) => foldedIds.add(id));
-        }
-
-        for (const a of archived) {
-            if (foldedIds.has(a.task.id)) continue;
-            entries.push({
-                ...derive(a),
-                sessionId: session.id,
-                sessionName: session.name,
-                archivedAt: a.archivedAt,
-                childCount: childIdsByParent.get(a.task.id)?.size ?? 0,
-            });
-        }
+    for (const a of archived) {
+        if (foldedIds.has(a.task.id)) continue;
+        entries.push({
+            ...derive(a),
+            sessionId: session.id,
+            sessionName: session.name,
+            archivedAt: a.archivedAt,
+            childCount: childIdsByParent.get(a.task.id)?.size ?? 0,
+        });
     }
 
     return entries.sort((a, b) => b.archivedAt.localeCompare(a.archivedAt));
@@ -132,7 +129,6 @@ export function archivedEntryMatches(entry: ArchivedEntry, query: string): boole
     const haystack = [
         entry.artist,
         entry.title,
-        entry.sessionName,
         entry.url,
         entry.filePath,
         entry.compiled?.album?.albumName,
@@ -141,15 +137,13 @@ export function archivedEntryMatches(entry: ArchivedEntry, query: string): boole
     return haystack.some((value) => value?.toLowerCase().includes(q));
 }
 
-/** Ids of every archived task across all sessions — for "already archived" import checks. */
-export function getArchivedTaskIds(sessions: StoredSession[]): Set<string> {
-    const ids = new Set<string>();
-    for (const session of sessions) for (const a of session.archived ?? []) ids.add(a.task.id);
-    return ids;
+/** Ids of the session's archived tasks — for "already archived" import checks. */
+export function getArchivedTaskIds(session: StoredSession | undefined): Set<string> {
+    return new Set((session?.archived ?? []).map((a) => a.task.id));
 }
 
-export function countArchived(sessions: StoredSession[]): number {
-    return sessions.reduce((n, s) => n + (s.archived?.length ?? 0), 0);
+export function countArchived(session: StoredSession | undefined): number {
+    return session?.archived?.length ?? 0;
 }
 
 // The queue is generic over task attributes; only music-download tasks are archived here.

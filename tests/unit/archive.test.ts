@@ -63,18 +63,16 @@ function makeTask(id: string, attributes: MusicDownloadTaskAttributes) {
 describe("archive helpers", () => {
     test("derives a display entry (artist, title, saved file) from a snapshot", () => {
         const task = makeTask("t1", trackAttrs("u1", { downloadSources: [savedSource("C:/music/a.mp3")] } as never));
-        const sessions: StoredSession[] = [
-            {
-                id: "s",
-                name: "S",
-                createdAt: "",
-                updatedAt: "",
-                tasks: [],
-                archived: [{ archivedAt: "2026-01-01T00:00:00.000Z", task: task.get() as never }],
-            },
-        ];
+        const session: StoredSession = {
+            id: "s",
+            name: "S",
+            createdAt: "",
+            updatedAt: "",
+            tasks: [],
+            archived: [{ archivedAt: "2026-01-01T00:00:00.000Z", task: task.get() as never }],
+        };
 
-        const [entry] = m.archive.buildArchivedEntries(sessions);
+        const [entry] = m.archive.buildArchivedEntries(session);
 
         expect(entry).toMatchObject({
             taskId: "t1",
@@ -94,18 +92,16 @@ describe("archive helpers", () => {
         const c2 = makeTask("c2", trackAttrs("c2"));
         const loner = makeTask("x", trackAttrs("x"));
         const archivedAt = "2026-01-01T00:00:00.000Z";
-        const sessions = [
-            {
-                id: "s",
-                name: "S",
-                createdAt: "",
-                updatedAt: "",
-                tasks: [],
-                archived: [parent, c1, c2, loner].map((t) => ({ archivedAt, task: t.get() as never })),
-            },
-        ] as StoredSession[];
+        const session = {
+            id: "s",
+            name: "S",
+            createdAt: "",
+            updatedAt: "",
+            tasks: [],
+            archived: [parent, c1, c2, loner].map((t) => ({ archivedAt, task: t.get() as never })),
+        } as StoredSession;
 
-        const entries = m.archive.buildArchivedEntries(sessions);
+        const entries = m.archive.buildArchivedEntries(session);
 
         expect(entries.map((e) => e.taskId).sort()).toEqual(["p", "x"]);
         expect(entries.find((e) => e.taskId === "p")?.childCount).toBe(2);
@@ -155,6 +151,28 @@ describe("SessionManager archive", () => {
                 .sort()
         ).toEqual(["a", "b"]);
         expect(m.store.getById(sessionId)?.archived).toEqual([]);
+    });
+
+    test("archives are per session: another session's archive is neither visible nor restorable", () => {
+        m.orchestrator.setTasks([makeTask("a", trackAttrs("a"))]);
+        m.manager.archiveTasks(["a"]);
+        const first = m.manager.getCurrentSessionId()!;
+
+        m.manager.newSession();
+        expect(m.manager.getCurrentSession()).toBeUndefined();
+        expect(m.archive.countArchived(m.manager.getCurrentSession())).toBe(0);
+
+        m.orchestrator.setTasks([makeTask("b", trackAttrs("b"))]);
+        m.manager.archiveTasks(["b"]);
+        const second = m.manager.getCurrentSessionId()!;
+        expect(second).not.toBe(first);
+
+        expect(m.archive.buildArchivedEntries(m.manager.getCurrentSession()).map((e) => e.taskId)).toEqual(["b"]);
+        expect([...m.archive.getArchivedTaskIds(m.manager.getCurrentSession())]).toEqual(["b"]);
+        expect(m.manager.restoreArchived(first, "a")).toBe(0);
+
+        m.manager.loadSession(first);
+        expect(m.archive.buildArchivedEntries(m.manager.getCurrentSession()).map((e) => e.taskId)).toEqual(["a"]);
     });
 
     test("skips running tasks", () => {

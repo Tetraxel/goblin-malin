@@ -6,7 +6,7 @@ import { readClipboard } from "./clipboard";
 import { detectUrls } from "./detectUrls";
 import { createTasksFromUrls, importTasks, MusicTask } from "#flows/musicDownloadFlow/taskFactory";
 import { useTheme } from "#base/themeContext";
-import { SessionStore } from "#sessions/sessionStore";
+import { SessionManager } from "#sessions/sessionManager";
 import { getArchivedTaskIds } from "#sessions/archive";
 import { ConfirmModalConfig } from "#components/ConfirmModal/useConfirmModal";
 
@@ -77,7 +77,7 @@ export function useImportFlow(openConfirmModal: (config: ConfirmModalConfig) => 
             setPendingImport(null);
 
             // Task ids derive from the URL, so a re-imported track matches its archived self.
-            const archivedIds = getArchivedTaskIds(SessionStore.getInstance().getAll());
+            const archivedIds = getArchivedTaskIds(SessionManager.getInstance().getCurrentSession());
             const archivedTasks = tasks.filter((t) => archivedIds.has(t.getId()));
             if (archivedTasks.length === 0) {
                 importTasks(tasks);
