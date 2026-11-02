@@ -98,6 +98,15 @@ export interface Theme {
         destructive: string;
         neutral: string;
     };
+
+    /** The highlighted "File attributes" block of the download detail (file name, format, size…). */
+    fileAttributes: {
+        header: string;
+        headerText: string;
+        background: string;
+        label: string;
+        value: string;
+    };
 }
 
 export const THEME_KEYS = ["dark", "light"] as const;

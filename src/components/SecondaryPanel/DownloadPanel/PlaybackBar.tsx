@@ -15,7 +15,7 @@ interface PlaybackBarProps {
     isFocused?: boolean;
     /** Clicking the icon or the time toggles play/pause (so does clicking the track while nothing is loaded). */
     onToggle?: () => void;
-    /** Clicking the track while it's loaded seeks to this fraction (0–1) of the file. */
+    /** Clicking the track seeks to this fraction (0–1) of the file; the caller starts it first when it isn't playing. */
     onSeek?: (fraction: number) => void;
 }
 
@@ -45,7 +45,7 @@ export function PlaybackBar({
         const left = getScreenBounds(barRef.current)?.x ?? 0;
         const cell = event.x - left - ICON_WIDTH;
         const isOnTrack = cell >= 0 && cell < barW;
-        if (isOnTrack && active && onSeek) {
+        if (isOnTrack && onSeek) {
             // The last cell maps to the very end, the first to the start.
             onSeek(Math.min(1, cell / (barW - 1)));
         } else {

@@ -400,6 +400,15 @@ export type TrackDownloadTask = {
     metadataGroups: MetadataGroupState[];
     metadataOverride: MetadataOverrides;
     downloadSources: TrackDownloadSource[];
+    /** Folder this track is saved to instead of the one from Settings. Unset = use the setting. */
+    outputDirOverride?: string;
+    /** File name (with `.flac`) this track is saved as instead of "Artist - Title.flac". */
+    outputFilenameOverride?: string;
+    /**
+     * Whether saving writes the compiled metadata into the file's tags (adding the ones it lacks and
+     * replacing the ones it has). `false` keeps the file's own tags. Unset means on.
+     */
+    overwriteTags?: boolean;
     discoveryAnchors?: Record<string, DiscoveryAnchor>;
 };
 

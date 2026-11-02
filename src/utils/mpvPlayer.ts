@@ -252,7 +252,8 @@ export class MpvPlayer extends EventEmitter {
 
     // ── Public API ───────────────────────────────────────────────────────
 
-    async play(filePath: string): Promise<void> {
+    /** Loads and plays a file, from `startMs` when given (set on the load itself: a seek sent right after it would race it). */
+    async play(filePath: string, startMs = 0): Promise<void> {
         await this.ensureStarted();
         this._filePath = filePath;
         this._positionMs = 0;
@@ -262,7 +263,11 @@ export class MpvPlayer extends EventEmitter {
         // mpv keeps its `pause` property across a "replace" load, so a track started while
         // another was paused would load paused too.
         await this.sendCommand(["set_property", "pause", false]);
-        await this.sendCommand(["loadfile", filePath, "replace"]);
+        await this.sendCommand(
+            startMs > 0
+                ? ["loadfile", filePath, "replace", -1, `start=${(startMs / 1000).toFixed(3)}`]
+                : ["loadfile", filePath, "replace"]
+        );
     }
 
     async stop(): Promise<void> {

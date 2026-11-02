@@ -862,6 +862,21 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.updateAttributes({ downloadSources: updated });
     }
 
+    /** Sets the folder this track is saved to; `undefined` goes back to the folder from Settings. */
+    setOutputDir(dir: string | undefined): void {
+        this.updateAttributes({ outputDirOverride: dir });
+    }
+
+    /** Sets the name this track is saved as (already cleaned); `undefined` goes back to "Artist - Title.flac". */
+    setOutputFilename(filename: string | undefined): void {
+        this.updateAttributes({ outputFilenameOverride: filename });
+    }
+
+    /** Whether saving writes the compiled metadata into the file's tags (see `TrackDownloadTask.overwriteTags`). */
+    setOverwriteTags(overwrite: boolean): void {
+        this.updateAttributes({ overwriteTags: overwrite });
+    }
+
     async saveTrack(): Promise<void> {
         const attrs = this.getAttributes();
         const sources = attrs?.downloadSources ?? [];
@@ -877,7 +892,16 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         const tags = compiledMetadataToTags(compiled, {
             includeMusicBrainzTags: settings.includeMusicBrainzTags,
         });
-        const outputPath = computeOutputPath(compiled, settings.outputDir);
+        const outputDir = attrs!.outputDirOverride ?? settings.outputDir;
+        await fs.mkdir(outputDir, { recursive: true });
+        // Re-saving into the folder the file is already in must not pick a "(2)" name because
+        // the file itself is in the way.
+        const outputPath = computeOutputPath(
+            compiled,
+            outputDir,
+            selectedSource.savedFile?.path,
+            attrs!.outputFilenameOverride
+        );
 
         this.status.update({ type: StatusType.Processing, message: "Saving…" });
 
@@ -909,7 +933,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 outputCreated = true;
             }
 
-            await cleanAndTagFlac(outputPath, tags);
+            // Off: the file keeps the tags it came with (it is still copied/renamed/moved as usual).
+            if (attrs!.overwriteTags !== false) await cleanAndTagFlac(outputPath, tags);
 
             this.updateAttributes({
                 downloadSources: sources.map((s) =>

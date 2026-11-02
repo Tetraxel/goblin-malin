@@ -14,16 +14,12 @@ interface DiffViewProps {
     pendingSource: TrackDownloadSource;
     compiled: CompiledMetadata | null;
     outputDir: string;
+    /** The name the file will have after the change; the saved name when null. */
+    newFilename: string | null;
     diffKind: "source-switch" | "metadata-change";
     isActive: boolean;
     width: number;
     height: number;
-}
-
-function computePreviewFilename(compiled: CompiledMetadata): string {
-    const artist = compiled.artists[0]?.name ?? "Unknown Artist";
-    const title = compiled.trackName || "Unknown Title";
-    return `${artist} - ${title}.flac`.replace(/[/\\:*?"<>|]/g, "_");
 }
 
 export function DiffView({
@@ -31,6 +27,7 @@ export function DiffView({
     pendingSource,
     compiled,
     outputDir,
+    newFilename: newFilenameProp,
     diffKind,
     isActive,
     width,
@@ -45,7 +42,7 @@ export function DiffView({
     const oldSavedAt = formatDate(savedSource.savedFile!.savedAt);
     const oldProvider = savedSource.provider.toUpperCase();
 
-    const newFilename = compiled ? computePreviewFilename(compiled) : oldFilename;
+    const newFilename = newFilenameProp ?? oldFilename;
     const newDir = outputDir;
     const newSize = pendingSource.fileInfo ? formatBytes(pendingSource.fileInfo.sizeBytes) : "—";
     const newDuration = formatDuration(pendingSource.fileInfo?.durationMs ?? pendingSource.track.duration);

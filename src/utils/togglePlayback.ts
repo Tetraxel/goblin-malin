@@ -13,3 +13,14 @@ export function togglePlayback(filePath: string): void {
         player.play(filePath).catch(() => {});
     }
 }
+
+/** Plays a file from `startMs`, or seeks there when it is already the loaded one. */
+export function playFrom(filePath: string, startMs: number): void {
+    const player = getInstance();
+    const status = player.getStatus();
+    if (status.filePath === filePath && (status.isPlaying || status.isPaused)) {
+        player.seekMs(startMs).catch(() => {});
+    } else {
+        player.play(filePath, startMs).catch(() => {});
+    }
+}

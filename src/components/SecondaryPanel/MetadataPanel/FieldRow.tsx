@@ -12,7 +12,7 @@ function getPlatformColor(apiProvider: string): string {
     return providerDisplayRegistry.get(apiProvider).colorSubtle;
 }
 
-function attributionBadge(
+export function attributionBadge(
     attr: FieldAttribution | undefined,
     theme: Theme
 ): {

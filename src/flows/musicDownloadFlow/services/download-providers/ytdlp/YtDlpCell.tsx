@@ -3,6 +3,7 @@ import path from "path";
 import { Text } from "ink";
 import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import { localFileName } from "#flows/musicDownloadFlow/utils/localFileName";
 
 export const YtDlpCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, isSelected }) => {
     const attrs = task.attributes;
@@ -11,7 +12,9 @@ export const YtDlpCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, 
     const saved = downloadSource?.savedFile;
     const display = saved
         ? path.basename(saved.path)
-        : (downloadSource?.localFile?.name ?? downloadSource?.state ?? "");
+        : downloadSource?.localFile
+          ? localFileName(downloadSource.localFile)
+          : (downloadSource?.state ?? "");
 
     const color = saved ? "cyan" : downloadSource?.state === "downloaded" ? "green" : "white";
 

@@ -11,6 +11,7 @@ import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { computeCompiledMetadata, CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { getSaveSettings } from "#flows/musicDownloadFlow/saveSettings";
 import { computeOutputFilename } from "#flows/musicDownloadFlow/utils/computeOutputPath";
+import { isSameDir } from "#flows/musicDownloadFlow/utils/cleanOutputDir";
 import { DownloadSourceTree } from "./DownloadSourceTree/DownloadSourceTree";
 import { DownloadSourceDetail } from "./DownloadSourceDetail/DownloadSourceDetail";
 import { DynamicHintBar } from "#components/DynamicHintBar/DynamicHintBar";
@@ -27,7 +28,7 @@ interface DownloadPanelProps {
 
 export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, width, height }) => {
     const theme = useTheme();
-    const { setSourcesInnerFocus, focusSourcesPane } = useFocusActions();
+    const { setSourcesInnerFocus, focusSourcesPane, setIsEditingField } = useFocusActions();
     const { activeWindow, isEditingField } = useFocusChrome();
     const secondaryPanel = useFocusSecondaryPanel();
 
@@ -83,7 +84,13 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
             ? computeCompiledMetadata(snapshot.attributes.metadataGroups, snapshot.attributes.metadataOverride)
             : null;
 
-    const { outputDir } = getSaveSettings();
+    const { outputDir: defaultOutputDir } = getSaveSettings();
+    const outputDirOverride =
+        snapshot?.attributes?.kind === "track" ? snapshot.attributes.outputDirOverride : undefined;
+    const outputDir = outputDirOverride ?? defaultOutputDir;
+    const trackAttrs = snapshot?.attributes?.kind === "track" ? snapshot.attributes : null;
+    const filenameOverride = trackAttrs?.outputFilenameOverride;
+    const overwriteTags = trackAttrs?.overwriteTags !== false;
 
     const downloadNavIndex =
         downloadSources.length === 0
@@ -96,9 +103,16 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     const listHeight = height - HINT_BAR_HEIGHT;
 
     // Auto-detect when compiled metadata would produce a different filename than what's on disk
-    const previewFilename = compiled ? computeOutputFilename(compiled) : null;
+    const previewFilename = compiled ? computeOutputFilename(compiled, filenameOverride) : null;
     const savedFilename = savedSource?.savedFile ? path.basename(savedSource.savedFile.path) : null;
-    const hasMetadataChange = previewFilename != null && savedFilename != null && previewFilename !== savedFilename;
+    // A per-track folder the saved file isn't in yet. Only an explicit override counts: changing the
+    // default folder in Settings applies to new saves, it doesn't drag every saved file along.
+    const hasFolderChange =
+        outputDirOverride != null &&
+        savedSource?.savedFile != null &&
+        !isSameDir(path.dirname(savedSource.savedFile.path), outputDirOverride);
+    const hasMetadataChange =
+        previewFilename != null && savedFilename != null && (previewFilename !== savedFilename || hasFolderChange);
 
     // Combined diff flag: manually triggered source-switch OR auto-detected metadata change
     const showDiff = isDiffMode || hasMetadataChange;
@@ -189,6 +203,8 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     }
 
     function handleCancelDiff() {
+        // A pending folder move has no other way out of the diff: cancelling drops the custom folder.
+        if (!isDiffMode && hasFolderChange) (typedTask as unknown as DownloadTask)?.setOutputDir(undefined);
         setIsDiffMode(false);
         setPendingSourceIndex(null);
         setSourcesInnerFocus("list");
@@ -262,7 +278,13 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                     source={selectedSource}
                     savedSource={savedSource}
                     compiled={compiled}
+                    overrides={trackAttrs?.metadataOverride ?? {}}
                     outputDir={outputDir}
+                    defaultOutputDir={defaultOutputDir}
+                    isOutputOverridden={outputDirOverride != null}
+                    filenameOverride={filenameOverride}
+                    overwriteTags={overwriteTags}
+                    previewFilename={previewFilename}
                     isDiffMode={showDiff}
                     diffKind={isDiffMode ? "source-switch" : "metadata-change"}
                     pendingSource={effectivePendingSource}
@@ -275,6 +297,14 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                     onCancelDiff={handleCancelDiff}
                     onRelocateFile={handleRelocateFile}
                     onSave={handleSave}
+                    onChangeOutputDir={(dir) => (typedTask as unknown as DownloadTask)?.setOutputDir(dir)}
+                    onChangeFilename={(name) => (typedTask as unknown as DownloadTask)?.setOutputFilename(name)}
+                    onChangeOverwriteTags={(overwrite) =>
+                        (typedTask as unknown as DownloadTask)?.setOverwriteTags(overwrite)
+                    }
+                    onOverridesChange={(updated) => typedTask?.updateAttributes({ metadataOverride: updated })}
+                    setIsEditingField={setIsEditingField}
+                    onFocusPane={() => focusSourcesPane("detail")}
                 />
             </Box>
             <DynamicHintBar width={width - 2} isActive={isPanelActive} />

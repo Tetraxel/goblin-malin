@@ -3,6 +3,7 @@ import path from "path";
 import { Text } from "ink";
 import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
 import { MusicDownloadTaskAttributes, TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import { localFileName } from "#flows/musicDownloadFlow/utils/localFileName";
 
 // Unlike yt-dlp (always exactly one row), Soulseek can produce several candidate
 // rows for one track — pick the single most relevant one to summarize in this
@@ -28,7 +29,9 @@ export const SoulseekCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ tas
     const saved = downloadSource?.savedFile;
     const display = saved
         ? path.basename(saved.path)
-        : (downloadSource?.localFile?.name ?? downloadSource?.state ?? "");
+        : downloadSource?.localFile
+          ? localFileName(downloadSource.localFile)
+          : (downloadSource?.state ?? "");
 
     const color = saved
         ? "cyan"

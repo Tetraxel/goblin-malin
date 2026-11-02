@@ -83,5 +83,12 @@
         "primary": "#9a6700",
         "destructive": "#cf222e",
         "neutral": "#57606a"
+    },
+    "fileAttributes": {
+        "header": "#9a6700",
+        "headerText": "#ffffff",
+        "background": "#fff3cd",
+        "label": "#7d5a00",
+        "value": "#24292f"
     }
 }
