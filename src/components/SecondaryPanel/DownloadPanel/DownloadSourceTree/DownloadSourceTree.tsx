@@ -3,16 +3,20 @@ import { Box, Text, type DOMElement } from "ink";
 import { useWheelTarget } from "#base/mouse/useMouseTarget";
 import { useTheme } from "#base/themeContext";
 import { providerDisplayRegistry } from "#base/providerDisplay";
-import { TrackDownloadSource, DownloadProvider } from "#flows/musicDownloadFlow/types";
+import { TrackDownloadSource, DownloadProvider, DownloadQueryField } from "#flows/musicDownloadFlow/types";
 import type { Updater } from "#hooks/useFocusManager";
 import { togglePlayback } from "#utils/togglePlayback";
 import { useShortcuts } from "#hooks/useShortcuts";
+import { useNowPlaying, type NowPlaying } from "#hooks/useNowPlaying";
 import { ProviderHeader } from "./ProviderHeader";
 import { MetadataHeader } from "./MetadataHeader";
 import { SourceFileRow } from "./SourceFileRow";
+import { QueryLines } from "./QueryLines";
 
 interface DownloadSourceTreeProps {
     sources: TrackDownloadSource[];
+    /** Show, under each group of rows, what the provider was actually asked for. */
+    showQuery: boolean;
     selectedSourceIndex: number;
     isActive: boolean;
     width: number;
@@ -42,6 +46,7 @@ type TreeItem =
           source: TrackDownloadSource;
           sourceIndex: number;
       }
+    | { type: "query-lines"; query: DownloadQueryField[] }
     | { type: "file-row"; source: TrackDownloadSource; sourceIndex: number };
 
 function getProviderDisplay(provider: string): {
@@ -57,13 +62,16 @@ function metadataKeyOf(source: TrackDownloadSource): string {
     return m.uri ?? `${m.platform}::${m.id}`;
 }
 
-function buildTreeItems(sources: TrackDownloadSource[]): TreeItem[] {
+function buildTreeItems(sources: TrackDownloadSource[], showQuery: boolean): TreeItem[] {
     const items: TreeItem[] = [];
     const seenProviders = new Set<string>();
     // Consecutive sources under the same provider that used the identical metadata
     // (the common case — one search/lookup feeds every candidate row) share a single
     // "used …" header instead of repeating it before every row.
     let lastMetadataKey: string | undefined;
+    // Same idea for the query: rows found by one search share one set of query lines, and a
+    // new set appears only where the query changes (e.g. Soulseek's MP3 search after its FLAC one).
+    let lastQueryKey: string | undefined;
     sources.forEach((source, i) => {
         if (!seenProviders.has(source.provider)) {
             seenProviders.add(source.provider);
@@ -75,19 +83,36 @@ function buildTreeItems(sources: TrackDownloadSource[]): TreeItem[] {
                 color,
             });
             lastMetadataKey = undefined;
+            lastQueryKey = undefined;
         }
         const metadataKey = metadataKeyOf(source);
         if (metadataKey !== lastMetadataKey) {
             items.push({ type: "metadata-header", source, sourceIndex: i });
             lastMetadataKey = metadataKey;
         }
+        if (showQuery && source.query && source.query.length > 0) {
+            const queryKey = JSON.stringify(source.query);
+            if (queryKey !== lastQueryKey) {
+                items.push({ type: "query-lines", query: source.query });
+                lastQueryKey = queryKey;
+            }
+        }
         items.push({ type: "file-row", source, sourceIndex: i });
     });
     return items;
 }
 
+/** Whether the player is on this source's file (the downloaded one, or the copy saved from it). */
+function playbackOf(source: TrackDownloadSource, nowPlaying: NowPlaying): "playing" | "paused" | undefined {
+    if (!nowPlaying) return undefined;
+    const isThis = nowPlaying.filePath === source.localFile?.path || nowPlaying.filePath === source.savedFile?.path;
+    if (!isThis) return undefined;
+    return nowPlaying.isPaused ? "paused" : "playing";
+}
+
 export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     sources,
+    showQuery,
     selectedSourceIndex,
     isActive,
     width,
@@ -102,7 +127,9 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     onInnerFocusSwitch,
 }) => {
     const theme = useTheme();
-    const treeItems = buildTreeItems(sources);
+    // Re-renders only when the track or its paused state changes, not on playback progress.
+    const nowPlaying = useNowPlaying();
+    const treeItems = buildTreeItems(sources, showQuery);
     const selectableIndices = treeItems
         .filter((item): item is Extract<TreeItem, { type: "file-row" }> => item.type === "file-row")
         .map((item) => item.sourceIndex);
@@ -256,6 +283,10 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                     return <MetadataHeader key={`mh-${i}`} source={item.source} />;
                 }
 
+                if (item.type === "query-lines") {
+                    return <QueryLines key={`ql-${i}`} query={item.query} />;
+                }
+
                 return (
                     <SourceFileRow
                         key={`fr-${i}`}
@@ -264,6 +295,7 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                         isSelected={item.sourceIndex === selectedSourceIndex}
                         isActive={isActive}
                         width={width}
+                        playback={playbackOf(item.source, nowPlaying)}
                         onSelect={onClickSource}
                     />
                 );

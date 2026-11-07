@@ -83,6 +83,11 @@ export class SessionManager {
         this.persistTimer = setTimeout(() => this.flushPending(), delay);
     }
 
+    /** Writes the debounced changes now (the app is closing). The store's own write still has to be awaited. */
+    flushNow(): void {
+        this.flushPending();
+    }
+
     /** Write any debounced snapshots immediately to the *current* session. */
     private flushPending(): void {
         if (!this.persistTimer && this.pendingSnapshots === null) return;

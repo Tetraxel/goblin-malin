@@ -68,6 +68,12 @@ export class SessionStore {
         }
     }
 
+    /** Resolves once everything handed to the store so far is on disk. */
+    async flush(): Promise<void> {
+        if (this.dirty && !this.writing) void this.flushToDisk();
+        while (this.dirty || this.writing) await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+
     private getCached(): SessionsFile {
         if (!this.cache) this.cache = this.readFromDisk();
         return this.cache;

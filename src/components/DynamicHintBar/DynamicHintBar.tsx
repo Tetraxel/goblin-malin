@@ -78,7 +78,13 @@ export const DynamicHintBar: React.FC<DynamicHintBarProps> = ({ width, isActive 
     const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
 
     useEffect(() => {
-        return shortcutRegistry.subscribe(forceUpdate);
+        const unsubscribe = shortcutRegistry.subscribe(forceUpdate);
+        // The registry can change between this bar's first render and this subscription: when a tab
+        // switch swaps one panel for another, the old panel unregisters its contexts in the same commit
+        // (its cleanup runs before this effect), so that notification is missed and the bar would keep
+        // showing the old panel's lines. Read the registry again now that we are listening.
+        forceUpdate();
+        return unsubscribe;
     }, []);
 
     if (!isActive) return null;

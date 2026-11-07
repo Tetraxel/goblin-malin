@@ -10,7 +10,14 @@ import { StatusType } from "#base/task/task-status";
 import { Logger } from "#base/logger/logger";
 import { makeAbortError, throwIfAborted } from "#utils/errors";
 import { probeAudio } from "#utils/probeAudio";
-import { APIProvider, TrackMetadata, TrackDownloadSource, LocalFile, FileInfo } from "#flows/musicDownloadFlow/types";
+import {
+    APIProvider,
+    TrackMetadata,
+    TrackDownloadSource,
+    DownloadQueryField,
+    LocalFile,
+    FileInfo,
+} from "#flows/musicDownloadFlow/types";
 import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { readFileInfo } from "#flows/musicDownloadFlow/utils/readFileInfo";
 import { getTempDownloadDir, getDownloadProviderSettings } from "../../../saveSettings";
@@ -198,6 +205,17 @@ export class SoulseekService extends DownloadService {
         }
     }
 
+    /** The exact text sent to Soulseek's search for one format: artist, title, then the `.ext` filter. */
+    private searchQuery(trackMetadata: TrackMetadata, extension: Extension): string {
+        const artistName = trackMetadata.artists?.[0]?.name ?? "";
+        return cleanSearchTerm(`${artistName} ${trackMetadata.trackName} .${extension}`);
+    }
+
+    /** What every row found by that search records as its query: the one search box, as sent. */
+    private queryFields(trackMetadata: TrackMetadata, extension: Extension): DownloadQueryField[] {
+        return [{ label: "Search", value: this.searchQuery(trackMetadata, extension) }];
+    }
+
     private searchOnce(query: string, timeoutMs: number): Promise<SlskFile[]> {
         return this.withReconnect(
             (client) =>
@@ -281,8 +299,11 @@ export class SoulseekService extends DownloadService {
             downloadedAt: new Date(),
             selected: false,
             progress: 0,
+            // The first search is for FLAC; rows found later carry the query that actually found them.
+            query: this.queryFields(trackMetadata, "flac"),
         };
         onUpdate?.(pendingSource);
+        let lastQuery = pendingSource.query;
 
         // Stable per-candidate row identity, assigned once results are ranked so every
         // candidate can be shown immediately as "pending" and later updated in place as
@@ -329,7 +350,9 @@ export class SoulseekService extends DownloadService {
                 // first so retries don't just pile up unused files in the temp dir.
                 deleteExistingTempFiles(SoulseekService.display.label, trackMetadata, extension, tempDir);
 
-                const query = cleanSearchTerm(`${artistName} ${trackTitle} .${extension}`);
+                const query = this.searchQuery(trackMetadata, extension);
+                const queryFields = this.queryFields(trackMetadata, extension);
+                lastQuery = queryFields;
                 this.status.update({ progress: 10 });
                 const results = await this.searchOnce(query, searchTimeoutMs);
                 this.status.update({ progress: 30 });
@@ -356,6 +379,7 @@ export class SoulseekService extends DownloadService {
                             selected: false,
                             providerDetail: candidate.user,
                             retryPayload: candidate,
+                            query: queryFields,
                         },
                         { attemptId }
                     );
@@ -380,6 +404,7 @@ export class SoulseekService extends DownloadService {
                                 selected: false,
                                 providerDetail: skippedCandidate.user,
                                 retryPayload: skippedCandidate,
+                                query: queryFields,
                             },
                             { attemptId: skippedId }
                         );
@@ -400,6 +425,10 @@ export class SoulseekService extends DownloadService {
                     );
                     if (result) {
                         markRemainingSkipped(attemptIndex + 1);
+                        // The task applies the returned source to the row of the *last*
+                        // onUpdate call — which is now the last skipped candidate's. Re-address
+                        // the winner's own row last so its result doesn't land on that one.
+                        onUpdate?.(result, { attemptId });
                         return result;
                     }
                 }
@@ -420,6 +449,7 @@ export class SoulseekService extends DownloadService {
                 progress: 0,
                 providerDetail: lastCandidate?.user,
                 retryPayload: lastCandidate,
+                query: lastQuery,
             };
         } catch (error) {
             if ((error as Error).name === "AbortError") throw error;
@@ -456,6 +486,7 @@ export class SoulseekService extends DownloadService {
         // so a real task abort still cancels it too, but independently abortable via
         // the row's `abort` option (e.g. rejectDownloadSource) without touching any
         // other candidate or the search loop itself.
+        const query = this.queryFields(trackMetadata, extension);
         const candidateController = new AbortController();
         const onOuterAbort = () => candidateController.abort();
         signal?.addEventListener("abort", onOuterAbort, { once: true });
@@ -472,6 +503,7 @@ export class SoulseekService extends DownloadService {
                 selected: false,
                 providerDetail: candidate.user,
                 retryPayload: candidate,
+                query,
             },
             { attemptId, abort: () => candidateController.abort() }
         );
@@ -500,6 +532,7 @@ export class SoulseekService extends DownloadService {
                             selected: false,
                             providerDetail: candidate.user,
                             retryPayload: candidate,
+                            query,
                         },
                         { attemptId }
                     );
@@ -521,6 +554,7 @@ export class SoulseekService extends DownloadService {
                     selected: false,
                     providerDetail: candidate.user,
                     retryPayload: candidate,
+                    query,
                 },
                 { attemptId }
             );
@@ -568,6 +602,7 @@ export class SoulseekService extends DownloadService {
             selected: false,
             providerDetail: candidate.user,
             retryPayload: candidate,
+            query: this.queryFields(trackMetadata, extension),
         };
     }
 
@@ -609,6 +644,7 @@ export class SoulseekService extends DownloadService {
             progress: 100,
             providerDetail: candidate?.user,
             retryPayload: candidate,
+            query: this.queryFields(trackMetadata, extension),
         };
     }
 }

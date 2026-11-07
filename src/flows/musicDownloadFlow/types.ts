@@ -345,6 +345,14 @@ export type DownloadProgressInfo = {
     log?: string[];
 };
 
+/** One input a download provider was given to find a source — e.g. the raw text of a search box, or a URL. */
+export type DownloadQueryField = {
+    /** What the input is (e.g. "Search", "URL"). */
+    label: string;
+    /** Exactly what was sent, with no cleanup for display. */
+    value: string;
+};
+
 export type TrackDownloadSource = {
     /**
      * "pending": queued, will still be attempted.
@@ -369,6 +377,12 @@ export type TrackDownloadSource = {
     progressInfo?: DownloadProgressInfo;
     /** Extra provider-specific origin detail (e.g. the Soulseek peer username this file came from). */
     providerDetail?: string;
+    /**
+     * What the provider was actually asked for to find this source, one entry per input it used (a
+     * single search box, or several fields). Not the metadata it was derived from — the real thing sent.
+     * Unset on sources saved before this was recorded.
+     */
+    query?: DownloadQueryField[];
     /**
      * Opaque, provider-specific data needed to retry this exact candidate on demand
      * (e.g. the Soulseek peer/file reference for a "skipped" or "failed" row) —

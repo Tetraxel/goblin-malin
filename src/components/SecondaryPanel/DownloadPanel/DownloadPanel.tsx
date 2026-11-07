@@ -44,6 +44,8 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
         () => typedTask?.get() as TaskSnapshot<MusicDownloadTaskAttributes> | undefined
     );
     const [isDiffMode, setIsDiffMode] = useState(false);
+    // Shows what each provider was actually asked for under its rows (the "e" toggle, like the Metadata tab's).
+    const [showQuery, setShowQuery] = useState(false);
     const [pendingSourceIndex, setPendingSourceIndex] = useState<number | null>(null);
 
     const [prevTypedTask, setPrevTypedTask] = useState(typedTask);
@@ -146,12 +148,18 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                 label: "Expand",
                 handler: () => setSplitRatio((prev) => Math.min(0.75, prev + 0.04)),
             },
+            {
+                id: "downloadPanel.toggleQuery",
+                defaultShortcut: { input: "e" },
+                label: "Toggle query",
+                handler: () => setShowQuery((prev) => !prev),
+            },
         ],
         hintLines: [
             {
                 id: "downloadPanel.line.panel",
                 left: { type: "text", value: "Download Panel", bold: true },
-                shortcutIds: ["downloadPanel.shrink", "downloadPanel.expand"],
+                shortcutIds: ["downloadPanel.shrink", "downloadPanel.expand", "downloadPanel.toggleQuery"],
             },
         ],
     });
@@ -280,6 +288,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
             <Box flexDirection="row" flexGrow={1} overflow="hidden">
                 <DownloadSourceTree
                     sources={downloadSources}
+                    showQuery={showQuery}
                     selectedSourceIndex={downloadNavIndex}
                     isActive={isPanelActive && innerFocus === "list"}
                     width={leftWidth}

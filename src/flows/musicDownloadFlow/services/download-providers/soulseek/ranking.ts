@@ -68,9 +68,21 @@ export function calculateResultWeight(result: SlskFile, query: RankingQuery): nu
     return score;
 }
 
-/** Rank + filter search results, keeping only the top `MAX_DOWNLOAD_ATTEMPTS` candidates. */
+/**
+ * Rank + filter search results, keeping only the top `MAX_DOWNLOAD_ATTEMPTS` candidates.
+ * The same peer can answer a search more than once, so the exact same file (user + path)
+ * is only kept once — slsk-client also keys its downloads by `user_file`, so duplicates
+ * would collide inside the library anyway.
+ */
 export function rankResults(results: SlskFile[], query: RankingQuery): SlskFile[] {
-    return results
+    const seen = new Set<string>();
+    const unique = results.filter((result) => {
+        const key = `${result.user}\0${result.file}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+    return unique
         .map((result) => ({ result, weight: calculateResultWeight(result, query) }))
         .filter(({ weight }) => weight >= 0)
         .sort((a, b) => b.weight - a.weight)

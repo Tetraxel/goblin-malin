@@ -27,6 +27,7 @@ import { deleteConfirmBridge, DeleteConfirmRequest } from "#base/bridges/deleteC
 import { consentBridge, ConsentRequest } from "#base/bridges/consentBridge";
 import { collectionHintBridge, CollectionHintRequest } from "#base/bridges/collectionHintBridge";
 import { ConfirmModal } from "./ConfirmModal/ConfirmModal";
+import { ClosingModal } from "./ClosingModal/ClosingModal";
 import { useConfirmModal } from "./ConfirmModal/useConfirmModal";
 import { useTheme } from "#base/themeContext";
 
@@ -187,6 +188,8 @@ export const AppInner: React.FC<{
                     onConfirm={handleConfirm}
                     onCancel={handleCancel}
                 />
+
+                <ClosingModal terminalHeight={terminalHeight} />
 
                 {updateInfo && (
                     <UpdateModal

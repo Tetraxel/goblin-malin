@@ -15,6 +15,7 @@ import {
     TrackMetadata,
     TrackDownloadSource,
     DownloadProgressInfo,
+    DownloadQueryField,
     LocalFile,
     FileInfo,
 } from "#flows/musicDownloadFlow/types";
@@ -88,6 +89,8 @@ export class YtDlpService extends DownloadService {
 
         // In-progress source emitted right away so the UI shows the download before it completes.
         const startedAt = Date.now();
+        // yt-dlp isn't searching: it is handed the track's page URL and nothing else.
+        const query: DownloadQueryField[] = [{ label: "URL", value: trackUrl }];
         const pendingSource: TrackDownloadSource = {
             state: "downloading",
             provider: "ytdlp",
@@ -96,6 +99,7 @@ export class YtDlpService extends DownloadService {
             selected: false,
             progress: 0,
             progressInfo: { startedAt },
+            query,
         };
         onUpdate?.(pendingSource, { abort: reportAbort });
 
@@ -281,6 +285,7 @@ export class YtDlpService extends DownloadService {
                 selected: true,
                 fileInfo,
                 progress: 100,
+                query,
             };
             return downloadSource;
         } catch (error) {

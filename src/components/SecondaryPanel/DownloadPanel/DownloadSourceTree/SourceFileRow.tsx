@@ -5,6 +5,7 @@ import { useTheme } from "#base/themeContext";
 import { TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 import { getProvenanceDisplay } from "#flows/musicDownloadFlow/utils/provenance";
 import { formatBytes } from "#components/SecondaryPanel/DownloadPanel/utils";
+import { PlaybackIndicator } from "#components/PlaybackIndicator";
 import { StateBadge } from "../StateBadge";
 
 interface SourceFileRowProps {
@@ -13,10 +14,20 @@ interface SourceFileRowProps {
     isSelected: boolean;
     isActive: boolean;
     width: number;
+    /** Set when the player is on this source's file. */
+    playback?: "playing" | "paused";
     onSelect: (sourceIndex: number) => void;
 }
 
-export function SourceFileRow({ source, sourceIndex, isSelected, isActive, width, onSelect }: SourceFileRowProps) {
+export function SourceFileRow({
+    source,
+    sourceIndex,
+    isSelected,
+    isActive,
+    width,
+    playback,
+    onSelect,
+}: SourceFileRowProps) {
     const theme = useTheme();
     const rowRef = useRef<DOMElement>(null);
     useClickTarget(rowRef, () => onSelect(sourceIndex));
@@ -72,6 +83,11 @@ export function SourceFileRow({ source, sourceIndex, isSelected, isActive, width
                     {`${sourceIndex + 1}. `}
                 </Text>
             </Box>
+            {playback && (
+                <Box flexShrink={0} paddingRight={1}>
+                    <PlaybackIndicator state={playback} />
+                </Box>
+            )}
             <Box flexGrow={1} overflow="hidden">
                 {filename ? (
                     <Text
