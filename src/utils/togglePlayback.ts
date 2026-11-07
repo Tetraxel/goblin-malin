@@ -24,3 +24,18 @@ export function playFrom(filePath: string, startMs: number): void {
         player.play(filePath, startMs).catch(() => {});
     }
 }
+
+/**
+ * A click on a playback bar's track: seek there when the file is the loaded one, otherwise start it from
+ * there. `knownDurationMs` (from the file's info) is what a not-yet-loaded file's fraction is measured on.
+ */
+export function seekFileToFraction(filePath: string, fraction: number, knownDurationMs: number): void {
+    const status = getInstance().getStatus();
+    if (status.filePath === filePath && status.durationMs > 0) {
+        getInstance()
+            .seekMs(Math.round(fraction * status.durationMs))
+            .catch(() => {});
+    } else if (knownDurationMs > 0) {
+        playFrom(filePath, Math.round(fraction * knownDurationMs));
+    }
+}

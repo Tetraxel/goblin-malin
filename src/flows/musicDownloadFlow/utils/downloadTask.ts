@@ -24,6 +24,7 @@ import { metadataLimiter, downloadLimiter } from "./stageLimiters";
 import { computeConfidenceScore } from "./confidence";
 import { ensureDiscoveryConsent, getUnansweredConsentKeys } from "./discoveryConsent";
 import { computeCompiledMetadata } from "./compiledMetadata";
+import { compiledFieldValues } from "./metadataFields";
 import { compiledMetadataToTags } from "./compiledMetadataToTags";
 import { computeOutputPath } from "./computeOutputPath";
 import { pickAutoSelectedIndex } from "./sourceSelection";
@@ -894,12 +895,12 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         });
         const outputDir = attrs!.outputDirOverride ?? settings.outputDir;
         await fs.mkdir(outputDir, { recursive: true });
-        // Re-saving into the folder the file is already in must not pick a "(2)" name because
-        // the file itself is in the way.
+        // Neither the file itself nor the saved files of the other sources (deleted below) may make
+        // the name look taken and push this one to "(2)".
         const outputPath = computeOutputPath(
             compiled,
             outputDir,
-            selectedSource.savedFile?.path,
+            sources.map((s) => s.savedFile?.path),
             attrs!.outputFilenameOverride
         );
 
@@ -939,7 +940,18 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             this.updateAttributes({
                 downloadSources: sources.map((s) =>
                     s === selectedSource
-                        ? { ...s, savedFile: { path: outputPath, savedAt: new Date() } }
+                        ? {
+                              ...s,
+                              savedFile: {
+                                  path: outputPath,
+                                  savedAt: new Date(),
+                                  // What was just written; when the file kept its own tags, what was known before.
+                                  tags:
+                                      attrs!.overwriteTags !== false
+                                          ? compiledFieldValues(compiled)
+                                          : selectedSource.savedFile?.tags,
+                              },
+                          }
                         : { ...s, savedFile: undefined }
                 ),
             });

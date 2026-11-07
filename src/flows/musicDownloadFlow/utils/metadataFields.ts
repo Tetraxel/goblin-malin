@@ -129,3 +129,8 @@ export const FIELDS: FieldDef[] = [
 ];
 
 export const navigableFields = FIELDS.filter((f) => f.editable);
+
+/** What the UI shows for every field of `compiled`, by field key. */
+export function compiledFieldValues(compiled: CompiledMetadata): Record<string, string> {
+    return Object.fromEntries(FIELDS.map((f) => [f.key, f.getCompiledValue(compiled)]));
+}

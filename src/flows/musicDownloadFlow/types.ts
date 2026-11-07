@@ -322,6 +322,12 @@ export type FileInfo = {
 export type SavedFile = {
     path: string;
     savedAt: Date;
+    /**
+     * The metadata that was written into the file's tags when it was saved, as the strings the UI shows
+     * ("—" for a missing one), keyed by compiled field. Absent when the file kept its own tags, and on
+     * files saved before this was recorded.
+     */
+    tags?: Record<string, string>;
 };
 
 /**

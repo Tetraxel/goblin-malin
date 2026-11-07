@@ -21,20 +21,21 @@ function samePath(a: string, b: string): boolean {
 
 /**
  * Where a track would be written inside `outputDir`, adding " (2)", " (3)"… when the name is taken.
- * `ownPath` is the file this track already saved: it doesn't count as "taken" by itself.
+ * `ownPaths` are the files this track already saved, or is about to replace: they don't count as "taken".
  */
 export function computeOutputPath(
     compiled: CompiledMetadata,
     outputDir: string,
-    ownPath?: string,
+    ownPaths: readonly (string | undefined)[] = [],
     filenameOverride?: string
 ): string {
     const safe = computeOutputFilename(compiled, filenameOverride);
     const basePath = path.join(outputDir, safe);
+    const isOwn = (p: string) => ownPaths.some((own) => own !== undefined && samePath(p, own));
 
     let dest = basePath;
     let counter = 2;
-    while (fs.existsSync(dest) && !(ownPath && samePath(dest, ownPath))) {
+    while (fs.existsSync(dest) && !isOwn(dest)) {
         const ext = path.extname(basePath);
         const base = path.basename(basePath, ext);
         dest = path.join(outputDir, `${base} (${counter})${ext}`);

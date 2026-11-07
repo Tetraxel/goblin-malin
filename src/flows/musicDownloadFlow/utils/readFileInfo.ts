@@ -30,7 +30,7 @@ function normalizeId3Tags(tags: NodeID3.Tags): Record<string, string | string[]>
     return embeddedTags;
 }
 
-async function readTags(filePath: string, format: "flac" | "mp3"): Promise<Record<string, string | string[]>> {
+export async function readTags(filePath: string, format: "flac" | "mp3"): Promise<Record<string, string | string[]>> {
     if (format === "flac") {
         const flacData = await readFlacTags(filePath);
         return flacData.tagMap ?? {};
