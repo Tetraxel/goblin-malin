@@ -25,6 +25,8 @@ interface DownloadSourceTreeProps {
     onRequestSelect: (index: number) => void;
     onRejectSource: (index: number) => void;
     onRetrySource: (index: number) => void;
+    /** Save (or update) the file of that source to the output folder. */
+    onRequestSave: (index: number) => void;
     onInnerFocusSwitch: () => void;
 }
 
@@ -96,6 +98,7 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     onRequestSelect,
     onRejectSource,
     onRetrySource,
+    onRequestSave,
     onInnerFocusSwitch,
 }) => {
     const theme = useTheme();
@@ -115,6 +118,7 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
 
     const selectedSource = sources[selectedSourceIndex];
     const canPlay = selectedSource?.localFile?.state === "found";
+    const saveLabel = selectedSource?.savedFile ? "Update" : "Save";
     // A source only carries retryPayload if its provider supports re-attempting it
     // on demand (e.g. a Soulseek candidate that was "skipped" or "failed") — gate on
     // the data being present rather than hardcoding which providers/states qualify.
@@ -172,6 +176,14 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                 },
             },
             {
+                id: "downloadSourceTree.save",
+                defaultShortcut: { input: "s" },
+                label: saveLabel,
+                handler: () => {
+                    if (canPlay) onRequestSave(selectedSourceIndex);
+                },
+            },
+            {
                 id: "downloadSourceTree.retry",
                 defaultShortcut: { input: "w" },
                 label: "Download",
@@ -206,7 +218,7 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                     "downloadSourceTree.select",
                     "downloadSourceTree.reject",
                     ...(canRetry ? ["downloadSourceTree.retry"] : []),
-                    ...(canPlay ? ["downloadSourceTree.playPause"] : []),
+                    ...(canPlay ? ["downloadSourceTree.playPause", "downloadSourceTree.save"] : []),
                 ],
             },
         ],

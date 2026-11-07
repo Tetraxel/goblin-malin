@@ -84,6 +84,9 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
             ? computeCompiledMetadata(snapshot.attributes.metadataGroups, snapshot.attributes.metadataOverride)
             : null;
 
+    const baseCompiled: CompiledMetadata | null =
+        snapshot?.attributes?.kind === "track" ? computeCompiledMetadata(snapshot.attributes.metadataGroups, {}) : null;
+
     const { outputDir: defaultOutputDir } = getSaveSettings();
     const outputDirOverride =
         snapshot?.attributes?.kind === "track" ? snapshot.attributes.outputDirOverride : undefined;
@@ -187,6 +190,21 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
         (typedTask as unknown as DownloadTask)?.retryDownloadSource(idx);
     }
 
+    /** Saves the file of the focused source: the selected one directly, another one after selecting it. */
+    function handleRequestSave(idx: number) {
+        const source = downloadSources[idx];
+        if (isSaving || source?.localFile?.state !== "found") return;
+        if (source.selected) {
+            handleSave();
+        } else if (downloadSources.some((s) => s.savedFile != null)) {
+            // Replacing the saved file is confirmed in the side-by-side view.
+            handleRequestSelect(idx);
+        } else {
+            (typedTask as unknown as DownloadTask)?.selectDownloadSource(idx);
+            handleSave();
+        }
+    }
+
     function handleConfirmDiff() {
         if (isDiffMode) {
             // Source-switch diff: confirm the new source selection
@@ -272,19 +290,20 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                     onRequestSelect={handleRequestSelect}
                     onRejectSource={handleRejectSource}
                     onRetrySource={handleRetrySource}
+                    onRequestSave={handleRequestSave}
                     onInnerFocusSwitch={() => setSourcesInnerFocus("detail")}
                 />
                 <DownloadSourceDetail
                     source={selectedSource}
                     savedSource={savedSource}
                     compiled={compiled}
+                    baseCompiled={baseCompiled}
                     overrides={trackAttrs?.metadataOverride ?? {}}
                     outputDir={outputDir}
                     defaultOutputDir={defaultOutputDir}
                     isOutputOverridden={outputDirOverride != null}
                     filenameOverride={filenameOverride}
                     overwriteTags={overwriteTags}
-                    previewFilename={previewFilename}
                     isDiffMode={showDiff}
                     diffKind={isDiffMode ? "source-switch" : "metadata-change"}
                     pendingSource={effectivePendingSource}
