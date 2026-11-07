@@ -20,6 +20,9 @@ interface SettingsTabProps {
     onSearchChange: (v: string) => void;
     onEditChange: (v: string) => void;
     onEditSubmit: (item: SettingsItem, v: string) => void;
+    onSearchClick: () => void;
+    /** Left-click on an interactive row; `step` is set when a select's ◀/▶ was hit. */
+    onItemClick: (index: number, step?: 1 | -1) => void;
 }
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({
@@ -35,6 +38,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     onSearchChange,
     onEditChange,
     onEditSubmit,
+    onSearchClick,
+    onItemClick,
 }) => {
     const listAreaH = Math.max(3, height - SEARCH_H);
     const rowStarts: number[] = [];
@@ -68,6 +73,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 placeholder="Search settings…"
                 highlighted={searchFocused && editingIndex === null}
                 inputFocus={searchFocused && isActive && editingIndex === null}
+                mouseWindow="settingsModal"
+                onFocusRequest={onSearchClick}
             />
 
             <Box flexDirection="column" overflow="hidden" flexGrow={1} flexShrink={0}>
@@ -84,6 +91,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             onEditChange={onEditChange}
                             onEditSubmit={(v) => onEditSubmit(item, v)}
                             innerWidth={width}
+                            onClick={(step) => onItemClick(idx, step)}
                         />
                     );
                 })}

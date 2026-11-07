@@ -47,7 +47,14 @@ function normalizeDiscoveryResult(raw: unknown): DiscoveryResult {
 // Title alone is worth 40, so a same-title cover by someone else does not pass.
 const LAST_RESORT_MIN_CONFIDENCE = 50;
 
+// Handle on the discovery stage currently running, so the user can cut it short.
+interface DiscoveryRun {
+    skipped: boolean;
+    skip: () => void;
+}
+
 export class DownloadTask extends Task<TrackDownloadTask> {
+    private discoveryRun?: DiscoveryRun;
     private metadataServices: ServiceScope<DownloadTask, MetadataService>;
     private discoveryServices: ServiceScope<DownloadTask, DiscoveryMetadataService>;
     private downloadServices: ServiceScope<DownloadTask, DownloadService>;
@@ -400,10 +407,23 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             metadataDiscovered: false,
         });
 
-        try {
+        // The user can end this stage early with skipDiscovery(). The run stops waiting at once; any
+        // request still in flight finishes in the background, and `run.skipped` keeps it from adding to
+        // the results afterwards.
+        const run: DiscoveryRun = { skipped: false, skip: () => {} };
+        const skippedSignal = new Promise<void>((resolve) => {
+            run.skip = () => {
+                run.skipped = true;
+                resolve();
+            };
+        });
+        this.discoveryRun = run;
+
+        const discoverEverywhere = async () => {
             // Phase A — MetadataService.searchTrack (like Spotify, Youtube, etc.)
             const services = this.metadataServices.getAllServices();
             for (const service of services) {
+                if (run.skipped) return;
                 // Skip the service that owns the primary metadata
                 if (
                     primaryMetadata.platform === service.id.toLowerCase() ||
@@ -424,6 +444,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 try {
                     this.logger.debug(`Searching for track using ${serviceKey}`);
                     const results = await service.searchTrack(primaryMetadata);
+                    if (run.skipped) return;
 
                     for (const result of results) {
                         this.addResultToGroup(result.metadata, serviceKey, [
@@ -443,27 +464,49 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             // Phase B — DiscoveryMetadataService.discoverFromUri (like Songlink).
             // Consent-gated services (Songlink) ask the user before their first use.
             for (const [key, ctor] of this.discoveryServiceRegistry.getAllConstructors()) {
+                if (run.skipped) return;
                 if (ctor.consent && !ctor.lastResort) await this.awaitDiscoveryConsent(key);
             }
             for (const discoveryService of this.discoveryServices.getAllServices()) {
+                if (run.skipped) return;
                 if (this.isLastResortService(discoveryService)) continue;
-                await this.runDiscoveryService(discoveryService, primaryMetadata, primaryUri);
+                await this.runDiscoveryService(discoveryService, primaryMetadata, primaryUri, undefined, false, run);
             }
 
             // Phase C — last-resort services (like Claude): slow and/or costly, so they only run when a
             // platform is still missing after everything above, and only once the user has allowed them.
             for (const [key, ctor] of this.discoveryServiceRegistry.getAllConstructors()) {
+                if (run.skipped) return;
                 if (!ctor.lastResort) continue;
                 const wanted = this.getMissingPlatforms();
                 if (wanted.length === 0) break;
                 if (!(await this.awaitDiscoveryConsent(key))) continue;
+                if (run.skipped) return;
                 if (!this.isDiscoveryServiceEnabled(key)) continue;
-                await this.runDiscoveryService(this.discoveryServices.get(key), primaryMetadata, primaryUri, wanted);
+                await this.runDiscoveryService(
+                    this.discoveryServices.get(key),
+                    primaryMetadata,
+                    primaryUri,
+                    wanted,
+                    false,
+                    run
+                );
             }
+        };
+
+        try {
+            await Promise.race([discoverEverywhere(), skippedSignal]);
         } finally {
+            if (this.discoveryRun === run) this.discoveryRun = undefined;
             this.updateAttributes({ metadataDiscoveringInProgress: false });
         }
+        if (run.skipped) this.logger.info("Discovery skipped by the user; keeping the sources found so far");
         this.updateAttributes({ metadataDiscovered: true });
+    }
+
+    /** Ends the running discovery stage now and keeps the sources found so far. No-op when none is running. */
+    skipDiscovery(): void {
+        this.discoveryRun?.skip();
     }
 
     // Runs one discovery service and merges what it found into the metadata groups.
@@ -473,7 +516,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         primaryMetadata: TrackMetadata,
         primaryUri: string,
         wantedPlatforms?: Platform[],
-        bypassCache = false
+        bypassCache = false,
+        run?: DiscoveryRun
     ): Promise<void> {
         const lastResort = this.isLastResortService(discoveryService);
         try {
@@ -483,6 +527,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 anchor,
                 searchKeys,
             } = normalizeDiscoveryResult(await (bypassCache ? runWithoutCache(discover) : discover()));
+            if (run?.skipped) return;
 
             // Store the anchor for Copy/Open contextual actions
             if (anchor) {
@@ -499,6 +544,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             const discovered = (allDiscovered ?? []).filter((m) => m.platform !== primaryMetadata.platform);
 
             for (const rudimentary of discovered) {
+                if (run?.skipped) return;
                 const targetServiceKey = this.findServiceKeyForPlatform(rudimentary.platform);
                 if (!targetServiceKey) continue;
 
@@ -557,6 +603,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                             finalMetadata = rudimentary;
                         }
                     }
+
+                    if (run?.skipped) return;
 
                     // A last-resort service only proposes URLs. Trust none of it: the platform itself must
                     // confirm the link exists, and what it returns must actually look like the primary track.

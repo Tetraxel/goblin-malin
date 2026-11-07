@@ -1,6 +1,7 @@
 ﻿import React from "react";
 import { Box, Text } from "ink";
 import TextInput from "ink-text-input";
+import { ClickArea } from "#base/mouse/ClickArea";
 import { useTheme } from "#base/themeContext";
 import type { SettingsItem } from "#settings/buildSettingsItems";
 import { sanitizeInput } from "#utils/string";
@@ -13,6 +14,8 @@ interface SettingsItemRowProps {
     onEditChange: (v: string) => void;
     onEditSubmit: (v: string) => void;
     innerWidth: number;
+    /** Left-click on an interactive row. `step` is set when a select's ◀ (-1) or ▶ (+1) was hit. */
+    onClick?: (step?: 1 | -1) => void;
 }
 
 export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
@@ -23,6 +26,7 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
     onEditChange,
     onEditSubmit,
     innerWidth,
+    onClick,
 }) => {
     const theme = useTheme();
     const cursor = isSelected ? "☛ " : "  ";
@@ -63,19 +67,19 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
         case "checkbox":
             // ☑︎ is bad on windows terminals, so we use ✔ and ☐ instead
             return (
-                <Box paddingLeft={item.indent} flexShrink={0}>
+                <ClickArea window="settingsModal" onClick={() => onClick?.()} paddingLeft={item.indent} flexShrink={0}>
                     <Text color={isSelected ? theme.ui.focusIndicator : undefined} bold={isSelected}>
                         {cursor}
                         {item.get() ? "✔" : "☐"}
                         {"  " + item.label}
                     </Text>
-                </Box>
+                </ClickArea>
             );
 
         case "textInput": {
             const prefix = cursor + item.label + ": ";
             return (
-                <Box paddingLeft={item.indent} flexShrink={0}>
+                <ClickArea window="settingsModal" onClick={() => onClick?.()} paddingLeft={item.indent} flexShrink={0}>
                     <Text color={isSelected ? theme.ui.focusIndicator : undefined} bold={isSelected}>
                         {prefix}
                     </Text>
@@ -89,29 +93,41 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
                     ) : (
                         <Text color={theme.text.secondary}>[{item.get()}]</Text>
                     )}
-                </Box>
+                </ClickArea>
             );
         }
 
-        case "select":
+        case "select": {
+            // Row layout: indent, cursor, "label: ", then "[value ◀ ▶]" — find the arrows by column.
+            const valueText = item.get();
+            const arrowsX = item.indent + cursor.length + item.label.length + 2 + 1 + valueText.length + 1;
             return (
-                <Box paddingLeft={item.indent} flexShrink={0}>
+                <ClickArea
+                    window="settingsModal"
+                    onClick={(event, bounds) => {
+                        const x = event.x - bounds.x;
+                        onClick?.(x === arrowsX ? -1 : 1);
+                    }}
+                    paddingLeft={item.indent}
+                    flexShrink={0}
+                >
                     <Text color={isSelected ? theme.ui.focusIndicator : undefined} bold={isSelected}>
                         {cursor}
                         {item.label}:{" "}
                     </Text>
-                    <Text color={theme.text.secondary}>[{item.get()} ◀ ▶]</Text>
-                </Box>
+                    <Text color={theme.text.secondary}>[{valueText} ◀ ▶]</Text>
+                </ClickArea>
             );
+        }
 
         case "action":
             return (
-                <Box paddingLeft={item.indent} flexShrink={0}>
+                <ClickArea window="settingsModal" onClick={() => onClick?.()} paddingLeft={item.indent} flexShrink={0}>
                     <Text color={isSelected ? theme.ui.focusIndicator : undefined} bold={isSelected}>
                         {cursor}
                         {item.label}
                     </Text>
-                </Box>
+                </ClickArea>
             );
 
         case "readonlyText":

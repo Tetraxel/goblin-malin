@@ -2,6 +2,7 @@
 import { Box, Text } from "ink";
 import { useShortcuts } from "#hooks/useShortcuts";
 import TextInput from "ink-text-input";
+import { ClickArea } from "#base/mouse/ClickArea";
 import { Task } from "#base/task/task";
 import { PromptType, SetupWizardPrompt } from "#base/task/task-prompt";
 import { providerDisplayRegistry } from "#base/providerDisplay";
@@ -198,6 +199,35 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
         switchBack();
     }, [wizardOnDisable, switchBack]);
 
+    const selectMode = (newMode: string) => {
+        setSelectedMode(newMode);
+        // Reset field values to current env values for the newly selected mode
+        if (config?.modes) {
+            const newActiveMode = config.modes.find((m) => m.id === newMode) ?? config.modes[0];
+            setFieldValues((prev) => ({
+                ...prev,
+                ...Object.fromEntries(newActiveMode.fields.map((f) => [f.envVar, process.env[f.envVar] ?? ""])),
+            }));
+        }
+    };
+
+    /** What Enter does on an item: open a link, edit a field, or pick a mode. */
+    const activateItem = (item: InteractiveItemUnion | undefined) => {
+        if (!item) return;
+        if (item.kind === "link") openUrl(item.url);
+        else if (item.kind === "field") setEditingField(item.envVar);
+        else if (item.kind === "mode") selectMode(item.id);
+    };
+
+    /** Left-click on an item: focus it and activate it (a click on the field being edited is left to the input). */
+    const clickItem = (index: number) => {
+        const item = interactiveItems[index];
+        if (!item || (item.kind === "field" && editingField === item.envVar)) return;
+        setEditingField(null);
+        setFocusedIndex(index);
+        activateItem(item);
+    };
+
     useShortcuts({
         id: "setupWizardModal",
         isActive,
@@ -255,24 +285,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
                 label: "Open/Edit",
                 handler: () => {
                     if (editingField) return;
-                    const item = interactiveItems[focusedIndex];
-                    if (!item) return;
-                    if (item.kind === "link") openUrl(item.url);
-                    else if (item.kind === "field") setEditingField(item.envVar);
-                    else if (item.kind === "mode") {
-                        const newMode = item.id;
-                        setSelectedMode(newMode);
-                        // Reset field values to current env values for the newly selected mode
-                        if (config?.modes) {
-                            const newActiveMode = config.modes.find((m) => m.id === newMode) ?? config.modes[0];
-                            setFieldValues((prev) => ({
-                                ...prev,
-                                ...Object.fromEntries(
-                                    newActiveMode.fields.map((f) => [f.envVar, process.env[f.envVar] ?? ""])
-                                ),
-                            }));
-                        }
-                    }
+                    activateItem(interactiveItems[focusedIndex]);
                 },
             },
         ],
@@ -332,7 +345,12 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
                             if (item.type === "link") linkInteractiveIndex++;
                             const isFocused = isActive && item.type === "link" && focusedIndex === myIndex;
                             return (
-                                <Box key={ii} flexDirection="row">
+                                <ClickArea
+                                    key={ii}
+                                    window="setupWizardModal"
+                                    onClick={() => item.type === "link" && clickItem(myIndex)}
+                                    flexDirection="row"
+                                >
                                     <Text color={isFocused ? theme.text.active : theme.text.muted}>
                                         {isFocused ? "☛ " : "  "}
                                     </Text>
@@ -353,7 +371,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
                                     ) : (
                                         <Text>{item.text}</Text>
                                     )}
-                                </Box>
+                                </ClickArea>
                             );
                         })}
                     </Box>
@@ -370,7 +388,6 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
             flexDirection="column"
             justifyContent="center"
             alignItems="center"
-            backgroundColor={theme.ui.background}
         >
             <Box
                 flexDirection="column"
@@ -406,7 +423,12 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
                                   ? borderColor
                                   : theme.text.secondary;
                             return (
-                                <Box key={mode.id} flexDirection="row">
+                                <ClickArea
+                                    key={mode.id}
+                                    window="setupWizardModal"
+                                    onClick={() => clickItem(itemIndex)}
+                                    flexDirection="row"
+                                >
                                     <Text color={isFocused ? theme.action.primary : theme.text.muted}>
                                         {isFocused ? "☛ " : "  "}
                                     </Text>
@@ -416,7 +438,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
                                     <Text color={itemColor} bold={isSelected || isFocused}>
                                         {mode.label}
                                     </Text>
-                                </Box>
+                                </ClickArea>
                             );
                         })}
                         {activeModeDescription && (
@@ -451,7 +473,9 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
                         const isEditing = editingField === field.envVar;
 
                         return (
-                            <Box
+                            <ClickArea
+                                window="setupWizardModal"
+                                onClick={() => clickItem(itemIndex)}
                                 flexDirection="row"
                                 key={field.envVar}
                                 marginTop={fi === 0 ? (config.modes ? 0 : 1) : 0}
@@ -501,7 +525,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
                                         </Text>
                                     )}
                                 </Box>
-                            </Box>
+                            </ClickArea>
                         );
                     })}
                 </Box>

@@ -1,5 +1,7 @@
-import React, { useState } from "react";
-import { Box, Text } from "ink";
+import React, { useRef, useState } from "react";
+import { Box, Text, type DOMElement } from "ink";
+import { ClickArea } from "#base/mouse/ClickArea";
+import { useWheelTarget } from "#base/mouse/useMouseTarget";
 import TextInput from "ink-text-input";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
@@ -101,6 +103,31 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
             },
         });
     }
+
+    /** Left-click on a session: select it; clicking the selected one loads it. */
+    function clickSession(index: number) {
+        if (renamingId) return;
+        if (modalFocus === "list" && index === safeIndex) {
+            doLoad(sessions[index]);
+            return;
+        }
+        setModalFocus("list");
+        setSelectedIndex(index);
+    }
+
+    /** Mouse wheel moves the selection like ↑/↓ (the list scrolls to follow it). */
+    function wheelList(delta: number) {
+        if (renamingId || sessions.length === 0) return;
+        if (modalFocus === "search") {
+            if (delta < 0) return;
+            setModalFocus("list");
+            setSelectedIndex(0);
+            return;
+        }
+        setSelectedIndex(Math.max(0, Math.min(sessions.length - 1, safeIndex + delta)));
+    }
+    const modalRef = useRef<DOMElement>(null);
+    useWheelTarget(modalRef, wheelList, { window: "sessionsModal" });
 
     useShortcuts({
         id: "sessionsModal",
@@ -228,6 +255,18 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
     const innerWidth = modalWidth - 6;
     const isSearching = searchQuery.trim().length > 0;
 
+    // The list shows whole sessions only; scroll it so the selected one stays in view.
+    const matchesBySession = sessions.map((session) => (isSearching ? getSessionMatches(session, searchQuery) : []));
+    let firstShown = 0;
+    if (modalFocus === "list") {
+        const heightThrough = (from: number, to: number) => {
+            let h = to - from; // one margin row between neighbours
+            for (let k = from; k <= to; k++) h += 2 + matchesBySession[k].length;
+            return h;
+        };
+        while (firstShown < safeIndex && heightThrough(firstShown, safeIndex) > listHeight) firstShown++;
+    }
+
     function formatDate(iso: string): string {
         try {
             return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -269,6 +308,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
             paddingTop={4}
         >
             <Box
+                ref={modalRef}
                 flexDirection="column"
                 borderStyle="round"
                 borderColor={theme.action.primary}
@@ -297,6 +337,10 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
                     placeholder="Search sessions…"
                     highlighted={modalFocus === "search" && !renamingId}
                     inputFocus={modalFocus === "search" && !renamingId}
+                    mouseWindow="sessionsModal"
+                    onFocusRequest={() => {
+                        if (!renamingId) setModalFocus("search");
+                    }}
                 />
 
                 {/* Session list */}
@@ -306,17 +350,25 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
                             <Text dimColor>No sessions found.</Text>
                         </Box>
                     )}
-                    {sessions.map((session, idx) => {
+                    {sessions.slice(firstShown).map((session, shownIdx) => {
+                        const idx = firstShown + shownIdx;
                         const isCurrent = session.id === currentSessionId;
                         const isSelected = modalFocus === "list" && idx === safeIndex;
                         const isRenaming = renamingId === session.id;
 
                         const cursorChar = isSelected ? "☛" : " ";
                         const cursorColor = isSelected ? theme.text.active : theme.text.muted;
-                        const matches = isSearching ? getSessionMatches(session, searchQuery) : [];
+                        const matches = matchesBySession[idx];
 
                         return (
-                            <Box key={session.id} flexDirection="row" flexShrink={0} marginTop={idx === 0 ? 0 : 1}>
+                            <ClickArea
+                                key={session.id}
+                                window="sessionsModal"
+                                onClick={() => clickSession(idx)}
+                                flexDirection="row"
+                                flexShrink={0}
+                                marginTop={shownIdx === 0 ? 0 : 1}
+                            >
                                 <Text color={cursorColor}>{cursorChar} </Text>
                                 <Box flexDirection="column" flexGrow={1}>
                                     <Box flexDirection="row" flexShrink={0}>
@@ -371,7 +423,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
                                         </Box>
                                     ))}
                                 </Box>
-                            </Box>
+                            </ClickArea>
                         );
                     })}
                 </Box>

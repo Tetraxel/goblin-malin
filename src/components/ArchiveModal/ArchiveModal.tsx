@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import * as fs from "fs";
 import * as path from "path";
 import open from "open";
-import { Box, Text } from "ink";
+import { Box, Text, type DOMElement } from "ink";
+import { ClickArea } from "#base/mouse/ClickArea";
+import { useWheelTarget } from "#base/mouse/useMouseTarget";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
@@ -133,6 +135,30 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({
         if (archived > 0) globalLogger.info(`Archived ${archived} saved task${archived === 1 ? "" : "s"}`);
     }
 
+    /** Left-click on an entry: select it; clicking the selected one restores it. */
+    function clickEntry(index: number) {
+        if (modalFocus === "list" && index === safeIndex) {
+            restore(entries[index]);
+            return;
+        }
+        setModalFocus("list");
+        setSelectedIndex(index);
+    }
+
+    /** Mouse wheel moves the selection like ↑/↓ (the list scrolls to follow it). */
+    function wheelList(delta: number) {
+        if (entries.length === 0) return;
+        if (modalFocus === "search") {
+            if (delta < 0) return;
+            setModalFocus("list");
+            setSelectedIndex(0);
+            return;
+        }
+        setSelectedIndex(Math.max(0, Math.min(entries.length - 1, safeIndex + delta)));
+    }
+    const modalRef = useRef<DOMElement>(null);
+    useWheelTarget(modalRef, wheelList, { window: "archiveModal" });
+
     useShortcuts({
         id: "archiveModal",
         isActive,
@@ -255,6 +281,7 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({
             alignItems="center"
         >
             <Box
+                ref={modalRef}
                 flexDirection="column"
                 borderStyle="round"
                 borderColor={theme.action.primary}
@@ -280,6 +307,8 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({
                     placeholder="Search artist, title, ISRC, session…"
                     highlighted={modalFocus === "search"}
                     inputFocus={modalFocus === "search"}
+                    mouseWindow="archiveModal"
+                    onFocusRequest={() => setModalFocus("search")}
                 />
 
                 {/* Column header */}
@@ -311,7 +340,13 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({
                                 ? `${entry.title} (${entry.childCount} track${entry.childCount === 1 ? "" : "s"})`
                                 : entry.title;
                         return (
-                            <Box key={`${entry.sessionId}:${entry.taskId}`} flexDirection="row" flexShrink={0}>
+                            <ClickArea
+                                key={`${entry.sessionId}:${entry.taskId}`}
+                                window="archiveModal"
+                                onClick={() => clickEntry(idx)}
+                                flexDirection="row"
+                                flexShrink={0}
+                            >
                                 {cell(
                                     2,
                                     <Text color={isSelected ? theme.text.active : theme.text.muted}>
@@ -343,7 +378,7 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({
                                             {entry.sessionName}
                                         </Text>
                                     )}
-                            </Box>
+                            </ClickArea>
                         );
                     })}
                 </Box>

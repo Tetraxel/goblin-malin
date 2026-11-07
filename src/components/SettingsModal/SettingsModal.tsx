@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from "react";
-import { Box, Text } from "ink";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Box, Text, type DOMElement } from "ink";
+import { ClickArea } from "#base/mouse/ClickArea";
+import { useWheelTarget } from "#base/mouse/useMouseTarget";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useTheme } from "#base/themeContext";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
@@ -145,6 +147,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
         switchBack();
     }
 
+    function switchTabTo(tab: ActiveTab) {
+        if (rebindingId || editingIndex !== null) return;
+        setActiveTab(tab);
+    }
+
     function startRebind(id: string) {
         setRebindingId(id);
         shortcutRegistry.enableRebind((input, key) => {
@@ -162,6 +169,73 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
             shortcutRegistry.disableRebind();
         });
     }
+
+    /** Left-click on a settings row: select it and act on it like Enter would (a select steps with ◀/▶). */
+    function clickSettingsItem(index: number, step?: 1 | -1) {
+        if (rebindingId || editingIndex === index) return;
+        const item = filteredItems[index];
+        if (!item || !isInteractive(item)) return;
+        setEditingIndex(null);
+        setSelectedIndex(index);
+        setModalFocus("list");
+        if (item.kind === "checkbox") item.set(!item.get());
+        else if (item.kind === "textInput") {
+            setEditValue(item.get());
+            setEditingIndex(index);
+        } else if (item.kind === "action") item.run();
+        else if (item.kind === "select") {
+            const curr = item.options.indexOf(item.get());
+            const n = item.options.length;
+            item.set(item.options[(curr + (step ?? 1) + n) % n]);
+        }
+    }
+
+    /** Left-click on a shortcut row: select it; clicking the selected row starts the rebind. */
+    function clickShortcutRow(id: string) {
+        if (rebindingId) return;
+        const index = buildShortcutsTabItems(shortcutsSearchQuery).findIndex((it) => it.id === id);
+        if (index < 0) return;
+        const alreadySelected = shortcutsModalFocus === "list" && index === shortcutsSelectedIndex;
+        setShortcutsModalFocus("list");
+        setShortcutsSelectedIndex(index);
+        if (alreadySelected) startRebind(id);
+    }
+    // The shortcut rows are memoized, so they get one stable callback that reads the latest closure.
+    const shortcutRowClickRef = useRef(clickShortcutRow);
+    useEffect(() => {
+        shortcutRowClickRef.current = clickShortcutRow;
+    });
+    const onShortcutRowClick = useCallback((id: string) => shortcutRowClickRef.current(id), []);
+
+    /** Mouse wheel moves the selection like ↑/↓ (the lists scroll to follow it). */
+    function wheelList(delta: number) {
+        if (rebindingId || editingIndex !== null) return;
+        if (activeTab === "shortcuts") {
+            const count = buildShortcutsTabItems(shortcutsSearchQuery).length;
+            if (count === 0) return;
+            if (shortcutsModalFocus === "search") {
+                if (delta < 0) return;
+                setShortcutsModalFocus("list");
+                setShortcutsSelectedIndex(0);
+                return;
+            }
+            setShortcutsSelectedIndex((prev) => Math.max(0, Math.min(count - 1, prev + delta)));
+            return;
+        }
+        if (modalFocus === "search") {
+            if (delta < 0) return;
+            const first = filteredItems.findIndex(isInteractive);
+            if (first < 0) return;
+            setSelectedIndex(first);
+            setModalFocus("list");
+            return;
+        }
+        let next = safeSelectedIndex + delta;
+        while (next >= 0 && next < filteredItems.length && !isInteractive(filteredItems[next])) next += delta;
+        if (next >= 0 && next < filteredItems.length) setSelectedIndex(next);
+    }
+    const modalRef = useRef<DOMElement>(null);
+    useWheelTarget(modalRef, wheelList, { window: "settingsModal" });
 
     useShortcuts({
         id: "settingsModal",
@@ -362,6 +436,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
             paddingTop={4}
         >
             <Box
+                ref={modalRef}
                 flexDirection="column"
                 borderStyle="round"
                 borderColor={theme.action.primary}
@@ -380,19 +455,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                         SETTINGS
                     </Text>
                     <Box flexDirection="row" flexShrink={0}>
-                        <Text
-                            bold={activeTab === "settings"}
-                            color={activeTab === "settings" ? theme.text.active : theme.text.muted}
-                        >
-                            Settings
-                        </Text>
+                        <ClickArea window="settingsModal" onClick={() => switchTabTo("settings")} flexShrink={0}>
+                            <Text
+                                bold={activeTab === "settings"}
+                                color={activeTab === "settings" ? theme.text.active : theme.text.muted}
+                            >
+                                Settings
+                            </Text>
+                        </ClickArea>
                         <Text dimColor>{" │ "}</Text>
-                        <Text
-                            bold={activeTab === "shortcuts"}
-                            color={activeTab === "shortcuts" ? theme.text.active : theme.text.muted}
-                        >
-                            Shortcuts
-                        </Text>
+                        <ClickArea window="settingsModal" onClick={() => switchTabTo("shortcuts")} flexShrink={0}>
+                            <Text
+                                bold={activeTab === "shortcuts"}
+                                color={activeTab === "shortcuts" ? theme.text.active : theme.text.muted}
+                            >
+                                Shortcuts
+                            </Text>
+                        </ClickArea>
                         <Text dimColor>{"  [Tab]"}</Text>
                     </Box>
                 </Box>
@@ -416,6 +495,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                                     if (item.kind === "textInput") item.set(v);
                                     setEditingIndex(null);
                                 }}
+                                onSearchClick={() => {
+                                    if (editingIndex === null) setModalFocus("search");
+                                }}
+                                onItemClick={clickSettingsItem}
                             />
                         </Box>
 
@@ -456,6 +539,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                                     setShortcutsSearchQuery(v);
                                     setShortcutsSelectedIndex(0);
                                 }}
+                                onSearchClick={() => {
+                                    if (!rebindingId) setShortcutsModalFocus("search");
+                                }}
+                                onRowClick={onShortcutRowClick}
                             />
                         </Box>
 

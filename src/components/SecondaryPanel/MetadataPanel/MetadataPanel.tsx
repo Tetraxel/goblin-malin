@@ -179,6 +179,12 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
         [typedTask]
     );
 
+    const handleSkipDiscovery = useCallback(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        () => (typedTask as any)?.skipDiscovery?.(),
+        [typedTask]
+    );
+
     // Pointer handlers. While a field is being edited the inline input owns the panel, so
     // clicks and wheel notches that would move the cursor or field underneath it are dropped.
     // Stable identities (like the handlers above) so memoized rows keep bailing out.
@@ -255,6 +261,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
                     onGroupsChange={handleGroupsChange}
                     onToggleDiscoverySources={() => setShowDiscoverySources(!showDiscoverySources)}
                     onRefetchResult={handleRefetchResult}
+                    onSkipDiscovery={handleSkipDiscovery}
                     isFetchingPrimarySource={
                         snapshot?.attributes?.kind === "track"
                             ? (snapshot.attributes.primaryMetadataInProgress ?? false)

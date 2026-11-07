@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Box, Text } from "ink";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Box, Text, type DOMElement } from "ink";
+import { useWheelTarget } from "#base/mouse/useMouseTarget";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useScreenSize } from "#hooks/useScreenSize";
 import { useAppSettings } from "#hooks/useAppSettings";
@@ -9,6 +10,9 @@ import { LogLevel, LogMetadata } from "#base/logger/types";
 import { Task } from "#base/task/task";
 import { useTheme } from "#base/themeContext";
 import { formatLogRows, LogRow } from "./logFormat";
+
+// Rows moved per wheel notch (the arrow keys move one).
+const WHEEL_ROWS = 3;
 
 // Mirror of the transport's ring-buffer bound so the panel's own copy of the log
 // list can't grow without limit either.
@@ -130,6 +134,12 @@ export const LogPanel = ({
     // When scrolled (indicator row visible), only height-1 rows are available for logs
     const maxOffset = Math.max(0, allRows.length - (height - 1));
 
+    // Wheel up goes back in history (delta -1), wheel down toward the newest line.
+    const panelRef = useRef<DOMElement>(null);
+    useWheelTarget(panelRef, (delta) =>
+        setScrollOffset((prev) => Math.max(0, Math.min(prev - delta * WHEEL_ROWS, maxOffset)))
+    );
+
     useShortcuts({
         id: "logPanel",
         isActive,
@@ -171,6 +181,7 @@ export const LogPanel = ({
 
     return (
         <Box
+            ref={panelRef}
             flexDirection="row"
             borderStyle="single"
             borderColor={theme.ui.border}

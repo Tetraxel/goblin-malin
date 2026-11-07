@@ -1,7 +1,9 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Text } from "ink";
 import TextInput from "ink-text-input";
+import { ClickArea } from "#base/mouse/ClickArea";
 import { useTheme } from "#base/themeContext";
+import type { FocusableWindow } from "#hooks/useFocusManager";
 
 /**
  * Shared search field used by the Settings, Shortcuts, and Sessions modals.
@@ -14,17 +16,23 @@ export function SearchBar({
     placeholder,
     highlighted,
     inputFocus,
+    mouseWindow,
+    onFocusRequest,
 }: {
     value: string;
     onChange: (v: string) => void;
     placeholder?: string;
     highlighted: boolean;
     inputFocus: boolean;
+    mouseWindow: FocusableWindow;
+    onFocusRequest: () => void;
 }) {
     const theme = useTheme();
     const borderColor = highlighted ? theme.action.primary : theme.text.secondary;
     return (
-        <Box
+        <ClickArea
+            window={mouseWindow}
+            onClick={onFocusRequest}
             marginTop={1}
             borderStyle="single"
             borderColor={borderColor}
@@ -37,6 +45,6 @@ export function SearchBar({
                 {"⌕ "}
             </Text>
             <TextInput value={value} onChange={onChange} placeholder={placeholder} focus={inputFocus} />
-        </Box>
+        </ClickArea>
     );
 }

@@ -1,7 +1,7 @@
 import React, { useRef } from "react";
 import { Box, Text, type DOMElement } from "ink";
 import Spinner from "ink-spinner";
-import { useWheelTarget } from "#base/mouse/useMouseTarget";
+import { useClickTarget, useHoverTarget, useWheelTarget } from "#base/mouse/useMouseTarget";
 import { useTheme } from "#base/themeContext";
 import { MetadataGroupState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
 import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
@@ -29,6 +29,8 @@ interface MetadataSourceListProps {
     onGroupsChange: (groups: MetadataGroupState[]) => void;
     onToggleDiscoverySources: () => void;
     onRefetchResult: (groupIndex: number, resultIndex: number) => void;
+    /** Stop discovering and keep the sources found so far. Must be referentially stable. */
+    onSkipDiscovery: () => void;
     isFetchingPrimarySource?: boolean;
     isDiscovering?: boolean;
 }
@@ -40,6 +42,26 @@ const getLoadingText = (isFetchingPrimarySource: boolean, isDiscovering: boolean
     if (isDiscovering) return "Discovering on other platforms…";
     return "";
 };
+
+const SkipDiscoveryButton = React.memo(function SkipDiscoveryButton({ onSkip }: { onSkip: () => void }) {
+    const theme = useTheme();
+    const ref = useRef<DOMElement>(null);
+    useClickTarget(ref, onSkip);
+    const isHovered = useHoverTarget(ref);
+    return (
+        <Box
+            ref={ref}
+            marginLeft={1}
+            paddingX={1}
+            flexShrink={0}
+            backgroundColor={isHovered ? theme.ui.rowBackground.regular.hover : undefined}
+        >
+            <Text color={theme.text.active} bold>
+                Skip ⏭
+            </Text>
+        </Box>
+    );
+});
 
 export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
     groups,
@@ -57,6 +79,7 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
     onGroupsChange,
     onToggleDiscoverySources,
     onRefetchResult,
+    onSkipDiscovery,
     isFetchingPrimarySource = false,
     isDiscovering = false,
 }) => {
@@ -77,6 +100,9 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
         onToggleDiscoverySources,
         onRefetchResult,
     });
+
+    // Skipping only makes sense once there is something to keep.
+    const canSkipDiscovery = isDiscovering && !isFetchingPrimarySource && groups.some((g) => g.results.length > 0);
 
     const overrideCount = Object.keys(overrides).filter(
         (k) => overrides[k as keyof MetadataOverrides] !== undefined
@@ -133,15 +159,16 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
                     );
                 })}
                 {(isFetchingPrimarySource || isDiscovering) && (
-                    <Box flexDirection="row" height={1} paddingLeft={3} flexShrink={0}>
+                    <Box flexDirection="row" height={1} paddingLeft={3} flexShrink={0} overflow="hidden">
                         <Box flexDirection="row" paddingRight={1} flexShrink={0}>
                             <Text color={theme.text.secondary}>
                                 <Spinner type="dots" />
                             </Text>
                         </Box>
-                        <Text color={theme.text.secondary}>
+                        <Text color={theme.text.secondary} wrap="truncate-end">
                             {getLoadingText(isFetchingPrimarySource, isDiscovering)}
                         </Text>
+                        {canSkipDiscovery && <SkipDiscoveryButton onSkip={onSkipDiscovery} />}
                     </Box>
                 )}
             </Box>

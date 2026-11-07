@@ -4,6 +4,7 @@ import type { Key } from "ink";
 import { shortcutRegistry } from "#base/shortcuts/ShortcutRegistry";
 import { SettingsStore } from "#settings/settingsStore";
 import { Shortcut, getShortcutLiteral } from "#types/actions";
+import { ClickArea } from "#base/mouse/ClickArea";
 import { useTheme } from "#base/themeContext";
 import { SearchBar } from "../SearchBar";
 
@@ -22,17 +23,28 @@ const ShortcutRow = React.memo(function ShortcutRow({
     isSelected,
     labelColW,
     bindingColW,
+    onClick,
 }: {
     item: ShortcutsTabItem;
     isSelected: boolean;
     labelColW: number;
     bindingColW: number;
+    /** Must be referentially stable so the memo holds. */
+    onClick: (id: string) => void;
 }) {
     const theme = useTheme();
     const binding = item.customBinding ?? item.defaultBinding;
     const isCustom = item.customBinding !== null;
     return (
-        <Box paddingX={1} height={1} flexShrink={0} flexDirection="row" overflow="hidden">
+        <ClickArea
+            window="settingsModal"
+            onClick={() => onClick(item.id)}
+            paddingX={1}
+            height={1}
+            flexShrink={0}
+            flexDirection="row"
+            overflow="hidden"
+        >
             <Text color={isSelected ? theme.ui.focusIndicator : undefined}>{isSelected ? "☛ " : "  "}</Text>
             <Box flexGrow={1} overflow="hidden">
                 <Text wrap="truncate-end" color={isSelected ? theme.text.active : theme.text.secondary}>
@@ -47,7 +59,7 @@ const ShortcutRow = React.memo(function ShortcutRow({
             <Box flexShrink={0} width={bindingColW} justifyContent="flex-end">
                 <Text color={isCustom ? theme.status.warning : theme.text.muted}>[{binding}]</Text>
             </Box>
-        </Box>
+        </ClickArea>
     );
 });
 
@@ -102,6 +114,9 @@ interface ShortcutsTabProps {
     searchQuery: string;
     searchFocused: boolean;
     onSearchChange: (v: string) => void;
+    onSearchClick: () => void;
+    /** Must be referentially stable (rows are memoized). */
+    onRowClick: (id: string) => void;
 }
 
 export const ShortcutsTab: React.FC<ShortcutsTabProps> = ({
@@ -113,6 +128,8 @@ export const ShortcutsTab: React.FC<ShortcutsTabProps> = ({
     searchQuery,
     searchFocused,
     onSearchChange,
+    onSearchClick,
+    onRowClick,
 }) => {
     const theme = useTheme();
     const [registryVersion, forceUpdate] = useReducer((x: number) => x + 1, 0);
@@ -146,6 +163,8 @@ export const ShortcutsTab: React.FC<ShortcutsTabProps> = ({
                 placeholder="Search shortcuts…"
                 highlighted={searchFocused && !rebindingId}
                 inputFocus={searchFocused && isActive && !rebindingId}
+                mouseWindow="settingsModal"
+                onFocusRequest={onSearchClick}
             />
             {rebindingId && (
                 <Box paddingX={1} height={REBIND_H} flexShrink={0} flexDirection="column">
@@ -166,6 +185,7 @@ export const ShortcutsTab: React.FC<ShortcutsTabProps> = ({
                             isSelected={isSelected}
                             labelColW={labelColW}
                             bindingColW={bindingColW}
+                            onClick={onRowClick}
                         />
                     );
                 })}
