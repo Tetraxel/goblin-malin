@@ -16,11 +16,10 @@ The two blockers found here — `yarn build` failing, and a fresh install unable
 
 | # | ID | Sev. | One-liner |
 |---|----|------|-----------|
-| 1 | [DATA-02](#data-02) | high | `sessions.json`: a BOM / truncation / empty file silently wipes every session on the next write; `{}`/`null`/`[]` crash |
-| 2 | [DATA-04](#data-04) | high | Data dir is split-brained: `cache/`, `bin/`, `app.log` follow a *persisted* `settings.json` path, not the live data dir |
-| 3 | [MD-01](#md-01) | high | Match confidence is blind to every non-ASCII letter: two different Japanese/Russian/Greek songs score as an exact match |
-| 4 | [UI-02](#ui-02) | medium | `Ctrl+C` does nothing (verified); there is no documented keyboard way to quit |
-| 5 | [DEP-02](#dep-02) | medium | 97 `yarn audit` advisories; the runtime chains (`axios`, `adm-zip`, `ws`) need deliberate bumps |
+| 1 | [DATA-04](#data-04) | high | Data dir is split-brained: `cache/`, `bin/`, `app.log` follow a *persisted* `settings.json` path, not the live data dir |
+| 2 | [MD-01](#md-01) | high | Match confidence is blind to every non-ASCII letter: two different Japanese/Russian/Greek songs score as an exact match |
+| 3 | [UI-02](#ui-02) | medium | `Ctrl+C` does nothing (verified); there is no documented keyboard way to quit |
+| 4 | [DEP-02](#dep-02) | medium | 97 `yarn audit` advisories; the runtime chains (`axios`, `adm-zip`, `ws`) need deliberate bumps |
 
 ### Counts
 
@@ -29,7 +28,7 @@ The two blockers found here — `yarn build` failing, and a fresh install unable
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Build, release & packaging (`REL-`) |  |  | 1 | 3 | 4 |
 | Dependencies & supply chain (`DEP-`) |  |  | 1 | 1 | 2 |
-| Data safety, persistence & state (`DATA-`) |  | 2 | 7 |  | 9 |
+| Data safety, persistence & state (`DATA-`) |  | 1 | 6 |  | 7 |
 | Download pipeline (`DL-`) |  |  |  | 1 | 1 |
 | Metadata & discovery (`MD-`) |  | 1 | 2 | 1 | 4 |
 | UI / TUI behaviour (`UI-`) |  |  | 2 | 5 | 7 |
@@ -37,14 +36,14 @@ The two blockers found here — `yarn build` failing, and a fresh install unable
 | Tests, CI & tooling (`TEST-`) |  |  | 2 | 3 | 5 |
 | Docs, instructions & hygiene (`DOC-`) |  |  | 2 | 3 | 5 |
 | Product & UX (`PROD-`) |  |  | 3 | 1 | 4 |
-| **Total** | **0** | **3** | **20** | **20** | **43** |
+| **Total** | **0** | **2** | **19** | **20** | **41** |
 
 Plus 9 unconfirmed candidates in [section K](#k-candidates-to-verify-found-while-reading-not-confirmed) (not counted).
 <!-- /COUNTS-TABLE -->
 
 ### Already fixed
 
-Removed from this file once fixed and committed (what was found, the fix and how it was checked are in the file's git history: `git log -p -- AUDIT-v0.2.0.md`): **REL-01** (`yarn build`), **REL-04** (`engines`), **REL-05** (`postinstall`), **DEP-01** (unused dependencies), **DATA-01** ("Clear temporary downloads"), **DOC-02** (`.env.example`), **DOC-05** (`TODO.md`), **PROD-02** (dotenv banner), and the ffmpeg/ffprobe bootstrap bug of **DL-01**. Findings that were only partly fixed (**REL-03**, **REL-07**, **DEP-02**, **DOC-04**, **DL-01**) keep just the part that is still open.
+Removed from this file once fixed and committed (what was found, the fix and how it was checked are in the file's git history: `git log -p -- AUDIT-v0.2.0.md`): **REL-01** (`yarn build`), **REL-04** (`engines`), **REL-05** (`postinstall`), **DEP-01** (unused dependencies), **DATA-01** ("Clear temporary downloads"), **DATA-02** and **DATA-03** (`sessions.json` / `settings.json` validation, quarantine, `.bak`, versioning), **DOC-02** (`.env.example`), **DOC-05** (`TODO.md`), **PROD-02** (dotenv banner), and the ffmpeg/ffprobe bootstrap bug of **DL-01**. Findings that were only partly fixed (**REL-03**, **REL-07**, **DEP-02**, **DOC-04**, **DL-01**) keep just the part that is still open.
 
 ---
 
@@ -112,37 +111,12 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 
 ### C. Data safety, persistence & state
 
-<a id="data-02"></a>
-#### DATA-02 — `sessions.json`: no validation, no backup — a BOM or truncation silently wipes all sessions; `{}`/`null`/`[]` crash
-**high · data-loss · verified (script against the real `SessionStore`)**
-
-- **Where:** `src/sessions/sessionStore.ts:19-25` (`readFromDisk`: `catch { return { ...EMPTY_FILE } }`), `:44-70` (whole-file rewrite from the in-memory cache).
-- **What:** `readFromDisk` swallows every error and returns an empty file; the very next write (the app writes right after boot) replaces the damaged file, with no backup. The `version: 1` field exists but is never checked. Results of loading each file shape, then doing one normal write:
-
-  | `sessions.json` content | `getAll()` | after first write |
-  | --- | --- | --- |
-  | valid | 3 sessions | 3 |
-  | **UTF-8 BOM** (Notepad / PowerShell 5 `Set-Content -Encoding UTF8`) | 0 | **0 — everything gone** |
-  | truncated mid-file / empty file | 0 | **0 — everything gone** |
-  | `null` / `[]` / `{}` / `{"sessions":null}` | **throws `TypeError`** | file stays corrupt |
-  | `version: 99` (downgrade) | 3 | 3 (unknown keys kept) |
-- **Impact:** a user's sessions and archive (the file is ~490 KB on the developer's machine) can disappear without a message; `v0.2.0` will change the data shape (README warns of it) and has no migration step.
-- **Fix:** validate the shape on load; on parse/shape failure rename the file to `sessions.json.corrupt-<date>` (and tell the user in the log panel/a toast) instead of overwriting; strip a BOM; keep one rolling `.bak`; check `version` and add a migration hook before 0.2.0 changes the shape. Add unit tests for exactly the table above.
-
-<a id="data-03"></a>
-#### DATA-03 — `settings.json`: any read error silently resets everything; defaults get frozen on disk
-**medium · data-loss · verified (script + the developer's real file)**
-
-- **Where:** `src/settings/settingsStore.ts:34-49` (`readFromDisk` catch-all), `:95-104` (`writeAppSettings` writes the whole merged `general`), `src/utils/deepMerge.ts`.
-- **What:** (a) A truncated `settings.json` (or a transient read error) returns defaults; the next write (e.g. rebinding one key) overwrites the file: theme, **all custom keybindings, output folder and temp folder are lost** with no backup (script output: `theme read: dark (user had 'light')`, `keybindings read: {}`, `outputDir read: <default>`, then `after one write -> keybindings: {"global.tab":…} | music: {}`). (b) Because every save persists the *merged* object, defaults get frozen into the user's file (the developer's real file contains every provider's `enabled`, `autoSaveToOutputDir`, concurrency numbers…), so **changing a default in v0.2.0 will not reach anyone who ever saved settings**. (c) Orphan keys are never cleaned: the real file still has `collections.defaultLiveRefreshIntervalMinutes` (old schema, next to the new `…Seconds`) and a keybinding override for `global.toggleProfiling`, a shortcut id that no longer exists.
-- **Fix:** same pattern as DATA-02 (quarantine + notify); persist only values that differ from the defaults; add a `version` + migration that drops removed keys/overrides.
-
 <a id="data-04"></a>
 #### DATA-04 — The data directory is split-brained between the live value and a persisted setting
 **high · bug / isolation · verified (code + observed live, and it bit the audit itself)**
 
 - **Where:** `src/constants.ts:25-26` (`DEFAULT_APP_DATA_DIR` = `GOBLIN_DATA_DIR`, else dev `<repo>/data`, else the OS default) · `src/utils/appPaths.ts:16-28` (`getCacheDir/getBinDir/getLogsPath` read `SettingsStore…general.appDataDir`) · `src/settings/appSettings.ts:40`, `src/settings/buildGlobalSettingsItems.ts:59` · `src/utils/cache.ts:20` (reads it at import time) · tracked fixtures `scripts/tui-test/fixtures/*/settings.json` (contain an absolute `C:\Users\axel7\…` path).
-- **What:** `sessions.json`, `settings.json`, `.env`, `install.json` live under `DEFAULT_APP_DATA_DIR`. `cache/` (api-cache, songlink_rate.json), `bin/` (yt-dlp, ffmpeg, ffprobe, mpv, cookies.txt) and `app.log` are derived from `general.appDataDir` in `settings.json` — a value that defaults to the same path but is written into the file on the first save (see DATA-03) and then wins forever. If the folder is moved, restored from a backup, synced between machines/users, or `GOBLIN_DATA_DIR` changes, the tools/cache/log keep pointing at the old absolute path: ~460 MB of binaries are re-downloaded into a stale location, or the app writes into another user's profile/an unplugged drive. It also means v0.2.0 cannot relocate `bin/`/`cache/` for anyone who has saved settings.
+- **What:** `sessions.json`, `settings.json`, `.env`, `install.json` live under `DEFAULT_APP_DATA_DIR`. `cache/` (api-cache, songlink_rate.json), `bin/` (yt-dlp, ffmpeg, ffprobe, mpv, cookies.txt) and `app.log` are derived from `general.appDataDir` in `settings.json` — a value that defaults to the same path but is written into the file on the first save and then wins forever. If the folder is moved, restored from a backup, synced between machines/users, or `GOBLIN_DATA_DIR` changes, the tools/cache/log keep pointing at the old absolute path: ~460 MB of binaries are re-downloaded into a stale location, or the app writes into another user's profile/an unplugged drive. It also means v0.2.0 cannot relocate `bin/`/`cache/` for anyone who has saved settings.
 - **Evidence:** with `GOBLIN_DATA_DIR` pointing at a copy of a fixture, the Settings row still displayed the fixture's path. The audit itself tripped on it: a scratch copy whose stored `appDataDir` I set to `%APPDATA%/goblin-malin` made the harness write `app.log` and `cache/api-cache` into the developer's **real** installed-app folder (see "Side effects" at the end). Harness runs on fixture *copies* also write cache/log/binaries into the repo's fixture folders.
 - **Fix:** never persist `appDataDir` (derive it from `DEFAULT_APP_DATA_DIR` everywhere; keep the Settings row informational) and strip the stored key on load; make fixtures path-independent.
 
@@ -355,7 +329,7 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 **low · tests · verified (import map of `tests/`)**
 
 - **What:** 26 unit files / 220 tests. No tests for `settingsStore` edge cases, `sessionStore` load/corruption, the shortcut registry dispatch, the updater (`isNewer`, installer detection), `envFile`, or any UI hook/component beyond the windowing helpers and `useConfirmModal`. `downloadTask.ts` is exercised indirectly by 7 tests.
-- **Fix:** start with the repro tables in DATA-02/03 as regression tests; add a coverage report (`@vitest/coverage-v8`) to CI.
+- **Fix:** the repro tables of DATA-02/03 are now regression tests (`tests/unit/sessionStore.test.ts`, `settingsStore.test.ts`); still missing: the shortcut registry, updater, `envFile`, hooks; add a coverage report (`@vitest/coverage-v8`) to CI.
 
 ### I. Docs, instructions & repository hygiene
 
