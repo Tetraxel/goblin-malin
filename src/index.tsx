@@ -77,7 +77,10 @@ export function start(): void {
     // In profile mode (TUI test harness), wrap the app in a single <Profiler>
     // to force ProfileMode tree-wide and forward Ink's per-frame render time.
     // The global is only set by src/profiling/install.ts; production is untouched.
-    const profile = globalThis.__GOBLIN_PROFILE__;
+    // Read through an explicit type: the `declare global` for this lives in src/profiling/types.ts, which the
+    // d.ts build (it only follows imports from the entry points) never sees.
+    const profile = (globalThis as { __GOBLIN_PROFILE__?: import("./profiling/types").ProfileHooks })
+        .__GOBLIN_PROFILE__;
     const tree = profile ? (
         <Profiler id="app" onRender={profile.onProfilerRender}>
             <App />

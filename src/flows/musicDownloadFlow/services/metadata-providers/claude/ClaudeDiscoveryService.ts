@@ -17,7 +17,9 @@ import {
 import { ClaudeLink, claudeLinksToTracks } from "./convertClaudeToTrack";
 import {
     CLAUDE_DISCOVERY_SYSTEM_PROMPT,
-    ClaudeTrackQuery,
+    // `type` matters: it is used in the signature of the @Cached() method below, and the swc pass that
+    // tsup runs for decorator metadata would otherwise keep this import alive as a value import.
+    type ClaudeTrackQuery,
     buildClaudeDiscoveryPrompt,
     buildClaudeDiscoverySchema,
 } from "./claudePrompt";

@@ -25,7 +25,7 @@ export function isMouseInputActive(): boolean {
 /**
  * Whether a mouse target may react right now. Targets on the main screen (toolbar, task list,
  * secondary panel) pass no `window` and follow the clickable-window set. A modal's targets pass
- * the modal's own window, so they react only while that modal is the focused one — never while a
+ * the modal's own window, so they react only while that modal is the focused one â€” never while a
  * confirm dialog sits on top of it, and never to the app underneath.
  */
 export function isMouseTargetActive(window?: FocusableWindow): boolean {
