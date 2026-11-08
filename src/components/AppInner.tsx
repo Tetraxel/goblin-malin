@@ -27,6 +27,8 @@ import { deleteConfirmBridge, DeleteConfirmRequest } from "#base/bridges/deleteC
 import { consentBridge, ConsentRequest } from "#base/bridges/consentBridge";
 import { collectionHintBridge, CollectionHintRequest } from "#base/bridges/collectionHintBridge";
 import { overwriteConfirmBridge, OverwriteConfirmRequest } from "#base/bridges/overwriteConfirmBridge";
+import { clearTempConfirmBridge, ClearTempRequest } from "#base/bridges/clearTempConfirmBridge";
+import { formatBytes } from "./SecondaryPanel/DownloadPanel/utils";
 import { ConfirmModal } from "./ConfirmModal/ConfirmModal";
 import { ClosingModal } from "./ClosingModal/ClosingModal";
 import { useConfirmModal } from "./ConfirmModal/useConfirmModal";
@@ -124,6 +126,37 @@ Replacing it cannot be undone.`,
         [openConfirmModal, theme]
     );
 
+    // Bridge: let "Clear temporary downloads" (a plain-TS settings action) confirm before it deletes files, or
+    // explain why it refused. "Keep them" comes first so a stray Enter deletes nothing.
+    const handleClearTempRequest = useCallback(
+        (req: ClearTempRequest) => {
+            if (req.kind === "refused") {
+                openConfirmModal({
+                    title: "Can't clear this folder",
+                    message: `${req.dir || "(no folder set)"}\n${req.reason}\nNothing was deleted. Pick a dedicated folder for temporary downloads in Settings.`,
+                    choices: [{ label: "OK", color: theme.action.primary }],
+                    accentColor: theme.status.warning,
+                    onConfirm: req.close,
+                    onCancel: req.close,
+                });
+                return;
+            }
+            const noun = req.fileCount === 1 ? "file" : "files";
+            openConfirmModal({
+                title: "Clear temporary downloads?",
+                message: `Delete ${req.fileCount} temporary ${noun} (${formatBytes(req.bytes)}) from:\n${req.dir}\nFiles you saved to your output folder are not touched.`,
+                choices: [
+                    { label: "Keep them", color: theme.action.primary },
+                    { label: "Delete", color: theme.status.error },
+                ],
+                accentColor: theme.status.warning,
+                onConfirm: (i) => (i === 1 ? req.proceed() : req.cancel()),
+                onCancel: req.cancel,
+            });
+        },
+        [openConfirmModal, theme]
+    );
+
     // Bridge: let plain-TS task actions open the start-options modal.
     useEffect(() => {
         startOptionsBridge.setOpener(openStartFlow);
@@ -145,6 +178,11 @@ Replacing it cannot be undone.`,
         overwriteConfirmBridge.setOpener(handleOverwriteRequest);
         return () => overwriteConfirmBridge.setOpener(null);
     }, [handleOverwriteRequest]);
+
+    useEffect(() => {
+        clearTempConfirmBridge.setOpener(handleClearTempRequest);
+        return () => clearTempConfirmBridge.setOpener(null);
+    }, [handleClearTempRequest]);
 
     useEffect(() => {
         consentBridge.setOpener(handleConsentRequest);

@@ -234,7 +234,7 @@ export function buildFlowSettingsItems(
         kind: "action",
         indent: 0,
         label: "⛒  Clear temporary downloads",
-        run: () => clearTempDownloads(),
+        run: () => void clearTempDownloads(),
     });
 
     if (downloadProviders.length > 0) {
