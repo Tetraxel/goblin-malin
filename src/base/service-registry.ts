@@ -17,6 +17,8 @@ type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> =
     new (task: TTask, logger: Logger): TService;
     display?: ProviderDisplay;
     parseUrl?: (url: string) => ParsedUrl | null;
+    /** Optional: turn links in another notation (e.g. `spotify:track:<id>`) found in a text into URLs `parseUrl` reads. */
+    findLinks?: (text: string) => string[];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expandCollection?: (url: string, logger: Logger, task: Task<any>) => Promise<CollectionExpansion>;
     defaultSettings?: ProviderSettingsSchema;
@@ -60,6 +62,7 @@ export class ServiceRegistry<TTask extends Task<any> = Task, TService extends Se
             this.constructors.set(name, ctor);
             if (ctor.display) providerDisplayRegistry.register(name, ctor.display);
             if (ctor.parseUrl) urlParserRegistry.register(ctor.parseUrl);
+            if (ctor.findLinks) urlParserRegistry.registerNormalizer(ctor.findLinks);
         } else {
             // Plain factory function path (escape hatch for custom instantiation)
             this.factories.set(name, ctorOrFactory as ServiceFactory<TTask, TService>);

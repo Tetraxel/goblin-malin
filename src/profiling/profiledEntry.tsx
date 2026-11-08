@@ -4,5 +4,7 @@
 // in place before the app pulls in Ink and the React reconciler.
 import "./install";
 import { start } from "../index";
+import { redirectConsoleToLog } from "../base/logger/redirectConsole";
 
+redirectConsoleToLog();
 start();

@@ -35,6 +35,7 @@ import { ConfirmModal } from "./ConfirmModal/ConfirmModal";
 import { ClosingModal } from "./ClosingModal/ClosingModal";
 import { useConfirmModal } from "./ConfirmModal/useConfirmModal";
 import { useTheme } from "#base/themeContext";
+import { useQuitShortcut } from "#hooks/useQuitShortcut";
 
 export const AppInner: React.FC<{
     tasks: Task<TaskAttributes>[];
@@ -46,6 +47,7 @@ export const AppInner: React.FC<{
     const theme = useTheme();
     const { pendingConfig, openConfirmModal, openConfirmModalWhenFree, handleConfirm, handleCancel } =
         useConfirmModal();
+    useQuitShortcut(openConfirmModal, pendingConfig);
     const { pendingImport, openImportFlow, handleImportConfirm, handleImportCancel } = useImportFlow(openConfirmModal);
     const { pendingStart, openStartFlow, handleStartConfirm, handleStartCancel } = useStartFlow();
 

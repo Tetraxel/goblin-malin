@@ -40,6 +40,7 @@ const KEY_MAP: Record<string, string> = {
     "Ctrl+C": "\x03",
     "Ctrl+D": "\x04",
     "Ctrl+N": "\x0e",
+    "Ctrl+Q": "\x11",
     "Ctrl+R": "\x12",
     "Ctrl+S": "\x13",
     "Ctrl+V": "\x16",

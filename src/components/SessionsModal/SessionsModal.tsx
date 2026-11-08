@@ -2,7 +2,7 @@ import React, { useRef, useState } from "react";
 import { Box, Text, type DOMElement } from "ink";
 import { ClickArea } from "#base/mouse/ClickArea";
 import { useWheelTarget } from "#base/mouse/useMouseTarget";
-import TextInput from "ink-text-input";
+import { TextInput } from "#components/TextInput";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";

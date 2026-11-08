@@ -230,3 +230,18 @@ describe("deepDiff", () => {
         expect(deepDiff({ a: { b: [1] } }, { a: { b: [1] } })).toBeUndefined();
     });
 });
+
+describe("the data folder is never stored", () => {
+    test("a stored appDataDir is ignored on load and dropped on the next write", () => {
+        const stale = { ...userFile, general: { theme: "light", appDataDir: "C:\Users\someone-else\goblin-malin" } };
+        fs.writeFileSync(file, JSON.stringify(stale));
+        const store = new SettingsStore(file);
+
+        expect(store.getAppSettings().general).not.toHaveProperty("appDataDir");
+        expect(store.getAppSettings().general.theme).toBe("light");
+
+        store.patchMusicSettings({ download: { outputDir: "B" } });
+        expect(onDisk().general).toEqual({ theme: "light" });
+        expect(notices).toEqual([]);
+    });
+});

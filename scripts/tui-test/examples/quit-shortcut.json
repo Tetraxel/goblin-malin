@@ -1,0 +1,22 @@
+{
+    "terminal": { "cols": 128, "rows": 40 },
+    "dataDir": "scripts/tui-test/fixtures/empty",
+    "steps": [
+        { "type": "stable", "timeout": 8000 },
+        { "type": "waitForContent", "text": "No task to run", "timeout": 5000 },
+
+        { "type": "key", "key": "Ctrl+Q" },
+        { "type": "waitForContent", "text": "Quit Goblin Malin?", "timeout": 3000 },
+        { "type": "snapshot", "name": "asked" },
+
+        { "type": "key", "key": "Esc" },
+        { "type": "wait", "ms": 400 },
+        { "type": "snapshot", "name": "stayed" },
+
+        { "type": "key", "key": "Ctrl+Q" },
+        { "type": "waitForContent", "text": "Quit Goblin Malin?", "timeout": 3000 },
+        { "type": "key", "key": "Ctrl+Q" },
+        { "type": "waitForContent", "text": "Goblin Malin is closed", "timeout": 5000 },
+        { "type": "snapshot", "name": "closed" }
+    ]
+}

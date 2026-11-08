@@ -205,3 +205,54 @@ describe("notice bridge", () => {
         expect(late).toHaveLength(1);
     });
 });
+
+describe("SessionStore write failures", () => {
+    // A directory sitting where the file should go makes the final rename fail, the way a locked file would.
+    const blockTarget = () => fs.mkdirSync(file);
+    const unblockTarget = () => fs.rmSync(file, { recursive: true, force: true });
+
+    test("a failing write is reported once, kept in memory, and flush() gives up instead of hanging", async () => {
+        const store = new SessionStore(file);
+        store.getAll();
+        blockTarget();
+
+        store.upsertSession(session("a"));
+        store.upsertSession(session("b"));
+        const started = Date.now();
+        const saved = await store.flush(400);
+
+        expect(saved).toBe(false);
+        expect(Date.now() - started).toBeLessThan(2000);
+        expect(store.getAll().map((s) => s.id)).toEqual(["b", "a"]);
+        expect(notices).toHaveLength(1);
+        expect(notices[0].title).toContain("couldn't be saved");
+        // No temp files pile up behind the failure.
+        expect(fs.readdirSync(dir).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+    });
+
+    test("once the disk accepts the write again, flush() saves what was pending", async () => {
+        const store = new SessionStore(file);
+        store.getAll();
+        blockTarget();
+        store.upsertSession(session("a"));
+        expect(await store.flush(300)).toBe(false);
+
+        unblockTarget();
+        expect(await store.flush()).toBe(true);
+        expect(JSON.parse(fs.readFileSync(file, "utf-8")).sessions.map((s: StoredSession) => s.id)).toEqual(["a"]);
+    });
+
+    test("two stores on one file never share a temp file name", async () => {
+        const first = new SessionStore(file);
+        const second = new SessionStore(file);
+        first.getAll();
+        second.getAll();
+        first.upsertSession(session("a"));
+        second.upsertSession(session("b"));
+        expect(await first.flush()).toBe(true);
+        expect(await second.flush()).toBe(true);
+
+        expect(() => JSON.parse(fs.readFileSync(file, "utf-8"))).not.toThrow();
+        expect(fs.readdirSync(dir).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+    });
+});

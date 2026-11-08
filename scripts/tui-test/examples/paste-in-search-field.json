@@ -1,0 +1,24 @@
+{
+    "terminal": { "cols": 128, "rows": 40 },
+    "dataDir": "scripts/tui-test/fixtures/empty",
+    "steps": [
+        { "type": "stable", "timeout": 8000 },
+        { "type": "waitForContent", "text": "No task to run", "timeout": 5000 },
+
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "key", "key": "Enter" },
+        { "type": "waitForContent", "text": "ARCHIVE", "timeout": 3000 },
+
+        { "type": "type", "text": "https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC" },
+        { "type": "wait", "ms": 600 },
+        { "type": "assert", "contains": "⌕ https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC" },
+        { "type": "snapshot", "name": "pasted-in-field" },
+
+        { "type": "key", "key": "Ctrl+Q" },
+        { "type": "waitForContent", "text": "Quit Goblin Malin?", "timeout": 3000 },
+        { "type": "key", "key": "Esc" },
+        { "type": "wait", "ms": 400 },
+        { "type": "snapshot", "name": "field-after-ctrl-q" }
+    ]
+}

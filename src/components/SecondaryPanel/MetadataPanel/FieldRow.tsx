@@ -1,6 +1,6 @@
 ﻿import React, { useRef } from "react";
 import { Box, Text, type DOMElement } from "ink";
-import TextInput from "ink-text-input";
+import { TextInput } from "#components/TextInput";
 import { useClickTarget } from "#base/mouse/useMouseTarget";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";

@@ -1,7 +1,6 @@
 {
     "general": {
         "reopenLastSession": true,
-        "appDataDir": "c:\\Users\\axel7\\Documents\\Github\\goblin-malin\\scripts\\tui-test\\fixtures\\collection-import",
         "animationsEnabled": true,
         "theme": "dark",
         "showWelcomeTutorial": false,

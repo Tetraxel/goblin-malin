@@ -93,6 +93,12 @@ brew install mpv
 - User selects the best download source and previews the audio
 - User saves the file to the desired folder with embedded tags
 
+### Keyboard
+
+- `Ctrl+V` imports the links on the clipboard (a link pasted while a text field has focus stays in that field). Plain links, links without `https://` and `spotify:track:…` URIs are all understood.
+- `Ctrl+Q` quits, from anywhere. It asks first; press `Ctrl+Q` again (right away, or while the question is up) to quit without the question. Closing waits for your session to be saved.
+- Every shortcut can be rebound in Settings.
+
 ## Running the project as a developer
 
 You can run the project as a developer:

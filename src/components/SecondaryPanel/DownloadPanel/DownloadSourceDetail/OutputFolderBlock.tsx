@@ -1,7 +1,7 @@
 import React from "react";
 import * as path from "path";
 import { Box, Text } from "ink";
-import TextInput from "ink-text-input";
+import { TextInput } from "#components/TextInput";
 import { useTheme } from "#base/themeContext";
 import { ClickableBox } from "./FocusRow";
 

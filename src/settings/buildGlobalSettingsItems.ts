@@ -1,5 +1,6 @@
 ﻿import { DeepPartial } from "#utils/types";
 import { clearCache } from "#utils/cache";
+import { getAppDataDir } from "#utils/appPaths";
 import { THEME_KEYS } from "#base/theme";
 import { LogLevel } from "#base/logger/types";
 import { AppSettings } from "./appSettings";
@@ -56,7 +57,7 @@ export function buildGlobalSettingsItems(
             kind: "readonlyText",
             indent: 0,
             label: "🗁  App directory",
-            value: settings.general.appDataDir,
+            value: getAppDataDir(),
         },
         {
             kind: "checkbox",

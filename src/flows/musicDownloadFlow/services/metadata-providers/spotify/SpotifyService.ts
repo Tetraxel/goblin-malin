@@ -238,6 +238,15 @@ export class SpotifyService extends MetadataService {
         };
     }
 
+    /** `spotify:track:<id>` URIs (what the desktop app copies) as the web links `parseUrl` reads. */
+    static findLinks(text: string): string[] {
+        const links: string[] = [];
+        for (const m of text.matchAll(/\bspotify:(track|album|playlist):([a-zA-Z0-9]+)/g)) {
+            links.push(`https://open.spotify.com/${m[1]}/${m[2]}`);
+        }
+        return links;
+    }
+
     static parseUrl(url: string): ParsedUrl | null {
         let parsed: URL;
         try {

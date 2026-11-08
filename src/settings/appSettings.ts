@@ -1,11 +1,9 @@
-import { DEFAULT_APP_DATA_DIR } from "#constants";
 import { LogLevel } from "#base/logger/types";
 import { Shortcut } from "#types/actions";
 
 export type AppSettings = {
     general: {
         reopenLastSession: boolean;
-        appDataDir: string;
         animationsEnabled: boolean;
         theme: string;
         showWelcomeTutorial: boolean;
@@ -37,7 +35,6 @@ export type AppSettings = {
 export const DEFAULT_APP_SETTINGS: AppSettings = {
     general: {
         reopenLastSession: true,
-        appDataDir: DEFAULT_APP_DATA_DIR,
         animationsEnabled: true,
         theme: "dark",
         showWelcomeTutorial: true,

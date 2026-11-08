@@ -1,6 +1,6 @@
 ﻿import React from "react";
 import { Box, Text } from "ink";
-import TextInput from "ink-text-input";
+import { TextInput } from "#components/TextInput";
 import { ClickArea } from "#base/mouse/ClickArea";
 import { useTheme } from "#base/themeContext";
 import type { SettingsItem } from "#settings/buildSettingsItems";

@@ -9,6 +9,11 @@ import { shortcutRegistry } from "./base/shortcuts/ShortcutRegistry";
 import { DISABLE_MOUSE, ENABLE_MOUSE, extractMouseEvents, mouseRegistry } from "./base/mouse/mouse";
 import { fpsTracker } from "./base/fpsTracker";
 import { initMusicApp } from "./flows/musicDownloadFlow/init";
+import os from "node:os";
+import { textInputFocus } from "./base/textInputFocus";
+import { getAppDataDir } from "./utils/appPaths";
+import { acquireInstanceLock, releaseInstanceLock } from "./utils/instanceLock";
+import { emergencyExit, restoreTerminal } from "./utils/exitApp";
 
 async function write(content: string) {
     return new Promise<void>((resolve, reject) => {
@@ -47,9 +52,16 @@ export const withFullScreen: WithFullScreen = (node, options) => {
 };
 
 export function start(): void {
-    console.log = (...args: unknown[]) => globalLogger.info(args.join(" "));
-    console.error = (...args: unknown[]) => globalLogger.error(args.join(" "));
-    console.warn = (...args: unknown[]) => globalLogger.warn(args.join(" "));
+    // One app per data folder: a second one would silently overwrite the first one's sessions.
+    const lock = acquireInstanceLock();
+    if (!lock.acquired) {
+        process.stderr.write(
+            `Goblin Malin is already running on ${getAppDataDir()}${lock.pid ? ` (process ${lock.pid})` : ""}.\n` +
+                `Close it first, or set GOBLIN_DATA_DIR to use another data folder.\n` +
+                `If it is not running, delete ${lock.lockPath} and start again.\n`
+        );
+        process.exit(1);
+    }
 
     // Register providers + apply concurrency budgets before the first render.
     initMusicApp();
@@ -57,6 +69,13 @@ export function start(): void {
     process.on("unhandledRejection", (reason, promise) => {
         globalLogger.error("Unhandled Rejection", { promise, reason });
     });
+    // A crash or the system stopping the app skips the normal Exit: still save, and give the terminal back.
+    process.on("uncaughtException", (error) => emergencyExit("unexpected error", 1, error));
+    // SIGHUP: the terminal window was closed. SIGINT only arrives from outside (kill -INT): Ctrl+C in the
+    // app is a key press in raw mode, not a signal.
+    for (const signal of ["SIGTERM", "SIGHUP", "SIGINT"] as const) {
+        process.on(signal, () => emergencyExit(`received ${signal}`, 128 + os.constants.signals[signal]));
+    }
 
     try {
         if (process.stdin && process.stdin.isTTY) {
@@ -69,10 +88,12 @@ export function start(): void {
 
     process.stdout.write("\x1b[?1049h"); // enter alternate screen buffer
     process.stdout.write(ENABLE_MOUSE);
-    // Exit buttons call process.exit() directly, so restore the terminal's mouse mode here
-    // rather than relying on render's waitUntilExit — a left-on mouse mode makes the
-    // shell print click reports as text.
-    process.once("exit", () => process.stdout.write(DISABLE_MOUSE));
+    // Safety net for any path that ends in process.exit() without going through exitApp(): give the terminal
+    // back (a left-on mouse mode makes the shell print click reports as text) and free the instance lock.
+    process.once("exit", () => {
+        restoreTerminal();
+        releaseInstanceLock();
+    });
 
     // In profile mode (TUI test harness), wrap the app in a single <Profiler>
     // to force ProfileMode tree-wide and forward Ink's per-frame render time.
@@ -109,6 +130,7 @@ export function start(): void {
         if (chunk === null) return;
         isHandlingFKey = true;
         const str = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+        textInputFocus.noteRawInput(str);
 
         // Mouse reports are consumed here and never handed to Ink — useInput would
         // otherwise see them as typed text and could fire shortcuts. Anything typed

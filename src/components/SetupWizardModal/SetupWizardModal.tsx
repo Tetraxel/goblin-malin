@@ -1,7 +1,7 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Text } from "ink";
 import { useShortcuts } from "#hooks/useShortcuts";
-import TextInput from "ink-text-input";
+import { TextInput } from "#components/TextInput";
 import { ClickArea } from "#base/mouse/ClickArea";
 import { Task } from "#base/task/task";
 import { PromptType, SetupWizardPrompt } from "#base/task/task-prompt";

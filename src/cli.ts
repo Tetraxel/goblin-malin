@@ -14,6 +14,8 @@ if (process.env.NODE_ENV === undefined) {
 
 // Thin entry point with a shebang used by the bin field so `npx goblin-malin` works.
 const { start } = await import("./index");
+const { redirectConsoleToLog } = await import("./base/logger/redirectConsole");
+redirectConsoleToLog();
 start();
 
 // Marks this file as an ES module so the top-level `await` above is allowed.

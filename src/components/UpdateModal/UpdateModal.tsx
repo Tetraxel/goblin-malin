@@ -9,6 +9,7 @@ import { Hint } from "../Hint";
 import { APP_VERSION } from "#constants";
 import { IS_SEA, getInstaller, getUpdateCommand } from "#updater/installSource";
 import { globalLogger } from "#base/logger/logger";
+import { exitApp } from "#utils/exitApp";
 
 interface UpdateModalProps {
     latestVersion: string;
@@ -66,7 +67,9 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
         }
 
         if (pkgStatus === "done") {
-            process.exit(0);
+            // Through the normal close, so the pending session is saved and the terminal is restored.
+            exitApp();
+            return;
         }
         if (pkgStatus === "error") {
             switchBack();

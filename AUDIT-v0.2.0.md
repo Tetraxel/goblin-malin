@@ -16,10 +16,8 @@ The two blockers found here — `yarn build` failing, and a fresh install unable
 
 | # | ID | Sev. | One-liner |
 |---|----|------|-----------|
-| 1 | [DATA-04](#data-04) | high | Data dir is split-brained: `cache/`, `bin/`, `app.log` follow a *persisted* `settings.json` path, not the live data dir |
-| 2 | [MD-01](#md-01) | high | Match confidence is blind to every non-ASCII letter: two different Japanese/Russian/Greek songs score as an exact match |
-| 3 | [UI-02](#ui-02) | medium | `Ctrl+C` does nothing (verified); there is no documented keyboard way to quit |
-| 4 | [DEP-02](#dep-02) | medium | 97 `yarn audit` advisories; the runtime chains (`axios`, `adm-zip`, `ws`) need deliberate bumps |
+| 1 | [MD-01](#md-01) | high | Match confidence is blind to every non-ASCII letter: two different Japanese/Russian/Greek songs score as an exact match |
+| 2 | [DEP-02](#dep-02) | medium | 97 `yarn audit` advisories; the runtime chains (`axios`, `adm-zip`, `ws`) need deliberate bumps |
 
 ### Counts
 
@@ -28,22 +26,22 @@ The two blockers found here — `yarn build` failing, and a fresh install unable
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Build, release & packaging (`REL-`) |  |  | 1 | 3 | 4 |
 | Dependencies & supply chain (`DEP-`) |  |  | 1 | 1 | 2 |
-| Data safety, persistence & state (`DATA-`) |  | 1 | 6 |  | 7 |
+| Data safety, persistence & state (`DATA-`) |  |  | 3 |  | 3 |
 | Download pipeline (`DL-`) |  |  |  | 1 | 1 |
 | Metadata & discovery (`MD-`) |  | 1 | 2 | 1 | 4 |
-| UI / TUI behaviour (`UI-`) |  |  | 2 | 5 | 7 |
+| UI / TUI behaviour (`UI-`) |  |  |  | 5 | 5 |
 | Security (`SEC-`) |  |  |  | 2 | 2 |
 | Tests, CI & tooling (`TEST-`) |  |  | 2 | 3 | 5 |
 | Docs, instructions & hygiene (`DOC-`) |  |  | 2 | 3 | 5 |
 | Product & UX (`PROD-`) |  |  | 3 | 1 | 4 |
-| **Total** | **0** | **2** | **19** | **20** | **41** |
+| **Total** | **0** | **1** | **14** | **20** | **35** |
 
 Plus 9 unconfirmed candidates in [section K](#k-candidates-to-verify-found-while-reading-not-confirmed) (not counted).
 <!-- /COUNTS-TABLE -->
 
 ### Already fixed
 
-Removed from this file once fixed and committed (what was found, the fix and how it was checked are in the file's git history: `git log -p -- AUDIT-v0.2.0.md`): **REL-01** (`yarn build`), **REL-04** (`engines`), **REL-05** (`postinstall`), **DEP-01** (unused dependencies), **DATA-01** ("Clear temporary downloads"), **DATA-02** and **DATA-03** (`sessions.json` / `settings.json` validation, quarantine, `.bak`, versioning), **DOC-02** (`.env.example`), **DOC-05** (`TODO.md`), **PROD-02** (dotenv banner), and the ffmpeg/ffprobe bootstrap bug of **DL-01**. Findings that were only partly fixed (**REL-03**, **REL-07**, **DEP-02**, **DOC-04**, **DL-01**) keep just the part that is still open.
+Removed from this file once fixed and committed (what was found, the fix and how it was checked are in the file's git history: `git log -p -- AUDIT-v0.2.0.md`): **REL-01** (`yarn build`), **REL-04** (`engines`), **REL-05** (`postinstall`), **DEP-01** (unused dependencies), **DATA-01** ("Clear temporary downloads"), **DATA-02** and **DATA-03** (`sessions.json` / `settings.json` validation, quarantine, `.bak`, versioning), **DATA-04** (the data folder is derived, never stored), **DATA-05** (visible write failures, bounded retry on close, unique temp names, one instance per data folder), **DATA-06** (self-update exits through `exitApp()`), **DATA-07** (crash/signal handlers restore the terminal and save; console patch moved to the entry points), **UI-01** (a link pasted into a focused text field stays in the field; scheme-less links and `spotify:` URIs are understood), **UI-02** (`Ctrl+Q`, rebindable `global.quit`, asks first; a second press quits at once), **DOC-02** (`.env.example`), **DOC-05** (`TODO.md`), **PROD-02** (dotenv banner), and the ffmpeg/ffprobe bootstrap bug of **DL-01**. Findings that were only partly fixed (**REL-03**, **REL-07**, **DEP-02**, **DOC-04**, **DL-01**) keep just the part that is still open.
 
 ---
 
@@ -110,39 +108,6 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 `ink` 7.0.2 → 7.1.1 (8.0.0 latest) · `react` 19.2.6 → 19.3.1 · `ytdlp-nodejs` 3.4.4 → 3.4.5 · `slsk-client` 1.1.0 → 2.0.2 (major; unmaintained-looking, see Soulseek note in Coverage) · `musicbrainz-api` 1.2.1 → 2.0.1 · `typescript` 6.0.3 → 7.0.2 · `vitest` 4.1.9 → 5.1.0 · `@types/node` 25 → 26 · `eslint` 9 → 10, `prettier`, `tsx`, `typescript-eslint`, `playwright` minor bumps. Do the minor/patch bumps with the build and tests green; defer majors.
 
 ### C. Data safety, persistence & state
-
-<a id="data-04"></a>
-#### DATA-04 — The data directory is split-brained between the live value and a persisted setting
-**high · bug / isolation · verified (code + observed live, and it bit the audit itself)**
-
-- **Where:** `src/constants.ts:25-26` (`DEFAULT_APP_DATA_DIR` = `GOBLIN_DATA_DIR`, else dev `<repo>/data`, else the OS default) · `src/utils/appPaths.ts:16-28` (`getCacheDir/getBinDir/getLogsPath` read `SettingsStore…general.appDataDir`) · `src/settings/appSettings.ts:40`, `src/settings/buildGlobalSettingsItems.ts:59` · `src/utils/cache.ts:20` (reads it at import time) · tracked fixtures `scripts/tui-test/fixtures/*/settings.json` (contain an absolute `C:\Users\axel7\…` path).
-- **What:** `sessions.json`, `settings.json`, `.env`, `install.json` live under `DEFAULT_APP_DATA_DIR`. `cache/` (api-cache, songlink_rate.json), `bin/` (yt-dlp, ffmpeg, ffprobe, mpv, cookies.txt) and `app.log` are derived from `general.appDataDir` in `settings.json` — a value that defaults to the same path but is written into the file on the first save and then wins forever. If the folder is moved, restored from a backup, synced between machines/users, or `GOBLIN_DATA_DIR` changes, the tools/cache/log keep pointing at the old absolute path: ~460 MB of binaries are re-downloaded into a stale location, or the app writes into another user's profile/an unplugged drive. It also means v0.2.0 cannot relocate `bin/`/`cache/` for anyone who has saved settings.
-- **Evidence:** with `GOBLIN_DATA_DIR` pointing at a copy of a fixture, the Settings row still displayed the fixture's path. The audit itself tripped on it: a scratch copy whose stored `appDataDir` I set to `%APPDATA%/goblin-malin` made the harness write `app.log` and `cache/api-cache` into the developer's **real** installed-app folder (see "Side effects" at the end). Harness runs on fixture *copies* also write cache/log/binaries into the repo's fixture folders.
-- **Fix:** never persist `appDataDir` (derive it from `DEFAULT_APP_DATA_DIR` everywhere; keep the Settings row informational) and strip the stored key on load; make fixtures path-independent.
-
-<a id="data-05"></a>
-#### DATA-05 — Persistence failures are invisible; closing can hang 8 s and then drop data; two instances overwrite each other
-**medium · data-loss · verified by reading**
-
-- **Where:** `src/sessions/sessionStore.ts:60-70` (`catch { this.dirty = true }`) and `flush()` (`while (this.dirty || this.writing) await sleep(5)`), `src/utils/exitApp.ts` (`MAX_CLOSE_MS = 8000`), fixed temp name `sessions.json.tmp`.
-- **What:** a failing write (disk full, file locked by antivirus/OneDrive, permissions) is swallowed — no log, no message. `flush()` never retries after a failure, so at exit it waits until `exitApp`'s 8 s timeout force-quits and the user is told "Everything is saved" (`shutdownState.setDone`) path is skipped but the data is not saved. Two app instances on the same data dir (second terminal tab) each hold the full file in memory and rewrite the **whole** file on every change with the same `.tmp` name: last writer wins, the other instance's work is lost silently; there is no lock file.
-- **Fix:** log + surface write failures (status line), retry with backoff in `flush()`, unique temp names, a simple lock file (or refuse a second instance with a message).
-
-<a id="data-06"></a>
-#### DATA-06 — The self-update path exits with `process.exit(0)`, bypassing the graceful shutdown
-**medium · bug · verified by reading**
-
-- **Where:** `src/components/UpdateModal/UpdateModal.tsx:69` vs `src/utils/exitApp.ts`.
-- **What:** after a successful `npm install -g …`, Enter calls `process.exit(0)` directly: no `SessionStore.flush()`, no cache save, alt-screen/mouse mode restored only partially (`process.once("exit")` in `index.tsx` writes `DISABLE_MOUSE` but not the alt-screen-leave sequence). Debounced session edits made just before are lost and the terminal stays on the alternate screen.
-- **Fix:** call `exitApp()`.
-
-<a id="data-07"></a>
-#### DATA-07 — No `uncaughtException`/signal handling; the terminal is left in alt-screen/mouse mode
-**medium · bug · verified by reading**
-
-- **Where:** `src/index.tsx` (only `unhandledRejection` is handled; no `uncaughtException`, `SIGINT/SIGTERM/SIGHUP`).
-- **What:** a crash, `kill`, or closing the terminal window skips `exitApp()`: pending debounced session writes are lost and, after a crash, the shell is left on the alternate screen with mouse reporting on (clicks print escape codes). `start()` also monkey-patches global `console.log/error/warn`, an unexpected side effect for a public library entry (`GoblinMalin.start()`).
-- **Fix:** a single `process.on("uncaughtException" | "SIGTERM" | "SIGHUP")` handler that runs the same cleanup as `exitApp` (flush + restore terminal), and keep the console patch inside the app entry only.
 
 <a id="data-08"></a>
 #### DATA-08 — The temp folder lives inside the Music library and nothing cleans it; several settings are dead
@@ -216,23 +181,6 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 
 ### F. UI / TUI behaviour
 
-<a id="ui-01"></a>
-#### UI-01 — The URL-paste shortcut hijacks text pasted into any text field (and stacks a second modal)
-**medium · bug · verified (TUI harness)**
-
-- **Where:** `src/components/ShortcutDispatcher.tsx:19-40`; Ink 7 already ships `usePaste` (bracketed paste, `node_modules/ink/build/hooks/use-paste.js`) which the app does not use.
-- **What:** any stdin chunk longer than 8 chars containing `http(s)://` is treated as an import paste "before normal shortcut routing so they work even inside modals". Pasting a URL into the Archive search box (or the Sessions search/rename, Settings search, a text setting) therefore (1) still inserts the URL into the field *and* (2) opens the Import modal, which is painted **under** the Archive modal so its actions are partly hidden. Non-URL or scheme-less pastes (`open.spotify.com/…`, `spotify:track:…`) are ignored.
-- **Evidence:** harness scenario: open Archive, `type` `https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC` → the search field shows `⌕ hellohttps://open.spotify.com/track/…` **and** `Import 1 URL … [Spotify] https://open.spotify.com/track/…` is on screen behind the Archive frame.
-- **Fix:** use `usePaste` in one place; deliver the paste to the focused text input when one has focus and open Import only when no field/modal owns input; accept scheme-less links and `spotify:` URIs.
-
-<a id="ui-02"></a>
-#### UI-02 — `Ctrl+C` does nothing and there is no documented keyboard way to quit
-**medium · ux · verified (harness: two Ctrl+C presses, app still running)**
-
-- **Where:** `src/index.tsx` (`exitOnCtrlC: false`, no replacement handler); README does not say how to exit.
-- **What:** the only exits are the toolbar "Exit" button (reached with double-Esc, then arrows, then Enter) or mouse. In a terminal app users expect Ctrl+C (or `q`/Ctrl+Q) to quit; `Ctrl+C` is instead bound to "Copy" in two panels.
-- **Fix:** register a rebindable `global.quit` shortcut (e.g. `Ctrl+Q`) and make a double `Ctrl+C` call `exitApp()`; document it in the README and the in-app hints.
-
 <a id="ui-03"></a>
 #### UI-03 — Import reads the clipboard with blocking `execSync`; Linux support limited to `xclip`
 **low · performance/ux · verified (timed)**
@@ -305,7 +253,7 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 #### TEST-02 — The e2e smoke test runs against the developer's real data dir; fixtures are not hermetic
 **medium · tests · verified**
 
-- **Where:** `tests/e2e/smoke.test.ts` (no `dataDir`), `tests/e2e/perf.test.ts` (uses a tracked fixture dir directly), fixtures' absolute `appDataDir` (DATA-04).
+- **Where:** `tests/e2e/smoke.test.ts` (no `dataDir`), `tests/e2e/perf.test.ts` (uses a tracked fixture dir directly).
 - **What:** `yarn test` boots the real app on `<repo>/data` (the developer's sessions, settings and cache) and on tracked fixtures that the app rewrites; in CI the real data dir doesn't exist and fixtures contain a Windows path.
 - **Fix:** have the harness always copy the fixture into a temp dir and rewrite `appDataDir`/output dirs; set `GOBLIN_DATA_DIR` for every e2e test.
 
@@ -450,7 +398,7 @@ These come from the UI agent's running notes before it was cut off. Treat them a
 - The single `useInput` rule holds (`ShortcutDispatcher` only); virtually all hints go through the registry (UI-05 is the lone literal found).
 - Shortcut dispatch semantics (priority + `exclusive`) are sound; the duplicate default keys I inspected live in different scopes.
 - `settings.json` writes are atomic (temp + rename); `sessions.json` writes are atomic and coalesced, off the main thread.
-- A graceful `exitApp()` exists (flush session store + cache, restore terminal, forced exit after 8 s) — it is only bypassed by DATA-06/DATA-07.
+- A graceful `exitApp()` exists (flush session store + cache, restore terminal, forced exit after 8 s) — crashes and signals now go through `emergencyExit()` (same save + terminal restore).
 - The Windows-Terminal-only `screenshot-powershell` step and the headless harness work; the harness is a good base for the regression scenarios proposed above.
 - **The happy path works** (given ffmpeg/yt-dlp are present): YouTube Music URL → title/artist/duration → yt-dlp download (~25 MB/s) → `SAVED` with the file at `<out>/<artist> - <title>.flac` and the message `FLAC metadata updated successfully`; Spotify (scrape mode, no credentials) → artist/title + YouTube match; the import options dialog, the Songlink/Claude consent dialogs (declining persists and is logged), quality labelling ("FLAC (transcoded from Opus)"), the output-path preview and the Sessions/Archive/Settings modals all render and respond correctly at 120–160 columns.
 - `Tab` behaves as designed (toolbar → task list → lower panel); focus starts on the toolbar.
@@ -465,12 +413,12 @@ Eight sub-agents were launched in parallel for: download pipeline, metadata/disc
 - **Soulseek** (credentials, remote file-name handling, `slsk-client` 1.1.0 vs 2.x), **the Claude provider's process spawn** (shell use, prompt-injection surface, consent flow), Songlink/MusicBrainz rate limiting and User-Agent policy, URL parsing/import fuzzing.
 - **UI static review** against `CLAUDE.md` (flexShrink/indentation/`#alias` violations, focus/modal management, accessibility, render performance) beyond the candidates in section K; *runtime* resize, large sessions (2,000+ tasks), NO_COLOR/non-TTY, idle CPU/memory. (A static terminal-size sweep from 100×30 down to 20×8 was done — see UI-06.)
 - **Docs/tests deep review**: claim-by-claim README/CLAUDE.md check, project status table (P1–P29 vs reality), coverage numbers, harness cleanup of orphan processes, `yarn test` full run.
-- **Core**: updater edge cases (pre-release tags, installer detection), prototype-pollution in `deepMerge`, two-instance behaviour beyond what DATA-05 states.
+- **Core**: updater edge cases (pre-release tags, installer detection), prototype-pollution in `deepMerge`, two-instance behaviour beyond the pid lock file added for DATA-05.
 
 The sub-agents keep their context: after 17:40 they can be resumed to finish these areas (their scratch work is in `%TEMP%/claude/.../scratchpad/work/<agent>`).
 
 ## 5. Side effects of this audit
 
-- While testing the settings row (UI-04) I briefly pointed a *scratch copy's* persisted `appDataDir` at `%APPDATA%/goblin-malin` (the owner's real installed-app folder). The harness runs then **rewrote `app.log` (truncated by the app at start, see DATA-10) and re-saved `cache/api-cache` there**. `sessions.json`, `settings.json`, `.env`, `install.json` and `bin/` were not touched (their timestamps are unchanged). This is DATA-04 in action.
+- While testing the settings row (UI-04) I briefly pointed a *scratch copy's* persisted `appDataDir` at `%APPDATA%/goblin-malin` (the owner's real installed-app folder). The harness runs then **rewrote `app.log` (truncated by the app at start, see DATA-10) and re-saved `cache/api-cache` there**. `sessions.json`, `settings.json`, `.env`, `install.json` and `bin/` were not touched (their timestamps are unchanged). This was DATA-04 in action (fixed: the data folder is no longer read from `settings.json`).
 - Network use: one YouTube Music download (~40 MB) and one Spotify scrape plus a few MusicBrainz lookups (Songlink and Claude were declined; no credentials or cookies were used or copied — only `yt-dlp`, `ffmpeg`, `ffprobe` were copied into an isolated temp data dir).
 - My isolated scratch data dirs (`%TEMP%/gm-o`, `gm-live`, `gm-sweep`, with the copied binaries and the 39 MB test download) were deleted afterwards. The remaining scratch files (scripts, scenario JSONs, the sub-agents' partial work) live under `%TEMP%/claude/.../scratchpad`.

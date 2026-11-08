@@ -98,6 +98,14 @@ function parseSettingsFile(raw: unknown): Parsed<StoredSettings> {
         }
     }
 
+    // The data folder is derived from `GOBLIN_DATA_DIR`/the OS default, never stored: older files froze their
+    // absolute path in here, which then pulled `cache/`, `bin/` and `app.log` away from the real folder.
+    if (isPlainObject(sections.general) && "appDataDir" in sections.general) {
+        const general = { ...sections.general };
+        delete general.appDataDir;
+        sections.general = general;
+    }
+
     const version = typeof rest.version === "number" ? rest.version : 1;
     const file = { ...sections, version } as StoredSettings;
     const value = runMigrations(file, version, SETTINGS_FILE_VERSION, SETTINGS_MIGRATIONS);

@@ -2,6 +2,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { EventEmitter } from "events";
 import { DEFAULT_APP_DATA_DIR } from "#constants";
+import { globalLogger } from "#base/logger/logger";
+import { dataFileNoticeBridge } from "#base/bridges/dataFileNoticeBridge";
 import { isPlainObject, loadDataFile, Parsed, refreshBackup, runMigrations } from "#utils/dataFile";
 import { StoredSession, SessionsFile } from "./types";
 
@@ -13,7 +15,16 @@ export const SESSIONS_FILE_VERSION = 1;
 /** `[v]` upgrades a version-`v` file to `v + 1`. Runs once on load; the result is saved on the next write. */
 const SESSIONS_MIGRATIONS: Record<number, (file: SessionsFile) => SessionsFile> = {};
 
-const emptyFile = (): SessionsFile => ({ version: SESSIONS_FILE_VERSION, lastSessionId: null, sessions: [] });
+/** First retry after a failed write; doubles each time up to the cap. */
+const RETRY_BASE_MS = 1000;
+const RETRY_MAX_MS = 30_000;
+/** How long `flush()` keeps retrying a failing write before giving up (it must fit inside the close timeout). */
+const FLUSH_TIMEOUT_MS = 4000;
+const FLUSH_RETRY_MS = 150;
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+const emptyFile =(): SessionsFile => ({ version: SESSIONS_FILE_VERSION, lastSessionId: null, sessions: [] });
 
 const isStoredSession = (value: unknown): value is StoredSession =>
     isPlainObject(value) && typeof value.id === "string" && Array.isArray(value.tasks);
@@ -84,6 +95,10 @@ export class SessionStore {
 
     private writing = false;
     private dirty = false;
+    /** Consecutive failed writes; the user is told on the first one only, then again after a success. */
+    private failures = 0;
+    private retryTimer: NodeJS.Timeout | null = null;
+    private tmpCounter = 0;
 
     private writeToDisk(file: SessionsFile): void {
         // Update the in-memory cache + notify the UI synchronously so reads and the
@@ -105,6 +120,7 @@ export class SessionStore {
     private async flushToDisk(): Promise<void> {
         if (this.writing) return; // an in-flight flush will pick up the latest `dirty`
         this.writing = true;
+        let tmp: string | null = null;
         try {
             await fs.promises.mkdir(path.dirname(this.filePath), { recursive: true });
             if (!this.backedUp) {
@@ -116,23 +132,64 @@ export class SessionStore {
                 this.dirty = false;
                 const snapshot = this.cache;
                 if (!snapshot) break;
-                const tmp = this.filePath + ".tmp";
+                // A name of its own, so two writers never share (and corrupt) one temp file.
+                tmp = `${this.filePath}.${process.pid}.${this.tmpCounter++}.tmp`;
                 // Compact JSON: smaller payload → faster stringify + write.
                 await fs.promises.writeFile(tmp, JSON.stringify(snapshot), "utf-8");
                 await fs.promises.rename(tmp, this.filePath);
+                tmp = null;
             }
-        } catch {
-            // Persistence failures must not crash the UI; the next write retries.
+            this.failures = 0;
+        } catch (error) {
+            // Persistence failures must not crash the UI: keep the data in memory and retry.
             this.dirty = true;
+            this.onWriteFailed(error);
         } finally {
+            if (tmp) await fs.promises.rm(tmp, { force: true }).catch(() => undefined);
             this.writing = false;
         }
     }
 
-    /** Resolves once everything handed to the store so far is on disk. */
-    async flush(): Promise<void> {
-        if (this.dirty && !this.writing) void this.flushToDisk();
-        while (this.dirty || this.writing) await new Promise((resolve) => setTimeout(resolve, 5));
+    /** Logs the failure, tells the user once per streak, and schedules a retry with a growing delay. */
+    private onWriteFailed(error: unknown): void {
+        this.failures++;
+        const reason = error instanceof Error ? error.message : String(error);
+        globalLogger.warn(`Could not save the sessions file (attempt ${this.failures}): ${reason}`);
+        if (this.failures === 1) {
+            dataFileNoticeBridge.report({
+                title: "Your sessions couldn't be saved",
+                message: `Writing ${this.filePath} failed (${reason}). Your work is kept in memory and saving is retried, but if the app closes before it succeeds, the latest changes are lost. Check that the disk isn't full and that no other program (antivirus, sync) is locking the file.`,
+            });
+        }
+        if (this.retryTimer) return;
+        const delay = Math.min(RETRY_BASE_MS * 2 ** (this.failures - 1), RETRY_MAX_MS);
+        this.retryTimer = setTimeout(() => {
+            this.retryTimer = null;
+            if (this.dirty) void this.flushToDisk();
+        }, delay);
+        this.retryTimer.unref();
+    }
+
+    /**
+     * Resolves once everything handed to the store so far is on disk, retrying a failing write for a few
+     * seconds. Returns `false` when it gave up: the latest changes are then only in memory.
+     */
+    async flush(timeoutMs: number = FLUSH_TIMEOUT_MS): Promise<boolean> {
+        const deadline = Date.now() + timeoutMs;
+        let delay = FLUSH_RETRY_MS;
+        while (this.dirty || this.writing) {
+            if (this.writing) {
+                await sleep(5);
+                continue;
+            }
+            await this.flushToDisk();
+            if (!this.dirty) break;
+            // The write failed: wait a little and try again, until the deadline.
+            if (Date.now() + delay > deadline) return false;
+            await sleep(delay);
+            delay *= 2;
+        }
+        return true;
     }
 
     private getCached(): SessionsFile {

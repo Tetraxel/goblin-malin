@@ -49,7 +49,7 @@ Named keys (use in `"key"` field):
 Enter  Esc  Tab  Shift+Tab  Space  Del
 ←  →  ↑  ↓                          (or: ArrowLeft  ArrowRight  ArrowUp  ArrowDown)
 Shift+←  Shift+→  Shift+↑  Shift+↓
-Ctrl+A  Ctrl+C  Ctrl+D  Ctrl+N  Ctrl+R  Ctrl+S  Ctrl+V
+Ctrl+A  Ctrl+C  Ctrl+D  Ctrl+N  Ctrl+Q  Ctrl+R  Ctrl+S  Ctrl+V
 ```
 
 Single characters pass through as-is: `"D"`, `"E"`, `"1"`, `"y"`, etc.
