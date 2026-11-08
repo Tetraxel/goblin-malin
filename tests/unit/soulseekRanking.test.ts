@@ -4,7 +4,11 @@ import {
     cleanSearchTerm,
     calculateResultWeight,
     rankResults,
+    parseResultsLimit,
+    remoteFileName,
+    DEFAULT_RESULTS_LIMIT,
     MAX_DOWNLOAD_ATTEMPTS,
+    MAX_HIDDEN_RESULTS,
 } from "#flows/musicDownloadFlow/services/download-providers/soulseek/ranking";
 
 function file(overrides: Partial<SlskFile> = {}): SlskFile {
@@ -40,8 +44,8 @@ describe("calculateResultWeight", () => {
         expect(calculateResultWeight(file({ file: "@@u\\Title.mp3" }), query)).toBe(-1);
     });
 
-    test("disqualifies a result with no free slots", () => {
-        expect(calculateResultWeight(file({ slots: false }), query)).toBe(-1);
+    test("keeps a result with no free slots (it ranks after the free-slot ones, see rankResults)", () => {
+        expect(calculateResultWeight(file({ slots: false }), query)).toBeGreaterThan(0);
     });
 
     test("disqualifies a remix result when a non-remix track was requested", () => {
@@ -92,10 +96,51 @@ describe("rankResults", () => {
         expect(ranked.map((r) => r.user)).toEqual(["high", "low"]);
     });
 
-    test("caps results to MAX_DOWNLOAD_ATTEMPTS", () => {
+    test("caps results to the given limit", () => {
         const results = Array.from({ length: MAX_DOWNLOAD_ATTEMPTS + 5 }, (_, i) =>
             file({ user: `user${i}`, bitrate: 100 + i })
         );
-        expect(rankResults(results, query)).toHaveLength(MAX_DOWNLOAD_ATTEMPTS);
+        expect(rankResults(results, query, MAX_DOWNLOAD_ATTEMPTS)).toHaveLength(MAX_DOWNLOAD_ATTEMPTS);
+    });
+
+    test("keeps every result when no limit is given", () => {
+        const results = Array.from({ length: 30 }, (_, i) => file({ user: `user${i}`, bitrate: 100 + i }));
+        expect(rankResults(results, query)).toHaveLength(30);
+    });
+
+    test("lists peers with no free slot after every free-slot peer, however good their file", () => {
+        const results = [
+            file({ user: "queued-great", slots: false, bitrate: 1400, speed: 5000 }),
+            file({ user: "free-poor", slots: true, bitrate: 128, speed: 10 }),
+            file({ user: "queued-ok", slots: false, bitrate: 900 }),
+        ];
+        const ranked = rankResults(results, query);
+        expect(ranked.map((r) => r.user)).toEqual(["free-poor", "queued-great", "queued-ok"]);
+    });
+});
+
+describe("parseResultsLimit", () => {
+    test("reads a plain number", () => {
+        expect(parseResultsLimit("25")).toBe(25);
+    });
+
+    test("falls back to the default for anything unusable", () => {
+        expect(parseResultsLimit("")).toBe(DEFAULT_RESULTS_LIMIT);
+        expect(parseResultsLimit("abc")).toBe(DEFAULT_RESULTS_LIMIT);
+        expect(parseResultsLimit("0")).toBe(DEFAULT_RESULTS_LIMIT);
+        expect(parseResultsLimit("-3")).toBe(DEFAULT_RESULTS_LIMIT);
+        expect(parseResultsLimit(undefined)).toBe(DEFAULT_RESULTS_LIMIT);
+    });
+
+    test("caps a huge value", () => {
+        expect(parseResultsLimit("100000")).toBe(MAX_HIDDEN_RESULTS);
+    });
+});
+
+describe("remoteFileName", () => {
+    test("takes the file name out of a backslash path whatever the host OS", () => {
+        expect(remoteFileName("@@u\\Goodbye (2026)\\Jersey\\Jersey - Goodbye - 02 - U&I.flac")).toBe(
+            "Jersey - Goodbye - 02 - U&I.flac"
+        );
     });
 });

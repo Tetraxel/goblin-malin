@@ -26,6 +26,7 @@ import { startOptionsBridge } from "#base/bridges/startOptionsBridge";
 import { deleteConfirmBridge, DeleteConfirmRequest } from "#base/bridges/deleteConfirmBridge";
 import { consentBridge, ConsentRequest } from "#base/bridges/consentBridge";
 import { collectionHintBridge, CollectionHintRequest } from "#base/bridges/collectionHintBridge";
+import { overwriteConfirmBridge, OverwriteConfirmRequest } from "#base/bridges/overwriteConfirmBridge";
 import { ConfirmModal } from "./ConfirmModal/ConfirmModal";
 import { ClosingModal } from "./ClosingModal/ClosingModal";
 import { useConfirmModal } from "./ConfirmModal/useConfirmModal";
@@ -102,6 +103,27 @@ export const AppInner: React.FC<{
         [openConfirmModal, theme]
     );
 
+    // Bridge: let a save ask before it replaces a file that isn't its own. "Keep" comes first: it is the
+    // choice the dialog starts on, so a stray Enter never destroys a file.
+    const handleOverwriteRequest = useCallback(
+        (req: OverwriteConfirmRequest) => {
+            openConfirmModal({
+                title: "Replace existing file?",
+                message: `A different file already has this name:
+${req.filePath}
+Replacing it cannot be undone.`,
+                choices: [
+                    { label: "Keep it", color: theme.action.primary },
+                    { label: "Replace", color: theme.status.error },
+                ],
+                accentColor: theme.status.warning,
+                onConfirm: (i) => (i === 1 ? req.replace() : req.cancel()),
+                onCancel: req.cancel,
+            });
+        },
+        [openConfirmModal, theme]
+    );
+
     // Bridge: let plain-TS task actions open the start-options modal.
     useEffect(() => {
         startOptionsBridge.setOpener(openStartFlow);
@@ -118,6 +140,11 @@ export const AppInner: React.FC<{
         collectionHintBridge.setOpener(handleCollectionHint);
         return () => collectionHintBridge.setOpener(null);
     }, [handleCollectionHint]);
+
+    useEffect(() => {
+        overwriteConfirmBridge.setOpener(handleOverwriteRequest);
+        return () => overwriteConfirmBridge.setOpener(null);
+    }, [handleOverwriteRequest]);
 
     useEffect(() => {
         consentBridge.setOpener(handleConsentRequest);

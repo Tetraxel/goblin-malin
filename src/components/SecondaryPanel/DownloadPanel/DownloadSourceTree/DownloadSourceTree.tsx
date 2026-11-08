@@ -1,4 +1,4 @@
-﻿import React, { useRef } from "react";
+﻿import React, { useRef, useState } from "react";
 import { Box, Text, type DOMElement } from "ink";
 import { useWheelTarget } from "#base/mouse/useMouseTarget";
 import { useTheme } from "#base/themeContext";
@@ -12,16 +12,35 @@ import { ProviderHeader } from "./ProviderHeader";
 import { MetadataHeader } from "./MetadataHeader";
 import { SourceFileRow } from "./SourceFileRow";
 import { QueryLines } from "./QueryLines";
+import { MoreRow } from "./MoreRow";
+import { SavedFileRow, SAVED_ROW_HEIGHT } from "./SavedFileRow";
+import { computeWindow } from "./treeWindow";
 
 interface DownloadSourceTreeProps {
     sources: TrackDownloadSource[];
     /** Show, under each group of rows, what the provider was actually asked for. */
     showQuery: boolean;
     selectedSourceIndex: number;
+    /** The provider whose header holds the cursor (instead of one of its rows); null when a row does. */
+    focusedProvider: DownloadProvider | null;
+    /** The cursor is on the pinned "saved file" row (instead of the saved source's own row in the list). */
+    savedFocused: boolean;
     isActive: boolean;
     width: number;
     height: number;
     onSelectSource: (index: number) => void;
+    /** Put the cursor on a provider's header. */
+    onFocusProvider: (provider: DownloadProvider) => void;
+    /** Put the cursor on the pinned saved-file row. */
+    onFocusSaved: () => void;
+    /** Whether results a provider found but didn't list can be listed now (not while a download is running). */
+    canShowMore: boolean;
+    /** List the next results of the search whose listing ends at that row. */
+    onShowMore: (anchorIndex: number) => void;
+    /** Whether that provider's whole search + download can be re-run right now. */
+    canRetryProvider: (provider: DownloadProvider) => boolean;
+    /** Re-run that provider's search + download from scratch. */
+    onRetryProvider: (provider: DownloadProvider) => void;
     /** A row was clicked: focus the list and select that source. */
     onClickSource: (index: number) => void;
     /** Mouse-wheel: move the selection without moving keyboard focus. */
@@ -47,7 +66,15 @@ type TreeItem =
           sourceIndex: number;
       }
     | { type: "query-lines"; query: DownloadQueryField[] }
-    | { type: "file-row"; source: TrackDownloadSource; sourceIndex: number };
+    | { type: "file-row"; source: TrackDownloadSource; sourceIndex: number }
+    /** Under the last row of one search that has results left unlisted: `firstIndex`..`anchorIndex` are that search's rows. */
+    | { type: "more-row"; anchorIndex: number; firstIndex: number; count: number };
+
+/** A place the cursor can be: the pinned saved file, a provider's header, or one download row. */
+type NavTarget =
+    | { kind: "saved" }
+    | { kind: "provider"; provider: DownloadProvider }
+    | { kind: "source"; index: number };
 
 function getProviderDisplay(provider: string): {
     label: string;
@@ -62,8 +89,11 @@ function metadataKeyOf(source: TrackDownloadSource): string {
     return m.uri ?? `${m.platform}::${m.id}`;
 }
 
-function buildTreeItems(sources: TrackDownloadSource[], showQuery: boolean): TreeItem[] {
+function buildTreeItems(sources: TrackDownloadSource[], showQuery: boolean, canShowMore: boolean): TreeItem[] {
     const items: TreeItem[] = [];
+    // The rows of one search (same provider, same query) — what a "more" row belongs to.
+    let runKey: string | undefined;
+    let runStart = 0;
     const seenProviders = new Set<string>();
     // Consecutive sources under the same provider that used the identical metadata
     // (the common case — one search/lookup feeds every candidate row) share a single
@@ -97,9 +127,30 @@ function buildTreeItems(sources: TrackDownloadSource[], showQuery: boolean): Tre
                 lastQueryKey = queryKey;
             }
         }
+        const key = `${source.provider}|${JSON.stringify(source.query ?? null)}`;
+        if (key !== runKey) {
+            runKey = key;
+            runStart = i;
+        }
         items.push({ type: "file-row", source, sourceIndex: i });
+        // Not while a row is still being worked on: listing more shifts the rows that are.
+        if (canShowMore && source.moreCandidates && source.moreCandidates.length > 0) {
+            items.push({ type: "more-row", anchorIndex: i, firstIndex: runStart, count: source.moreCandidates.length });
+        }
     });
     return items;
+}
+
+/** How many terminal lines a tree item takes (a provider header after the first carries a blank line above it). */
+function itemHeight(item: TreeItem, index: number, items: TreeItem[]): number {
+    switch (item.type) {
+        case "provider-header":
+            return items.slice(0, index).some((t) => t.type === "provider-header") ? 2 : 1;
+        case "query-lines":
+            return item.query.length;
+        default:
+            return 1;
+    }
 }
 
 /** Whether the player is on this source's file (the downloaded one, or the copy saved from it). */
@@ -114,10 +165,18 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     sources,
     showQuery,
     selectedSourceIndex,
+    focusedProvider,
+    savedFocused,
     isActive,
     width,
-    height,
+    height: fullHeight,
     onSelectSource,
+    onFocusProvider,
+    onFocusSaved,
+    canShowMore,
+    onShowMore,
+    canRetryProvider,
+    onRetryProvider,
     onClickSource,
     onScrollSource,
     onRequestSelect,
@@ -129,12 +188,41 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     const theme = useTheme();
     // Re-renders only when the track or its paused state changes, not on playback progress.
     const nowPlaying = useNowPlaying();
-    const treeItems = buildTreeItems(sources, showQuery);
+    // The saved file is pinned above the scrolling list, so the list gets what is left.
+    const savedIndex = sources.findIndex((s) => s.savedFile != null);
+    const hasSaved = savedIndex >= 0;
+    const onSaved = hasSaved && savedFocused && focusedProvider === null;
+    const height = hasSaved ? Math.max(1, fullHeight - SAVED_ROW_HEIGHT) : fullHeight;
+    const treeItems = buildTreeItems(sources, showQuery, canShowMore);
     const selectableIndices = treeItems
         .filter((item): item is Extract<TreeItem, { type: "file-row" }> => item.type === "file-row")
         .map((item) => item.sourceIndex);
 
     const treeRef = useRef<DOMElement>(null);
+
+    // The list can be taller than the panel (a search can list dozens of results): draw only the part
+    // around the cursor, scrolling as little as needed, instead of letting the layout squeeze rows away.
+    const [scrollStart, setScrollStart] = useState(0);
+    // On the pinned row nothing in the list is focused: the window stays where it was.
+    const focusedRowIndex = onSaved
+        ? Math.min(scrollStart, Math.max(0, treeItems.length - 1))
+        : Math.max(
+              0,
+              treeItems.findIndex((item) =>
+                  focusedProvider !== null
+                      ? item.type === "provider-header" && item.provider === focusedProvider
+                      : item.type === "file-row" && item.sourceIndex === selectedSourceIndex
+              )
+          );
+    // The "show more" row hangs off the row above it: keep it in view together with that row.
+    const focusItemIndex = treeItems[focusedRowIndex + 1]?.type === "more-row" ? focusedRowIndex + 1 : focusedRowIndex;
+    const { start: windowStart, end: windowEnd } = computeWindow(
+        treeItems.map((item, i) => itemHeight(item, i, treeItems)),
+        focusItemIndex,
+        scrollStart,
+        height
+    );
+    if (windowStart !== scrollStart) setScrollStart(windowStart);
     useWheelTarget(treeRef, (delta) =>
         onScrollSource((prev) => {
             const pos = selectableIndices.indexOf(prev);
@@ -143,7 +231,35 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
         })
     );
 
-    const selectedSource = sources[selectedSourceIndex];
+    // Everything the cursor can land on, top to bottom: the pinned saved file, then each provider's header and its rows.
+    const navTargets: NavTarget[] = [
+        ...(hasSaved ? [{ kind: "saved" } as const] : []),
+        ...treeItems.flatMap<NavTarget>((item) =>
+            item.type === "provider-header"
+                ? [{ kind: "provider", provider: item.provider }]
+                : item.type === "file-row"
+                  ? [{ kind: "source", index: item.sourceIndex }]
+                  : []
+        ),
+    ];
+    const navPos = navTargets.findIndex((t) =>
+        onSaved
+            ? t.kind === "saved"
+            : focusedProvider !== null
+              ? t.kind === "provider" && t.provider === focusedProvider
+              : t.kind === "source" && t.index === selectedSourceIndex
+    );
+    const moveTo = (target: NavTarget | undefined) => {
+        if (!target) return;
+        if (target.kind === "saved") onFocusSaved();
+        else if (target.kind === "provider") onFocusProvider(target.provider);
+        else onSelectSource(target.index);
+    };
+
+    // While a header holds the cursor there is no row to select, play, save…
+    const onHeader = focusedProvider !== null;
+    const selectedSource = onHeader ? undefined : sources[selectedSourceIndex];
+    const canRetryHeader = onHeader && canRetryProvider(focusedProvider);
     const canPlay = selectedSource?.localFile?.state === "found";
     const saveLabel = selectedSource?.savedFile ? "Update" : "Save";
     // A source only carries retryPayload if its provider supports re-attempting it
@@ -152,6 +268,16 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     const canRetry =
         selectedSource?.retryPayload != null &&
         (selectedSource.state === "skipped" || selectedSource.state === "failed");
+    // The "more" row of the search the cursor is in, if it has one.
+    const moreItem =
+        onHeader || onSaved
+            ? undefined
+            : treeItems.find(
+                  (item): item is Extract<TreeItem, { type: "more-row" }> =>
+                      item.type === "more-row" &&
+                      selectedSourceIndex >= item.firstIndex &&
+                      selectedSourceIndex <= item.anchorIndex
+              );
 
     useShortcuts({
         id: "downloadSourceTree",
@@ -163,8 +289,7 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                 defaultShortcut: { key: "upArrow" },
                 label: "Up",
                 handler: () => {
-                    const pos = selectableIndices.indexOf(selectedSourceIndex);
-                    if (pos > 0) onSelectSource(selectableIndices[pos - 1]);
+                    if (navPos > 0) moveTo(navTargets[navPos - 1]);
                 },
             },
             {
@@ -172,26 +297,25 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                 defaultShortcut: { key: "downArrow" },
                 label: "Down",
                 handler: () => {
-                    const pos = selectableIndices.indexOf(selectedSourceIndex);
-                    if (pos === -1 && selectableIndices.length > 0) {
-                        onSelectSource(selectableIndices[0]);
-                    } else if (pos < selectableIndices.length - 1) {
-                        onSelectSource(selectableIndices[pos + 1]);
-                    }
+                    if (navPos === -1) moveTo(navTargets[0]);
+                    else if (navPos < navTargets.length - 1) moveTo(navTargets[navPos + 1]);
                 },
             },
             {
                 id: "downloadSourceTree.focusDetail",
                 defaultShortcut: { key: "rightArrow" },
                 label: "Details",
-                handler: () => onInnerFocusSwitch(),
+                handler: () => {
+                    // A header has no detail of its own to step into.
+                    if (!onHeader) onInnerFocusSwitch();
+                },
             },
             {
                 id: "downloadSourceTree.select",
                 defaultShortcut: { key: "return" },
                 label: "Select",
                 handler: () => {
-                    if (selectedSourceIndex >= 0) onRequestSelect(selectedSourceIndex);
+                    if (!onHeader && selectedSourceIndex >= 0) onRequestSelect(selectedSourceIndex);
                 },
             },
             {
@@ -199,7 +323,8 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                 defaultShortcut: { key: "delete" },
                 label: "Reject",
                 handler: () => {
-                    if (selectedSourceIndex >= 0) onRejectSource(selectedSourceIndex);
+                    // The saved file is not rejected by accident from its pinned row.
+                    if (!onHeader && !onSaved && selectedSourceIndex >= 0) onRejectSource(selectedSourceIndex);
                 },
             },
             {
@@ -219,6 +344,22 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                 },
             },
             {
+                id: "downloadSourceTree.showMore",
+                defaultShortcut: { input: "m" },
+                label: "Show more",
+                handler: () => {
+                    if (moreItem) onShowMore(moreItem.anchorIndex);
+                },
+            },
+            {
+                id: "downloadSourceTree.retryProvider",
+                defaultShortcut: { input: "r" },
+                label: "Retry",
+                handler: () => {
+                    if (canRetryHeader) onRetryProvider(focusedProvider);
+                },
+            },
+            {
                 id: "downloadSourceTree.playPause",
                 defaultShortcut: { input: " " },
                 label: "Play/Pause",
@@ -233,8 +374,11 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
         hintLines: [
             {
                 id: "downloadSourceTree.line.sources",
-                left:
-                    selectedSourceIndex >= 0 && sources.length > 0
+                left: onHeader
+                    ? { type: "text" as const, value: getProviderDisplay(focusedProvider).label, bold: true }
+                    : onSaved
+                      ? { type: "text" as const, value: "Saved file", bold: true }
+                      : selectedSourceIndex >= 0 && sources.length > 0
                         ? {
                               type: "text" as const,
                               value: `Source ${selectedSourceIndex + 1}/${sources.length}`,
@@ -242,9 +386,10 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                           }
                         : { type: "text" as const, value: "Download Sources", bold: true },
                 shortcutIds: [
-                    "downloadSourceTree.select",
-                    "downloadSourceTree.reject",
+                    ...(onHeader || onSaved ? [] : ["downloadSourceTree.select", "downloadSourceTree.reject"]),
+                    ...(canRetryHeader ? ["downloadSourceTree.retryProvider"] : []),
                     ...(canRetry ? ["downloadSourceTree.retry"] : []),
+                    ...(moreItem ? ["downloadSourceTree.showMore"] : []),
                     ...(canPlay ? ["downloadSourceTree.playPause", "downloadSourceTree.save"] : []),
                 ],
             },
@@ -270,12 +415,32 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     }
 
     return (
-        <Box ref={treeRef} flexDirection="column" width={width} height={height} overflow="hidden">
-            {treeItems.map((item, i) => {
+        <Box ref={treeRef} flexDirection="column" width={width} height={fullHeight} overflow="hidden">
+            {hasSaved && (
+                <SavedFileRow
+                    source={sources[savedIndex]}
+                    isFocused={onSaved}
+                    isActive={isActive}
+                    width={width}
+                    playback={playbackOf(sources[savedIndex], nowPlaying)}
+                    onSelect={onFocusSaved}
+                />
+            )}
+            {treeItems.slice(windowStart, windowEnd).map((item, offset) => {
+                const i = windowStart + offset;
                 if (item.type === "provider-header") {
                     const addMargin = treeItems.slice(0, i).some((t) => t.type === "provider-header");
                     return (
-                        <ProviderHeader key={`ph-${i}`} label={item.label} color={item.color} addMargin={addMargin} />
+                        <ProviderHeader
+                            key={`ph-${i}`}
+                            label={item.label}
+                            color={item.color}
+                            addMargin={addMargin}
+                            width={width}
+                            isFocused={item.provider === focusedProvider}
+                            isActive={isActive}
+                            onSelect={() => onFocusProvider(item.provider)}
+                        />
                     );
                 }
 
@@ -287,12 +452,30 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                     return <QueryLines key={`ql-${i}`} query={item.query} />;
                 }
 
+                if (item.type === "more-row") {
+                    return (
+                        <MoreRow
+                            key={`mr-${i}`}
+                            count={item.count}
+                            isFocused={
+                                isActive &&
+                                !onHeader &&
+                                !onSaved &&
+                                selectedSourceIndex >= item.firstIndex &&
+                                selectedSourceIndex <= item.anchorIndex
+                            }
+                            width={width}
+                            onShowMore={() => onShowMore(item.anchorIndex)}
+                        />
+                    );
+                }
+
                 return (
                     <SourceFileRow
                         key={`fr-${i}`}
                         source={item.source}
                         sourceIndex={item.sourceIndex}
-                        isSelected={item.sourceIndex === selectedSourceIndex}
+                        isSelected={!onHeader && !onSaved && item.sourceIndex === selectedSourceIndex}
                         isActive={isActive}
                         width={width}
                         playback={playbackOf(item.source, nowPlaying)}

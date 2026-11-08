@@ -17,7 +17,7 @@ export function QueryLines({ query }: QueryLinesProps) {
     const labelWidth = Math.max(...query.map((field) => field.label.length));
 
     return (
-        <Box marginLeft={6} flexDirection="column" flexShrink={0}>
+        <Box marginLeft={5} flexDirection="column" flexShrink={0}>
             {query.map((field) => (
                 <Box key={field.label} flexDirection="row" flexShrink={0}>
                     <Box flexShrink={0} paddingRight={1}>

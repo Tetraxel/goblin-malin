@@ -40,7 +40,9 @@ export function SourceFileRow({
 
     const localFile = source.localFile;
     const filename = localFile ? `${localFile.name}.${localFile.extension}` : null;
-    const sizeText = source.fileInfo ? formatBytes(source.fileInfo.sizeBytes) : "";
+    const candidate = source.candidate;
+    const sizeBytes = source.fileInfo?.sizeBytes ?? candidate?.sizeBytes;
+    const sizeText = sizeBytes != null ? formatBytes(sizeBytes) : "";
     const provenance = getProvenanceDisplay(source.fileInfo);
     const provenanceColor =
         provenance.tone === "success"
@@ -53,7 +55,8 @@ export function SourceFileRow({
     // track name (dimmed) so the row is recognizable during download. The state badge
     // on the right communicates progress, so we don't repeat it on the left.
     const artist = source.track.artists?.[0]?.name ?? "";
-    const trackLabel = artist ? `${artist} - ${source.track.trackName}` : source.track.trackName;
+    // A listed remote file (not downloaded yet) is recognized by its own name instead.
+    const trackLabel = candidate?.name ?? (artist ? `${artist} - ${source.track.trackName}` : source.track.trackName);
 
     return (
         <Box
@@ -62,9 +65,9 @@ export function SourceFileRow({
             width={width}
             minWidth={width}
             height={1}
+            flexShrink={0}
             overflow="hidden"
             backgroundColor={bg}
-            paddingLeft={1}
         >
             <Box width={3} minWidth={3} flexShrink={0}>
                 <Text color={theme.ui.focusIndicator}>{isSelected && isActive ? "☛ " : "  "}</Text>
@@ -113,6 +116,13 @@ export function SourceFileRow({
                 <Box maxWidth={20} paddingLeft={1} flexShrink={0} overflow="hidden">
                     <Text color={theme.text.secondary} dimColor strikethrough={source.isRejected} wrap="truncate-end">
                         {`${source.providerDetail}`}
+                    </Text>
+                </Box>
+            )}
+            {candidate?.note && !localFile && (
+                <Box paddingLeft={1} flexShrink={0}>
+                    <Text color={theme.status.warning} dimColor strikethrough={source.isRejected}>
+                        {candidate.note}
                     </Text>
                 </Box>
             )}

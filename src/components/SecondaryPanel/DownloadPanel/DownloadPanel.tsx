@@ -6,14 +6,15 @@ import { useFocusActions, useFocusChrome, useFocusSecondaryPanel } from "#contex
 import { Task, TaskSnapshot } from "#base/task/task";
 import { StatusType } from "#base/task/task-status";
 import { useTheme } from "#base/themeContext";
-import { MusicDownloadTaskAttributes, TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import { DownloadProvider, MusicDownloadTaskAttributes, TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { computeCompiledMetadata, CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { getSaveSettings } from "#flows/musicDownloadFlow/saveSettings";
-import { computeOutputFilename } from "#flows/musicDownloadFlow/utils/computeOutputPath";
+import { computeOutputPath, samePath } from "#flows/musicDownloadFlow/utils/computeOutputPath";
 import { isSameDir } from "#flows/musicDownloadFlow/utils/cleanOutputDir";
 import { DownloadSourceTree } from "./DownloadSourceTree/DownloadSourceTree";
 import { DownloadSourceDetail } from "./DownloadSourceDetail/DownloadSourceDetail";
+import { ProviderSummary } from "./DownloadSourceDetail/ProviderSummary";
 import { DynamicHintBar } from "#components/DynamicHintBar/DynamicHintBar";
 import { useShortcuts } from "#hooks/useShortcuts";
 import type { Updater } from "#hooks/useFocusManager";
@@ -35,6 +36,10 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     const { sourcesPanel } = secondaryPanel;
     const { innerFocus } = sourcesPanel;
     const [selectedSourceIndex, setSelectedSourceIndex] = useState(0);
+    // The provider whose header holds the cursor; null while it is on one of the rows.
+    const [focusedProvider, setFocusedProvider] = useState<DownloadProvider | null>(null);
+    // The cursor is on the pinned "saved file" row (the detail then shows the saved source, like its own row does).
+    const [savedFocused, setSavedFocused] = useState(false);
 
     const isPanelActive = activeWindow === "secondaryPanel" && secondaryPanel.subTab === "downloadSources";
 
@@ -43,10 +48,8 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     const [snapshot, setSnapshot] = useState<TaskSnapshot<MusicDownloadTaskAttributes> | undefined>(
         () => typedTask?.get() as TaskSnapshot<MusicDownloadTaskAttributes> | undefined
     );
-    const [isDiffMode, setIsDiffMode] = useState(false);
     // Shows what each provider was actually asked for under its rows (the "e" toggle, like the Metadata tab's).
     const [showQuery, setShowQuery] = useState(false);
-    const [pendingSourceIndex, setPendingSourceIndex] = useState<number | null>(null);
 
     const [prevTypedTask, setPrevTypedTask] = useState(typedTask);
     if (prevTypedTask !== typedTask) {
@@ -54,8 +57,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
         const nextSnapshot = typedTask?.get() as TaskSnapshot<MusicDownloadTaskAttributes> | undefined;
         setSnapshot(nextSnapshot);
         // The selected task can change under a focused panel (mouse-wheel scrolling the
-        // list), so don't carry the previous task's source cursor or half-finished diff
-        // over: land on the new task's chosen source.
+        // list), so don't carry the previous task's source cursor over: land on the new task's chosen source.
         const nextSources = nextSnapshot?.attributes?.kind === "track" ? nextSnapshot.attributes.downloadSources : [];
         setSelectedSourceIndex(
             Math.max(
@@ -63,8 +65,8 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                 nextSources.findIndex((s) => s.selected)
             )
         );
-        setIsDiffMode(false);
-        setPendingSourceIndex(null);
+        setFocusedProvider(null);
+        setSavedFocused(false);
     }
 
     useEffect(() => {
@@ -107,29 +109,38 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     const rightWidth = width - leftWidth - 4;
     const listHeight = height - HINT_BAR_HEIGHT;
 
-    // Auto-detect when compiled metadata would produce a different filename than what's on disk
-    const previewFilename = compiled ? computeOutputFilename(compiled, filenameOverride) : null;
-    const savedFilename = savedSource?.savedFile ? path.basename(savedSource.savedFile.path) : null;
-    // A per-track folder the saved file isn't in yet. Only an explicit override counts: changing the
-    // default folder in Settings applies to new saves, it doesn't drag every saved file along.
+    const savedIndex = downloadSources.findIndex((s) => s.savedFile != null);
+    // The pinned saved row is only there while a file is saved.
+    const onSaved = savedFocused && savedSource != null && focusedProvider === null;
+    const cursorSource = focusedProvider ? null : (downloadSources[downloadNavIndex] ?? null);
+
+    // The diff follows the cursor. On any other source that has a file, the saved file (OLD) is shown next to
+    // that source (NEW): what Enter would replace it with.
+    const isSourceSwitch =
+        savedSource != null &&
+        cursorSource != null &&
+        cursorSource !== savedSource &&
+        cursorSource.localFile?.state === "found";
+
+    // On the saved file itself: does saving now rename or move it? The name it would get is worked out like
+    // saving does.
+    // Only an explicit per-track folder counts: changing the default folder in Settings applies to new saves,
+    // it doesn't drag every saved file along.
+    const savedPath = savedSource?.savedFile?.path ?? null;
     const hasFolderChange =
-        outputDirOverride != null &&
-        savedSource?.savedFile != null &&
-        !isSameDir(path.dirname(savedSource.savedFile.path), outputDirOverride);
+        outputDirOverride != null && savedPath != null && !isSameDir(path.dirname(savedPath), outputDirOverride);
     const hasMetadataChange =
-        previewFilename != null && savedFilename != null && (previewFilename !== savedFilename || hasFolderChange);
+        compiled != null &&
+        savedPath != null &&
+        !samePath(
+            computeOutputPath(compiled, outputDirOverride ?? path.dirname(savedPath), filenameOverride),
+            savedPath
+        );
+    const isMetadataChange =
+        !isSourceSwitch && cursorSource != null && cursorSource === savedSource && hasMetadataChange;
 
-    // Combined diff flag: manually triggered source-switch OR auto-detected metadata change
-    const showDiff = isDiffMode || hasMetadataChange;
-
-    // For metadata-only change the "pending" source is the currently selected (saved) source
-    const effectivePendingSource = isDiffMode
-        ? pendingSourceIndex !== null
-            ? (downloadSources[pendingSourceIndex] ?? null)
-            : null
-        : hasMetadataChange
-          ? (downloadSources.find((s) => s.selected) ?? savedSource)
-          : null;
+    const showDiff = isSourceSwitch || isMetadataChange;
+    const effectivePendingSource = isSourceSwitch ? cursorSource : isMetadataChange ? savedSource : null;
 
     useShortcuts({
         id: "downloadPanel",
@@ -164,26 +175,66 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
         ],
     });
 
-    // Pointer handlers. A pending source-switch diff has to be confirmed or cancelled from the
-    // keyboard, so the mouse must not move the list underneath it.
+    // Pointer handlers.
     function handleClickSource(idx: number) {
-        if (isDiffMode) return;
         focusSourcesPane("list");
-        setSelectedSourceIndex(idx);
+        selectSource(idx);
     }
 
     function handleScrollSource(next: Updater<number>) {
-        if (!isDiffMode) setSelectedSourceIndex(next);
+        setFocusedProvider(null);
+        setSavedFocused(false);
+        setSelectedSourceIndex(next);
+    }
+
+    /** Moves the cursor onto one of the rows. */
+    function selectSource(idx: number) {
+        setFocusedProvider(null);
+        setSavedFocused(false);
+        setSelectedSourceIndex(idx);
+    }
+
+    /** Moves the cursor onto a provider's header (a click on it also focuses the list). */
+    function handleFocusProvider(provider: DownloadProvider) {
+        focusSourcesPane("list");
+        setSavedFocused(false);
+        setFocusedProvider(provider);
+    }
+
+    /** Moves the cursor onto the pinned saved file (a click on it also focuses the list). */
+    function handleFocusSaved() {
+        if (savedIndex < 0) return;
+        focusSourcesPane("list");
+        setFocusedProvider(null);
+        setSavedFocused(true);
+        setSelectedSourceIndex(savedIndex);
+    }
+
+    /** Lists the next results of one search (a click on its "show more" row, or the shortcut). */
+    function handleShowMore(anchorIndex: number) {
+        const added = (typedTask as unknown as DownloadTask)?.showMoreSources(anchorIndex) ?? 0;
+        // The new rows go in under the anchor: keep the cursor on the row it was on.
+        if (added > 0 && !focusedProvider && selectedSourceIndex > anchorIndex) {
+            setSelectedSourceIndex(selectedSourceIndex + added);
+        }
+    }
+
+    function canRetryProvider(provider: DownloadProvider): boolean {
+        return typedTask instanceof DownloadTask && typedTask.canRetryDownloadProvider(provider);
+    }
+
+    function handleRetryProvider(provider: DownloadProvider) {
+        (typedTask as unknown as DownloadTask)?.retryDownloadProvider(provider).catch(() => {
+            // already logged by the task
+        });
     }
 
     function handleRequestSelect(idx: number) {
-        const hasSaved = downloadSources.some((s) => s.savedFile != null);
         const isAlreadySelected = downloadSources[idx]?.selected;
-        if (hasSaved && !isAlreadySelected) {
-            setPendingSourceIndex(idx);
-            setIsDiffMode(true);
+        if (isSourceSwitch && idx === downloadNavIndex) {
+            // Replacing the saved file is confirmed in the side-by-side view.
             setSourcesInnerFocus("detail");
-        } else {
+        } else if (!isAlreadySelected) {
             (typedTask as unknown as DownloadTask)?.selectDownloadSource(idx);
         }
     }
@@ -202,11 +253,12 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     function handleRequestSave(idx: number) {
         const source = downloadSources[idx];
         if (isSaving || source?.localFile?.state !== "found") return;
-        if (source.selected) {
+        if (isSourceSwitch) {
+            // The comparison with the saved file is already on screen: this source takes its place.
+            (typedTask as unknown as DownloadTask)?.selectDownloadSource(idx);
             handleSave();
-        } else if (downloadSources.some((s) => s.savedFile != null)) {
-            // Replacing the saved file is confirmed in the side-by-side view.
-            handleRequestSelect(idx);
+        } else if (source.selected) {
+            handleSave();
         } else {
             (typedTask as unknown as DownloadTask)?.selectDownloadSource(idx);
             handleSave();
@@ -214,15 +266,12 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     }
 
     function handleConfirmDiff() {
-        if (isDiffMode) {
-            // Source-switch diff: confirm the new source selection
-            if (pendingSourceIndex !== null) {
-                (typedTask as unknown as DownloadTask)?.selectDownloadSource(pendingSourceIndex);
-            }
-            setIsDiffMode(false);
-            setPendingSourceIndex(null);
+        if (isSourceSwitch) {
+            // The source under the cursor takes the saved file's place.
+            (typedTask as unknown as DownloadTask)?.selectDownloadSource(downloadNavIndex);
             setSourcesInnerFocus("list");
-        } else if (hasMetadataChange) {
+            handleSave();
+        } else if (isMetadataChange) {
             // Metadata-only diff: save directly (re-tag + rename the existing file)
             handleSave();
         }
@@ -230,9 +279,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
 
     function handleCancelDiff() {
         // A pending folder move has no other way out of the diff: cancelling drops the custom folder.
-        if (!isDiffMode && hasFolderChange) (typedTask as unknown as DownloadTask)?.setOutputDir(undefined);
-        setIsDiffMode(false);
-        setPendingSourceIndex(null);
+        if (isMetadataChange && hasFolderChange) (typedTask as unknown as DownloadTask)?.setOutputDir(undefined);
         setSourcesInnerFocus("list");
     }
 
@@ -290,10 +337,18 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                     sources={downloadSources}
                     showQuery={showQuery}
                     selectedSourceIndex={downloadNavIndex}
+                    focusedProvider={focusedProvider}
+                    savedFocused={onSaved}
                     isActive={isPanelActive && innerFocus === "list"}
                     width={leftWidth}
                     height={listHeight}
-                    onSelectSource={setSelectedSourceIndex}
+                    onSelectSource={selectSource}
+                    onFocusProvider={handleFocusProvider}
+                    onFocusSaved={handleFocusSaved}
+                    canShowMore={typedTask instanceof DownloadTask && typedTask.canShowMoreSources()}
+                    onShowMore={handleShowMore}
+                    canRetryProvider={canRetryProvider}
+                    onRetryProvider={handleRetryProvider}
                     onClickSource={handleClickSource}
                     onScrollSource={handleScrollSource}
                     onRequestSelect={handleRequestSelect}
@@ -303,7 +358,18 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                     onInnerFocusSwitch={() => setSourcesInnerFocus("detail")}
                 />
                 <DownloadSourceDetail
-                    source={selectedSource}
+                    source={focusedProvider ? null : selectedSource}
+                    emptyState={
+                        focusedProvider ? (
+                            <ProviderSummary
+                                provider={focusedProvider}
+                                sources={downloadSources.filter((s) => s.provider === focusedProvider)}
+                                canRetry={canRetryProvider(focusedProvider)}
+                                width={rightWidth}
+                                height={listHeight}
+                            />
+                        ) : undefined
+                    }
                     savedSource={savedSource}
                     compiled={compiled}
                     baseCompiled={baseCompiled}
@@ -314,7 +380,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                     filenameOverride={filenameOverride}
                     overwriteTags={overwriteTags}
                     isDiffMode={showDiff}
-                    diffKind={isDiffMode ? "source-switch" : "metadata-change"}
+                    diffKind={isSourceSwitch ? "source-switch" : "metadata-change"}
                     pendingSource={effectivePendingSource}
                     isActive={isPanelActive && innerFocus === "detail"}
                     isSaving={isSaving}

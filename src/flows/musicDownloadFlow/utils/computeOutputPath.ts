@@ -13,33 +13,22 @@ export function computeOutputFilename(compiled: CompiledMetadata, override?: str
     return `${artist} - ${title}.flac`.replace(/[/\\:*?"<>|]/g, "_");
 }
 
-function samePath(a: string, b: string): boolean {
+export function samePath(a: string, b: string): boolean {
     const ra = path.resolve(a);
     const rb = path.resolve(b);
     return process.platform === "win32" ? ra.toLowerCase() === rb.toLowerCase() : ra === rb;
 }
 
-/**
- * Where a track would be written inside `outputDir`, adding " (2)", " (3)"… when the name is taken.
- * `ownPaths` are the files this track already saved, or is about to replace: they don't count as "taken".
- */
-export function computeOutputPath(
-    compiled: CompiledMetadata,
-    outputDir: string,
-    ownPaths: readonly (string | undefined)[] = [],
-    filenameOverride?: string
-): string {
-    const safe = computeOutputFilename(compiled, filenameOverride);
-    const basePath = path.join(outputDir, safe);
-    const isOwn = (p: string) => ownPaths.some((own) => own !== undefined && samePath(p, own));
+/** Where a track is written inside `outputDir`: its file name, whether or not that name is already in use. */
+export function computeOutputPath(compiled: CompiledMetadata, outputDir: string, filenameOverride?: string): string {
+    return path.join(outputDir, computeOutputFilename(compiled, filenameOverride));
+}
 
-    let dest = basePath;
-    let counter = 2;
-    while (fs.existsSync(dest) && !isOwn(dest)) {
-        const ext = path.extname(basePath);
-        const base = path.basename(basePath, ext);
-        dest = path.join(outputDir, `${base} (${counter})${ext}`);
-        counter++;
-    }
-    return dest;
+/**
+ * Whether writing to `dest` would replace a file this track doesn't own. `ownPaths` are the files the track
+ * already saved, or is about to replace: overwriting those is the point, so they don't count.
+ */
+export function isOutputPathTaken(dest: string, ownPaths: readonly (string | undefined)[] = []): boolean {
+    if (!fs.existsSync(dest)) return false;
+    return !ownPaths.some((own) => own !== undefined && samePath(dest, own));
 }

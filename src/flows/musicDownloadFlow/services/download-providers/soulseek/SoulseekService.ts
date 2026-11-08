@@ -17,12 +17,21 @@ import {
     DownloadQueryField,
     LocalFile,
     FileInfo,
+    HiddenCandidate,
 } from "#flows/musicDownloadFlow/types";
 import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { readFileInfo } from "#flows/musicDownloadFlow/utils/readFileInfo";
 import { getTempDownloadDir, getDownloadProviderSettings } from "../../../saveSettings";
 import { generateTempFilename, deleteExistingTempFiles } from "#flows/musicDownloadFlow/utils/tempFile";
-import { cleanSearchTerm, rankResults } from "./ranking";
+import {
+    cleanSearchTerm,
+    rankResults,
+    parseResultsLimit,
+    remoteFileName,
+    DEFAULT_RESULTS_LIMIT,
+    MAX_DOWNLOAD_ATTEMPTS,
+    MAX_HIDDEN_RESULTS,
+} from "./ranking";
 import { SoulseekCell } from "./SoulseekCell";
 
 // slsk-client's own login handshake timeout (passed as `timeout` to connect())
@@ -66,12 +75,17 @@ export class SoulseekService extends DownloadService {
     static readonly cellComponent = SoulseekCell;
     static readonly defaultSettings: ProviderSettingsSchema = {
         enabled: { label: "Enable", defaultValue: false, kind: "checkbox" },
+        mp3Fallback: { label: "Fall back to MP3 if no FLAC found", defaultValue: true, kind: "checkbox" },
         searchTimeoutMs: {
             label: "Search timeout (ms)",
             defaultValue: String(DEFAULT_SEARCH_TIMEOUT_MS),
             kind: "textInput",
         },
-        mp3Fallback: { label: "Fall back to MP3 if no FLAC found", defaultValue: true, kind: "checkbox" },
+        resultsLimit: {
+            label: `Results shown per search (more on demand, max ${MAX_HIDDEN_RESULTS})`,
+            defaultValue: String(DEFAULT_RESULTS_LIMIT),
+            kind: "textInput",
+        },
     };
     static readonly setupWizard: SetupWizardConfig = {
         title: "⚙  Soulseek Setup Wizard",
@@ -183,9 +197,7 @@ export class SoulseekService extends DownloadService {
                 await fs.promises.unlink(path.join(cwd, orphan)).catch(() => {});
             }
             if (orphans.length > 0) {
-                this.logger.info(
-                    `Cleaned up ${orphans.length} orphaned Soulseek file(s) slsk-client wrote to ${cwd}`
-                );
+                this.logger.info(`Cleaned up ${orphans.length} orphaned Soulseek file(s) slsk-client wrote to ${cwd}`);
             }
         } catch (error) {
             this.logger.warn("Failed to sweep for orphaned Soulseek downloads", { error });
@@ -214,6 +226,19 @@ export class SoulseekService extends DownloadService {
     /** What every row found by that search records as its query: the one search box, as sent. */
     private queryFields(trackMetadata: TrackMetadata, extension: Extension): DownloadQueryField[] {
         return [{ label: "Search", value: this.searchQuery(trackMetadata, extension) }];
+    }
+
+    /** What a row (or a not-yet-listed result) records about the remote file and its peer. */
+    private candidateStub(file: SlskFile): HiddenCandidate {
+        return {
+            providerDetail: file.user,
+            candidate: {
+                name: remoteFileName(file.file),
+                sizeBytes: file.size,
+                note: file.slots ? undefined : "queued",
+            },
+            retryPayload: file,
+        };
     }
 
     private searchOnce(query: string, timeoutMs: number): Promise<SlskFile[]> {
@@ -289,9 +314,15 @@ export class SoulseekService extends DownloadService {
 
     async downloadTrack(
         trackMetadata: TrackMetadata,
-        onUpdate?: DownloadUpdateCallback,
+        reportUpdate?: DownloadUpdateCallback,
         signal?: AbortSignal
     ): Promise<TrackDownloadSource> {
+        // The row last reported: a final "failed" result is applied to it (see the end of this method).
+        let lastEmitted: TrackDownloadSource | undefined;
+        const onUpdate: DownloadUpdateCallback = (source, options) => {
+            lastEmitted = source;
+            reportUpdate?.(source, options);
+        };
         const pendingSource: TrackDownloadSource = {
             state: "searching",
             provider: "soulseek",
@@ -302,7 +333,7 @@ export class SoulseekService extends DownloadService {
             // The first search is for FLAC; rows found later carry the query that actually found them.
             query: this.queryFields(trackMetadata, "flac"),
         };
-        onUpdate?.(pendingSource);
+        onUpdate(pendingSource);
         let lastQuery = pendingSource.query;
 
         // Stable per-candidate row identity, assigned once results are ranked so every
@@ -311,10 +342,8 @@ export class SoulseekService extends DownloadService {
         // (undefined) key — the same row the initial "searching" state above opened —
         // so that row seamlessly becomes "candidate 1" instead of leaving a stale
         // leftover "searching" row once real candidates are known.
-        let attemptCount = 0;
-        const nextAttemptId = (): string | undefined =>
-            attemptCount++ === 0 ? undefined : `candidate-${attemptCount - 1}`;
-        let lastCandidate: SlskFile | undefined;
+        let rowCount = 0;
+        const nextAttemptId = (): string | undefined => (rowCount++ === 0 ? undefined : `candidate-${rowCount - 1}`);
 
         const artistName = trackMetadata.artists?.[0]?.name ?? "";
         const trackTitle = trackMetadata.trackName;
@@ -322,6 +351,7 @@ export class SoulseekService extends DownloadService {
 
         const settings = getDownloadProviderSettings("soulseek");
         const searchTimeoutMs = Number(settings.searchTimeoutMs) || DEFAULT_SEARCH_TIMEOUT_MS;
+        const resultsLimit = parseResultsLimit(settings.resultsLimit);
         const mp3FallbackEnabled = settings.mp3Fallback !== false;
         const extensionsToTry: Extension[] = mp3FallbackEnabled ? ["flac", "mp3"] : ["flac"];
 
@@ -357,33 +387,66 @@ export class SoulseekService extends DownloadService {
                 const results = await this.searchOnce(query, searchTimeoutMs);
                 this.status.update({ progress: 30 });
 
-                const candidates = rankResults(results, { artistName, trackTitle, albumName, extension });
-                if (candidates.length === 0) {
+                // Every usable result, best first (free-slot peers before queued ones). Only the
+                // top `resultsLimit` become rows; a bounded remainder is kept behind a "show more" row.
+                const ranked = rankResults(
+                    results,
+                    { artistName, trackTitle, albumName, extension },
+                    resultsLimit + MAX_HIDDEN_RESULTS
+                );
+                if (ranked.length === 0) {
                     this.logger.info(`No ranked Soulseek candidates for "${extension}"`);
                     continue;
                 }
 
-                this.logger.info(`Found ${candidates.length} ranked Soulseek candidates for "${extension}"`);
+                const listed = ranked.slice(0, resultsLimit);
+                const unlisted = ranked.slice(resultsLimit);
+                this.logger.info(
+                    `Found ${ranked.length} ranked Soulseek candidates for "${extension}" (listing ${listed.length})`
+                );
 
-                // Assign every candidate its row identity up front and show them all
-                // immediately as "pending" — the user sees the full ranked field for
-                // this format right away, instead of one row revealed at a time.
-                const attempts = candidates.map((candidate) => ({ candidate, attemptId: nextAttemptId() }));
-                for (const { candidate, attemptId } of attempts) {
-                    onUpdate?.(
-                        {
-                            state: "pending",
-                            provider: "soulseek",
-                            track: trackMetadata,
-                            downloadedAt: new Date(),
-                            selected: false,
-                            providerDetail: candidate.user,
-                            retryPayload: candidate,
-                            query: queryFields,
-                        },
-                        { attemptId }
-                    );
+                // Only peers with a free slot are downloaded from automatically (sorted first, so
+                // they are the head of `listed`); the rest of the list is there to be picked by hand.
+                const autoAttemptCount = Math.min(
+                    MAX_DOWNLOAD_ATTEMPTS,
+                    resultsLimit,
+                    listed.filter((candidate) => candidate.slots).length
+                );
+
+                // Assign every listed result its row identity up front and show them all
+                // immediately — the user sees the full ranked field for this format right
+                // away, instead of one row revealed at a time. Those that will be tried are
+                // "pending"; the others are "skipped" from the start (still downloadable by hand).
+                // The last row carries the stubs of everything not listed.
+                const listedRow = (
+                    candidate: SlskFile,
+                    state: "pending" | "skipped",
+                    isLastListed: boolean
+                ): TrackDownloadSource => ({
+                    state,
+                    provider: "soulseek",
+                    track: trackMetadata,
+                    downloadedAt: new Date(),
+                    selected: false,
+                    ...this.candidateStub(candidate),
+                    query: queryFields,
+                    ...(isLastListed && unlisted.length > 0
+                        ? { moreCandidates: unlisted.map((file) => this.candidateStub(file)) }
+                        : {}),
+                });
+                const attempts = listed.map((candidate, index) => ({
+                    candidate,
+                    attemptId: nextAttemptId(),
+                    row: listedRow(
+                        candidate,
+                        index < autoAttemptCount ? "pending" : "skipped",
+                        index === listed.length - 1
+                    ),
+                }));
+                for (const { attemptId, row } of attempts) {
+                    onUpdate(row, { attemptId });
                 }
+                const attemptedRows = attempts.slice(0, autoAttemptCount);
 
                 // Still only ever one candidate downloading at a time, sequentially,
                 // stopping at the first success — no extra files are fetched. Each
@@ -394,26 +457,13 @@ export class SoulseekService extends DownloadService {
                 // queued to run. Skipped (and failed) rows keep their `retryPayload` so
                 // the user can still manually download that exact candidate later.
                 const markRemainingSkipped = (fromIndex: number) => {
-                    for (const { candidate: skippedCandidate, attemptId: skippedId } of attempts.slice(fromIndex)) {
-                        onUpdate?.(
-                            {
-                                state: "skipped",
-                                provider: "soulseek",
-                                track: trackMetadata,
-                                downloadedAt: new Date(),
-                                selected: false,
-                                providerDetail: skippedCandidate.user,
-                                retryPayload: skippedCandidate,
-                                query: queryFields,
-                            },
-                            { attemptId: skippedId }
-                        );
+                    for (const { row, attemptId: skippedId } of attemptedRows.slice(fromIndex)) {
+                        onUpdate({ ...row, state: "skipped" }, { attemptId: skippedId });
                     }
                 };
 
-                for (const [attemptIndex, { candidate, attemptId }] of attempts.entries()) {
+                for (const [attemptIndex, { candidate, attemptId }] of attemptedRows.entries()) {
                     throwIfAborted(signal);
-                    lastCandidate = candidate;
                     const result = await this.attemptSingleCandidate(
                         trackMetadata,
                         candidate,
@@ -428,7 +478,7 @@ export class SoulseekService extends DownloadService {
                         // The task applies the returned source to the row of the *last*
                         // onUpdate call — which is now the last skipped candidate's. Re-address
                         // the winner's own row last so its result doesn't land on that one.
-                        onUpdate?.(result, { attemptId });
+                        onUpdate(result, { attemptId });
                         return result;
                     }
                 }
@@ -443,14 +493,14 @@ export class SoulseekService extends DownloadService {
             // lose which peer it was or the ability to retry it.
             this.logger.info(`No usable Soulseek results for: ${trackTitle}`);
             this.status.set({ type: StatusType.Error, message: "No results" });
-            return {
-                ...pendingSource,
-                state: "failed",
-                progress: 0,
-                providerDetail: lastCandidate?.user,
-                retryPayload: lastCandidate,
-                query: lastQuery,
-            };
+            // This return value lands on the row last reported. If that is a listed result (attempted and
+            // failed, or never attempted because every peer was queued), keep its file and peer rather
+            // than overwriting it with a generic "failed" that forgets which file it was.
+            const lastRow: TrackDownloadSource | undefined = lastEmitted;
+            if (lastRow?.retryPayload != null) {
+                return { ...lastRow, state: lastRow.state === "skipped" ? "skipped" : "failed", progress: 0 };
+            }
+            return { ...pendingSource, state: "failed", progress: 0, query: lastQuery };
         } catch (error) {
             if ((error as Error).name === "AbortError") throw error;
             this.logger.error(`Error downloading track from Soulseek: ${trackTitle}`, { error });
@@ -458,7 +508,7 @@ export class SoulseekService extends DownloadService {
                 type: StatusType.Error,
                 message: `Failed to download ${trackTitle}`,
             });
-            onUpdate?.({ ...pendingSource, state: "failed" });
+            onUpdate({ ...pendingSource, state: "failed" });
             throw error;
         }
     }
@@ -501,8 +551,7 @@ export class SoulseekService extends DownloadService {
                 track: trackMetadata,
                 downloadedAt: new Date(),
                 selected: false,
-                providerDetail: candidate.user,
-                retryPayload: candidate,
+                ...this.candidateStub(candidate),
                 query,
             },
             { attemptId, abort: () => candidateController.abort() }
@@ -518,7 +567,10 @@ export class SoulseekService extends DownloadService {
 
             if (trackMetadata.duration != null) {
                 const probed = await probeAudio(destPath);
-                if (probed?.durationMs && Math.abs(probed.durationMs - trackMetadata.duration) > DURATION_TOLERANCE_MS) {
+                if (
+                    probed?.durationMs &&
+                    Math.abs(probed.durationMs - trackMetadata.duration) > DURATION_TOLERANCE_MS
+                ) {
                     this.logger.warn(
                         `Rejecting candidate from ${candidate.user}: duration mismatch (got ${probed.durationMs}ms, expected ~${trackMetadata.duration}ms)`
                     );
@@ -530,8 +582,7 @@ export class SoulseekService extends DownloadService {
                             track: trackMetadata,
                             downloadedAt: new Date(),
                             selected: false,
-                            providerDetail: candidate.user,
-                            retryPayload: candidate,
+                            ...this.candidateStub(candidate),
                             query,
                         },
                         { attemptId }
@@ -552,8 +603,7 @@ export class SoulseekService extends DownloadService {
                     track: trackMetadata,
                     downloadedAt: new Date(),
                     selected: false,
-                    providerDetail: candidate.user,
-                    retryPayload: candidate,
+                    ...this.candidateStub(candidate),
                     query,
                 },
                 { attemptId }
@@ -600,8 +650,7 @@ export class SoulseekService extends DownloadService {
             track: trackMetadata,
             downloadedAt: new Date(),
             selected: false,
-            providerDetail: candidate.user,
-            retryPayload: candidate,
+            ...this.candidateStub(candidate),
             query: this.queryFields(trackMetadata, extension),
         };
     }
@@ -626,7 +675,11 @@ export class SoulseekService extends DownloadService {
         try {
             // Soulseek FLACs are the genuine lossless source this provider exists for;
             // MP3 fallbacks are honestly lossy at their real (probed) bitrate.
-            fileInfo = await readFileInfo(filePath, trackMetadata.duration ?? 0, extension === "flac" ? "lossless" : "lossy");
+            fileInfo = await readFileInfo(
+                filePath,
+                trackMetadata.duration ?? 0,
+                extension === "flac" ? "lossless" : "lossy"
+            );
         } catch (err) {
             this.logger.warn(`Failed to read file info for ${path.basename(filePath)}`, { error: err });
         }
@@ -642,8 +695,7 @@ export class SoulseekService extends DownloadService {
             selected: true,
             fileInfo,
             progress: 100,
-            providerDetail: candidate?.user,
-            retryPayload: candidate,
+            ...(candidate ? this.candidateStub(candidate) : {}),
             query: this.queryFields(trackMetadata, extension),
         };
     }

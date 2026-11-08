@@ -26,7 +26,7 @@ export function OutputFolderBlock({
     folderExists,
     isFocused,
     notice,
-    renamedTo,
+    replacesExisting,
     edit,
     onClick,
 }: {
@@ -39,8 +39,8 @@ export function OutputFolderBlock({
     folderExists: boolean;
     isFocused: boolean;
     notice: string | null;
-    /** The name the file really gets when `filename` is already taken by another file; null when it is free. */
-    renamedTo: string | null;
+    /** Another file already has this name: saving replaces it, after the user confirms. */
+    replacesExisting: boolean;
     /** The draft of the folder being typed; null when it is not being edited. */
     edit: OutputFolderEdit | null;
     onClick: () => void;
@@ -104,9 +104,10 @@ export function OutputFolderBlock({
                                     (isOverridden ? "Custom folder for this track" : "Default folder (Settings)") +
                                         (folderExists ? "" : " · will be created")}
                             </Text>
-                            {renamedTo && (
+                            {replacesExisting && (
                                 <Text color={theme.status.warning} bold wrap="wrap">
-                                    {`△ A different file already has this name: this one will be saved as ${renamedTo}`}
+                                    △ A different file already has this name: saving will replace it (you will be asked
+                                    first)
                                 </Text>
                             )}
                         </Box>

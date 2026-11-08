@@ -353,6 +353,21 @@ export type DownloadQueryField = {
     value: string;
 };
 
+/** What a provider found for a row that is not downloaded (yet): the remote file, as listed by its search. */
+export type SourceCandidate = {
+    /** The remote file's name, as the provider reports it. */
+    name: string;
+    sizeBytes?: number;
+    /** A short caveat worth showing next to the row (e.g. "queued": the peer has no free slot). */
+    note?: string;
+};
+
+/**
+ * A result a provider found but did not list as a row: just what's needed to turn it into one later
+ * (see `TrackDownloadSource.moreCandidates`).
+ */
+export type HiddenCandidate = Pick<TrackDownloadSource, "providerDetail" | "candidate" | "retryPayload">;
+
 export type TrackDownloadSource = {
     /**
      * "pending": queued, will still be attempted.
@@ -390,6 +405,14 @@ export type TrackDownloadSource = {
      * same service's `retryCandidate()`.
      */
     retryPayload?: unknown;
+    /** The remote file this row stands for, shown until a real file replaces it. */
+    candidate?: SourceCandidate;
+    /**
+     * Results the provider found beyond the rows it listed, kept as light stubs (not full rows — each row
+     * carries the whole track metadata). Set on the last listed row of a search; the UI shows a "show more"
+     * row under it, and `DownloadTask.showMoreSources()` turns the next stubs into "skipped" rows.
+     */
+    moreCandidates?: HiddenCandidate[];
 };
 
 //----------------------//

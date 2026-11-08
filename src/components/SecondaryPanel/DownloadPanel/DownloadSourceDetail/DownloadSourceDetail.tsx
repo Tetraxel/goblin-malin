@@ -11,7 +11,7 @@ import { MetadataOverrides, TrackDownloadSource } from "#flows/musicDownloadFlow
 import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { FIELDS, FieldDef, compiledFieldValues } from "#flows/musicDownloadFlow/utils/metadataFields";
 import { readDiskFieldValues } from "#flows/musicDownloadFlow/utils/diskTagValues";
-import { computeOutputFilename, computeOutputPath } from "#flows/musicDownloadFlow/utils/computeOutputPath";
+import { computeOutputFilename, computeOutputPath, isOutputPathTaken } from "#flows/musicDownloadFlow/utils/computeOutputPath";
 import {
     cleanOutputDir,
     cleanOutputFilename,
@@ -80,6 +80,8 @@ interface DownloadSourceDetailProps {
     setIsEditingField: (editing: boolean) => void;
     /** A click landed in this pane: give it keyboard focus. */
     onFocusPane: () => void;
+    /** Shown in place of the pane when there is no `source` (e.g. the cursor is on a provider's header). */
+    emptyState?: React.ReactNode;
 }
 
 const PRIORITY_TAGS = ["TITLE", "ARTIST", "ALBUM", "DATE", "TRACKNUMBER", "ISRC", "BPM", "KEY"];
@@ -178,6 +180,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     onOverridesChange,
     setIsEditingField,
     onFocusPane,
+    emptyState,
 }) => {
     const theme = useTheme();
 
@@ -498,7 +501,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     const canSave = canPlay && !isSaving;
     const saveLabel = source?.savedFile ? "Update" : "Save";
     // What confirming does when the two versions are side by side.
-    const diffConfirmLabel = diffKind === "metadata-change" ? "Save changes" : "Switch source";
+    const diffConfirmLabel = diffKind === "metadata-change" ? "Save changes" : "Replace saved file";
 
     useShortcuts({
         id: "downloadSourceDetail",
@@ -698,7 +701,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
               ],
     });
 
-    if (!source) return null;
+    if (!source) return <>{emptyState ?? null}</>;
 
     // The file isn't on disk yet (still downloading, queued, or failed). Don't show the
     // "NEW FILE" preview — there's nothing to preview/save. Show the current state instead.
@@ -717,19 +720,14 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     const panelTitle = compare ? "NEW VERSION" : isSaved ? "FILE ON DISK" : "NEW FILE";
     const panelColor = compare || !isSaved ? theme.status.success : theme.text.primary;
 
-    // When another file already has this name, saving picks a "(2)" name instead. The file this track saved
+    // When another file already has this name, saving replaces it (after asking). The file this track saved
     // (or the one this source replaces) is not "another file".
-    const savedName = compiled
-        ? path.basename(
-              computeOutputPath(
-                  compiled,
-                  outputDir,
-                  [source.savedFile?.path, savedSource?.savedFile?.path],
-                  filenameOverride
-              )
-          )
-        : "";
-    const renamedTo = compiled && savedName !== currentFilename ? savedName : null;
+    const replacesExisting =
+        compiled != null &&
+        isOutputPathTaken(computeOutputPath(compiled, outputDir, filenameOverride), [
+            source.savedFile?.path,
+            savedSource?.savedFile?.path,
+        ]);
     const outputEdit = edit?.target === "output" ? edit : null;
 
     const fileNotFound = source.localFile?.state === "not_found";
@@ -1158,7 +1156,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                     folderExists={fs.existsSync(outputDir)}
                     isFocused={isActive && current === "output"}
                     notice={notice}
-                    renamedTo={renamedTo}
+                    replacesExisting={replacesExisting}
                     edit={
                         outputEdit
                             ? {

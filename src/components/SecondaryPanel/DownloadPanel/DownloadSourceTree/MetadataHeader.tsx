@@ -22,7 +22,7 @@ export function MetadataHeader({ source }: MetadataHeaderProps) {
     const usesCompiledMetadata = providerDisplayRegistry.get(source.provider).usesCompiledMetadata;
 
     return (
-        <Box marginLeft={2} flexDirection="row" overflow="hidden" flexShrink={0}>
+        <Box marginLeft={4} flexDirection="row" overflow="hidden" flexShrink={0}>
             <Box paddingRight={1} flexDirection="row" flexShrink={0}>
                 <Text color={theme.text.secondary}>{"└─ used"}</Text>
             </Box>

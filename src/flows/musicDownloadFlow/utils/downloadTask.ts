@@ -18,6 +18,7 @@ import {
     Platform,
 } from "#flows/musicDownloadFlow/types";
 import { runWithoutCache } from "#utils/cache";
+import { overwriteConfirmBridge } from "#base/bridges/overwriteConfirmBridge";
 import { cleanAndTagFlac } from "#utils/metadata";
 import { SafeAction } from "#utils/decorators";
 import { metadataLimiter, downloadLimiter } from "./stageLimiters";
@@ -26,7 +27,7 @@ import { ensureDiscoveryConsent, getUnansweredConsentKeys } from "./discoveryCon
 import { computeCompiledMetadata } from "./compiledMetadata";
 import { compiledFieldValues } from "./metadataFields";
 import { compiledMetadataToTags } from "./compiledMetadataToTags";
-import { computeOutputPath } from "./computeOutputPath";
+import { computeOutputPath, isOutputPathTaken } from "./computeOutputPath";
 import { pickAutoSelectedIndex } from "./sourceSelection";
 import { MetadataService } from "../metadataService";
 import { DiscoveryMetadataService } from "../discoveryMetadataService";
@@ -62,6 +63,9 @@ export class DownloadTask extends Task<TrackDownloadTask> {
     private discoveryServiceRegistry: ServiceRegistry<DownloadTask, DiscoveryMetadataService>;
     private isMetadataServiceEnabled: (key: string) => boolean;
     private isDiscoveryServiceEnabled: (key: string) => boolean;
+    private isDownloadServiceEnabled: (key: string) => boolean;
+    // Download providers whose search + download is being re-run by the user right now.
+    private retryingProviders = new Set<string>();
     // Cancel handle for whichever download source row is currently in flight, keyed
     // by its index in `downloadSources` — populated from onUpdate's `abort` option
     // (see DownloadUpdateOptions) and consumed by rejectDownloadSource() so rejecting
@@ -99,6 +103,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.discoveryServiceRegistry = discoveryServiceRegistry;
         this.isMetadataServiceEnabled = isMetadataServiceEnabled;
         this.isDiscoveryServiceEnabled = isDiscoveryServiceEnabled;
+        this.isDownloadServiceEnabled = isDownloadServiceEnabled;
         this.metadataServices = metadataServiceRegistry.createScope(this, this.logger, isMetadataServiceEnabled);
         this.discoveryServices = discoveryServiceRegistry.createScope(this, this.logger, isDiscoveryServiceEnabled);
         this.downloadServices = downloadServiceRegistry.createScope(this, this.logger, isDownloadServiceEnabled);
@@ -852,7 +857,11 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         const patchSource = (patch: TrackDownloadSource) => {
             const current = [...(this.getAttributes()?.downloadSources ?? [])];
             if (!current[sourceIndex]) return;
-            current[sourceIndex] = { ...patch, selected: current[sourceIndex].selected };
+            current[sourceIndex] = {
+                ...patch,
+                selected: current[sourceIndex].selected,
+                moreCandidates: current[sourceIndex].moreCandidates,
+            };
             this.updateAttributes({ downloadSources: current });
         };
 
@@ -885,6 +894,44 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             }
             patchSource({ ...target, state: "failed" });
         }
+    }
+
+    /** Whether a "show more" row can be acted on now: not while any row is still being worked on (rows would shift under it). */
+    canShowMoreSources(): boolean {
+        return !(this.getAttributes()?.downloadSources ?? []).some((s) => DownloadTask.isInFlight(s));
+    }
+
+    /**
+     * Turns the next `count` results a provider found but didn't list (`moreCandidates`, kept on the last
+     * listed row of that search) into rows of their own, right under that row. They are "skipped": the user
+     * can still download any of them on demand, like any other not-needed row.
+     * Returns how many rows were added, so a caller can keep its cursor on the same row.
+     */
+    showMoreSources(anchorIndex: number, count = 10): number {
+        const sources = this.getAttributes()?.downloadSources ?? [];
+        const anchor = sources[anchorIndex];
+        const pool = anchor?.moreCandidates;
+        if (!anchor || !pool || pool.length === 0 || !this.canShowMoreSources()) return 0;
+
+        const batch = pool.slice(0, count);
+        const rest = pool.slice(count);
+        const rows: TrackDownloadSource[] = batch.map((candidate, i) => ({
+            state: "skipped",
+            provider: anchor.provider,
+            track: anchor.track,
+            downloadedAt: new Date(),
+            selected: false,
+            query: anchor.query,
+            ...candidate,
+            // The new last row of the listing carries whatever is still hidden.
+            moreCandidates: i === batch.length - 1 && rest.length > 0 ? rest : undefined,
+        }));
+
+        const next = [...sources];
+        next[anchorIndex] = { ...anchor, moreCandidates: undefined };
+        next.splice(anchorIndex + 1, 0, ...rows);
+        this.updateAttributes({ downloadSources: next });
+        return rows.length;
     }
 
     updateLocalFile(sourceIndex: number, newPath: string): void {
@@ -943,14 +990,19 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         });
         const outputDir = attrs!.outputDirOverride ?? settings.outputDir;
         await fs.mkdir(outputDir, { recursive: true });
-        // Neither the file itself nor the saved files of the other sources (deleted below) may make
-        // the name look taken and push this one to "(2)".
-        const outputPath = computeOutputPath(
-            compiled,
-            outputDir,
-            sources.map((s) => s.savedFile?.path),
-            attrs!.outputFilenameOverride
-        );
+        const outputPath = computeOutputPath(compiled, outputDir, attrs!.outputFilenameOverride);
+        // Another file with this name is replaced only if the user agrees. The track's own saved files don't
+        // count: this one replaces them anyway (the saved files of the other sources are deleted below).
+        if (
+            isOutputPathTaken(
+                outputPath,
+                sources.map((s) => s.savedFile?.path)
+            ) &&
+            !(await overwriteConfirmBridge.confirm(outputPath))
+        ) {
+            globalLogger.info("Save cancelled: the file name is taken and the user kept the existing file");
+            return;
+        }
 
         this.status.update({ type: StatusType.Processing, message: "Saving…" });
 
@@ -1014,6 +1066,205 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         }
     }
 
+    /**
+     * Runs one download service for this track: finds the metadata it can use, lets it search and download,
+     * and writes every row it reports into `downloadSources`. Never throws for a failed attempt (that just
+     * leaves a failed row); only a task-level abort propagates.
+     *
+     * New rows are appended, or spliced in from `insertAt` on (a re-run of one provider keeps its place in
+     * the list instead of jumping to the bottom).
+     */
+    private async runDownloadService(
+        downloadService: DownloadService,
+        signal?: AbortSignal,
+        insertAt?: number
+    ): Promise<void> {
+        const metadataGroups = this.getAttributes()?.metadataGroups ?? [];
+        let createdRows = 0;
+
+        // Every row update round-trips through the live persisted attributes rather
+        // than a locally-accumulated array — a service call can be in flight for
+        // seconds (Soulseek candidates especially), during which the user can mutate
+        // a row directly (rejectDownloadSource, selectDownloadSource). A stale local
+        // copy would silently clobber that (e.g. a "failed" update arriving after an
+        // abort would wipe the `isRejected` flag that abort was supposed to set).
+        // Returns the slot index actually used (existing or newly created).
+        const applyRowUpdate = (existingSlot: number | undefined, patch: TrackDownloadSource): number => {
+            const current = [...(this.getAttributes()?.downloadSources ?? [])];
+            let slotIndex: number;
+            if (existingSlot === undefined) {
+                slotIndex = insertAt === undefined ? current.length : insertAt + createdRows;
+                createdRows++;
+                current.splice(slotIndex, 0, patch);
+            } else {
+                slotIndex = existingSlot;
+                const live = current[slotIndex];
+                // `moreCandidates` is set once, on the row that ends the listing; later updates to that
+                // row (it may be attempted too) don't repeat it, so it must survive them.
+                current[slotIndex] = live
+                    ? {
+                          ...patch,
+                          selected: live.selected,
+                          isRejected: live.isRejected,
+                          moreCandidates: patch.moreCandidates ?? live.moreCandidates,
+                      }
+                    : patch;
+            }
+            this.updateAttributes({ downloadSources: current });
+            return slotIndex;
+        };
+
+        try {
+            // Find first compatible metadata across groups (sorted by group rank, then result rank)
+            let compatibleMetadata: TrackMetadata | undefined;
+            for (const group of [...metadataGroups].sort((a, b) => a.rank - b.rank)) {
+                for (const result of [...group.results].sort((a, b) => a.rank - b.rank)) {
+                    if (
+                        !result.isRejected &&
+                        result.fetchState !== "loading" &&
+                        downloadService.canDownload(result.metadata)
+                    ) {
+                        compatibleMetadata = result.metadata;
+                        break;
+                    }
+                }
+                if (compatibleMetadata) break;
+            }
+
+            if (!compatibleMetadata) {
+                this.logger.warn(`No compatible metadata found for ${downloadService.id}`);
+                return;
+            }
+
+            // A free-text search provider (e.g. Soulseek) isn't really tied to
+            // whichever group happened to rank first — overlay the task's compiled
+            // (merged + user-overridden) fields so the query, and what the UI shows
+            // as "used …", reflect the actual current metadata instead of one
+            // arbitrary source's raw values.
+            if (downloadService.usesCompiledMetadataForQuery) {
+                const compiled = computeCompiledMetadata(metadataGroups, this.getAttributes()?.metadataOverride ?? {});
+                compatibleMetadata = {
+                    ...compatibleMetadata,
+                    trackName: compiled.trackName || compatibleMetadata.trackName,
+                    artists: compiled.artists.length > 0 ? compiled.artists : compatibleMetadata.artists,
+                    album: compiled.album ?? compatibleMetadata.album,
+                    duration: compiled.duration ?? compatibleMetadata.duration,
+                };
+            }
+
+            this.logger.info(`Downloading using ${downloadService.id} from ${compatibleMetadata.apiProvider}`);
+
+            // Reserve slot(s) for this service. The service emits intermediate sources
+            // (e.g. "downloading" + progress) via onUpdate so the UI can show the
+            // download in progress before it completes. `selected` is owned by this
+            // task, so it is preserved across intermediate updates. A service that
+            // tries multiple candidates for one track (e.g. Soulseek working through a
+            // ranked peer list) can address each with a stable `attemptId`: the first
+            // update for an id opens its own row, later updates with the same id
+            // update that exact row — so every real attempt (pending/downloading/
+            // failed/downloaded) shows as its own row instead of one shared status.
+            // Services that never pass an `attemptId` (e.g. yt-dlp) keep the original
+            // single-row behavior via the implicit `undefined` key.
+            const slotByAttemptId = new Map<string | undefined, number>();
+            let lastAttemptId: string | undefined;
+            const onUpdate = (source: TrackDownloadSource, options?: DownloadUpdateOptions) => {
+                const attemptId = options?.attemptId;
+                lastAttemptId = attemptId;
+                const slotIndex = applyRowUpdate(slotByAttemptId.get(attemptId), source);
+                slotByAttemptId.set(attemptId, slotIndex);
+                if (options?.abort) {
+                    this.activeAbortBySourceIndex.set(slotIndex, options.abort);
+                } else {
+                    this.activeAbortBySourceIndex.delete(slotIndex);
+                }
+            };
+
+            // Download the track
+            const downloadSource = await downloadService.downloadTrack(compatibleMetadata, onUpdate, signal);
+            const finalSlot = applyRowUpdate(slotByAttemptId.get(lastAttemptId), downloadSource);
+            this.activeAbortBySourceIndex.delete(finalSlot);
+            this.logger.info(`Successfully downloaded using ${downloadService.id}`);
+        } catch (error) {
+            // Only a genuine task-level abort (the signal passed into the whole stage) should stop it.
+            // A service can also throw AbortError when just *one row* was cancelled (e.g. the user
+            // rejected a source mid-download via its per-row `abort` handle) — that
+            // should only fail this one service's attempt, not the rest of the task.
+            if (signal?.aborted) throw error;
+            this.logger.warn(`Failed to download using ${downloadService.id}:`, { error });
+        }
+    }
+
+    /** Whether a download row is still being worked on (as opposed to settled: downloaded, failed, skipped). */
+    private static isInFlight(source: TrackDownloadSource): boolean {
+        return source.state === "pending" || source.state === "searching" || source.state === "downloading";
+    }
+
+    /**
+     * Whether `provider`'s whole search + download can be re-run now. Not while the first pass is still going,
+     * while another provider's rows are being worked on (replacing this provider's rows shifts their positions),
+     * or when one of its files has been saved (re-running would drop the record of that saved copy).
+     */
+    canRetryDownloadProvider(provider: string): boolean {
+        const attrs = this.getAttributes();
+        if (!attrs || attrs.kind !== "track" || !attrs.downloadsFetched) return false;
+        if (!this.isDownloadServiceEnabled(provider)) return false;
+        const sources = attrs.downloadSources;
+        if (!sources.some((s) => s.provider === provider)) return false;
+        if (this.retryingProviders.has(provider)) return false;
+        if (sources.some((s) => s.provider !== provider && DownloadTask.isInFlight(s))) return false;
+        return !sources.some((s) => s.provider === provider && s.savedFile);
+    }
+
+    /**
+     * Re-runs the search and download of one provider from scratch (e.g. Soulseek after the metadata was
+     * corrected, or yt-dlp after a network error): its previous rows are replaced, in place, by whatever the
+     * new attempt produces. The other providers' rows are untouched.
+     */
+    @TaskScoped()
+    @SafeAction("Retry download provider")
+    async retryDownloadProvider(provider: string): Promise<void> {
+        if (!this.canRetryDownloadProvider(provider)) return;
+        const service = this.downloadServices.get(provider);
+
+        this.retryingProviders.add(provider);
+        try {
+            // Like the first pass, wait for a download slot. The old rows stay visible until it is this
+            // provider's turn, so the list does not blank out while the retry is queued.
+            await downloadLimiter.run(async () => {
+                const before = this.getAttributes()?.downloadSources ?? [];
+                // Another provider's row may have started while this waited: replacing this provider's rows
+                // would shift the positions its updates are addressed to.
+                if (before.some((s) => s.provider !== provider && DownloadTask.isInFlight(s))) return;
+
+                const firstIndex = before.findIndex((s) => s.provider === provider);
+                if (firstIndex === -1) return;
+                // A row of this provider still in flight is cancelled; the cancel handles are keyed by the
+                // very indices that are about to go away.
+                before.forEach((s, i) => {
+                    if (s.provider !== provider) return;
+                    this.activeAbortBySourceIndex.get(i)?.();
+                    this.activeAbortBySourceIndex.delete(i);
+                });
+                const hadSelected = before.some((s) => s.provider === provider && s.selected);
+
+                this.updateAttributes({ downloadSources: before.filter((s) => s.provider !== provider) });
+                await this.runDownloadService(service, undefined, firstIndex);
+
+                // The selected row went away with its provider: pick again, as the first pass does. A
+                // selection that lives on another provider is the user's, and stays.
+                if (hadSelected) {
+                    const sources = this.getAttributes()?.downloadSources ?? [];
+                    const picked = pickAutoSelectedIndex(sources, getMusicSettings().download.preferLossless);
+                    this.updateAttributes({
+                        downloadSources: sources.map((s, i) => ({ ...s, selected: i === picked })),
+                    });
+                }
+            });
+        } finally {
+            this.retryingProviders.delete(provider);
+        }
+    }
+
     @TaskScoped()
     @SafeAction("Start downloads")
     async startDownloads(signal?: AbortSignal): Promise<void> {
@@ -1027,116 +1278,9 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.logger.info(`Starting downloads with ${metadataGroups.length} metadata groups`);
         this.updateAttributes({ downloadSources: [], downloadsFetched: false });
 
-        const downloadServices = this.downloadServices.getAllServices();
-
-        // Every row update round-trips through the live persisted attributes rather
-        // than a locally-accumulated array — a service call can be in flight for
-        // seconds (Soulseek candidates especially), during which the user can mutate
-        // a row directly (rejectDownloadSource, selectDownloadSource). A stale local
-        // copy would silently clobber that (e.g. a "failed" update arriving after an
-        // abort would wipe the `isRejected` flag that abort was supposed to set).
-        // Returns the slot index actually used (existing or newly appended).
-        const applyRowUpdate = (existingSlot: number | undefined, patch: TrackDownloadSource): number => {
-            const current = [...(this.getAttributes()?.downloadSources ?? [])];
-            let slotIndex: number;
-            if (existingSlot === undefined) {
-                slotIndex = current.length;
-                current.push(patch);
-            } else {
-                slotIndex = existingSlot;
-                const live = current[slotIndex];
-                current[slotIndex] = live ? { ...patch, selected: live.selected, isRejected: live.isRejected } : patch;
-            }
-            this.updateAttributes({ downloadSources: current });
-            return slotIndex;
-        };
-
-        for (const downloadService of downloadServices) {
+        for (const downloadService of this.downloadServices.getAllServices()) {
             throwIfAborted(signal);
-
-            try {
-                // Find first compatible metadata across groups (sorted by group rank, then result rank)
-                let compatibleMetadata: TrackMetadata | undefined;
-                for (const group of [...metadataGroups].sort((a, b) => a.rank - b.rank)) {
-                    for (const result of [...group.results].sort((a, b) => a.rank - b.rank)) {
-                        if (
-                            !result.isRejected &&
-                            result.fetchState !== "loading" &&
-                            downloadService.canDownload(result.metadata)
-                        ) {
-                            compatibleMetadata = result.metadata;
-                            break;
-                        }
-                    }
-                    if (compatibleMetadata) break;
-                }
-
-                if (!compatibleMetadata) {
-                    this.logger.warn(`No compatible metadata found for ${downloadService.id}`);
-                    continue;
-                }
-
-                // A free-text search provider (e.g. Soulseek) isn't really tied to
-                // whichever group happened to rank first — overlay the task's compiled
-                // (merged + user-overridden) fields so the query, and what the UI shows
-                // as "used …", reflect the actual current metadata instead of one
-                // arbitrary source's raw values.
-                if (downloadService.usesCompiledMetadataForQuery) {
-                    const compiled = computeCompiledMetadata(
-                        metadataGroups,
-                        this.getAttributes()?.metadataOverride ?? {}
-                    );
-                    compatibleMetadata = {
-                        ...compatibleMetadata,
-                        trackName: compiled.trackName || compatibleMetadata.trackName,
-                        artists: compiled.artists.length > 0 ? compiled.artists : compatibleMetadata.artists,
-                        album: compiled.album ?? compatibleMetadata.album,
-                        duration: compiled.duration ?? compatibleMetadata.duration,
-                    };
-                }
-
-                this.logger.info(`Downloading using ${downloadService.id} from ${compatibleMetadata.apiProvider}`);
-
-                // Reserve slot(s) for this service. The service emits intermediate sources
-                // (e.g. "downloading" + progress) via onUpdate so the UI can show the
-                // download in progress before it completes. `selected` is owned by this
-                // task, so it is preserved across intermediate updates. A service that
-                // tries multiple candidates for one track (e.g. Soulseek working through a
-                // ranked peer list) can address each with a stable `attemptId`: the first
-                // update for an id opens its own row, later updates with the same id
-                // update that exact row — so every real attempt (pending/downloading/
-                // failed/downloaded) shows as its own row instead of one shared status.
-                // Services that never pass an `attemptId` (e.g. yt-dlp) keep the original
-                // single-row behavior via the implicit `undefined` key.
-                const slotByAttemptId = new Map<string | undefined, number>();
-                let lastAttemptId: string | undefined;
-                const onUpdate = (source: TrackDownloadSource, options?: DownloadUpdateOptions) => {
-                    const attemptId = options?.attemptId;
-                    lastAttemptId = attemptId;
-                    const slotIndex = applyRowUpdate(slotByAttemptId.get(attemptId), source);
-                    slotByAttemptId.set(attemptId, slotIndex);
-                    if (options?.abort) {
-                        this.activeAbortBySourceIndex.set(slotIndex, options.abort);
-                    } else {
-                        this.activeAbortBySourceIndex.delete(slotIndex);
-                    }
-                };
-
-                // Download the track
-                const downloadSource = await downloadService.downloadTrack(compatibleMetadata, onUpdate, signal);
-                const finalSlot = applyRowUpdate(slotByAttemptId.get(lastAttemptId), downloadSource);
-                this.activeAbortBySourceIndex.delete(finalSlot);
-                this.logger.info(`Successfully downloaded using ${downloadService.id}`);
-            } catch (error) {
-                // Only a genuine task-level abort (the signal passed into this whole
-                // startDownloads() call) should stop the loop entirely. A service can
-                // also throw AbortError when just *one row* was cancelled (e.g. the user
-                // rejected a source mid-download via its per-row `abort` handle) — that
-                // should only fail this one service's attempt, not the rest of the task.
-                if (signal?.aborted) throw error;
-                this.logger.warn(`Failed to download using ${downloadService.id}:`, { error });
-                // Continue to next download service
-            }
+            await this.runDownloadService(downloadService, signal);
         }
 
         // Auto-select the best downloaded source — lossless-first when preferLossless
