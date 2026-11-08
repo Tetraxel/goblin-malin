@@ -6,6 +6,7 @@ import { providerDisplayRegistry } from "#base/providerDisplay";
 import { TrackDownloadSource, DownloadProvider, DownloadQueryField } from "#flows/musicDownloadFlow/types";
 import type { Updater } from "#hooks/useFocusManager";
 import { togglePlayback } from "#utils/togglePlayback";
+import { playableFilePath } from "#flows/musicDownloadFlow/utils/playableFile";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useNowPlaying, type NowPlaying } from "#hooks/useNowPlaying";
 import { ProviderHeader } from "./ProviderHeader";
@@ -260,7 +261,9 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     const onHeader = focusedProvider !== null;
     const selectedSource = onHeader ? undefined : sources[selectedSourceIndex];
     const canRetryHeader = onHeader && canRetryProvider(focusedProvider);
-    const canPlay = selectedSource?.localFile?.state === "found";
+    // Previewing and saving need a file: the temporary copy, or the saved file once that copy is cleaned up.
+    const playPath = selectedSource ? playableFilePath(selectedSource) : null;
+    const canPlay = playPath !== null;
     const saveLabel = selectedSource?.savedFile ? "Update" : "Save";
     // A source only carries retryPayload if its provider supports re-attempting it
     // on demand (e.g. a Soulseek candidate that was "skipped" or "failed") — gate on
@@ -364,10 +367,8 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                 defaultShortcut: { input: " " },
                 label: "Play/Pause",
                 handler: () => {
-                    if (!canPlay) return;
-                    const source = sources[selectedSourceIndex];
-                    if (!source?.localFile?.path) return;
-                    togglePlayback(source.localFile.path);
+                    if (playPath === null) return;
+                    togglePlayback(playPath);
                 },
             },
         ],

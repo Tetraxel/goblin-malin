@@ -6,7 +6,7 @@ import { providerDisplayRegistry } from "#base/providerDisplay";
 import { SettingsItem } from "#settings/buildSettingsItems";
 import { MusicDownloadFlowSettings } from "./settings";
 import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
-import { clearTempDownloads } from "./saveSettings";
+import { runTempCleanup } from "./tempCleanupFlow";
 
 export type ProviderEntry = {
     key: string;
@@ -109,13 +109,20 @@ function providerItems(
     return items;
 }
 
+/** Values the rows need that are not settings — worked out by the caller, possibly after the modal opened. */
+export type FlowSettingsExtras = {
+    /** The temporary folder's size, as text; `undefined` while it is still being measured. */
+    tempUsageText?: string;
+};
+
 export function buildFlowSettingsItems(
     flowSettings: MusicDownloadFlowSettings,
     metadataProviders: ProviderEntry[],
     downloadProviders: ProviderEntry[],
     discoveryProviders: ProviderEntry[],
     onChange: (patch: DeepPartial<MusicDownloadFlowSettings>) => void,
-    onOpenWizard: (config: SetupWizardConfig, onDisable?: () => void) => void = () => {}
+    onOpenWizard: (config: SetupWizardConfig, onDisable?: () => void) => void = () => {},
+    extras: FlowSettingsExtras = {}
 ): SettingsItem[] {
     const items: SettingsItem[] = [];
 
@@ -195,27 +202,6 @@ export function buildFlowSettingsItems(
     //     get: () => flowSettings.download.autoChooseBestSource,
     //     set: (v) => onChange({ download: { autoChooseBestSource: v } }),
     // });
-    // items.push({
-    //   kind: 'checkbox',
-    //   indent: 0,
-    //   label: 'Auto-save to the specified output directory',
-    //   get: () => flowSettings.download.autoSaveToOutputDir,
-    //   set: (v) => onChange({ download: { autoSaveToOutputDir: v } }),
-    // });
-    // items.push({
-    //   kind: 'checkbox',
-    //   indent: 0,
-    //   label: 'Automatically delete temporary downloads after 24h',
-    //   get: () => flowSettings.download.autoDeleteTempAfter24h,
-    //   set: (v) => onChange({ download: { autoDeleteTempAfter24h: v } }),
-    // });
-    // items.push({
-    //   kind: 'checkbox',
-    //   indent: 0,
-    //   label: 'Auto-relocate missing files',
-    //   get: () => flowSettings.download.autoRelocateMissingFiles,
-    //   set: (v) => onChange({ download: { autoRelocateMissingFiles: v } }),
-    // });
     items.push({
         kind: "textInput",
         indent: 0,
@@ -233,8 +219,23 @@ export function buildFlowSettingsItems(
     items.push({
         kind: "action",
         indent: 0,
-        label: "⛒  Clear temporary downloads",
-        run: () => void clearTempDownloads(),
+        label: "⛒  Clear temporary downloads…",
+        run: () => void runTempCleanup("manual", flowSettings.download.outputTemporaryDir),
+    });
+    items.push({ kind: "note", indent: 0, text: extras.tempUsageText ?? "calculating…" });
+    items.push({
+        kind: "checkbox",
+        indent: 0,
+        label: "Remind me to clean up unused temporary downloads",
+        get: () => flowSettings.download.tempCleanupReminder,
+        set: (v) => onChange({ download: { tempCleanupReminder: v } }),
+    });
+    items.push({
+        kind: "checkbox",
+        indent: 0,
+        label: "Delete temporary downloads unused for 48 h automatically",
+        get: () => flowSettings.download.autoDeleteUnusedTemp,
+        set: (v) => onChange({ download: { autoDeleteUnusedTemp: v } }),
     });
 
     if (downloadProviders.length > 0) {
@@ -261,7 +262,8 @@ export function buildFlowSettingsItems(
 export function buildMusicSettingsItems(
     settings: Record<string, unknown>,
     onChange: (patch: Record<string, unknown>) => void,
-    onOpenWizard?: (config: SetupWizardConfig, onDisable?: () => void) => void
+    onOpenWizard?: (config: SetupWizardConfig, onDisable?: () => void) => void,
+    extras?: FlowSettingsExtras
 ): SettingsItem[] {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const toEntries = (registry: ServiceRegistry<any, any>): ProviderEntry[] =>
@@ -276,6 +278,7 @@ export function buildMusicSettingsItems(
         toEntries(downloadServiceRegistry),
         toEntries(discoveryServiceRegistry),
         onChange as (patch: DeepPartial<MusicDownloadFlowSettings>) => void,
-        onOpenWizard
+        onOpenWizard,
+        extras
     );
 }

@@ -979,7 +979,11 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         const selectedSource = sources.find((s) => s.selected);
 
         if (!selectedSource) throw new Error("No download source selected");
-        if (selectedSource.localFile?.state !== "found") throw new Error("Local file not found");
+        // A track that is already saved can be re-tagged / renamed / moved without its temporary copy, which
+        // may have been cleaned up since (only a *new* save copies from it).
+        if (!selectedSource.savedFile && selectedSource.localFile?.state !== "found") {
+            throw new Error("Local file not found");
+        }
 
         const settings = getSaveSettings();
         globalLogger.info("Saving track with settings:", { settings });

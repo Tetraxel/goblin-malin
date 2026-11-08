@@ -11,6 +11,7 @@ import { buildGlobalSettingsItems } from "#settings/buildGlobalSettingsItems";
 import { filterSettingsItems, isInteractive, SettingsItem } from "#settings/buildSettingsItems";
 import { getMusicSettings, saveMusicSettings } from "#flows/musicDownloadFlow/settings";
 import { buildMusicSettingsItems } from "#flows/musicDownloadFlow/buildFlowSettingsItems";
+import { describeTempUsage, getTempUsage, TempUsage } from "#flows/musicDownloadFlow/tempCleanupFlow";
 import { deepMerge } from "#utils/deepMerge";
 import { DeepPartial } from "#utils/types";
 import { shortcutRegistry } from "#base/shortcuts/ShortcutRegistry";
@@ -40,6 +41,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
 
     const [appDraft, setAppDraft] = useState<AppSettings>(() => SettingsStore.getInstance().getAppSettings());
     const [flowPatch, setFlowPatch] = useState<Record<string, unknown>>({});
+    // How much the temporary folder holds. Measured in the background once the modal is open (it can be
+    // hundreds of files): the rest of the page works meanwhile and the row says "calculating…".
+    const [tempUsage, setTempUsage] = useState<TempUsage | undefined>(undefined);
     const [originalKeybindings, setOriginalKeybindings] = useState<AppSettings["keybindings"]>(
         () => SettingsStore.getInstance().getAppSettings().keybindings
     );
@@ -66,6 +70,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
             setAppDraft(freshSettings);
             setOriginalKeybindings(freshSettings.keybindings);
             setFlowPatch({});
+            setTempUsage(undefined);
             setSelectedIndex(0);
             setEditingIndex(null);
             setEditValue("");
@@ -80,6 +85,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
         }
     }
 
+    // The folder as it currently stands on screen, saved or not.
+    const draftTempDir = useMemo(() => {
+        const merged = deepMerge(
+            getMusicSettings() as unknown as Record<string, unknown>,
+            flowPatch
+        ) as unknown as ReturnType<typeof getMusicSettings>;
+        return merged.download.outputTemporaryDir;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [flowPatch, returningFromWindow]);
+
+    // Measure when the modal opens, when the folder is edited and after a clean-up dialog closes.
+    useEffect(() => {
+        if (!isVisible) return;
+        let cancelled = false;
+        void getTempUsage(draftTempDir).then((usage) => {
+            if (!cancelled) setTempUsage(usage);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [isVisible, draftTempDir, returningFromWindow]);
+
     const allItems = useMemo((): SettingsItem[] => {
         const globalItems = buildGlobalSettingsItems(appDraft, (patch) =>
             setAppDraft((prev) => deepMerge(prev, patch as DeepPartial<AppSettings>))
@@ -88,11 +115,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
         const musicItems = buildMusicSettingsItems(
             fullMusicSettings,
             (patch) => setFlowPatch((prev) => deepMerge(prev, patch) as Record<string, unknown>),
-            openWizard
+            openWizard,
+            { tempUsageText: describeTempUsage(tempUsage) }
         );
         return [...globalItems, ...musicItems];
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [appDraft, flowPatch, returningFromWindow]);
+    }, [appDraft, flowPatch, returningFromWindow, tempUsage]);
 
     const filteredItems = useMemo(() => filterSettingsItems(allItems, searchQuery), [allItems, searchQuery]);
     const safeSelectedIndex = Math.min(selectedIndex, Math.max(0, filteredItems.length - 1));

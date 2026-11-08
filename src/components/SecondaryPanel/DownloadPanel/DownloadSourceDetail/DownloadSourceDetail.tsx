@@ -21,6 +21,7 @@ import {
 } from "#flows/musicDownloadFlow/utils/cleanOutputDir";
 import { getProvenanceDisplay } from "#flows/musicDownloadFlow/utils/provenance";
 import { getInstance } from "#utils/mpvPlayer";
+import { playableFilePath } from "#flows/musicDownloadFlow/utils/playableFile";
 import { togglePlayback as toggleFilePlayback, seekFileToFraction } from "#utils/togglePlayback";
 import { formatBytes, formatDate, tagValue } from "#components/SecondaryPanel/DownloadPanel/utils";
 import { Uri } from "#components/SecondaryPanel/MetadataPanel/Uri";
@@ -259,11 +260,12 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     // keeps playing in the background while you move between tasks and tabs (the playing task
     // is flagged in the task list, and the player is the app-wide singleton).
 
-    const currentFilePath = source?.localFile?.path ?? null;
+    // The temporary copy, or the saved file once that copy has been cleaned up.
+    const currentFilePath = source ? playableFilePath(source) : null;
     const newPlayback = useFilePlayback(currentFilePath);
     const oldPlayback = useFilePlayback(oldPath);
 
-    const canPlay = source?.localFile?.state === "found";
+    const canPlay = currentFilePath !== null;
     // Shared by the Space shortcut and a click on the playback bar. Only a file that is already
     // loaded can be paused; starting one needs it to be on disk.
     const togglePlayback = () => {
@@ -276,7 +278,8 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
         if (!canPlay || !currentFilePath) return;
         seekFileToFraction(currentFilePath, fraction, source?.fileInfo?.durationMs ?? source?.track.duration ?? 0);
     };
-    const fileNotFoundNow = source?.localFile?.state === "not_found";
+    // A saved source whose temporary copy is gone (cleaned up) is not lost: its saved file is what is edited.
+    const fileNotFoundNow = source?.localFile?.state === "not_found" && !source.savedFile;
 
     /** Seeks by `deltaMs` in whichever of the two files is loaded in the player. */
     function seekBy(deltaMs: number) {
@@ -730,7 +733,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
         ]);
     const outputEdit = edit?.target === "output" ? edit : null;
 
-    const fileNotFound = source.localFile?.state === "not_found";
+    const fileNotFound = source.localFile?.state === "not_found" && !source.savedFile;
     const sourceDurationMs = source.fileInfo?.durationMs ?? source.track.duration ?? 0;
     const displayDurationMs = newPlayback.durationMs > 0 ? newPlayback.durationMs : sourceDurationMs;
     const sizeText = source.fileInfo ? formatBytes(source.fileInfo.sizeBytes) : "—";

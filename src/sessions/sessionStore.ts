@@ -219,6 +219,22 @@ export class SessionStore {
         this.writeToDisk({ ...current, sessions });
     }
 
+    /**
+     * Rewrites sessions in a single write. `fn` returns the very same object for a session it leaves alone.
+     * Returns how many sessions changed.
+     */
+    updateSessions(fn: (session: StoredSession) => StoredSession): number {
+        const current = this.getCached();
+        let changed = 0;
+        const sessions = current.sessions.map((session) => {
+            const next = fn(session);
+            if (next !== session) changed++;
+            return next;
+        });
+        if (changed > 0) this.writeToDisk({ ...current, sessions });
+        return changed;
+    }
+
     deleteSession(id: string): void {
         const current = this.getCached();
         const sessions = current.sessions.filter((s) => s.id !== id);

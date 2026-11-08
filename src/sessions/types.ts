@@ -16,6 +16,12 @@ export interface StoredSession {
     flowId?: string;
     createdAt: string;
     updatedAt: string;
+    /**
+     * When the session was last in use: bumped when it is opened and when the app closes with it open, without
+     * touching `updatedAt` (which is about edits, and drives the list order). Temporary downloads of a session
+     * used recently are kept even if the session itself is old. Absent in files saved before this field existed.
+     */
+    lastUsedAt?: string;
     tasks: SessionTaskSnapshot[];
     /** Archived tasks: never loaded into the queue, so they don't run or clutter the task list. */
     archived?: ArchivedTaskSnapshot[];

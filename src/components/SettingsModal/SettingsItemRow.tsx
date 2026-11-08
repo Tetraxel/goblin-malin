@@ -130,6 +130,16 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
                 </ClickArea>
             );
 
+        case "note":
+            // Under the row above it, in line with that row's label (cursor + icon).
+            return (
+                <Box paddingLeft={item.indent + 5} flexShrink={0}>
+                    <Text color={theme.text.secondary} wrap="truncate-end">
+                        {item.text}
+                    </Text>
+                </Box>
+            );
+
         case "readonlyText":
             return (
                 <Box paddingLeft={item.indent} flexShrink={0}>

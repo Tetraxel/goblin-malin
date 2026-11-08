@@ -17,11 +17,16 @@ export type MusicDownloadFlowSettings = {
         autoChooseBestSource: boolean;
         /** When auto-selecting among multiple downloaded sources, prefer lossless over lossy/transcoded. */
         preferLossless: boolean;
-        autoSaveToOutputDir: boolean;
-        autoDeleteTempAfter24h: boolean;
-        autoRelocateMissingFiles: boolean;
         outputDir: string;
         outputTemporaryDir: string;
+        /** Suggest cleaning temporary downloads that no recent session uses (at most once a day, at start-up). */
+        tempCleanupReminder: boolean;
+        /** At start-up, delete temporary downloads no session has used for 48 hours — without asking. */
+        autoDeleteUnusedTemp: boolean;
+        /** The age last picked in the clean-up dialog (a `TEMP_AGES` key); it is the dialog's starting point. */
+        tempCleanupAge: string;
+        /** When the reminder was last shown (ISO date), so it doesn't come back on every launch. */
+        tempCleanupRemindedAt: string;
         providers: Record<string, StoredProviderSettings>;
     };
     ui: {
@@ -74,11 +79,12 @@ export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSetting
     download: {
         autoChooseBestSource: false,
         preferLossless: true,
-        autoSaveToOutputDir: true,
-        autoDeleteTempAfter24h: false,
-        autoRelocateMissingFiles: false,
         outputDir: MEDIA_OUTPUT_DIR,
         outputTemporaryDir: path.join(MEDIA_OUTPUT_DIR, "tmp"),
+        tempCleanupReminder: true,
+        autoDeleteUnusedTemp: false,
+        tempCleanupAge: "7d",
+        tempCleanupRemindedAt: "",
         providers: {},
     },
     ui: {

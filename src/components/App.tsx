@@ -18,6 +18,10 @@ import { checkForUpdate, UpdateInfo } from "#updater/updateChecker";
 import { SettingsStore } from "#settings/settingsStore";
 import { SessionManager } from "#sessions/sessionManager";
 import { setCacheEnabled } from "#utils/cache";
+import { runStartupTempMaintenance } from "#flows/musicDownloadFlow/tempCleanupFlow";
+
+// Let the interface mount (and the intro start) before a dialog or a progress box may appear on top of it.
+const TEMP_MAINTENANCE_DELAY_MS = 2000;
 
 export const App: React.FC = () => {
     useEffect(() => {
@@ -83,6 +87,10 @@ export const App: React.FC = () => {
     // Restore the last session once at startup (gated by the reopenLastSession setting).
     useEffect(() => {
         SessionManager.getInstance().init();
+        // Temporary downloads are cleaned (or the user is reminded to) only now: the last session is loaded, so
+        // what it uses counts as in use.
+        const timer = setTimeout(() => void runStartupTempMaintenance(), TEMP_MAINTENANCE_DELAY_MS);
+        return () => clearTimeout(timer);
     }, []);
 
     useEffect(() => {

@@ -252,7 +252,8 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     /** Saves the file of the focused source: the selected one directly, another one after selecting it. */
     function handleRequestSave(idx: number) {
         const source = downloadSources[idx];
-        if (isSaving || source?.localFile?.state !== "found") return;
+        // A saved source can be saved again (re-tag, rename, move) without its temporary copy.
+        if (isSaving || !source || (source.localFile?.state !== "found" && !source.savedFile)) return;
         if (isSourceSwitch) {
             // The comparison with the saved file is already on screen: this source takes its place.
             (typedTask as unknown as DownloadTask)?.selectDownloadSource(idx);

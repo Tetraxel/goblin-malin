@@ -8,19 +8,39 @@ import path from "path";
  * the app made itself — anything else in the folder is somebody's, and is never touched.
  */
 const APP_TEMP_FILE = / [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[^\\/]+$/i;
+/** The same signature, capturing everything before the extension: the stem a download and its leftovers share. */
+const APP_TEMP_STEM = /^(.* [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.[^\\/]+$/i;
 
 export function isAppTempFile(name: string): boolean {
     return APP_TEMP_FILE.test(name);
 }
 
+/**
+ * The stem (`<provider> <id> <uuid>`, lower-cased) of an app temp file, given its name or full path; `null`
+ * for anything else. A download (`… <uuid>.flac`) and its leftovers (`… <uuid>.f251.webm.part`) share it, which
+ * is how a session's `localFile.path` is matched to every file on disk that belongs to it.
+ */
+export function tempFileStem(nameOrPath: string): string | null {
+    const name = nameOrPath.split(/[\\/]/).pop() ?? nameOrPath;
+    const match = APP_TEMP_STEM.exec(name);
+    return match ? match[1].toLowerCase() : null;
+}
+
 /** A folder the temporary-download folder must never be, or contain (e.g. the music library). */
 export type ProtectedPath = { label: string; path: string };
 
-export type TempFile = { path: string; bytes: number };
+export type TempFile = { path: string; bytes: number; mtimeMs: number };
 
-export type TempClearPlan =
-    | { ok: true; dir: string; files: TempFile[] }
-    | { ok: false; dir: string; reason: string };
+/** One download and the leftovers sharing its stem: they are kept or deleted together. */
+export type TempGroup = {
+    stem: string;
+    files: TempFile[];
+    bytes: number;
+    /** The newest modification time of the group's files: while it is recent, a download may still be writing. */
+    mtimeMs: number;
+};
+
+export type TempFolderCheck = { ok: true; dir: string } | { ok: false; dir: string; reason: string };
 
 /** Absolute, symlink-free and (on Windows) lower-cased, so two spellings of one folder compare equal. */
 function canonical(p: string): string {
@@ -40,17 +60,15 @@ function isSameOrInside(inner: string, outer: string): boolean {
 }
 
 /**
- * Decides what "Clear temporary downloads" may delete, without deleting anything.
+ * Decides whether the temporary folder may be cleaned at all, without touching anything.
  *
- * The temporary folder is a free-text setting, so it can be set to a folder that holds real files. The plan
- * therefore (1) refuses outright when the folder is a drive root, or is — or contains — any of
- * `protectedPaths` (the output folder, the home folder, the app's own data folder…), and (2) otherwise
- * lists only the files directly inside it that carry the app's temp-file signature. Sub-folders and foreign
- * files are left alone.
+ * The temporary folder is a free-text setting, so it can be set to a folder that holds real files. It is
+ * therefore refused outright when it is a drive root, or is — or contains — any of `protectedPaths` (the
+ * output folder, the home folder, the app's own data folder…).
  */
-export function planTempClear(tempDir: string, protectedPaths: ProtectedPath[]): TempClearPlan {
+export function checkTempFolder(tempDir: string, protectedPaths: ProtectedPath[]): TempFolderCheck {
     const raw = tempDir.trim();
-    const refuse = (reason: string): TempClearPlan => ({ ok: false, dir: raw, reason });
+    const refuse = (reason: string): TempFolderCheck => ({ ok: false, dir: raw, reason });
 
     if (!raw) return refuse("No temporary download folder is set.");
     if (!path.isAbsolute(raw)) return refuse("The temporary download folder is not an absolute path.");
@@ -70,39 +88,73 @@ export function planTempClear(tempDir: string, protectedPaths: ProtectedPath[]):
             );
         }
     }
-
-    if (!fs.existsSync(dir)) return { ok: true, dir, files: [] };
-
-    try {
-        const files: TempFile[] = [];
-        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-            if (!entry.isFile() || !isAppTempFile(entry.name)) continue;
-            const filePath = path.join(dir, entry.name);
-            files.push({ path: filePath, bytes: fs.statSync(filePath).size });
-        }
-        return { ok: true, dir, files };
-    } catch (error) {
-        return refuse(`The folder cannot be read (${error instanceof Error ? error.message : String(error)}).`);
-    }
+    return { ok: true, dir };
 }
 
-/** Deletes the files of an approved plan. Returns how many went away and how many could not be deleted. */
-export function deleteTempFiles(plan: Extract<TempClearPlan, { ok: true }>): {
-    removed: number;
-    failed: number;
-    bytes: number;
-} {
-    let removed = 0;
-    let failed = 0;
-    let bytes = 0;
-    for (const file of plan.files) {
-        try {
-            fs.rmSync(file.path, { force: true });
-            removed++;
-            bytes += file.bytes;
-        } catch {
-            failed++;
-        }
+/**
+ * The app's own temp files directly inside `dir`, grouped by stem. Sub-folders and foreign files are left out.
+ * Asynchronous: the folder can hold gigabytes in hundreds of files, and the UI must keep painting meanwhile.
+ * A folder that does not exist (yet) has nothing in it.
+ */
+export async function scanTempGroups(dir: string): Promise<TempGroup[]> {
+    let entries: fs.Dirent[];
+    try {
+        entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+        throw error;
     }
-    return { removed, failed, bytes };
+
+    const groups = new Map<string, TempGroup>();
+    for (const entry of entries) {
+        if (!entry.isFile()) continue;
+        const stem = tempFileStem(entry.name);
+        if (!stem) continue;
+        const filePath = path.join(dir, entry.name);
+        let stat: fs.Stats;
+        try {
+            stat = await fs.promises.stat(filePath);
+        } catch {
+            continue; // gone since the listing (a download finished or was cleaned up meanwhile)
+        }
+        const group = groups.get(stem) ?? { stem, files: [], bytes: 0, mtimeMs: 0 };
+        group.files.push({ path: filePath, bytes: stat.size, mtimeMs: stat.mtimeMs });
+        group.bytes += stat.size;
+        group.mtimeMs = Math.max(group.mtimeMs, stat.mtimeMs);
+        groups.set(stem, group);
+    }
+    return [...groups.values()];
+}
+
+export type DeleteTempResult = {
+    /** Stems whose every file is gone: the sources that pointed at them are now broken links. */
+    removedStems: Set<string>;
+    removedFiles: number;
+    failedFiles: number;
+    bytes: number;
+};
+
+/** Deletes the groups' files one by one (so progress can be shown), reporting a stem only once all of it is gone. */
+export async function deleteTempGroups(
+    groups: TempGroup[],
+    onProgress?: (done: number, total: number) => void
+): Promise<DeleteTempResult> {
+    const result: DeleteTempResult = { removedStems: new Set(), removedFiles: 0, failedFiles: 0, bytes: 0 };
+    let done = 0;
+    for (const group of groups) {
+        let complete = true;
+        for (const file of group.files) {
+            try {
+                await fs.promises.rm(file.path, { force: true });
+                result.removedFiles++;
+                result.bytes += file.bytes;
+            } catch {
+                result.failedFiles++;
+                complete = false;
+            }
+        }
+        if (complete) result.removedStems.add(group.stem);
+        onProgress?.(++done, groups.length);
+    }
+    return result;
 }

@@ -13,7 +13,9 @@ export type SettingsItem =
           set: (v: string) => void;
       }
     | { kind: "action"; label: string; indent: number; run: () => void }
-    | { kind: "readonlyText"; label: string; indent: number; value: string };
+    | { kind: "readonlyText"; label: string; indent: number; value: string }
+    /** A dim line of information under the row above it (never selectable). It stays with that row when searching. */
+    | { kind: "note"; indent: number; text: string };
 
 export function isInteractive(item: SettingsItem): boolean {
     return item.kind === "checkbox" || item.kind === "textInput" || item.kind === "select" || item.kind === "action";
@@ -39,7 +41,12 @@ export function filterSettingsItems(items: SettingsItem[], query: string): Setti
     let pendingSubHeader: SettingsItem | null = null;
     let pendingProvider: SettingsItem | null = null;
 
-    for (const item of items) {
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === "note") {
+            if (result.includes(items[i - 1])) result.push(item);
+            continue;
+        }
         if (item.kind === "sectionHeader") {
             pendingSection = item;
             pendingSubHeader = null;

@@ -1,14 +1,32 @@
 import { EventEmitter } from "events";
 import { randomUUID } from "crypto";
+import * as fs from "fs";
 import { TaskOrchestrator } from "#base/task/orchestrator";
-import { TaskSnapshot } from "#base/task/task";
+import { Task, TaskSnapshot } from "#base/task/task";
 import { SettingsStore } from "#settings/settingsStore";
 import { createTasksFromSnapshots } from "#flows/musicDownloadFlow/taskFactory";
 import { SessionStore } from "./sessionStore";
 import { globalLogger } from "#base/logger/logger";
 import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import { markMissingInAttributes, markMissingInSnapshot } from "#flows/musicDownloadFlow/utils/missingLocalFiles";
+import { tempFileStem } from "#flows/musicDownloadFlow/utils/tempDownloads";
+import type { TempUseGroup } from "#flows/musicDownloadFlow/utils/tempCleanup";
 import { StoredSession, SessionTaskSnapshot, ArchivedTaskSnapshot } from "./types";
 import { deriveSessionName } from "./sessionSearch";
+
+const fileIsGone = (filePath: string): boolean => !fs.existsSync(filePath);
+/**
+ * A temporary download that is no longer on disk. Only the app's own temp files are checked when a session
+ * opens: a source relocated to a file on an unplugged or network drive is not "lost" for good, and marking it
+ * would stick (only "Relocate" resets it).
+ */
+const tempFileIsGone = (filePath: string): boolean => tempFileStem(filePath) !== null && fileIsGone(filePath);
+
+/** When a session was last in use: the latest of its explicit use stamp, its last edit and its creation. */
+export function sessionLastUsedMs(session: StoredSession): number {
+    const times = [session.lastUsedAt, session.updatedAt, session.createdAt].map((t) => (t ? Date.parse(t) : NaN));
+    return Math.max(0, ...times.filter((t) => Number.isFinite(t)));
+}
 
 export class SessionManager {
     private static instance: SessionManager;
@@ -45,12 +63,26 @@ export class SessionManager {
     }
 
     loadSession(id: string): void {
-        const session = this.store.getById(id);
-        if (!session) return;
+        if (!this.store.getById(id)) return;
 
         // Flush any debounced write for the outgoing session first, so its latest
         // edits land on the right record before currentSessionId changes.
         this.flushPending();
+        // Read only now: when this is the session that is already open, the flush above just wrote its latest
+        // edits, and building on the record read before it would put the old ones back.
+        const stored = this.store.getById(id);
+        if (!stored) return;
+
+        // Opening a session is a use of it (its temporary downloads must outlive a clean-up for a while), and
+        // any file that vanished while it was closed (cleaned up, deleted by hand) becomes "File not found"
+        // here instead of a source that claims a file that is not there. `updatedAt` is left alone: it is
+        // about edits and drives the list order.
+        const session: StoredSession = {
+            ...stored,
+            tasks: stored.tasks.map((task) => markMissingInSnapshot(task, tempFileIsGone)),
+            lastUsedAt: new Date().toISOString(),
+        };
+        this.store.upsertSession(session);
 
         this.isLoading = true;
         try {
@@ -86,6 +118,9 @@ export class SessionManager {
     /** Writes the debounced changes now (the app is closing). The store's own write still has to be awaited. */
     flushNow(): void {
         this.flushPending();
+        // The session open until now was in use until now, however long ago it was opened.
+        const current = this.currentSessionId ? this.store.getById(this.currentSessionId) : undefined;
+        if (current) this.store.upsertSession({ ...current, lastUsedAt: new Date().toISOString() });
     }
 
     /** Write any debounced snapshots immediately to the *current* session. */
@@ -124,6 +159,7 @@ export class SessionManager {
                 name: deriveSessionName(snapshots),
                 createdAt: now,
                 updatedAt: now,
+                lastUsedAt: now,
                 tasks: snapshots,
             };
             this.store.upsertSession(session);
@@ -242,7 +278,9 @@ export class SessionManager {
         }
         if (restorable.length === 0) return 0;
 
-        orchestrator.addTasks(createTasksFromSnapshots(restorable.map((e) => e.task)));
+        orchestrator.addTasks(
+            createTasksFromSnapshots(restorable.map((e) => markMissingInSnapshot(e.task, tempFileIsGone)))
+        );
         const restoredIds = new Set(restorable.map((e) => e.task.id));
         this.store.upsertSession({
             ...session,
@@ -267,6 +305,75 @@ export class SessionManager {
         const attrs = root.task.attributes as MusicDownloadTaskAttributes | undefined;
         const childIds = new Set(attrs?.kind === "collection" ? attrs.childTaskIds : []);
         return [root, ...archived.filter((e) => e !== root && childIds.has(e.task.id))];
+    }
+
+    // ── Temporary downloads ──────────────────────────────────────────────────
+
+    /**
+     * Who uses which temporary file, for clean-up: every stored session with the time it was last used, plus the
+     * live queue (which can be ahead of its stored record, or never stored at all) as always in use.
+     */
+    getTempUseGroups(): TempUseGroup[] {
+        // The stored record of the open session must not lag behind the queue.
+        this.flushPending();
+        const groups: TempUseGroup[] = this.store.getAll().map((session) => ({
+            lastUsedMs: sessionLastUsedMs(session),
+            live: session.id === this.currentSessionId,
+            snapshots: [...session.tasks, ...(session.archived ?? []).map((entry) => entry.task)],
+        }));
+        groups.push({
+            lastUsedMs: Date.now(),
+            live: true,
+            snapshots: TaskOrchestrator.getInstance()
+                .getTasks()
+                .map((task) => task.get()),
+        });
+        return groups;
+    }
+
+    /**
+     * Temporary files were deleted (`stems` are the downloads the clean-up went through): every source that pointed at one —
+     * in any stored session, archived tasks included, and in the live queue — now says "File not found", so
+     * nothing keeps offering a file that is not there. Sessions are rewritten without touching `updatedAt` /
+     * `lastUsedAt`. Resolves once that is on disk.
+     */
+    async markTempFilesDeleted(stems: ReadonlySet<string>): Promise<void> {
+        if (stems.size === 0) return;
+        this.flushPending();
+        // `stems` are the downloads a clean-up went through. Whether a source's file is really gone is read from
+        // the disk, not assumed: a leftover that could not be deleted must not leave the download looking
+        // deleted, and a file that did go must not be left looking present.
+        const isGone = (filePath: string): boolean => {
+            const stem = tempFileStem(filePath);
+            return stem !== null && stems.has(stem) && fileIsGone(filePath);
+        };
+
+        const sessionsChanged = this.store.updateSessions((session) => {
+            const tasks = session.tasks.map((task) => markMissingInSnapshot(task, isGone));
+            const archived = session.archived?.map((entry) => {
+                const task = markMissingInSnapshot(entry.task, isGone);
+                return task === entry.task ? entry : { ...entry, task };
+            });
+            const tasksChanged = tasks.some((task, i) => task !== session.tasks[i]);
+            const archivedChanged = archived?.some((entry, i) => entry !== session.archived?.[i]) ?? false;
+            if (!tasksChanged && !archivedChanged) return session;
+            return { ...session, tasks, ...(archived ? { archived } : {}) };
+        });
+
+        let tasksChanged = 0;
+        const liveTasks = TaskOrchestrator.getInstance().getTasks() as unknown as Task<MusicDownloadTaskAttributes>[];
+        for (const task of liveTasks) {
+            const attributes = task.getAttributes();
+            if (!attributes) continue;
+            const marked = markMissingInAttributes(attributes, isGone);
+            if (marked === attributes) continue;
+            task.updateAttributes(marked);
+            tasksChanged++;
+        }
+        globalLogger.info(
+            `Temporary downloads deleted: ${sessionsChanged} stored session(s) and ${tasksChanged} open task(s) updated`
+        );
+        await this.store.flush();
     }
 
     getCurrentSessionId(): string | null {

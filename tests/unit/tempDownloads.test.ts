@@ -1,17 +1,20 @@
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, describe, expect, test } from "vitest";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { deleteTempFiles, isAppTempFile, planTempClear } from "#flows/musicDownloadFlow/utils/tempDownloads";
-import type { ClearTempRequest } from "#base/bridges/clearTempConfirmBridge";
+import {
+    checkTempFolder,
+    deleteTempGroups,
+    isAppTempFile,
+    scanTempGroups,
+    tempFileStem,
+} from "#flows/musicDownloadFlow/utils/tempDownloads";
 
 // "Clear temporary downloads" used to `rmSync(<configured folder>, { recursive: true })` with no confirmation, so a
-// temp folder pointed at the music library wiped it. These tests pin the safe behaviour. Everything happens inside
-// throw-away folders under the OS temp dir; GOBLIN_DATA_DIR is set before anything that resolves #constants loads.
-const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "goblin-temp-test-data-"));
-process.env.GOBLIN_DATA_DIR = dataDir;
-
-const roots: string[] = [dataDir];
+// temp folder pointed at the music library wiped it. These tests pin the safe behaviour of the folder layer: what
+// counts as one of the app's files, which folders are refused, and that only the app's files are ever listed or
+// deleted. Everything happens inside throw-away folders under the OS temp dir.
+const roots: string[] = [];
 function makeDir(prefix: string): string {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
     roots.push(dir);
@@ -19,7 +22,8 @@ function makeDir(prefix: string): string {
 }
 
 const UUID = "bc77579f-0b13-4cf9-9787-7a78ef8d15d6";
-const tempName = (label = "YtDlp", ext = "flac") => `${label} YOUTUBE-TRACK-dlR8aLEeAr8 ${UUID}.${ext}`;
+const OTHER_UUID = "11111111-2222-3333-4444-555555555555";
+const tempName = (label = "YtDlp", ext = "flac", uuid = UUID) => `${label} YOUTUBE-TRACK-dlR8aLEeAr8 ${uuid}.${ext}`;
 const write = (dir: string, name: string) => fs.writeFileSync(path.join(dir, name), "x");
 
 afterAll(() => {
@@ -43,32 +47,54 @@ describe("isAppTempFile", () => {
     });
 });
 
-describe("planTempClear", () => {
+describe("tempFileStem", () => {
+    test("a download and its leftovers share one stem, whatever the extension", () => {
+        const stem = tempFileStem(tempName());
+        expect(stem).toBe(`ytdlp youtube-track-dlr8aleear8 ${UUID}`);
+        expect(tempFileStem(tempName("YtDlp", "webm"))).toBe(stem);
+        expect(tempFileStem(`YtDlp YOUTUBE-TRACK-dlR8aLEeAr8 ${UUID}.f251.webm.part`)).toBe(stem);
+        expect(tempFileStem(tempName("YtDlp", "flac", OTHER_UUID))).not.toBe(stem);
+    });
+
+    test("works on a full path (either separator) and ignores case", () => {
+        const name = tempName();
+        expect(tempFileStem(path.join("C:", "tmp", name))).toBe(tempFileStem(name));
+        expect(tempFileStem(`/home/me/tmp/${name}`)).toBe(tempFileStem(name));
+        expect(tempFileStem(name.toUpperCase())).toBe(tempFileStem(name));
+    });
+
+    test("is null for anything that is not the app's", () => {
+        expect(tempFileStem("my-favourite-song.flac")).toBeNull();
+        expect(tempFileStem(path.join(os.homedir(), "Music", "Daft Punk - Technologic.flac"))).toBeNull();
+    });
+});
+
+describe("checkTempFolder", () => {
     test("refuses an empty, relative or root folder", () => {
-        expect(planTempClear("", [])).toMatchObject({ ok: false });
-        expect(planTempClear("   ", [])).toMatchObject({ ok: false });
-        expect(planTempClear("tmp", [])).toMatchObject({ ok: false });
-        expect(planTempClear(path.parse(os.tmpdir()).root, [])).toMatchObject({ ok: false });
+        expect(checkTempFolder("", [])).toMatchObject({ ok: false });
+        expect(checkTempFolder("   ", [])).toMatchObject({ ok: false });
+        expect(checkTempFolder("tmp", [])).toMatchObject({ ok: false });
+        expect(checkTempFolder(path.parse(os.tmpdir()).root, [])).toMatchObject({ ok: false });
     });
 
     test("refuses a temp folder that is the output folder", () => {
         const library = makeDir("goblin-temp-test-lib-");
-        write(library, tempName());
-        const plan = planTempClear(library, [{ label: "output folder", path: library }]);
-        expect(plan).toMatchObject({ ok: false });
-        expect(!plan.ok && plan.reason).toMatch(/output folder/);
-        expect(fs.existsSync(path.join(library, tempName()))).toBe(true);
+        const check = checkTempFolder(library, [{ label: "output folder", path: library }]);
+        expect(check).toMatchObject({ ok: false });
+        expect(!check.ok && check.reason).toMatch(/output folder/);
     });
 
     test("refuses a temp folder that contains the output folder or the home folder", () => {
         const parent = makeDir("goblin-temp-test-parent-");
         const library = path.join(parent, "Music");
         fs.mkdirSync(library);
-        expect(planTempClear(parent, [{ label: "output folder", path: library }])).toMatchObject({ ok: false });
-        expect(planTempClear(path.dirname(os.homedir()), [{ label: "home folder", path: os.homedir() }])).toMatchObject({
+        expect(checkTempFolder(parent, [{ label: "output folder", path: library }])).toMatchObject({ ok: false });
+        expect(
+            checkTempFolder(path.dirname(os.homedir()), [{ label: "home folder", path: os.homedir() }])
+        ).toMatchObject({ ok: false });
+        expect(checkTempFolder(os.homedir(), [{ label: "home folder", path: os.homedir() }])).toMatchObject({
             ok: false,
         });
-        expect(planTempClear(os.homedir(), [{ label: "home folder", path: os.homedir() }])).toMatchObject({ ok: false });
     });
 
     test("does not mistake a sibling with the same prefix for a protected folder", () => {
@@ -77,141 +103,66 @@ describe("planTempClear", () => {
         const sibling = path.join(base, "lib-extra");
         fs.mkdirSync(temp);
         fs.mkdirSync(sibling);
-        expect(planTempClear(temp, [{ label: "output folder", path: sibling }])).toMatchObject({ ok: true });
+        expect(checkTempFolder(temp, [{ label: "output folder", path: sibling }])).toMatchObject({ ok: true });
     });
 
     test("allows the default layout: the temp folder is a sub-folder of the output folder", () => {
         const library = makeDir("goblin-temp-test-lib-");
         const temp = path.join(library, "tmp");
         fs.mkdirSync(temp);
-        write(temp, tempName());
-        const plan = planTempClear(temp, [{ label: "output folder", path: library }]);
-        expect(plan).toMatchObject({ ok: true });
-        expect(plan.ok && plan.files).toHaveLength(1);
+        expect(checkTempFolder(temp, [{ label: "output folder", path: library }])).toMatchObject({ ok: true });
     });
+});
 
-    test("lists only the app's own temp files, never foreign files or sub-folders", () => {
+describe("scanTempGroups", () => {
+    test("lists only the app's own temp files, never foreign files or sub-folders", async () => {
         const temp = makeDir("goblin-temp-test-tmp-");
         write(temp, tempName());
         write(temp, tempName("Soulseek", "mp3"));
         write(temp, "my-favourite-song.flac");
         fs.mkdirSync(path.join(temp, "Some Album"));
         write(path.join(temp, "Some Album"), tempName());
-        const plan = planTempClear(temp, []);
-        expect(plan.ok && plan.files.map((f) => path.basename(f.path)).sort()).toEqual(
-            [tempName(), tempName("Soulseek", "mp3")].sort()
-        );
+        const groups = await scanTempGroups(temp);
+        const names = groups.flatMap((g) => g.files.map((f) => path.basename(f.path))).sort();
+        expect(names).toEqual([tempName(), tempName("Soulseek", "mp3")].sort());
     });
 
-    test("a folder that does not exist yet has nothing to clear", () => {
+    test("groups a download with its leftovers, summing sizes and keeping the newest write time", async () => {
+        const temp = makeDir("goblin-temp-test-group-");
+        write(temp, tempName());
+        write(temp, `YtDlp YOUTUBE-TRACK-dlR8aLEeAr8 ${UUID}.f251.webm.part`);
+        write(temp, tempName("YtDlp", "flac", OTHER_UUID));
+        const old = new Date(Date.now() - 3 * 24 * 3600 * 1000);
+        fs.utimesSync(path.join(temp, tempName()), old, old);
+
+        const groups = await scanTempGroups(temp);
+        expect(groups).toHaveLength(2);
+        const pair = groups.find((g) => g.files.length === 2)!;
+        expect(pair.bytes).toBe(2);
+        // The leftover was just written: the group as a whole is "recent".
+        expect(Date.now() - pair.mtimeMs).toBeLessThan(60_000);
+    });
+
+    test("a folder that does not exist yet has nothing in it", async () => {
         const temp = path.join(makeDir("goblin-temp-test-none-"), "not-created");
-        expect(planTempClear(temp, [])).toEqual({ ok: true, dir: temp, files: [] });
+        expect(await scanTempGroups(temp)).toEqual([]);
     });
 });
 
-describe("deleteTempFiles", () => {
-    test("removes the planned files and leaves everything else, folder included", () => {
+describe("deleteTempGroups", () => {
+    test("removes the groups' files and leaves everything else, folder included", async () => {
         const temp = makeDir("goblin-temp-test-del-");
         write(temp, tempName());
+        write(temp, `YtDlp YOUTUBE-TRACK-dlR8aLEeAr8 ${UUID}.f251.webm.part`);
         write(temp, "keep-me.flac");
-        const plan = planTempClear(temp, []);
-        if (!plan.ok) throw new Error("plan refused");
-        expect(deleteTempFiles(plan)).toMatchObject({ removed: 1, failed: 0 });
+        const groups = await scanTempGroups(temp);
+        const progress: Array<[number, number]> = [];
+
+        const result = await deleteTempGroups(groups, (done, total) => progress.push([done, total]));
+
+        expect(result).toMatchObject({ removedFiles: 2, failedFiles: 0 });
+        expect(result.removedStems).toEqual(new Set([tempFileStem(tempName())]));
+        expect(progress).toEqual([[1, 1]]);
         expect(fs.readdirSync(temp)).toEqual(["keep-me.flac"]);
-    });
-});
-
-describe("clearTempDownloads (settings action)", () => {
-    type Mods = {
-        clear: typeof import("#flows/musicDownloadFlow/saveSettings").clearTempDownloads;
-        bridge: typeof import("#base/bridges/clearTempConfirmBridge").clearTempConfirmBridge;
-        settings: import("#settings/settingsStore").SettingsStore;
-    };
-    let m: Mods;
-
-    beforeAll(async () => {
-        m = {
-            clear: (await import("#flows/musicDownloadFlow/saveSettings")).clearTempDownloads,
-            bridge: (await import("#base/bridges/clearTempConfirmBridge")).clearTempConfirmBridge,
-            settings: (await import("#settings/settingsStore")).SettingsStore.getInstance(),
-        };
-    });
-    afterEach(() => m.bridge.setOpener(null));
-
-    function configure(outputDir: string, tempDir: string) {
-        m.settings.writeMusicSettings({ download: { outputDir, outputTemporaryDir: tempDir } });
-    }
-    function answer(choice: "proceed" | "cancel") {
-        const seen: ClearTempRequest[] = [];
-        m.bridge.setOpener((req) => {
-            seen.push(req);
-            if (req.kind === "confirm") (choice === "proceed" ? req.proceed : req.cancel)();
-            else req.close();
-        });
-        return seen;
-    }
-
-    test("deletes only the app's temp files after the user confirms", async () => {
-        const output = makeDir("goblin-temp-test-out-");
-        const temp = path.join(output, "tmp");
-        fs.mkdirSync(temp);
-        write(temp, tempName());
-        write(temp, "someone-elses.flac");
-        configure(output, temp);
-        const seen = answer("proceed");
-
-        expect(await m.clear()).toBe("cleared");
-        expect(seen).toHaveLength(1);
-        expect(seen[0]).toMatchObject({ kind: "confirm", fileCount: 1 });
-        expect(fs.readdirSync(temp)).toEqual(["someone-elses.flac"]);
-    });
-
-    test("deletes nothing when the user says no", async () => {
-        const output = makeDir("goblin-temp-test-out-");
-        const temp = path.join(output, "tmp");
-        fs.mkdirSync(temp);
-        write(temp, tempName());
-        configure(output, temp);
-        answer("cancel");
-
-        expect(await m.clear()).toBe("cancelled");
-        expect(fs.existsSync(path.join(temp, tempName()))).toBe(true);
-    });
-
-    test("deletes nothing when no UI is there to ask", async () => {
-        const output = makeDir("goblin-temp-test-out-");
-        const temp = path.join(output, "tmp");
-        fs.mkdirSync(temp);
-        write(temp, tempName());
-        configure(output, temp);
-
-        expect(await m.clear()).toBe("cancelled");
-        expect(fs.existsSync(path.join(temp, tempName()))).toBe(true);
-    });
-
-    test("refuses, explains and keeps the library when the temp folder is the output folder", async () => {
-        const library = makeDir("goblin-temp-test-lib-");
-        write(library, "my-favourite-song.flac");
-        write(library, tempName());
-        fs.mkdirSync(path.join(library, "Some Album"));
-        write(path.join(library, "Some Album"), "01 track.flac");
-        configure(library, library);
-        const seen = answer("proceed");
-
-        expect(await m.clear()).toBe("refused");
-        expect(seen).toHaveLength(1);
-        expect(seen[0]).toMatchObject({ kind: "refused" });
-        expect(fs.readdirSync(library).sort()).toEqual(["Some Album", "my-favourite-song.flac", tempName()].sort());
-    });
-
-    test("reports when there is nothing to clear", async () => {
-        const output = makeDir("goblin-temp-test-out-");
-        const temp = path.join(output, "tmp");
-        fs.mkdirSync(temp);
-        configure(output, temp);
-        const seen = answer("proceed");
-
-        expect(await m.clear()).toBe("nothing");
-        expect(seen).toHaveLength(0);
     });
 });
