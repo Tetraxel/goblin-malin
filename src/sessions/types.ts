@@ -24,7 +24,8 @@ export interface StoredSession {
 }
 
 export interface SessionsFile {
-    version: 1;
+    /** File-format version; see `SESSIONS_FILE_VERSION` in `sessionStore.ts`. */
+    version: number;
     lastSessionId: string | null;
     sessions: StoredSession[];
 }

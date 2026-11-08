@@ -1,12 +1,11 @@
 # TODO
 
 > State of 2026-11-08 (`main` after the `DL-01` fix, working towards **v0.2.0**).
-> IDs like `DL-01` or `DATA-02` point to [AUDIT-v0.2.0.md](AUDIT-v0.2.0.md), which has the evidence and the suggested fix for each.
+> IDs like `DL-01` or `DATA-04` point to [AUDIT-v0.2.0.md](AUDIT-v0.2.0.md), which has the evidence and the suggested fix for each.
 > Per-project roadmap: [docs/projects/](docs/projects/README.md) (`P24`, `P25`… below).
 
 ## 🔴 Release blockers (v0.2.0)
 
-- [ ] **Protect the user's data files** — `sessions.json` / `settings.json`: validate the shape, strip a BOM, move a damaged file aside (`*.corrupt-<date>`) instead of overwriting it, keep a rolling `.bak`, add a `version` + migration step before the data model changes — `DATA-02`, `DATA-03`
 - [ ] **Stop persisting `general.appDataDir`** — `cache/`, `bin/` and `app.log` follow a stale saved path instead of the live data folder — `DATA-04`
 - [ ] **Release 0.2.0** — bump `package.json` to `0.2.0`, rehearse with a `dry_run` of `release.yml`, then tag `v0.2.0` — `REL-02` (the pipeline itself is fixed; only action SHA-pinning is left, `REL-03`)
 - [ ] **Match confidence ignores non-Latin letters** (two different Japanese/Russian songs score as an exact match) — Unicode-aware normalisation, empty ≠ equal — `MD-01`

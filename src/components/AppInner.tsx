@@ -29,6 +29,7 @@ import { collectionHintBridge, CollectionHintRequest } from "#base/bridges/colle
 import { overwriteConfirmBridge, OverwriteConfirmRequest } from "#base/bridges/overwriteConfirmBridge";
 import { clearTempConfirmBridge, ClearTempRequest } from "#base/bridges/clearTempConfirmBridge";
 import { binaryAlertBridge, BinaryAlertRequest } from "#base/bridges/binaryAlertBridge";
+import { dataFileNoticeBridge, DataFileNotice } from "#base/bridges/dataFileNoticeBridge";
 import { formatBytes } from "./SecondaryPanel/DownloadPanel/utils";
 import { ConfirmModal } from "./ConfirmModal/ConfirmModal";
 import { ClosingModal } from "./ClosingModal/ClosingModal";
@@ -177,6 +178,21 @@ Check your internet connection, then try again.`,
         [openConfirmModalWhenFree, theme]
     );
 
+    // Bridge: tell the user a data file (sessions, settings) was damaged, repaired or set aside. These are raised
+    // while the app boots, so the bridge holds them until this handler is attached.
+    const handleDataFileNotice = useCallback(
+        (notice: DataFileNotice) => {
+            openConfirmModalWhenFree({
+                title: notice.title,
+                message: notice.message,
+                choices: [{ label: "OK", color: theme.action.primary }],
+                accentColor: theme.status.warning,
+                onConfirm: () => {},
+            });
+        },
+        [openConfirmModalWhenFree, theme]
+    );
+
     // Bridge: let plain-TS task actions open the start-options modal.
     useEffect(() => {
         startOptionsBridge.setOpener(openStartFlow);
@@ -213,6 +229,11 @@ Check your internet connection, then try again.`,
         binaryAlertBridge.setOpener(handleBinaryAlert);
         return () => binaryAlertBridge.setOpener(null);
     }, [handleBinaryAlert]);
+
+    useEffect(() => {
+        dataFileNoticeBridge.setOpener(handleDataFileNotice);
+        return () => dataFileNoticeBridge.setOpener(null);
+    }, [handleDataFileNotice]);
 
     return (
         <ImportActionsProvider openImportFlow={openImportFlow}>

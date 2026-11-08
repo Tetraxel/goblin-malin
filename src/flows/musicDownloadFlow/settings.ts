@@ -113,5 +113,8 @@ export function getMusicSettings(): MusicDownloadFlowSettings {
 }
 
 export function saveMusicSettings(settings: Record<string, unknown>): void {
-    SettingsStore.getInstance().writeMusicSettings(settings);
+    SettingsStore.getInstance().writeMusicSettings(
+        settings,
+        computeDefaultMusicSettings() as unknown as Record<string, unknown>
+    );
 }
