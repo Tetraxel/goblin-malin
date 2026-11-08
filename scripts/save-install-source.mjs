@@ -26,15 +26,28 @@ function getAppDataDir() {
     }
 }
 
-const configDir = getAppDataDir();
-mkdirSync(configDir, { recursive: true });
-writeFileSync(
-    join(configDir, "install.json"),
-    JSON.stringify({ installer: detectInstaller(), installedAt: new Date().toISOString() })
-);
-
-// Run compat patch only in dev (script won't exist in published package)
+// The compat patch script only exists in a dev checkout (it is not part of the published package).
 const patchScript = join(__dirname, "patch-pkg-compat.mjs");
-if (existsSync(patchScript)) {
+const isDevCheckout = existsSync(patchScript);
+
+// Remembering which package manager installed us is a nicety for the updater, never a reason to fail an
+// install: an unwritable home (Docker, CI, restricted accounts, sudo) must not abort `npm i -g goblin-malin`.
+// Dev checkouts skip it — a `yarn install` in the repo would otherwise overwrite the install.json of the
+// user's real, globally installed copy.
+if (!isDevCheckout) {
+    try {
+        const configDir = getAppDataDir();
+        mkdirSync(configDir, { recursive: true });
+        writeFileSync(
+            join(configDir, "install.json"),
+            JSON.stringify({ installer: detectInstaller(), installedAt: new Date().toISOString() })
+        );
+    } catch (error) {
+        console.warn(`goblin-malin: could not save the install source (${error instanceof Error ? error.message : error}).`);
+    }
+}
+
+// Run compat patch only in dev
+if (isDevCheckout) {
     execFileSync(process.execPath, [patchScript], { stdio: "inherit" });
 }

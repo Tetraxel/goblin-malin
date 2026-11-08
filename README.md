@@ -23,7 +23,7 @@ A keyboard-driven terminal UI for downloading and tagging music tracks with meta
 
 ### Installation with `npm` (RECOMMENDED)
 
-1. Install [Node.js](https://nodejs.org/en/download) with `npm`
+1. Install [Node.js](https://nodejs.org/en/download) **22 or newer** with `npm`
 2. Install with `npm`
     ```bash
     npm install -g goblin-malin
@@ -101,7 +101,7 @@ brew install mpv
 You can run the project as a developer:
 
 1. Clone the repository and open a terminal in the project directory
-2. Install [Node.js](https://nodejs.org/en/download) and [yarn](https://classic.yarnpkg.com/lang/en/docs/install)
+2. Install [Node.js](https://nodejs.org/en/download) (22 or newer) and [yarn](https://classic.yarnpkg.com/lang/en/docs/install)
 3. Install dependencies in the project directory: `yarn install`
 4. Run the application: `yarn run dev`
 
