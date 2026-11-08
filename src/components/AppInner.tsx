@@ -28,6 +28,7 @@ import { consentBridge, ConsentRequest } from "#base/bridges/consentBridge";
 import { collectionHintBridge, CollectionHintRequest } from "#base/bridges/collectionHintBridge";
 import { overwriteConfirmBridge, OverwriteConfirmRequest } from "#base/bridges/overwriteConfirmBridge";
 import { clearTempConfirmBridge, ClearTempRequest } from "#base/bridges/clearTempConfirmBridge";
+import { binaryAlertBridge, BinaryAlertRequest } from "#base/bridges/binaryAlertBridge";
 import { formatBytes } from "./SecondaryPanel/DownloadPanel/utils";
 import { ConfirmModal } from "./ConfirmModal/ConfirmModal";
 import { ClosingModal } from "./ClosingModal/ClosingModal";
@@ -42,7 +43,8 @@ export const AppInner: React.FC<{
     updateInfo: UpdateInfo | null;
 }> = ({ tasks, columns, terminalHeight, terminalWidth, updateInfo }) => {
     const theme = useTheme();
-    const { pendingConfig, openConfirmModal, handleConfirm, handleCancel } = useConfirmModal();
+    const { pendingConfig, openConfirmModal, openConfirmModalWhenFree, handleConfirm, handleCancel } =
+        useConfirmModal();
     const { pendingImport, openImportFlow, handleImportConfirm, handleImportCancel } = useImportFlow(openConfirmModal);
     const { pendingStart, openStartFlow, handleStartConfirm, handleStartCancel } = useStartFlow();
 
@@ -157,6 +159,24 @@ Replacing it cannot be undone.`,
         [openConfirmModal, theme]
     );
 
+    // Bridge: tell the user a tool (ffmpeg, yt-dlp…) could not be found or downloaded. This comes from background
+    // work at any moment, so it waits for a free dialog slot instead of replacing a dialog the user is answering.
+    const handleBinaryAlert = useCallback(
+        (req: BinaryAlertRequest) => {
+            openConfirmModalWhenFree({
+                title: `Can't set up ${req.binary}`,
+                message: `${req.reason}
+
+${req.impact}
+Check your internet connection, then try again.`,
+                choices: [{ label: "OK", color: theme.action.primary }],
+                accentColor: theme.status.error,
+                onConfirm: () => {},
+            });
+        },
+        [openConfirmModalWhenFree, theme]
+    );
+
     // Bridge: let plain-TS task actions open the start-options modal.
     useEffect(() => {
         startOptionsBridge.setOpener(openStartFlow);
@@ -188,6 +208,11 @@ Replacing it cannot be undone.`,
         consentBridge.setOpener(handleConsentRequest);
         return () => consentBridge.setOpener(null);
     }, [handleConsentRequest]);
+
+    useEffect(() => {
+        binaryAlertBridge.setOpener(handleBinaryAlert);
+        return () => binaryAlertBridge.setOpener(null);
+    }, [handleBinaryAlert]);
 
     return (
         <ImportActionsProvider openImportFlow={openImportFlow}>

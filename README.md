@@ -80,9 +80,6 @@ playback, install [`mpv`](https://mpv.io/) — it is picked up from your `PATH`:
 brew install mpv
 ```
 
-> Optional: `brew install ffmpeg` if you'd rather use a system ffmpeg than the
-> auto-downloaded one.
-
 ## Steps
 
 - Import with `Ctrl+V` URLs from compatible streaming platforms :

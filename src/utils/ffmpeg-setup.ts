@@ -1,19 +1,11 @@
 ﻿import * as fs from "fs/promises";
-import { createWriteStream } from "fs";
 import * as path from "path";
-import * as https from "https";
 import AdmZip from "adm-zip";
 import { getBinDir } from "./appPaths";
+import { getLatestWin64Build } from "./ffmpegBuilds";
+import { downloadFile, httpsGetJson } from "./http";
+import { withBinaryAlert } from "./withBinaryAlert";
 import { globalLogger } from "#base/logger/logger";
-
-interface GitHubRelease {
-    tag_name: string;
-    assets: Array<{
-        name: string;
-        browser_download_url: string;
-    }>;
-    published_at: string;
-}
 
 // Executable suffix for locally-stored binaries: ".exe" on Windows, none elsewhere.
 function binExt(): string {
@@ -28,7 +20,15 @@ function binExt(): string {
  *   binary without checking for updates — a download only happens when no binary
  *   exists at all (initialization), never just to update.
  */
-export async function ensureFfmpeg(autoDownloadBinary = true): Promise<string> {
+export function ensureFfmpeg(autoDownloadBinary = true): Promise<string> {
+    return withBinaryAlert(
+        "ffmpeg",
+        "ffmpeg converts the downloaded audio to FLAC, so downloads with yt-dlp fail until it is available.",
+        () => setUpFfmpeg(autoDownloadBinary)
+    );
+}
+
+async function setUpFfmpeg(autoDownloadBinary: boolean): Promise<string> {
     // Updates disabled: reuse an existing binary and skip the latest-version
     // check entirely. Fall through to the normal download only if none exists.
     if (!autoDownloadBinary) {
@@ -94,20 +94,24 @@ export async function ensureFfmpeg(autoDownloadBinary = true): Promise<string> {
         globalLogger.info(`Successfully downloaded ffmpeg ${source.versionId} to ${binaryPath}`);
         return binaryPath;
     } catch (error) {
+        // Say why, even when we then fall back to something usable: a failing update
+        // check used to be swallowed here, so a stale binary was never explained.
+        globalLogger.warn(`ffmpeg setup failed: ${errorMessage(error)}`);
         const existingBinary = await findExistingBinary("ffmpeg_", binExt());
         if (existingBinary) {
             globalLogger.info(`Using existing ffmpeg at ${existingBinary}`);
             return existingBinary;
         }
-        // Last resort on non-Windows: rely on a system ffmpeg from PATH (e.g.
-        // installed via `brew install ffmpeg`). ytdlp-nodejs accepts a bare
-        // command name for ffmpegPath.
-        if (process.platform !== "win32") {
-            globalLogger.warn(`ffmpeg setup failed (${error}); falling back to system ffmpeg on PATH`);
-            return "ffmpeg";
-        }
-        throw new Error("Failed to fetch latest version from GitHub and no existing binary found");
+        // Deliberately no fallback to an ffmpeg from the user's PATH: which build (and which
+        // codecs) a download ends up using must not depend on what is installed on the machine.
+        throw new Error(
+            `Could not download ffmpeg (${errorMessage(error)}) and no downloaded copy exists in ${getBinDir()}.`
+        );
     }
+}
+
+function errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
 }
 
 interface FfmpegSource {
@@ -119,7 +123,7 @@ interface FfmpegSource {
 
 /**
  * Resolve where to download ffmpeg for the current platform and how to name the
- * cached copy. Windows uses BtbN's win64 GPL build; macOS uses evermeet.cx's
+ * cached copy. Windows uses the FFmpeg-Builds win64 GPL build; macOS uses evermeet.cx's
  * static build (x86_64, which also runs on Apple Silicon via Rosetta 2).
  */
 async function resolveFfmpegSource(): Promise<FfmpegSource> {
@@ -131,13 +135,9 @@ async function resolveFfmpegSource(): Promise<FfmpegSource> {
         };
     }
 
-    const release = await getLatestFfmpegRelease();
-    return {
-        // Use published_at date to create a unique version identifier
-        versionId: new Date(release.published_at).toISOString().split("T")[0],
-        downloadUrl: `https://github.com/BtbN/FFmpeg-Builds/releases/download/${release.tag_name}/ffmpeg-master-latest-win64-gpl.zip`,
-        entrySuffix: "bin/ffmpeg.exe",
-    };
+    // The published_at date is the version identifier (it names the cached binary).
+    const build = await getLatestWin64Build("Node.js ffmpeg installer");
+    return { ...build, entrySuffix: "bin/ffmpeg.exe" };
 }
 
 /**
@@ -147,7 +147,9 @@ async function resolveFfmpegSource(): Promise<FfmpegSource> {
  */
 async function getEvermeetFfmpegVersion(): Promise<string> {
     try {
-        const info = await httpsGetJson<{ version?: string }>("https://evermeet.cx/ffmpeg/info/ffmpeg/release");
+        const info = await httpsGetJson<{ version?: string }>("https://evermeet.cx/ffmpeg/info/ffmpeg/release", {
+            userAgent: "Node.js ffmpeg installer",
+        });
         if (info.version) {
             return info.version;
         }
@@ -179,33 +181,6 @@ async function findExistingBinary(prefix: string, suffix: string): Promise<strin
     }
 }
 
-async function getLatestFfmpegRelease(): Promise<GitHubRelease> {
-    return httpsGetJson<GitHubRelease>("https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest");
-}
-
-// Fetch and JSON-parse a URL. Used for the GitHub and evermeet.cx metadata APIs.
-async function httpsGetJson<T>(url: string): Promise<T> {
-    return new Promise((resolve, reject) => {
-        https
-            .get(url, { headers: { "User-Agent": "Node.js ffmpeg installer" } }, (res) => {
-                let data = "";
-                res.on("data", (chunk) => {
-                    data += chunk;
-                });
-                res.on("end", () => {
-                    try {
-                        resolve(JSON.parse(data) as T);
-                    } catch (error) {
-                        reject(new Error(`Failed to parse response from ${url}: ${error}`));
-                    }
-                });
-            })
-            .on("error", (error) => {
-                reject(new Error(`Failed to fetch ${url}: ${error}`));
-            });
-    });
-}
-
 // Clean up old versions to avoid accumulating binaries
 async function cleanupOldVersions(prefix: string, currentVersion: string): Promise<void> {
     try {
@@ -221,40 +196,4 @@ async function cleanupOldVersions(prefix: string, currentVersion: string): Promi
     } catch (error) {
         globalLogger.warn(`Failed to cleanup old versions: ${error}`);
     }
-}
-
-async function downloadFile(url: string, destination: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-        https
-            .get(url, (res) => {
-                if (res.statusCode === 302 || res.statusCode === 301) {
-                    // Follow redirect
-                    if (res.headers.location) {
-                        downloadFile(res.headers.location, destination).then(resolve).catch(reject);
-                        return;
-                    }
-                }
-
-                if (res.statusCode !== 200) {
-                    reject(new Error(`Failed to download: HTTP ${res.statusCode}`));
-                    return;
-                }
-
-                const fileStream = createWriteStream(destination);
-                res.pipe(fileStream);
-
-                fileStream.on("finish", () => {
-                    fileStream.close();
-                    resolve();
-                });
-
-                fileStream.on("error", (error: Error) => {
-                    fs.unlink(destination).catch(() => {}); // Clean up partial download
-                    reject(error);
-                });
-            })
-            .on("error", (error) => {
-                reject(new Error(`Download failed: ${error}`));
-            });
-    });
 }

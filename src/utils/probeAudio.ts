@@ -29,7 +29,11 @@ let ffprobePathPromise: Promise<string> | null = null;
 
 function getFfprobePath(): Promise<string> {
     if (!ffprobePathPromise) {
-        ffprobePathPromise = ensureFfprobe();
+        // A failed setup is not remembered: once the network is back the next probe tries again.
+        ffprobePathPromise = ensureFfprobe().catch((error: unknown) => {
+            ffprobePathPromise = null;
+            throw error;
+        });
     }
     return ffprobePathPromise;
 }

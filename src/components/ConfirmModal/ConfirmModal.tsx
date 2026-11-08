@@ -123,9 +123,12 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
                     })}
                 </Box>
                 <Box marginTop={1} flexDirection="row">
-                    <Hint label="Choose" shortcutIds={["confirmModal.left", "confirmModal.right"]} />
-                    <Hint label="Confirm" shortcutId="confirmModal.confirm" />
-                    <Hint label="Cancel" shortcutId="confirmModal.cancel" />
+                    {/* A notice has one button: nothing to choose between, and Esc just closes it. */}
+                    {choiceCount > 1 && (
+                        <Hint label="Choose" shortcutIds={["confirmModal.left", "confirmModal.right"]} />
+                    )}
+                    <Hint label={choiceCount > 1 ? "Confirm" : "OK"} shortcutId="confirmModal.confirm" />
+                    <Hint label={choiceCount > 1 ? "Cancel" : "Close"} shortcutId="confirmModal.cancel" />
                 </Box>
             </Box>
         </Box>

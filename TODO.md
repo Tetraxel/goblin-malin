@@ -1,12 +1,11 @@
 # TODO
 
-> State of 2026-11-08 (`main` @ `4db1d64`, working towards **v0.2.0**).
+> State of 2026-11-08 (`main` after the `DL-01` fix, working towards **v0.2.0**).
 > IDs like `DL-01` or `DATA-02` point to [AUDIT-v0.2.0.md](AUDIT-v0.2.0.md), which has the evidence and the suggested fix for each.
 > Per-project roadmap: [docs/projects/](docs/projects/README.md) (`P24`, `P25`… below).
 
 ## 🔴 Release blockers (v0.2.0)
 
-- [ ] **ffmpeg / ffprobe download is broken for fresh installs** — GitHub moved BtbN/FFmpeg-Builds (`301`) and the app doesn't follow it: follow redirects, new repo/URL, `PATH` fallback on Windows, show the real error — `DL-01`
 - [ ] **Protect the user's data files** — `sessions.json` / `settings.json`: validate the shape, strip a BOM, move a damaged file aside (`*.corrupt-<date>`) instead of overwriting it, keep a rolling `.bak`, add a `version` + migration step before the data model changes — `DATA-02`, `DATA-03`
 - [ ] **Stop persisting `general.appDataDir`** — `cache/`, `bin/` and `app.log` follow a stale saved path instead of the live data folder — `DATA-04`
 - [ ] **Release pipeline** — make `release.yml` depend on CI, use `--frozen-lockfile` (today's `--immutable` does nothing on Yarn 1), check tag == `package.json` version, publish to npm before/independently of the exe; then bump to `0.2.0` — `REL-03`, `REL-02`
@@ -45,6 +44,8 @@
 - [ ] Dependencies: `axios`/`ws` resolutions, `adm-zip` 0.6.x, minor bumps — `DEP-02`, `DEP-03`
 - [ ] Type-check and lint `tests/` and `scripts/`, hermetic e2e tests (fixtures with their own `appDataDir`), unit tests green on Linux CI, then enable them there — `TEST-01`, `TEST-02`
 - [ ] Remaining `REL-03` / `REL-07` leftovers: `patch-pkg-compat.mjs`, undeclared `esbuild` in `scripts/`, drop `emitDecoratorMetadata`
+- [ ] **Linux has no working ffmpeg/ffprobe download** — `resolveFfmpegSource` has a macOS branch and treats everything else as Windows (fetches the win64 zip); check, and either add a Linux build or state Linux is unsupported
+- [ ] Tool downloads, follow-ups to `DL-01`: move `mpv-setup.ts` onto `#utils/http` (it still has its own helpers with no status check or timeout; it also falls back to a PATH `mpv` on purpose, and raises no alert since it is optional), SHA256-verify the downloaded binaries, and stop ffmpeg and ffprobe each fetching the same ~200 MB archive on a first run
 
 ## 🟣 Promised by the former `README-TARGET` but not built yet
 
@@ -76,4 +77,6 @@ Decide per release whether each is wanted.
 - [x] Handle Spotify albums and playlists as input (and YouTube playlists), with live refresh
 - [x] Copy / edit cell values
 - [x] Button to rerun a task without the cache (Restart / Re-fetch / Re-discover bypass it)
-- [x] Audit quick wins (uncommitted until you commit them): `yarn build` fixed (`REL-01`), CI added, `engines` Node ≥ 22, `postinstall` can't fail an install, dead dependencies removed, "Clear temporary downloads" made safe and confirmed (`DATA-01`), `.env.example` and doc links fixed, dotenv banner silenced
+- [x] Audit quick wins: `yarn build` fixed (`REL-01`), CI added, `engines` Node ≥ 22, `postinstall` can't fail an install, dead dependencies removed, "Clear temporary downloads" made safe and confirmed (`DATA-01`), `.env.example` and doc links fixed, dotenv banner silenced
+- [x] **ffmpeg / ffprobe download works on a fresh install again** — redirects are followed (GitHub moved BtbN/FFmpeg-Builds → `FFmpeg-Builds/FFmpeg-Builds`) and a failed download now says why. Deliberately no fallback to a system `ffmpeg` on `PATH`, so behaviour doesn't depend on the user's machine — `DL-01`
+- [x] **Alert when a tool (yt-dlp, ffmpeg, ffprobe) can't be found or downloaded** — a dialog with the cause and what stops working, once per tool until it next works (`binaryAlertBridge`, `withBinaryAlert`); yt-dlp's setup no longer swallows its cause

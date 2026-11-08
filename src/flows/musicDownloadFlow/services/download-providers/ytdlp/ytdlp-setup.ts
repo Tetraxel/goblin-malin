@@ -1,17 +1,9 @@
 ﻿import * as fs from "fs/promises";
-import { createWriteStream } from "fs";
 import * as path from "path";
-import * as https from "https";
 import { getBinDir } from "#utils/appPaths";
+import { downloadFile, httpsGetJson } from "#utils/http";
+import { withBinaryAlert } from "#utils/withBinaryAlert";
 import { globalLogger } from "#base/logger/logger";
-
-interface GitHubRelease {
-    tag_name: string;
-    assets: Array<{
-        name: string;
-        browser_download_url: string;
-    }>;
-}
 
 // Executable suffix for locally-stored binaries: ".exe" on Windows, none elsewhere.
 function binExt(): string {
@@ -39,7 +31,15 @@ function ytDlpAssetName(): string {
  *   binary without checking for updates — a download only happens when no binary
  *   exists at all (initialization), never just to update.
  */
-export async function ensureYtDlpSetup(autoDownloadBinary = true): Promise<string> {
+export function ensureYtDlpSetup(autoDownloadBinary = true): Promise<string> {
+    return withBinaryAlert(
+        "yt-dlp",
+        "yt-dlp fetches the audio from YouTube, so downloads from it fail until it is available.",
+        () => setUpYtDlp(autoDownloadBinary)
+    );
+}
+
+async function setUpYtDlp(autoDownloadBinary: boolean): Promise<string> {
     // Updates disabled: reuse an existing binary and skip the latest-version
     // check entirely. Fall through to the normal download only if none exists.
     if (!autoDownloadBinary) {
@@ -52,20 +52,8 @@ export async function ensureYtDlpSetup(autoDownloadBinary = true): Promise<strin
     }
 
     try {
-        let latestVersion: string | null = null;
-
-        // Try to get the latest version from GitHub
-        try {
-            latestVersion = await getLatestYtDlpVersion();
-        } catch (error) {
-            globalLogger.warn(`Failed to fetch latest yt-dlp version: ${error}`);
-            globalLogger.info("Attempting to use existing binary…");
-        }
-
-        // If GitHub API failed, try to find existing binary
-        if (!latestVersion) {
-            throw new Error("yt-dlp release not found");
-        }
+        // A failure here is handled by the catch below, which falls back to a binary downloaded earlier.
+        const latestVersion = await getLatestYtDlpVersion();
 
         const binaryName = `yt-dlp_${latestVersion}${binExt()}`;
         const binaryPath = path.join(getBinDir(), binaryName);
@@ -96,13 +84,16 @@ export async function ensureYtDlpSetup(autoDownloadBinary = true): Promise<strin
 
         globalLogger.info(`Successfully downloaded yt-dlp ${latestVersion} to ${binaryPath}`);
         return binaryPath;
-    } catch {
+    } catch (error) {
+        const cause = error instanceof Error ? error.message : String(error);
+        // Say why, even when we then fall back to an older copy: this used to be swallowed without a trace.
+        globalLogger.warn(`yt-dlp setup failed: ${cause}`);
         const existingBinary = await findExistingBinary("yt-dlp_", binExt());
         if (existingBinary) {
             globalLogger.info(`Using existing yt-dlp at ${existingBinary}`);
             return existingBinary;
         }
-        throw new Error("Failed to fetch latest version from GitHub and no existing binary found");
+        throw new Error(`Could not download yt-dlp (${cause}) and no downloaded copy exists in ${getBinDir()}.`);
     }
 }
 
@@ -129,36 +120,12 @@ async function findExistingBinary(prefix: string, suffix: string): Promise<strin
 }
 
 async function getLatestYtDlpVersion(): Promise<string> {
-    return new Promise((resolve, reject) => {
-        https
-            .get(
-                "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
-                {
-                    headers: {
-                        "User-Agent": "Node.js yt-dlp installer",
-                    },
-                },
-                (res) => {
-                    let data = "";
-
-                    res.on("data", (chunk) => {
-                        data += chunk;
-                    });
-
-                    res.on("end", () => {
-                        try {
-                            const release: GitHubRelease = JSON.parse(data);
-                            resolve(release.tag_name);
-                        } catch (error) {
-                            reject(new Error(`Failed to parse GitHub API response: ${error}`));
-                        }
-                    });
-                }
-            )
-            .on("error", (error) => {
-                reject(new Error(`Failed to fetch latest version: ${error}`));
-            });
-    });
+    const apiUrl = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest";
+    const release = await httpsGetJson<{ tag_name?: string }>(apiUrl, { userAgent: "Node.js yt-dlp installer" });
+    if (!release.tag_name) {
+        throw new Error(`Unexpected release metadata from ${apiUrl} (no tag_name)`);
+    }
+    return release.tag_name;
 }
 
 // Clean up old versions to avoid accumulating binaries
@@ -176,40 +143,4 @@ async function cleanupOldVersions(prefix: string, currentVersion: string): Promi
     } catch (error) {
         globalLogger.warn(`Failed to cleanup old versions: ${error}`);
     }
-}
-
-async function downloadFile(url: string, destination: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-        https
-            .get(url, (res) => {
-                if (res.statusCode === 302 || res.statusCode === 301) {
-                    // Follow redirect
-                    if (res.headers.location) {
-                        downloadFile(res.headers.location, destination).then(resolve).catch(reject);
-                        return;
-                    }
-                }
-
-                if (res.statusCode !== 200) {
-                    reject(new Error(`Failed to download: HTTP ${res.statusCode}`));
-                    return;
-                }
-
-                const fileStream = createWriteStream(destination);
-                res.pipe(fileStream);
-
-                fileStream.on("finish", () => {
-                    fileStream.close();
-                    resolve();
-                });
-
-                fileStream.on("error", (error: Error) => {
-                    fs.unlink(destination).catch(() => {}); // Clean up partial download
-                    reject(error);
-                });
-            })
-            .on("error", (error) => {
-                reject(new Error(`Download failed: ${error}`));
-            });
-    });
 }

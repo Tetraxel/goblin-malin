@@ -15,14 +15,14 @@
 **`v0.2.0` cannot be shipped as the repository stands today.** Two independent blockers were reproduced:
 
 1. **`yarn build` fails at HEAD** (three independent causes) → no `dist/`, so `npm publish`, the Windows `.exe` and the release workflow all fail. This is exactly why the last release attempt (`v0.1.15`) failed in CI and was never published. → [REL-01](#rel-01), [REL-02](#rel-02)
-2. **A new Windows user cannot bootstrap ffmpeg/ffprobe**: BtbN/FFmpeg-Builds moved and the app neither follows the GitHub redirect nor falls back, so every yt-dlp download fails on a fresh install. → [DL-01](#dl-01)
+2. **A new Windows user cannot bootstrap ffmpeg/ffprobe**: BtbN/FFmpeg-Builds moved and the app neither follows the GitHub redirect nor falls back, so every yt-dlp download fails on a fresh install. → [DL-01](#dl-01) _(✅ fixed, see its Status line)_
 
 Then, in the order I would fix them:
 
 | # | ID | Sev. | One-liner |
 |---|----|------|-----------|
 | 1 | [REL-01](#rel-01) | blocker | `yarn build` fails (non-UTF-8 byte + swc/decorator type-import + d.ts global) |
-| 2 | [DL-01](#dl-01) | blocker | Fresh install cannot download ffmpeg/ffprobe (GitHub API answers `301`, never followed) |
+| 2 | [DL-01](#dl-01) | blocker | ✅ _fixed_ — Fresh install cannot download ffmpeg/ffprobe (GitHub API answers `301`, never followed) |
 | 3 | [DATA-01](#data-01) | high | "Clear temporary downloads" recursively deletes whatever folder is configured (no confirm, no guard) |
 | 4 | [DATA-02](#data-02) | high | `sessions.json`: a BOM / truncation / empty file silently wipes every session on the next write; `{}`/`null`/`[]` crash |
 | 5 | [DATA-04](#data-04) | high | Data dir is split-brained: `cache/`, `bin/`, `app.log` follow a *persisted* `settings.json` path, not the live data dir |
@@ -51,15 +51,11 @@ Then, in the order I would fix them:
 Plus 9 unconfirmed candidates in [section K](#k-candidates-to-verify-found-while-reading-not-confirmed) (not counted).
 <!-- /COUNTS-TABLE -->
 
-### Quick wins (each ≲ 1 hour) — ✅ applied in the working tree, **not committed**
+### Already fixed
 
-- ✅ Re-save `src/base/mouse/clickableWindows.ts` as UTF-8, `import { type ClaudeTrackQuery }`, fix the `globalThis` read in `src/index.tsx`, add a CI job that runs `yarn build` ([REL-01](#rel-01), [REL-03](#rel-03)).
-- ✅ `dotenv.config({ path, quiet: true })` ([PROD-02](#prod-02)); `import { type … }` + `engines: { "node": ">=22" }` ([REL-04](#rel-04)).
-- ✅ Delete `ink-picture`, `ink-big-text`, `ink-gradient`, `ink-link`, `ink-form`, `fullscreen-ink`, `chalk`, `@yao-pkg/pkg`, `@types/ink` (+4 other `@types/*` stubs), `ts-node`, `xterm`; declare `string-width` ([DEP-01](#dep-01)).
-- ✅ Fix `.env.example` variable names ([DOC-02](#doc-02)); fix the broken `TREE.ps1` link in `CLAUDE.md` ([DOC-04](#doc-04); `docs/README-TARGET.md` was deleted instead of fixed).
-- ✅ Wrap `postinstall` in `try/catch` ([REL-05](#rel-05)); make `clearTempDownloads` refuse non-owned folders and ask for confirmation ([DATA-01](#data-01)).
+The quick wins (build fix, `dotenv` banner, `engines`, unused-dependency cleanup, `.env.example`, `postinstall` guard, the `clearTempDownloads` guard) are done and committed; they are no longer listed here. The findings below keep their original text and carry a `Status` line where something was done.
 
-Verified after the changes: `yarn install --frozen-lockfile` is a no-op, `yarn type-check` and `yarn lint` clean, **191 unit tests pass** (176 + 15 new for DATA-01), `yarn build` succeeds (ESM + DTS), and the built `dist/cli.js` boots to the UI in a PTY with no module errors. `yarn audit`: 120 → **97** advisories (critical gone, high 74 → 57), 859 → 661 installed packages. The findings below keep their original text and carry a `Status` line where something was done.
+Verified after those changes: `yarn install --frozen-lockfile` is a no-op, `yarn type-check` and `yarn lint` clean, **191 unit tests pass** (176 + 15 new for DATA-01), `yarn build` succeeds (ESM + DTS), and the built `dist/cli.js` boots to the UI in a PTY with no module errors. `yarn audit`: 120 → **97** advisories (critical gone, high 74 → 57), 859 → 661 installed packages.
 
 ---
 
@@ -121,7 +117,7 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 #### REL-04 — No `engines` field although Ink 7 needs Node ≥ 22
 **medium · packaging · verified (`node_modules/ink/package.json` → `"node": ">=22"`)**
 
-> ✅ **Fixed (uncommitted):** `"engines": { "node": ">=22" }` in `package.json`; the README install steps now say Node 22 or newer. Not done: `.nvmrc`, a readable fail-fast in `cli.ts`.
+> ✅ **Fixed:** `"engines": { "node": ">=22" }` in `package.json`; the README install steps now say Node 22 or newer. Not done: `.nvmrc`, a readable fail-fast in `cli.ts`.
 
 - **Where:** `package.json`; `README.md` (never states a Node version; CI uses Node 22).
 - **What:** users on Node 18/20 get no install-time warning and an obscure runtime failure; `clipboardy`/`open`/`string-width` also need ≥ 20.
@@ -131,7 +127,7 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 #### REL-05 — The `postinstall` hook can fail the whole install and writes outside the package
 **medium · packaging · verified by reading**
 
-> ✅ **Fixed (uncommitted):** the `install.json` write is wrapped in `try/catch` (warns, exits 0) and skipped in a dev checkout, so `yarn install` in the repo no longer overwrites the real install's file. Not done: removing the hook altogether.
+> ✅ **Fixed:** the `install.json` write is wrapped in `try/catch` (warns, exits 0) and skipped in a dev checkout, so `yarn install` in the repo no longer overwrites the real install's file. Not done: removing the hook altogether.
 
 - **Where:** `package.json` (`"postinstall": "node scripts/save-install-source.mjs"`), `scripts/save-install-source.mjs`.
 - **What:** the script shipped to every consumer does `mkdirSync`/`writeFileSync` in the user's data dir with no `try/catch` — an unwritable or read-only home (Docker, CI, restricted accounts, `sudo` global installs) aborts `npm i -g goblin-malin`. It also writes a hand-maintained duplicate of the data-dir logic ("MUST reflect the paths in src/constants.ts") during **dev** `yarn install` into the developer's real app-data dir, and then runs `patch-pkg-compat.mjs` which mutates `node_modules` (see REL-07). pnpm ≥ 10 / bun skip dependency lifecycle scripts by default, so `install.json` is then never written.
@@ -161,7 +157,7 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 #### DEP-01 — Seven unused runtime dependencies (one drags in `sharp`) and one undeclared import
 **medium · deps · verified (import scan of `src/`, `scripts/`, `tests/`)**
 
-> ✅ **Fixed (uncommitted):** the 7 unused runtime dependencies, `@yao-pkg/pkg`, `ts-node`, `xterm` and the 5 `@types/*` stubs are removed and `string-width@^8.2.1` is declared. Type-check, lint, 191 unit tests, the build and a boot of `dist/cli.js` pass; 859 → 661 installed packages.
+> ✅ **Fixed:** the 7 unused runtime dependencies, `@yao-pkg/pkg`, `ts-node`, `xterm` and the 5 `@types/*` stubs are removed and `string-width@^8.2.1` is declared. Type-check, lint, 191 unit tests, the build and a boot of `dist/cli.js` pass; 859 → 661 installed packages.
 
 - **What:** `chalk`, `fullscreen-ink`, `ink-big-text`, `ink-form`, `ink-gradient`, `ink-link`, `ink-picture` are in `dependencies` but never imported (`ink-gradient` is only mentioned in a comment). `ink-picture` pulls `sharp` (native binary) and `@xmldom/xmldom`. Conversely `string-width` is imported in `FocusRow.tsx` and `Toolbar.tsx` but declared nowhere (works only through Yarn hoisting; tsup bundles it). Dead dev packages: `@types/ink`, `@types/ink-select-input`, `@types/ink-spinner`, `@types/ink-text-input`, `@types/dotenv` (deprecated stubs; the libraries ship their own types), `ts-node`, `xterm`, `@yao-pkg/pkg`.
 - **Impact:** slower/heavier installs (every end user), native `sharp` download, avoidable advisories (see DEP-02).
@@ -199,7 +195,7 @@ Removing the three dead packages (`ink-picture`, `@yao-pkg/pkg`, `@types/ink`) a
 #### DATA-01 — "Clear temporary downloads" deletes whatever folder is configured, with no confirmation and no guard
 **high · data-loss · verified (script)**
 
-> ✅ **Fixed (uncommitted):** `clearTempDownloads()` now (1) refuses when the temp folder is a drive root, or is/contains the output folder, the home folder, the app-data folder or the working directory; (2) deletes only files carrying the app's temp-file name signature (`<name> <uuid>.<ext>`, incl. yt-dlp `.part`/`.ytdl` leftovers) — never sub-folders, other files, or the folder itself; (3) asks for confirmation through a new `clearTempConfirmBridge` (default answer *Keep them*; with no UI mounted nothing is deleted) and explains a refusal in a dialog. 15 new unit tests in `tests/unit/tempDownloads.test.ts`, and the three cases were also driven in the real TUI (Settings → Clear temporary downloads): *Keep them* (the default) leaves everything, *Delete* removes only the temp file while a foreign `.flac` in the same folder survives, and temp folder == output folder shows the refusal dialog. Code: `utils/tempDownloads.ts`, `saveSettings.ts`, `AppInner.tsx`.
+> ✅ **Fixed:** `clearTempDownloads()` now (1) refuses when the temp folder is a drive root, or is/contains the output folder, the home folder, the app-data folder or the working directory; (2) deletes only files carrying the app's temp-file name signature (`<name> <uuid>.<ext>`, incl. yt-dlp `.part`/`.ytdl` leftovers) — never sub-folders, other files, or the folder itself; (3) asks for confirmation through a new `clearTempConfirmBridge` (default answer *Keep them*; with no UI mounted nothing is deleted) and explains a refusal in a dialog. 15 new unit tests in `tests/unit/tempDownloads.test.ts`, and the three cases were also driven in the real TUI (Settings → Clear temporary downloads): *Keep them* (the default) leaves everything, *Delete* removes only the temp file while a foreign `.flac` in the same folder survives, and temp folder == output folder shows the refusal dialog. Code: `utils/tempDownloads.ts`, `saveSettings.ts`, `AppInner.tsx`.
 
 - **Where:** `src/flows/musicDownloadFlow/saveSettings.ts:28-34` (`clearTempDownloads`), `src/flows/musicDownloadFlow/buildFlowSettingsItems.ts:219-238` (free-text "Temporary download directory" + the action), `src/components/SettingsModal/SettingsModal.tsx:185,375` (`item.run()` straight from Enter).
 - **What:** the action runs `fs.rmSync(getTempDownloadDir(), { recursive: true, force: true })`. The directory is a free text setting without validation and the action has no confirm dialog. If the user points it at their output folder, their Music folder, a parent of it, or any folder holding other files, one Enter deletes everything. The default (`<outputDir>/tmp`) is a sub-folder of the music output, so "same folder as output" is a natural mistake.
@@ -294,6 +290,8 @@ Removing the three dead packages (`ink-picture`, `@yao-pkg/pkg`, `@types/ink`) a
 <a id="dl-01"></a>
 #### DL-01 — A fresh install cannot bootstrap ffmpeg/ffprobe (GitHub moved the repo; the app does not follow the `301`)
 **blocker · bug · reported by the download agent, reproduced against the real functions; I re-checked the `301`s**
+
+> ✅ **Fixed:** new `src/utils/http.ts` (`httpsGetJson` / `downloadFile`: follows 301/302/303/307/308 with a 5-hop limit, refuses an https → http downgrade, requires `200`, 30 s idle timeout, errors name the URL and status, partial files are removed). `ffmpeg-setup.ts` and `ffprobe-setup.ts` use it and share `src/utils/ffmpegBuilds.ts`, which points at `FFmpeg-Builds/FFmpeg-Builds` and rejects bad release metadata with a readable message instead of `RangeError: Invalid time value`. There is deliberately **no** fallback to an `ffmpeg`/`ffprobe` from the user's `PATH` (the audit suggested one; it would make behaviour depend on what is installed on the machine): when the download fails and nothing was downloaded before, the thrown error carries the actual cause. The failed setup is logged even when an older binary is then used. **Verified live** (GitHub still answers `301` today): an empty data dir fetched a working `ffmpeg_2026-11-08.exe` and `ffprobe_2026-11-08.exe` (170 MB each, ~4 s each, both run `-version`); a simulated offline run gives `Could not download ffmpeg (Request to https://api.github.com/repos/FFmpeg-Builds/… failed: …) and no downloaded copy exists in <bin>`, even with an `ffmpeg.exe`/`ffprobe.exe` on `PATH`. Regression tests: `tests/unit/http.test.ts` (loopback server: `301` chain, loop, 404, non-JSON, timeout, truncated download) and `tests/unit/ffmpegBuilds.test.ts`. **Alert:** when yt-dlp, ffmpeg or ffprobe cannot be found or downloaded, the user now gets a dialog (`src/base/bridges/binaryAlertBridge.ts`, `src/utils/withBinaryAlert.ts`, rendered by `AppInner` through the confirm modal) with the cause and what stops working, shown once per tool until it next works; it waits for a free dialog slot instead of replacing a dialog the user is answering (`openConfirmModalWhenFree` in `useConfirmModal`). `ytdlp-setup.ts` moved onto the shared helper too (it used to swallow the error with a bare `catch {}`), and `probeAudio` no longer remembers a failed ffprobe setup for the whole session. Checked end to end in the TUI harness with a `bin` that cannot be created: two imported tracks → both rows fail, **one** dialog. **Not done:** SHA256 verification of the binaries; `mpv-setup.ts` still carries its own copies of the old helpers (optional, PATH-based by design, so no alert); ffmpeg and ffprobe each download the same ~200 MB archive on a first run.
 
 - **Where:** `src/utils/ffmpeg-setup.ts:134-141,187-207` (`getLatestFfmpegRelease`, `httpsGetJson`, `resolveFfmpegSource`), `src/utils/ffprobe-setup.ts:122-128,166-186`, caller `…/ytdlp/YtDlpService.ts:50-66`.
 - **What:** ffmpeg/ffprobe are located through `https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest`. That repository moved to the `FFmpeg-Builds` organisation, so the API answers `HTTP 301 {"message":"Moved Permanently",…}` (re-verified: `301 → https://api.github.com/repositories/292087234/releases/latest`; the download URL `…/BtbN/FFmpeg-Builds/releases/download/latest/…zip` also answers `301`). `httpsGetJson` ignores the status code and never follows redirects, so `published_at` is `undefined`, `new Date(undefined).toISOString()` throws `RangeError: Invalid time value`, the generic `catch` swallows it silently and — with no existing binary — `ensureFfmpeg` throws `Failed to fetch latest version from GitHub and no existing binary found`. On Windows there is no PATH fallback, so **every yt-dlp row fails** (yt-dlp needs ffmpeg for `-x --audio-format flac`); ffprobe fails the same way. Users who already have a binary keep working (the catch falls back to it) but silently stop updating.
@@ -468,7 +466,7 @@ Removing the three dead packages (`ink-picture`, `@yao-pkg/pkg`, `@types/ink`) a
 #### DOC-02 — `.env.example` documents the wrong Spotify variable names and omits every other setting
 **medium · docs · verified**
 
-> ✅ **Fixed (uncommitted):** `.env.example` rewritten with the real variable names (`SPOTIFY_AUTH_MODE`, `SPOTIFY_CLIENT_ID/SECRET`, `SOULSEEK_*`), the data-folder location per OS and the two process-level variables (`GOBLIN_DATA_DIR`, `GOBLIN_NO_AUDIO`).
+> ✅ **Fixed:** `.env.example` rewritten with the real variable names (`SPOTIFY_AUTH_MODE`, `SPOTIFY_CLIENT_ID/SECRET`, `SOULSEEK_*`), the data-folder location per OS and the two process-level variables (`GOBLIN_DATA_DIR`, `GOBLIN_NO_AUDIO`).
 
 - **Where:** `.env.example:2-3` vs `…/spotify/SpotifyService.ts:128-129,157-158`.
 - **What:** `.env.example` says `SPOTIFY_API_CLIENT_ID/SECRET`; the code reads `SPOTIFY_CLIENT_ID/SECRET` (+ `SPOTIFY_AUTH_MODE`). The environment variables the app really reads and that were documented nowhere are `GOBLIN_DATA_DIR`, `GOBLIN_NO_AUDIO` and `SPOTIFY_AUTH_MODE` (plus the dev-only `GOBLIN_PROFILE_OUT`/`DEV` and the harness's `GOBLIN_SLOW`). _Correction: an earlier version of this finding claimed ~25 undocumented variables including `SONGLINK_*`, `CLAUDE_*` and `MUSICBRAINZ_APP_*` — those are constants and settings in the code, not environment variables._
@@ -494,7 +492,7 @@ Removing the three dead packages (`ink-picture`, `@yao-pkg/pkg`, `@types/ink`) a
 #### DOC-05 — `TODO.md` is out of date
 **low · docs · verified**
 
-> ✅ **Fixed (uncommitted):** `TODO.md` was rewritten for the v0.2.0 scope — done items removed (sessions, Soulseek, album/playlist input, copy/edit, no-cache rerun), open items re-prioritised with pointers to this audit's IDs, and the unbuilt `README-TARGET` promises carried over.
+> ✅ **Fixed:** `TODO.md` was rewritten for the v0.2.0 scope — done items removed (sessions, Soulseek, album/playlist input, copy/edit, no-cache rerun), open items re-prioritised with pointers to this audit's IDs, and the unbuilt `README-TARGET` promises carried over.
 
 - **What:** the "Release Blocker" list contains done work ("Save the tasks into the disk as a session" — sessions exist), and "Add Soulseek download" sits in the backlog while `SoulseekService` (700 lines) is registered. `docs/projects/README.md` still labels P21–P28 "proposed" although several are implemented (collections, Soulseek, discovery).
 - **Fix:** rewrite it as the v0.2.0 scope (see PROD-01).
@@ -553,7 +551,7 @@ Removing the three dead packages (`ink-picture`, `@yao-pkg/pkg`, `@types/ink`) a
 #### PROD-02 — dotenv 17 prints a banner/tip on every start
 **low · ux · verified (observed on import)**
 
-> ✅ **Fixed (uncommitted):** `dotenv.config({ path, quiet: true })` in `src/constants.ts`.
+> ✅ **Fixed:** `dotenv.config({ path, quiet: true })` in `src/constants.ts`.
 
 - **Where:** `src/constants.ts:28` (`dotenv.config({ path })` without `quiet: true`).
 - **What:** dotenv ≥ 17 logs `◇ injected env (N) from <path> // tip: …` (a rotating promotional tip). It prints on the normal screen before the alternate screen opens, so it stays in the user's scrollback after quitting.
