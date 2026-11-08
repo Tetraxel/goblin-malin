@@ -13,10 +13,7 @@
             - [DEP-02 — `yarn audit`: 97 advisories (0 critical, 57 high, 37 moderate, 3 low); reachable runtime chains](#dep-02--yarn-audit-97-advisories-0-critical-57-high-37-moderate-3-low-reachable-runtime-chains)
             - [DEP-03 — Outdated dependencies](#dep-03--outdated-dependencies)
         - [C. Data safety, persistence \& state](#c-data-safety-persistence--state)
-            - [DATA-09 — About 460 MB of tool binaries live under `%APPDATA%` (Roaming)](#data-09--about-460-mb-of-tool-binaries-live-under-appdata-roaming)
-            - [DATA-10 — Logging is heavy and not useful: whole tasks in every record, `Error`s serialize to `{}`, file truncated at start](#data-10--logging-is-heavy-and-not-useful-whole-tasks-in-every-record-errors-serialize-to--file-truncated-at-start)
-        - [D. Download pipeline](#d-download-pipeline)
-            - [DL-01 — Tool downloads: no integrity check, duplicated helpers, one archive fetched twice](#dl-01--tool-downloads-no-integrity-check-duplicated-helpers-one-archive-fetched-twice)
+            - [❌ DATA-09 — About 460 MB of tool binaries live under `%APPDATA%` (Roaming)](#-data-09--about-460-mb-of-tool-binaries-live-under-appdata-roaming)
         - [E. Metadata \& discovery](#e-metadata--discovery)
             - [MD-03 — MusicBrainz IDs can never be written to a saved file](#md-03--musicbrainz-ids-can-never-be-written-to-a-saved-file)
             - [MD-04 — Provider-key branching in core code contradicts the extensibility rule; hardcoded Spotify market](#md-04--provider-key-branching-in-core-code-contradicts-the-extensibility-rule-hardcoded-spotify-market)
@@ -76,15 +73,14 @@ The two blockers found here — `yarn build` failing, and a fresh install unable
 | ------------------------------------------ | ------: | ----: | -----: | -----: | -----: |
 | Build, release & packaging (`REL-`)        |         |       |        |      3 |      3 |
 | Dependencies & supply chain (`DEP-`)       |         |       |      1 |      1 |      2 |
-| Data safety, persistence & state (`DATA-`) |         |       |      2 |        |      2 |
-| Download pipeline (`DL-`)                  |         |       |        |      1 |      1 |
+| Data safety, persistence & state (`DATA-`) |         |       |      1 |        |      1 |
 | Metadata & discovery (`MD-`)               |         |       |      1 |      1 |      2 |
 | UI / TUI behaviour (`UI-`)                 |         |       |        |      5 |      5 |
 | Security (`SEC-`)                          |         |       |        |      1 |      1 |
 | Tests, CI & tooling (`TEST-`)              |         |       |      2 |      3 |      5 |
 | Docs, instructions & hygiene (`DOC-`)      |         |       |      2 |      3 |      5 |
 | Product & UX (`PROD-`)                     |         |       |      3 |      1 |      4 |
-| **Total**                                  |   **0** | **0** | **11** | **19** | **30** |
+| **Total**                                  |   **0** | **0** | **10** | **18** | **28** |
 
 Plus 9 unconfirmed candidates in [section K](#k-candidates-to-verify-found-while-reading-not-confirmed) (not counted).
 
@@ -92,7 +88,7 @@ Plus 9 unconfirmed candidates in [section K](#k-candidates-to-verify-found-while
 
 ### Already fixed
 
-Removed from this file once fixed and committed (what was found, the fix and how it was checked are in the file's git history: `git log -p -- AUDIT-v0.2.0.md`): **REL-01** (`yarn build`), **REL-04** (`engines`), **REL-05** (`postinstall`), **DEP-01** (unused dependencies), **DATA-01** ("Clear temporary downloads"), **DATA-02** and **DATA-03** (`sessions.json` / `settings.json` validation, quarantine, `.bak`, versioning), **DATA-04** (the data folder is derived, never stored), **DATA-05** (visible write failures, bounded retry on close, unique temp names, one instance per data folder), **DATA-06** (self-update exits through `exitApp()`), **DATA-07** (crash/signal handlers restore the terminal and save; console patch moved to the entry points), **MD-01** (confidence normalisation keeps every script and strips only accents; empty names score 0; live/remix/karaoke/cover versions are penalised; `tests/unit/confidence.test.ts`), **MD-02** (scraped Spotify answers are never cached; "nothing found" discovery results are kept 1 day, not 90; concurrent identical calls share one request; `tests/unit/cache.test.ts` — caches written before the fix may still hold old entries until they expire or "Clear cache"), **REL-06** (no more `prepack`/`postpack`: the README carries absolute image URLs, `patch-readme.mjs` is gone), **SEC-01** (`openUrl` spawns the native opener with an argv array — no shell, http(s) only; the updater takes a program + args from `getUpdateArgv`, with the version validated as semver, and uses a shell only on Windows for the `.cmd` shims; `tests/unit/shellSafety.test.ts`), **UI-01** (a link pasted into a focused text field stays in the field; scheme-less links and `spotify:` URIs are understood), **UI-02** (`Ctrl+Q`, rebindable `global.quit`, asks first; a second press quits at once), **DOC-02** (`.env.example`), **DOC-05** (`TODO.md`), **PROD-02** (dotenv banner), **DATA-08** (temporary downloads are cleaned by how recently a session used them — manual age picker, start-up reminder, opt-in 48 h auto-clean, size row in Settings, sources marked "File not found" after a clean-up; the dead `autoDeleteTempAfter24h`, `autoSaveToOutputDir` and `autoRelocateMissingFiles` settings are gone; moving the default folder out of the Music library and deleting unselected candidates after a save are in `TODO.md`), and the ffmpeg/ffprobe bootstrap bug of **DL-01**. Findings that were only partly fixed (**REL-03**, **REL-07**, **DEP-02**, **DOC-04**, **DL-01**) keep just the part that is still open.
+Removed from this file once fixed and committed (what was found, the fix and how it was checked are in the file's git history: `git log -p -- AUDIT-v0.2.0.md`): **REL-01** (`yarn build`), **REL-04** (`engines`), **REL-05** (`postinstall`), **DEP-01** (unused dependencies), **DATA-01** ("Clear temporary downloads"), **DATA-02** and **DATA-03** (`sessions.json` / `settings.json` validation, quarantine, `.bak`, versioning), **DATA-04** (the data folder is derived, never stored), **DATA-05** (visible write failures, bounded retry on close, unique temp names, one instance per data folder), **DATA-06** (self-update exits through `exitApp()`), **DATA-07** (crash/signal handlers restore the terminal and save; console patch moved to the entry points), **MD-01** (confidence normalisation keeps every script and strips only accents; empty names score 0; live/remix/karaoke/cover versions are penalised; `tests/unit/confidence.test.ts`), **MD-02** (scraped Spotify answers are never cached; "nothing found" discovery results are kept 1 day, not 90; concurrent identical calls share one request; `tests/unit/cache.test.ts` — caches written before the fix may still hold old entries until they expire or "Clear cache"), **REL-06** (no more `prepack`/`postpack`: the README carries absolute image URLs, `patch-readme.mjs` is gone), **SEC-01** (`openUrl` spawns the native opener with an argv array — no shell, http(s) only; the updater takes a program + args from `getUpdateArgv`, with the version validated as semver, and uses a shell only on Windows for the `.cmd` shims; `tests/unit/shellSafety.test.ts`), **UI-01** (a link pasted into a focused text field stays in the field; scheme-less links and `spotify:` URIs are understood), **UI-02** (`Ctrl+Q`, rebindable `global.quit`, asks first; a second press quits at once), **DOC-02** (`.env.example`), **DOC-05** (`TODO.md`), **PROD-02** (dotenv banner), **DATA-08** (temporary downloads are cleaned by how recently a session used them — manual age picker, start-up reminder, opt-in 48 h auto-clean, size row in Settings, sources marked "File not found" after a clean-up; the dead `autoDeleteTempAfter24h`, `autoSaveToOutputDir` and `autoRelocateMissingFiles` settings are gone; moving the default folder out of the Music library and deleting unselected candidates after a save are in `TODO.md`), the ffmpeg/ffprobe bootstrap bug and then the rest of **DL-01** (yt-dlp and ffmpeg downloads are SHA-256-verified when the vendor publishes a checksum list and only warn when it can't be fetched; mpv, whose vendor publishes none, is not verified; `mpv-setup.ts` is on `#utils/http`; ffmpeg and ffprobe share one archive download), and **DATA-10** (the log file gets a task id instead of the whole task, `Error`s are serialised, and the previous session's log is kept as `app.prev.log` instead of being truncated; 10 MB cap per file). Findings that were only partly fixed (**REL-03**, **REL-07**, **DEP-02**, **DOC-04**) keep just the part that is still open.
 
 ---
 
@@ -147,7 +143,7 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 | `ytmusic-api` → `axios` 1.16.0 → follow-redirects/form-data | 24         | **runtime** | patched axios is `≥1.18/1.20`; `ytmusic-api 5.3.1` is the latest release (Feb 2026) → add a `resolutions` entry for `axios`; exploitability is low (fixed YouTube Music URLs)                                                                                                         |
 | `eslint` → js-yaml                                          | 16         | dev only    | bump                                                                                                                                                                                                                                                                                  |
 | `vitest` → vite/postcss/nanoid                              | 13         | dev only    | bump to a patched 4.x/5.x                                                                                                                                                                                                                                                             |
-| `adm-zip` 0.5.17                                            | 8          | **runtime** | used to unzip the downloaded ffmpeg/ffprobe; fixed only in `0.6.x` (outside `^0.5.17`) → deliberate bump + check `extractEntryTo` use in `ffmpeg-setup.ts`/`ffprobe-setup.ts`; archives come from fixed vendor URLs, so risk is moderate, but there is no integrity check (see DL-01) |
+| `adm-zip` 0.5.17                                            | 8          | **runtime** | used to unzip the downloaded ffmpeg/ffprobe; fixed only in `0.6.x` (outside `^0.5.17`) → deliberate bump + check `extractEntryTo` use in `ffmpeg-setup.ts`/`ffprobe-setup.ts`; archives come from fixed vendor URLs, so risk is moderate (the ffmpeg archive is SHA-256-verified against the vendor's list since DL-01) |
 | `eslint-plugin-react-hooks` → babel/browserslist/zod        | 5          | dev only    | bump                                                                                                                                                                                                                                                                                  |
 | `ink` → `ws` 8.20.0                                         | 2          | **runtime** | patched `ws ≥ 8.21` → `ink` 7.1.x or a `resolutions` pin                                                                                                                                                                                                                              |
 | `tsup`                                                      | 1          | dev only    | bump                                                                                                                                                                                                                                                                                  |
@@ -164,34 +160,15 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 
 <a id="data-09"></a>
 
-#### DATA-09 — About 460 MB of tool binaries live under `%APPDATA%` (Roaming)
+#### ❌ DATA-09 — About 460 MB of tool binaries live under `%APPDATA%` (Roaming)
+
+**❌❌❌ WON'T DO ❌❌❌** — the owner decided to keep this as is.
 
 **medium · product · verified for sizes; the Roaming consequence is likely**
 
 - **Where:** `src/constants.ts:12-19`, `src/utils/{ffmpeg,ffprobe,mpv}-setup.ts`, `…/ytdlp-setup.ts`.
 - **What:** `data/bin` on the dev machine: `ffmpeg` 163 MB + `ffprobe` 163 MB (the full GPL build ships both at full size) + `mpv` 113 MB + `yt-dlp` 23 MB, with date-stamped file names. On roaming-profile / OneDrive-redirected setups ~0.5 GB of executables gets synced; `%LOCALAPPDATA%` is the right place for binaries and caches. (The real installed-app folder `%APPDATA%/goblin-malin/bin` already holds 270 MB.)
 - **Fix:** `%LOCALAPPDATA%` / `~/Library/Caches` / `$XDG_CACHE_HOME` for `bin/` and `cache/`; consider an audio-only ffmpeg build or the system ffmpeg; document the footprint.
-
-<a id="data-10"></a>
-
-#### DATA-10 — Logging is heavy and not useful: whole tasks in every record, `Error`s serialize to `{}`, file truncated at start
-
-**medium · performance/observability · verified (live run + code)**
-
-- **Where:** `src/base/logger/logger.ts:12` (`fs.writeFileSync(logsPath, "")`), `:43` (winston `format.json()`), `:62-68` (every record gets `task`); 49 call sites of the form `logger.warn|error("…", { error })` (e.g. `env.ts`, the `unhandledRejection` handler).
-- **What:** (a) every log record produced inside a task embeds the **entire `Task` object** (`_snapshotCache`, `attributes`, `activeAbortBySourceIndex`, …): 17 of the first 21 lines of a one-track run, ≈ 2.1 KB per line on average (max 4.3 KB) for a task that has only just started. A finished task is 3–30 KB (median 3.3 KB, p90 5 KB, max 30 KB across the 130 tasks of the developer's real `sessions.json`), and the file transport always keeps DEBUG, so a 100-track batch with ~100 lines per track is tens of MB per run — all stringified synchronously on the UI thread. (b) `JSON.stringify(new Error("x"))` is `{}`: the one `warn` of the live run reads `{"details":{"error":{}}, "message":"Phase A search failed for spotify"}` — the reason is lost (the same message also pops up in the footer for any user without Spotify credentials). (c) `app.log` is truncated at every start, so the previous session's log — the one you want after a crash — is erased the moment the app restarts (a harness run truncated the developer's real `%APPDATA%/goblin-malin/app.log`).
-- **Fix:** log a task _reference_ (`taskId`, URL) instead of the object; add an error serializer (`format.errors({ stack: true })` plus a replacer that maps `Error` → `{ name, message, stack }`); rotate (`app.log` → `app.log.1`) instead of truncating; cap the file size.
-
-### D. Download pipeline
-
-<a id="dl-01"></a>
-
-#### DL-01 — Tool downloads: no integrity check, duplicated helpers, one archive fetched twice
-
-**low · hardening · follow-ups to the (fixed) ffmpeg/ffprobe bootstrap bug**
-
-- **What is still open:** (1) the downloaded binaries (ffmpeg, ffprobe, yt-dlp, mpv) are not SHA256-verified; (2) `src/utils/mpv-setup.ts` still carries its own copies of the old `httpsGetJson`/download helpers (no status check, no timeout) instead of `src/utils/http.ts` — mpv is optional and falls back to a `PATH` copy on purpose, so it raises no alert; (3) on a first run ffmpeg and ffprobe each download the same ~200 MB archive.
-- **Fix:** verify checksums where the vendor publishes them, move `mpv-setup.ts` onto `#utils/http`, and have ffmpeg and ffprobe share one download (extract both binaries from the same archive).
 
 ### E. Metadata & discovery
 
@@ -442,7 +419,7 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 
 **low · ux · verified**
 
-- **What:** (a) the first import is interrupted by **two** back-to-back consent dialogs for optional providers (Songlink, then Claude) while the row only says `Waiting for your an…` (truncated) — a new user has not heard of either; (b) with no Spotify credentials a YouTube import logs `[WARN] Phase A search failed for spotify` in the footer for every task (no explanation, see DATA-10); (c) with only YouTube + MusicBrainz available, a YouTube-origin track ends up with just title/artist/duration (no album, year, ISRC, cover) and nothing tells the user that Spotify credentials or Songlink would fill them in; (d) completed tasks keep their TAG?/DL? checkboxes ticked, and the next import + Run flipped the already-saved first row from `✅ Saved` back to `⌛ Queued` — confirm whether re-running finished tasks is intended.
+- **What:** (a) the first import is interrupted by **two** back-to-back consent dialogs for optional providers (Songlink, then Claude) while the row only says `Waiting for your an…` (truncated) — a new user has not heard of either; (b) with no Spotify credentials a YouTube import logs `[WARN] Phase A search failed for spotify` in the footer for every task (no explanation; the reason is now logged, DATA-10); (c) with only YouTube + MusicBrainz available, a YouTube-origin track ends up with just title/artist/duration (no album, year, ISRC, cover) and nothing tells the user that Spotify credentials or Songlink would fill them in; (d) completed tasks keep their TAG?/DL? checkboxes ticked, and the next import + Run flipped the already-saved first row from `✅ Saved` back to `⌛ Queued` — confirm whether re-running finished tasks is intended.
 - **Fix:** ask the optional-provider questions once, in the welcome tour/first-run, not mid-run; show a one-line "what you get with Spotify credentials" hint; untick finished tasks (or skip them) when running.
 
 ### K. Candidates to verify (found while reading, not confirmed)
@@ -489,6 +466,6 @@ The sub-agents keep their context: after 17:40 they can be resumed to finish the
 
 ## 5. Side effects of this audit
 
-- While testing the settings row (UI-04) I briefly pointed a _scratch copy's_ persisted `appDataDir` at `%APPDATA%/goblin-malin` (the owner's real installed-app folder). The harness runs then **rewrote `app.log` (truncated by the app at start, see DATA-10) and re-saved `cache/api-cache` there**. `sessions.json`, `settings.json`, `.env`, `install.json` and `bin/` were not touched (their timestamps are unchanged). This was DATA-04 in action (fixed: the data folder is no longer read from `settings.json`).
+- While testing the settings row (UI-04) I briefly pointed a _scratch copy's_ persisted `appDataDir` at `%APPDATA%/goblin-malin` (the owner's real installed-app folder). The harness runs then **rewrote `app.log` (truncated by the app at start at the time; now kept as `app.prev.log`, DATA-10) and re-saved `cache/api-cache` there**. `sessions.json`, `settings.json`, `.env`, `install.json` and `bin/` were not touched (their timestamps are unchanged). This was DATA-04 in action (fixed: the data folder is no longer read from `settings.json`).
 - Network use: one YouTube Music download (~40 MB) and one Spotify scrape plus a few MusicBrainz lookups (Songlink and Claude were declined; no credentials or cookies were used or copied — only `yt-dlp`, `ffmpeg`, `ffprobe` were copied into an isolated temp data dir).
 - My isolated scratch data dirs (`%TEMP%/gm-o`, `gm-live`, `gm-sweep`, with the copied binaries and the 39 MB test download) were deleted afterwards. The remaining scratch files (scripts, scenario JSONs, the sub-agents' partial work) live under `%TEMP%/claude/.../scratchpad`.

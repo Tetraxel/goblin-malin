@@ -24,6 +24,8 @@ describe("getLatestWin64Build", () => {
             versionId: "2026-11-08",
             downloadUrl:
                 "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
+            archiveName: "ffmpeg-master-latest-win64-gpl.zip",
+            checksumsUrl: "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/latest/checksums.sha256",
         });
     });
 

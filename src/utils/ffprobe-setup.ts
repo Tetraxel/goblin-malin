@@ -1,9 +1,10 @@
 import * as fs from "fs/promises";
 import * as path from "path";
-import AdmZip from "adm-zip";
 import { getBinDir } from "./appPaths";
+import { installFromZip } from "./binaryArchive";
 import { getLatestWin64Build } from "./ffmpegBuilds";
-import { downloadFile, httpsGetJson } from "./http";
+import { installWin64Archive, versionedBinaryName } from "./ffmpegInstall";
+import { httpsGetJson } from "./http";
 import { withBinaryAlert } from "./withBinaryAlert";
 import { globalLogger } from "#base/logger/logger";
 
@@ -42,7 +43,7 @@ async function setUpFfprobe(autoDownloadBinary: boolean): Promise<string> {
     try {
         const source = await resolveFfprobeSource();
 
-        const binaryName = `ffprobe_${source.versionId}${binExt()}`;
+        const binaryName = versionedBinaryName("ffprobe", source.versionId);
         const binaryPath = path.join(getBinDir(), binaryName);
 
         try {
@@ -53,31 +54,9 @@ async function setUpFfprobe(autoDownloadBinary: boolean): Promise<string> {
             globalLogger.info(`ffprobe ${source.versionId} not found, downloading…`);
         }
 
-        await fs.mkdir(getBinDir(), { recursive: true });
         await cleanupOldVersions("ffprobe_", binaryName);
 
-        // Temp name uses a hyphen so it's never picked up by findExistingBinary()/
-        // cleanupOldVersions(), which match the "ffprobe_" (underscore) prefix.
-        const zipPath = path.join(getBinDir(), "ffprobe-download.zip");
-        await downloadFile(source.downloadUrl, zipPath);
-
-        globalLogger.debug("Extracting ffprobe…");
-        const zip = new AdmZip(zipPath);
-        const ffprobeEntry = zip.getEntries().find((entry) => entry.entryName.endsWith(source.entrySuffix));
-
-        if (!ffprobeEntry) {
-            throw new Error("ffprobe executable not found in the downloaded archive");
-        }
-
-        zip.extractEntryTo(ffprobeEntry, getBinDir(), false, true);
-        const extractedPath = path.join(getBinDir(), path.basename(ffprobeEntry.entryName));
-        await fs.rename(extractedPath, binaryPath);
-
-        if (process.platform !== "win32") {
-            await fs.chmod(binaryPath, 0o755);
-        }
-
-        await fs.unlink(zipPath);
+        await source.install(binaryPath);
 
         globalLogger.info(`Successfully downloaded ffprobe ${source.versionId} to ${binaryPath}`);
         return binaryPath;
@@ -102,28 +81,37 @@ function errorMessage(error: unknown): string {
 
 interface FfprobeSource {
     versionId: string;
-    downloadUrl: string;
-    // An archive entry whose name ends with this string is the ffprobe executable.
-    entrySuffix: string;
+    /** Download and extract ffprobe so that it ends up at `binaryPath`. */
+    install: (binaryPath: string) => Promise<void>;
 }
 
+const USER_AGENT = "Node.js ffprobe installer";
+
 /**
- * Resolve where to download ffprobe for the current platform. Windows reuses
- * the FFmpeg-Builds win64 GPL build (the same archive `ensureFfmpeg` downloads also
- * contains `bin/ffprobe.exe`); macOS uses evermeet.cx's separate ffprobe
+ * Resolve where to download ffprobe for the current platform. Windows uses the same FFmpeg-Builds
+ * win64 GPL archive as `ensureFfmpeg` (it holds `bin/ffprobe.exe` too), and whichever of the two runs
+ * first extracts both, so that archive is downloaded once; macOS uses evermeet.cx's separate ffprobe
  * static build (x86_64, runs on Apple Silicon via Rosetta 2).
  */
 async function resolveFfprobeSource(): Promise<FfprobeSource> {
     if (process.platform === "darwin") {
         return {
             versionId: await getEvermeetFfprobeVersion(),
-            downloadUrl: "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip",
-            entrySuffix: "ffprobe",
+            install: (binaryPath) =>
+                installFromZip(
+                    {
+                        url: "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip",
+                        // Hyphen: never matched by findExistingBinary()/cleanupOldVersions() ("ffprobe_").
+                        tempName: "ffprobe-download.zip",
+                        userAgent: USER_AGENT,
+                    },
+                    [{ entrySuffix: "ffprobe", destPath: binaryPath }]
+                ),
         };
     }
 
-    const build = await getLatestWin64Build("Node.js ffprobe installer");
-    return { ...build, entrySuffix: "bin/ffprobe.exe" };
+    const build = await getLatestWin64Build(USER_AGENT);
+    return { versionId: build.versionId, install: () => installWin64Archive(build, USER_AGENT) };
 }
 
 async function getEvermeetFfprobeVersion(): Promise<string> {

@@ -2,14 +2,42 @@
 import path from "path";
 import winston from "winston";
 import { inkTransport } from "./ink-transport";
+import { toLoggable } from "./serialize";
 import { LogMetadata, LogLevel, LogDetails } from "./types";
 import { getCurrentTask } from "#base/task/taskContext";
 import { getLogsPath } from "#utils/appPaths";
 
+// Cap for the log file within one session (winston rotates to a second file when it is reached).
+const MAX_LOG_BYTES = 10 * 1024 * 1024;
+
 // Capture once at startup; ensure directory exists
 const logsPath = getLogsPath();
 fs.mkdirSync(path.dirname(logsPath), { recursive: true });
-fs.writeFileSync(logsPath, "");
+rotatePreviousLog(logsPath);
+
+/**
+ * Keep the previous session's log (the one you want after a crash) as `app.prev.log` instead of
+ * truncating it at start. Never throws: if the rename fails (the file is held by another process),
+ * the new session simply appends to the existing file.
+ */
+function rotatePreviousLog(file: string): void {
+    try {
+        if (!fs.existsSync(file) || fs.statSync(file).size === 0) return;
+        const { dir, name, ext } = path.parse(file);
+        fs.renameSync(file, path.join(dir, `${name}.prev${ext}`));
+    } catch {
+        // appending beats losing the log or failing to start
+    }
+}
+
+// The file gets plain data: a task as { taskId, label }, an Error as { name, message, stack } (DATA-10).
+const toPlainData = winston.format((info) => {
+    const { task, details, ...rest } = info as typeof info & { task?: unknown; details?: unknown };
+    const out: Record<string, unknown> = { ...rest };
+    if (task) out.task = toLoggable(task);
+    if (details !== undefined) out.details = toLoggable(details);
+    return out as unknown as typeof info;
+});
 
 function getString(obj: unknown): string {
     if (typeof obj === "string") {
@@ -40,7 +68,10 @@ export class Logger {
                     new winston.transports.File({
                         filename: logsPath,
                         level: "debug",
-                        format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
+                        format: winston.format.combine(toPlainData(), winston.format.timestamp(), winston.format.json()),
+                        maxsize: MAX_LOG_BYTES,
+                        maxFiles: 2,
+                        tailable: true,
                     }),
                 ],
             });

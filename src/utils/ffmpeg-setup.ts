@@ -1,9 +1,10 @@
 ﻿import * as fs from "fs/promises";
 import * as path from "path";
-import AdmZip from "adm-zip";
 import { getBinDir } from "./appPaths";
+import { installFromZip } from "./binaryArchive";
 import { getLatestWin64Build } from "./ffmpegBuilds";
-import { downloadFile, httpsGetJson } from "./http";
+import { installWin64Archive, versionedBinaryName } from "./ffmpegInstall";
+import { httpsGetJson } from "./http";
 import { withBinaryAlert } from "./withBinaryAlert";
 import { globalLogger } from "#base/logger/logger";
 
@@ -44,7 +45,7 @@ async function setUpFfmpeg(autoDownloadBinary: boolean): Promise<string> {
         // Resolve the download source + a version identifier for the current platform.
         const source = await resolveFfmpegSource();
 
-        const binaryName = `ffmpeg_${source.versionId}${binExt()}`;
+        const binaryName = versionedBinaryName("ffmpeg", source.versionId);
         const binaryPath = path.join(getBinDir(), binaryName);
 
         // Check if binary exists
@@ -62,34 +63,7 @@ async function setUpFfmpeg(autoDownloadBinary: boolean): Promise<string> {
         // Clean up old ffmpeg versions (optional)
         await cleanupOldVersions("ffmpeg_", binaryName);
 
-        // Download and extract the ZIP file. The temp name uses a hyphen so it can
-        // never be picked up by findExistingBinary()/cleanupOldVersions(), which
-        // match the "ffmpeg_" (underscore) prefix — important on non-Windows where
-        // the executable has no extension to distinguish it from the archive.
-        const zipPath = path.join(getBinDir(), "ffmpeg-download.zip");
-        await downloadFile(source.downloadUrl, zipPath);
-
-        // Extract the ffmpeg executable from the ZIP
-        globalLogger.debug("Extracting ffmpeg…");
-        const zip = new AdmZip(zipPath);
-        const ffmpegEntry = zip.getEntries().find((entry) => entry.entryName.endsWith(source.entrySuffix));
-
-        if (!ffmpegEntry) {
-            throw new Error("ffmpeg executable not found in the downloaded archive");
-        }
-
-        // Extract flat, then rename the extracted file to include the version
-        zip.extractEntryTo(ffmpegEntry, getBinDir(), false, true);
-        const extractedPath = path.join(getBinDir(), path.basename(ffmpegEntry.entryName));
-        await fs.rename(extractedPath, binaryPath);
-
-        // On non-Windows platforms the extracted binary is not executable by default.
-        if (process.platform !== "win32") {
-            await fs.chmod(binaryPath, 0o755);
-        }
-
-        // Clean up the zip file
-        await fs.unlink(zipPath);
+        await source.install(binaryPath);
 
         globalLogger.info(`Successfully downloaded ffmpeg ${source.versionId} to ${binaryPath}`);
         return binaryPath;
@@ -116,28 +90,38 @@ function errorMessage(error: unknown): string {
 
 interface FfmpegSource {
     versionId: string;
-    downloadUrl: string;
-    // An archive entry whose name ends with this string is the ffmpeg executable.
-    entrySuffix: string;
+    /** Download and extract ffmpeg so that it ends up at `binaryPath`. */
+    install: (binaryPath: string) => Promise<void>;
 }
+
+const USER_AGENT = "Node.js ffmpeg installer";
 
 /**
  * Resolve where to download ffmpeg for the current platform and how to name the
- * cached copy. Windows uses the FFmpeg-Builds win64 GPL build; macOS uses evermeet.cx's
- * static build (x86_64, which also runs on Apple Silicon via Rosetta 2).
+ * cached copy. Windows uses the FFmpeg-Builds win64 GPL build (one archive that also holds
+ * ffprobe, see ffmpegInstall.ts); macOS uses evermeet.cx's static build (x86_64, which also
+ * runs on Apple Silicon via Rosetta 2). evermeet.cx publishes no checksums (only PGP signatures).
  */
 async function resolveFfmpegSource(): Promise<FfmpegSource> {
     if (process.platform === "darwin") {
         return {
             versionId: await getEvermeetFfmpegVersion(),
-            downloadUrl: "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip",
-            entrySuffix: "ffmpeg",
+            install: (binaryPath) =>
+                installFromZip(
+                    {
+                        url: "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip",
+                        // Hyphen: never matched by findExistingBinary()/cleanupOldVersions() ("ffmpeg_").
+                        tempName: "ffmpeg-download.zip",
+                        userAgent: USER_AGENT,
+                    },
+                    [{ entrySuffix: "ffmpeg", destPath: binaryPath }]
+                ),
         };
     }
 
     // The published_at date is the version identifier (it names the cached binary).
-    const build = await getLatestWin64Build("Node.js ffmpeg installer");
-    return { ...build, entrySuffix: "bin/ffmpeg.exe" };
+    const build = await getLatestWin64Build(USER_AGENT);
+    return { versionId: build.versionId, install: () => installWin64Archive(build, USER_AGENT) };
 }
 
 /**

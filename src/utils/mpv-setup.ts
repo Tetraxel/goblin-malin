@@ -1,9 +1,8 @@
 ﻿import * as fs from "fs/promises";
-import { createWriteStream } from "fs";
 import * as path from "path";
-import * as https from "https";
 import { spawn } from "child_process";
 import { getBinDir } from "./appPaths";
+import { downloadFile, httpsGetJson } from "./http";
 import { globalLogger } from "#base/logger/logger";
 
 // Windows-only auto-download.
@@ -97,7 +96,7 @@ async function locateMpv(): Promise<string> {
 
         const archivePath = path.join(getBinDir(), asset.name);
         globalLogger.info(`Downloading ${asset.name}...`);
-        await downloadFile(asset.browser_download_url, archivePath);
+        await downloadFile(asset.browser_download_url, archivePath, { userAgent: "Node.js mpv installer" });
 
         globalLogger.debug("Extracting mpv.exe...");
         await extract7z(archivePath, getBinDir(), "mpv.exe");
@@ -121,25 +120,10 @@ async function locateMpv(): Promise<string> {
 
 // ── GitHub API ───────────────────────────────────────────────────────────
 
-async function getLatestRelease(): Promise<GitHubRelease> {
-    return new Promise((resolve, reject) => {
-        https
-            .get(
-                "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest",
-                { headers: { "User-Agent": "Node.js mpv installer" } },
-                (res) => {
-                    let data = "";
-                    res.on("data", (chunk) => (data += chunk));
-                    res.on("end", () => {
-                        try {
-                            resolve(JSON.parse(data) as GitHubRelease);
-                        } catch (e) {
-                            reject(new Error(`Failed to parse GitHub response: ${e}`));
-                        }
-                    });
-                }
-            )
-            .on("error", (e) => reject(new Error(`GitHub API request failed: ${e}`)));
+// shinchiro/mpv-winbuild-cmake publishes no checksums, so unlike yt-dlp and ffmpeg this download is not verified.
+function getLatestRelease(): Promise<GitHubRelease> {
+    return httpsGetJson<GitHubRelease>("https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest", {
+        userAgent: "Node.js mpv installer",
     });
 }
 
@@ -191,30 +175,4 @@ async function cleanupOldVersions(prefix: string, currentName: string): Promise<
     } catch {
         /* ignore */
     }
-}
-
-async function downloadFile(url: string, destination: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-        https
-            .get(url, (res) => {
-                if (res.statusCode === 301 || res.statusCode === 302) {
-                    if (res.headers.location) {
-                        downloadFile(res.headers.location, destination).then(resolve).catch(reject);
-                        return;
-                    }
-                }
-                if (res.statusCode !== 200) {
-                    reject(new Error(`HTTP ${res.statusCode} downloading mpv`));
-                    return;
-                }
-                const ws = createWriteStream(destination);
-                res.pipe(ws);
-                ws.on("finish", () => ws.close(() => resolve()));
-                ws.on("error", (e) => {
-                    fs.unlink(destination).catch(() => {});
-                    reject(e);
-                });
-            })
-            .on("error", reject);
-    });
 }

@@ -86,9 +86,9 @@ async function getFollowingRedirects<T>(
     throw new Error(`Too many redirects (more than ${maxRedirects}) starting at ${url}`);
 }
 
-/** GET a URL and parse the body as JSON. Follows redirects; rejects on any non-200 status. */
-export async function httpsGetJson<T>(url: string, opts: HttpOptions = {}): Promise<T> {
-    const body = await getFollowingRedirects(url, opts, async (res) => {
+/** GET a URL and return the body as text. Follows redirects; rejects on any non-200 status. */
+export async function httpsGetText(url: string, opts: HttpOptions = {}): Promise<string> {
+    return getFollowingRedirects(url, opts, async (res) => {
         let data = "";
         res.setEncoding("utf8");
         for await (const chunk of res) {
@@ -96,6 +96,11 @@ export async function httpsGetJson<T>(url: string, opts: HttpOptions = {}): Prom
         }
         return data;
     });
+}
+
+/** GET a URL and parse the body as JSON. Follows redirects; rejects on any non-200 status. */
+export async function httpsGetJson<T>(url: string, opts: HttpOptions = {}): Promise<T> {
+    const body = await httpsGetText(url, opts);
     try {
         return JSON.parse(body) as T;
     } catch (error) {

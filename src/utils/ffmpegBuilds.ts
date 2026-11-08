@@ -20,6 +20,10 @@ export interface FfmpegWin64Build {
     versionId: string;
     /** The zip that holds `bin/ffmpeg.exe` and `bin/ffprobe.exe`. */
     downloadUrl: string;
+    /** The file name of that zip, as it appears in the checksum list. */
+    archiveName: string;
+    /** The `sha256sum`-style list the vendor publishes next to the zip. */
+    checksumsUrl: string;
 }
 
 /** Look up the latest Windows x64 GPL build (ffmpeg and ffprobe ship in the same archive). */
@@ -32,8 +36,11 @@ export async function getLatestWin64Build(userAgent: string): Promise<FfmpegWin6
         throw new Error(`Unexpected release metadata from ${apiUrl} (no tag_name / published_at)`);
     }
 
+    const releaseUrl = `https://github.com/${FFMPEG_BUILDS_REPO}/releases/download/${release.tag_name}`;
     return {
         versionId: published.toISOString().split("T")[0],
-        downloadUrl: `https://github.com/${FFMPEG_BUILDS_REPO}/releases/download/${release.tag_name}/${WIN64_ARCHIVE}`,
+        downloadUrl: `${releaseUrl}/${WIN64_ARCHIVE}`,
+        archiveName: WIN64_ARCHIVE,
+        checksumsUrl: `${releaseUrl}/checksums.sha256`,
     };
 }

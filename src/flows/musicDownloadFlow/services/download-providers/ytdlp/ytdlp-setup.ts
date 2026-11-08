@@ -1,6 +1,7 @@
 ﻿import * as fs from "fs/promises";
 import * as path from "path";
 import { getBinDir } from "#utils/appPaths";
+import { verifyAgainstPublishedChecksums } from "#utils/checksum";
 import { downloadFile, httpsGetJson } from "#utils/http";
 import { withBinaryAlert } from "#utils/withBinaryAlert";
 import { globalLogger } from "#base/logger/logger";
@@ -74,8 +75,15 @@ async function setUpYtDlp(autoDownloadBinary: boolean): Promise<string> {
         await cleanupOldVersions("yt-dlp_", binaryName);
 
         // Download the binary
-        const downloadUrl = `https://github.com/yt-dlp/yt-dlp/releases/download/${latestVersion}/${ytDlpAssetName()}`;
-        await downloadFile(downloadUrl, binaryPath);
+        const releaseUrl = `https://github.com/yt-dlp/yt-dlp/releases/download/${latestVersion}`;
+        await downloadFile(`${releaseUrl}/${ytDlpAssetName()}`, binaryPath);
+        // The release publishes SHA2-256SUMS. A missing list only logs a warning; a mismatch deletes the file and fails.
+        await verifyAgainstPublishedChecksums(
+            binaryPath,
+            `${releaseUrl}/SHA2-256SUMS`,
+            ytDlpAssetName(),
+            "Node.js yt-dlp installer"
+        );
 
         // On non-Windows platforms the downloaded binary is not executable by default.
         if (process.platform !== "win32") {

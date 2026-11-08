@@ -1,6 +1,6 @@
 # TODO
 
-> State of 2026-11-08 (`main` after the `DL-01` fix, working towards **v0.2.0**).
+> State of 2026-11-08 (`main`, working towards **v0.2.0**).
 > IDs like `DL-01` or `DATA-04` point to [AUDIT-v0.2.0.md](AUDIT-v0.2.0.md), which has the evidence and the suggested fix for each.
 > Per-project roadmap: [docs/projects/](docs/projects/README.md) (`P24`, `P25`… below).
 
@@ -21,14 +21,13 @@
 - [ ] Pasting a URL into a text field opens the Import modal and also types it into the field: use Ink's `usePaste` — `UI-01`
 - [ ] Self-update must exit through `exitApp()`; handle `uncaughtException` / `SIGTERM` / `SIGHUP` so the terminal is restored and the session saved — `DATA-06`, `DATA-07`
 - [ ] Surface persistence failures, retry on exit, lock against a second instance — `DATA-05`
-- [ ] Logging: log a task id not the whole task, serialise `Error`s, rotate `app.log` instead of truncating it — `DATA-10`
 - [ ] Stale selection after deleting the last task; settings row at 80 columns; "terminal too small" message below ~66 columns — `UI-07`, `UI-04`, `UI-06`
 
 **Product**
 
 - [ ] Output format choice (keep the original codec / MP3 / FLAC) — every save is a `.flac` today, even from Opus — `PROD-03`
 - [ ] Embed cover art — `PROD-04`
-- [ ] Temp downloads: move the default out of the Music library (with a one-time migration of the old folder), clean unselected candidates after a save; tools/cache in `%LOCALAPPDATA%` — `DATA-09`
+- [ ] Temp downloads: move the default out of the Music library (with a one-time migration of the old folder), clean unselected candidates after a save
 - [ ] Handling of **SoundCloud** links
 - [ ] Add a button `Open all tracks in MB Picard`
 - [ ] First run: ask for the optional providers (Songlink, Claude) once, not mid-import — `PROD-05`
@@ -42,7 +41,6 @@
 - [ ] Type-check and lint `tests/` and `scripts/`, hermetic e2e tests (fixtures with their own `appDataDir`), unit tests green on Linux CI, then enable them there — `TEST-01`, `TEST-02`
 - [ ] Remaining `REL-03` / `REL-07` leftovers: `patch-pkg-compat.mjs`, undeclared `esbuild` in `scripts/`, drop `emitDecoratorMetadata`
 - [ ] **Linux has no working ffmpeg/ffprobe download** — `resolveFfmpegSource` has a macOS branch and treats everything else as Windows (fetches the win64 zip); check, and either add a Linux build or state Linux is unsupported
-- [ ] Tool downloads, follow-ups to `DL-01`: move `mpv-setup.ts` onto `#utils/http` (it still has its own helpers with no status check or timeout; it also falls back to a PATH `mpv` on purpose, and raises no alert since it is optional), SHA256-verify the downloaded binaries, and stop ffmpeg and ffprobe each fetching the same ~200 MB archive on a first run
 
 ## 🟣 Promised by the former `README-TARGET` but not built yet
 
@@ -69,6 +67,8 @@ Decide per release whether each is wanted.
 
 ## ✅ Done (removed from the lists above)
 
+- [x] **Tool downloads** — yt-dlp and ffmpeg are SHA-256-verified against the vendor's published list (a missing list only logs a warning; a mismatch deletes the file and fails), `mpv-setup.ts` uses `#utils/http` (mpv's vendor publishes no checksums), ffmpeg and ffprobe share one archive download — `DL-01`
+- [x] **Logging** — task id instead of the whole task, `Error`s serialised, previous session's log kept as `app.prev.log`, 10 MB cap — `DATA-10`
 - [x] Save the tasks to disk as sessions (+ archive)
 - [x] **Soulseek** download provider
 - [x] Handle Spotify albums and playlists as input (and YouTube playlists), with live refresh
