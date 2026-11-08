@@ -1,0 +1,52 @@
+name: CI
+
+# Runs on every push and pull request. It exists mainly so that `yarn build` (the only step that produces
+# dist/, which `npm publish` and the Windows exe both need) is exercised long before a release: type-check,
+# lint and the unit tests can all pass while the build is broken.
+
+on:
+    push:
+    pull_request:
+
+concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    check:
+        name: ${{ matrix.os }} / node ${{ matrix.node }}
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [windows-latest, ubuntu-latest]
+                node: [22, 24]
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ matrix.node }}
+                  cache: yarn
+
+            # `--frozen-lockfile` is the Yarn 1 flag that makes a stale yarn.lock fail the install.
+            - name: Install dependencies
+              run: yarn install --frozen-lockfile
+
+            - name: Type-check
+              run: yarn type-check
+
+            - name: Lint
+              run: yarn lint
+
+            - name: Build
+              run: yarn build
+
+            # The unit tests are only run on Windows for now (the release is built there and the suite has not
+            # been run on Linux yet). Drop the `if` once they are green on ubuntu too.
+            - name: Unit tests
+              if: runner.os == 'Windows'
+              run: npx vitest run tests/unit
+              env:
+                  GOBLIN_NO_AUDIO: "1"
