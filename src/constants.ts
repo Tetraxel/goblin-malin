@@ -25,7 +25,8 @@ function getPlatformDefaultDataDir(): string {
 export const DEFAULT_APP_DATA_DIR =
     process.env.GOBLIN_DATA_DIR ?? (IS_DEV ? path.join(PROJECT_ROOT, "data") : getPlatformDefaultDataDir());
 
-dotenv.config({ path: path.join(DEFAULT_APP_DATA_DIR, ".env") });
+// `quiet`: dotenv >= 17 otherwise prints an "injected env (N) from …" banner with a rotating tip on every start.
+dotenv.config({ path: path.join(DEFAULT_APP_DATA_DIR, ".env"), quiet: true });
 
 function resolveAppVersion(): string {
     try {
