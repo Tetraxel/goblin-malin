@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Box, Text } from "ink";
-import { spawn, exec } from "child_process";
+import { spawn } from "child_process";
 import open from "open";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { Hint } from "../Hint";
 import { APP_VERSION } from "#constants";
-import { IS_SEA, getInstaller, getUpdateCommand } from "#updater/installSource";
+import { IS_SEA, getInstaller, getUpdateArgv, getUpdateCommand } from "#updater/installSource";
+import { openUrl } from "#utils/openUrl";
 import { globalLogger } from "#base/logger/logger";
 import { exitApp } from "#utils/exitApp";
 
@@ -54,14 +55,8 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     const handleConfirm = useCallback(() => {
         if (IS_SEA) {
             // open package is pre-bundled as a shim in SEA builds and may fail silently;
-            // use the platform's native command directly instead.
-            const cmd =
-                process.platform === "win32"
-                    ? `start "" "${releaseUrl}"`
-                    : process.platform === "darwin"
-                      ? `open "${releaseUrl}"`
-                      : `xdg-open "${releaseUrl}"`;
-            exec(cmd);
+            // openUrl uses the platform's native opener directly (no shell).
+            openUrl(releaseUrl);
             switchBack();
             return;
         }
@@ -86,8 +81,10 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
         // Run the package manager update command
         setPkgStatus("running");
         globalLogger.info(`[updater] running: ${updateCommand}`);
-        const [bin, ...args] = updateCommand.split(" ");
-        const proc = spawn(bin, args, { stdio: "pipe", shell: true });
+        const { bin, args } = getUpdateArgv(latestVersion);
+        // Windows package managers are .cmd shims, which Node refuses to spawn without a shell (EINVAL).
+        // Safe there because every argument is a constant or a version validated by getUpdateArgv.
+        const proc = spawn(bin, args, { stdio: "pipe", shell: process.platform === "win32" });
 
         const addLines = (chunk: Buffer) => {
             const lines = chunk.toString().split("\n").filter(Boolean);
@@ -114,7 +111,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
             setPkgOutput((prev) => [...prev, err.message]);
             setPkgStatus("error");
         });
-    }, [pkgStatus, selectedIndex, releaseUrl, switchBack, updateCommand]);
+    }, [pkgStatus, selectedIndex, releaseUrl, latestVersion, switchBack, updateCommand]);
 
     useShortcuts({
         id: "updateModal",

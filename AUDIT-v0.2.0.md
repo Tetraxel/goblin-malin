@@ -29,18 +29,18 @@ The two blockers found here — `yarn build` failing, and a fresh install unable
 | Download pipeline (`DL-`) |  |  |  | 1 | 1 |
 | Metadata & discovery (`MD-`) |  |  | 1 | 1 | 2 |
 | UI / TUI behaviour (`UI-`) |  |  |  | 5 | 5 |
-| Security (`SEC-`) |  |  |  | 2 | 2 |
+| Security (`SEC-`) |  |  |  | 1 | 1 |
 | Tests, CI & tooling (`TEST-`) |  |  | 2 | 3 | 5 |
 | Docs, instructions & hygiene (`DOC-`) |  |  | 2 | 3 | 5 |
 | Product & UX (`PROD-`) |  |  | 3 | 1 | 4 |
-| **Total** | **0** | **0** | **12** | **20** | **32** |
+| **Total** | **0** | **0** | **12** | **19** | **31** |
 
 Plus 9 unconfirmed candidates in [section K](#k-candidates-to-verify-found-while-reading-not-confirmed) (not counted).
 <!-- /COUNTS-TABLE -->
 
 ### Already fixed
 
-Removed from this file once fixed and committed (what was found, the fix and how it was checked are in the file's git history: `git log -p -- AUDIT-v0.2.0.md`): **REL-01** (`yarn build`), **REL-04** (`engines`), **REL-05** (`postinstall`), **DEP-01** (unused dependencies), **DATA-01** ("Clear temporary downloads"), **DATA-02** and **DATA-03** (`sessions.json` / `settings.json` validation, quarantine, `.bak`, versioning), **DATA-04** (the data folder is derived, never stored), **DATA-05** (visible write failures, bounded retry on close, unique temp names, one instance per data folder), **DATA-06** (self-update exits through `exitApp()`), **DATA-07** (crash/signal handlers restore the terminal and save; console patch moved to the entry points), **MD-01** (confidence normalisation keeps every script and strips only accents; empty names score 0; live/remix/karaoke/cover versions are penalised; `tests/unit/confidence.test.ts`), **MD-02** (scraped Spotify answers are never cached; "nothing found" discovery results are kept 1 day, not 90; concurrent identical calls share one request; `tests/unit/cache.test.ts` — caches written before the fix may still hold old entries until they expire or "Clear cache"), **REL-06** (no more `prepack`/`postpack`: the README carries absolute image URLs, `patch-readme.mjs` is gone), **UI-01** (a link pasted into a focused text field stays in the field; scheme-less links and `spotify:` URIs are understood), **UI-02** (`Ctrl+Q`, rebindable `global.quit`, asks first; a second press quits at once), **DOC-02** (`.env.example`), **DOC-05** (`TODO.md`), **PROD-02** (dotenv banner), and the ffmpeg/ffprobe bootstrap bug of **DL-01**. Findings that were only partly fixed (**REL-03**, **REL-07**, **DEP-02**, **DOC-04**, **DL-01**) keep just the part that is still open.
+Removed from this file once fixed and committed (what was found, the fix and how it was checked are in the file's git history: `git log -p -- AUDIT-v0.2.0.md`): **REL-01** (`yarn build`), **REL-04** (`engines`), **REL-05** (`postinstall`), **DEP-01** (unused dependencies), **DATA-01** ("Clear temporary downloads"), **DATA-02** and **DATA-03** (`sessions.json` / `settings.json` validation, quarantine, `.bak`, versioning), **DATA-04** (the data folder is derived, never stored), **DATA-05** (visible write failures, bounded retry on close, unique temp names, one instance per data folder), **DATA-06** (self-update exits through `exitApp()`), **DATA-07** (crash/signal handlers restore the terminal and save; console patch moved to the entry points), **MD-01** (confidence normalisation keeps every script and strips only accents; empty names score 0; live/remix/karaoke/cover versions are penalised; `tests/unit/confidence.test.ts`), **MD-02** (scraped Spotify answers are never cached; "nothing found" discovery results are kept 1 day, not 90; concurrent identical calls share one request; `tests/unit/cache.test.ts` — caches written before the fix may still hold old entries until they expire or "Clear cache"), **REL-06** (no more `prepack`/`postpack`: the README carries absolute image URLs, `patch-readme.mjs` is gone), **SEC-01** (`openUrl` spawns the native opener with an argv array — no shell, http(s) only; the updater takes a program + args from `getUpdateArgv`, with the version validated as semver, and uses a shell only on Windows for the `.cmd` shims; `tests/unit/shellSafety.test.ts`), **UI-01** (a link pasted into a focused text field stays in the field; scheme-less links and `spotify:` URIs are understood), **UI-02** (`Ctrl+Q`, rebindable `global.quit`, asks first; a second press quits at once), **DOC-02** (`.env.example`), **DOC-05** (`TODO.md`), **PROD-02** (dotenv banner), and the ffmpeg/ffprobe bootstrap bug of **DL-01**. Findings that were only partly fixed (**REL-03**, **REL-07**, **DEP-02**, **DOC-04**, **DL-01**) keep just the part that is still open.
 
 ---
 
@@ -196,16 +196,11 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 
 ### G. Security
 
-<a id="sec-01"></a>
-#### SEC-01 — URLs are interpolated into shell strings
-**low · security · verified by reading**
-
-- **Where:** `src/utils/openUrl.ts` (`exec(\`start "" "${url}"\`)` / `open "${url}"` / `xdg-open "${url}"`), `src/components/UpdateModal/UpdateModal.tsx:49-56` (same pattern with `releaseUrl` from the GitHub API), update command run via `spawn(cmd, { shell: true })`.
-- **What:** a `"` inside the URL breaks out of the quoting (and `%VAR%` expands inside cmd quotes). Current call sites pass constants / the GitHub API's `html_url`, so it is not exploitable today, but the helper is a footgun; the `open` package (already a dependency, used elsewhere) uses `spawn` without a shell.
-- **Fix:** use `open` everywhere (drop `openUrl.ts` and the inline `exec`), keep `spawn(bin, args)` without `shell: true` for the updater.
-
 <a id="sec-02"></a>
-#### SEC-02 — A copy of the secrets file sits in the repository root (kept on purpose)
+#### ❌ SEC-02 — A copy of the secrets file sits in the repository root (kept on purpose)
+
+**❌❌❌ WON'T DO ❌❌❌** — the owner decided to keep this as is.
+
 **low · security · verified (key names only inspected — values never read)**
 
 - **Where:** `(copie).env` (repo root; matches `*.env` in `.gitignore`, not in npm `files`).
