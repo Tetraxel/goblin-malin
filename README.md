@@ -122,8 +122,8 @@ GoblinMalin.start();
 
 ### Metadata view
 
-<img src="docs/screenshots/2026-05-14-metadata-view.png" width="100%"/>
+<img src="https://raw.githubusercontent.com/Tetraxel/goblin-malin/main/docs/screenshots/2026-05-14-metadata-view.png" width="100%"/>
 
 ### Download view
 
-<img src="docs/screenshots/2026-05-08-download-view.png" width="100%"/>
+<img src="https://raw.githubusercontent.com/Tetraxel/goblin-malin/main/docs/screenshots/2026-05-08-download-view.png" width="100%"/>

@@ -60,8 +60,6 @@
         "format:check": "prettier --check src/",
         "postinstall": "node scripts/save-install-source.mjs",
         "package:win": "node scripts/build-sea.mjs",
-        "prepack": "node scripts/patch-readme.mjs",
-        "postpack": "git checkout -- README.md",
         "prepublishOnly": "tsup"
     },
     "keywords": [
