@@ -9,6 +9,7 @@ import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { MusicBrainzClient } from "../../apis/musicbrainz-client";
 import { extractTracksFromMusicBrainzRecording } from "./convertMusicBrainzToTrack";
 import { MusicBrainzCell } from "./MusicBrainzCell";
+import { discoveryResultTtl } from "#flows/musicDownloadFlow/utils/discoveryCache";
 
 export class MusicBrainzDiscoveryService extends DiscoveryMetadataService {
     static readonly display: ProviderDisplay = {
@@ -36,7 +37,7 @@ export class MusicBrainzDiscoveryService extends DiscoveryMetadataService {
         return MusicBrainzDiscoveryService.client;
     }
 
-    @Cached()
+    @Cached({ ttl: discoveryResultTtl })
     async discoverFromUri(sourceMetadata: TrackMetadata): Promise<DiscoveryResult> {
         const isrc = sourceMetadata.isrc;
         const trackName = sourceMetadata.trackName;

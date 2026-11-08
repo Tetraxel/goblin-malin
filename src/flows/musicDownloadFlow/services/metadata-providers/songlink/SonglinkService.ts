@@ -9,6 +9,7 @@ import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { SonglinkClient, SonglinkRateLimitError } from "../../apis/songlink-client";
 import { extractTracksFromSonglinkResponse } from "./convertSonglinkToTrack";
 import { SonglinkCell } from "./SonglinkCell";
+import { discoveryResultTtl } from "#flows/musicDownloadFlow/utils/discoveryCache";
 
 /**
  * ⚠️⚠️  SONGLINK RATE LIMIT — READ BEFORE USING  ⚠️⚠️
@@ -66,7 +67,7 @@ export class SonglinkService extends DiscoveryMetadataService {
         return SonglinkService.client;
     }
 
-    @Cached()
+    @Cached({ ttl: discoveryResultTtl })
     async discoverFromUri(sourceMetadata: TrackMetadata): Promise<DiscoveryResult> {
         const url = sourceMetadata.url;
         if (!url) return { tracks: [], anchor: { state: "notFound" } };

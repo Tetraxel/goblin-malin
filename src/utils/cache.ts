@@ -46,9 +46,64 @@ export function runWithoutCache<T>(fn: () => Promise<T>): Promise<T> {
     return withSkipCache(fn);
 }
 
-interface CacheOptions {
-    ttl?: number;
+/** How long a "nothing found" answer is kept: data may appear upstream tomorrow, errors can be transient. */
+export const NEGATIVE_RESULT_TTL_MS = 24 * 60 * 60 * 1000;
+
+export interface CacheOptions {
+    /** TTL in ms, or a function of the result (return `undefined` for the default). */
+    ttl?: number | ((result: unknown) => number | undefined);
+    /** Return `false` to keep a result out of the cache (e.g. a degraded fallback answer). */
+    shouldCache?: (result: unknown) => boolean;
     keyGenerator?: (...args: unknown[]) => string;
+}
+
+// Calls currently running, per cache key: concurrent cold calls share one underlying request.
+const inFlight = new Map<string, Promise<unknown>>();
+
+/** Runs `compute` through the persistent cache. Exported for tests; use the `@Cached` decorator in services. */
+export async function cachedCall<T>(cacheKey: string, compute: () => Promise<T>, options: CacheOptions = {}): Promise<T> {
+    // Return existing cache value ONLY if cache is globally enabled and not skipped for this call
+    const shouldSkip = !cacheGloballyEnabled || skipCacheStorage.getStore() === true;
+    if (!shouldSkip) {
+        const cached = cache.get(cacheKey);
+        if (cached !== undefined) {
+            globalLogger.debug(`Cache found for ${cacheKey}`);
+            return cached as T;
+        }
+        const pending = inFlight.get(cacheKey);
+        if (pending) {
+            globalLogger.debug(`Cache joined in-flight call for ${cacheKey}`);
+            return pending as Promise<T>;
+        }
+        globalLogger.debug(`Cache miss for ${cacheKey}`);
+    } else {
+        globalLogger.debug(`Cache skip requested for ${cacheKey}`);
+    }
+
+    const run = (async () => {
+        const result = await compute();
+
+        const empty = result === undefined || result === null || result === "";
+        if (empty) {
+            globalLogger.warn(`Not caching a value "${result}" that may be an error case (${cacheKey})`);
+        } else if (options.shouldCache && !options.shouldCache(result)) {
+            globalLogger.debug(`Cache not saved for "${cacheKey}" (shouldCache refused it)`);
+        } else {
+            const ttl = typeof options.ttl === "function" ? options.ttl(result) : options.ttl;
+            cache.set(cacheKey, result, ttl);
+            globalLogger.debug(`Cache saved for "${cacheKey}"`);
+        }
+        return result;
+    })();
+
+    if (shouldSkip) return run;
+
+    inFlight.set(cacheKey, run);
+    try {
+        return await run;
+    } finally {
+        inFlight.delete(cacheKey);
+    }
 }
 
 // Method decorator to handle both @Cached and @Cached()
@@ -57,32 +112,9 @@ export function Cached(options: CacheOptions = {}) {
         const originalMethod = descriptor.value;
         const className = target.constructor.name;
 
-        descriptor.value = async function (...args: unknown[]) {
-            // Generate cache key
+        descriptor.value = function (this: unknown, ...args: unknown[]) {
             const cacheKey = `${className}:${propertyKey}:${JSON.stringify(args)}`;
-
-            // Return existing cache value ONLY if cache is globally enabled and not skipped for this call
-            const shouldSkip = !cacheGloballyEnabled || skipCacheStorage.getStore() === true;
-            if (!shouldSkip) {
-                const cached = cache.get(cacheKey);
-                if (cached !== undefined) {
-                    globalLogger.debug(`Cache found for ${cacheKey}`);
-                    return cached;
-                }
-                globalLogger.debug(`Cache miss for ${cacheKey}`);
-            } else {
-                globalLogger.debug(`Cache skip requested for ${cacheKey}`);
-            }
-
-            // Call original method and cache result
-            const result = await originalMethod.apply(this, args);
-            globalLogger.debug(`Cache saved for "${cacheKey}"`);
-            cache.set(cacheKey, result, options.ttl);
-
-            if (result === undefined || result === null || result === "")
-                globalLogger.warn(`Cached a value "${result}" that may be an error case`);
-
-            return result;
+            return cachedCall(cacheKey, () => originalMethod.apply(this, args), options);
         };
 
         return descriptor;

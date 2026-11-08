@@ -384,7 +384,9 @@ export class SpotifyService extends MetadataService {
         }
     }
 
-    @Cached()
+    // Scraped answers (ISRC-less, album-less) are never cached: once the credentials are fixed, or the
+    // user switches to the official API, the same URL must be fetched again, not served for 90 days.
+    @Cached({ shouldCache: (result) => (result as TrackMetadata).fetchedBy !== "spotifyUrlInfo" })
     async getTrackMetadata(url: string): Promise<TrackMetadata> {
         await this.resolveAuth();
 
