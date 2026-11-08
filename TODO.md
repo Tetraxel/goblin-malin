@@ -8,7 +8,7 @@
 
 - [ ] **Protect the user's data files** — `sessions.json` / `settings.json`: validate the shape, strip a BOM, move a damaged file aside (`*.corrupt-<date>`) instead of overwriting it, keep a rolling `.bak`, add a `version` + migration step before the data model changes — `DATA-02`, `DATA-03`
 - [ ] **Stop persisting `general.appDataDir`** — `cache/`, `bin/` and `app.log` follow a stale saved path instead of the live data folder — `DATA-04`
-- [ ] **Release pipeline** — make `release.yml` depend on CI, use `--frozen-lockfile` (today's `--immutable` does nothing on Yarn 1), check tag == `package.json` version, publish to npm before/independently of the exe; then bump to `0.2.0` — `REL-03`, `REL-02`
+- [ ] **Release 0.2.0** — bump `package.json` to `0.2.0`, rehearse with a `dry_run` of `release.yml`, then tag `v0.2.0` — `REL-02` (the pipeline itself is fixed; only action SHA-pinning is left, `REL-03`)
 - [ ] **Match confidence ignores non-Latin letters** (two different Japanese/Russian songs score as an exact match) — Unicode-aware normalisation, empty ≠ equal — `MD-01`
 - [ ] **MusicBrainz IDs never reach the saved file** — "Include MusicBrainz tags" setting (the option is hard-coded `false`), show the MB ID rows, set `MusicBrainzReleaseId` — `MD-03`, `P27/T27.4`
 - [ ] Status per service (Spotify, Ytdlp, etc...) instead of per task — `P25`

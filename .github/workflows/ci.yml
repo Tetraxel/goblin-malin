@@ -4,12 +4,27 @@ name: CI
 # dist/, which `npm publish` and the Windows exe both need) is exercised long before a release: type-check,
 # lint and the unit tests can all pass while the build is broken.
 
+#
+# It is also called by release.yml (`workflow_call`) so that a release can only go out when the very same checks
+# pass on the tagged commit. `push` is limited to branches: a tag push is handled by release.yml, which calls
+# this workflow itself, so the checks do not run twice for a tag.
+
 on:
     push:
+        branches: ["**"]
     pull_request:
+    workflow_call:
+        inputs:
+            ref:
+                description: "Git ref (tag) to check out; empty = the ref that triggered the run"
+                type: string
+                required: false
+                default: ""
 
+# `github.workflow` is the *caller's* name when this runs through workflow_call, so a release run and a branch
+# push on the same ref can never cancel each other.
 concurrency:
-    group: ci-${{ github.ref }}
+    group: ci-${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
 
 jobs:
@@ -24,6 +39,8 @@ jobs:
 
         steps:
             - uses: actions/checkout@v4
+              with:
+                  ref: ${{ inputs.ref }}
 
             - uses: actions/setup-node@v4
               with:
