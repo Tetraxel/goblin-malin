@@ -11,7 +11,7 @@
 - [ ] **MusicBrainz IDs never reach the saved file** — "Include MusicBrainz tags" setting (the option is hard-coded `false`), show the MB ID rows, set `MusicBrainzReleaseId` — `MD-03`, `P27/T27.4`
 - [ ] Status per service (Spotify, Ytdlp, etc...) instead of per task — `P25`
 - [ ] Easier `cookies.txt` extraction for yt-dlp (drag and drop? step by step instructions?) — `P24/T24.3`
-- [ ] Better way to select the app path / folders in settings (a path picker; the temp folder defaults to a sub-folder of the Music library) — `P24/T24.4`, `DATA-08`
+- [ ] Better way to select the app path / folders in settings (a path picker; the temp folder defaults to a sub-folder of the Music library) — `P24/T24.4`
 
 ## 🔵 Release backlog
 
@@ -28,7 +28,7 @@
 
 - [ ] Output format choice (keep the original codec / MP3 / FLAC) — every save is a `.flac` today, even from Opus — `PROD-03`
 - [ ] Embed cover art — `PROD-04`
-- [ ] Temp downloads: move the default out of the Music library, clean unselected candidates after a save, implement or drop the 24 h clean-up; tools/cache in `%LOCALAPPDATA%` — `DATA-08`, `DATA-09`
+- [ ] Temp downloads: move the default out of the Music library (with a one-time migration of the old folder), clean unselected candidates after a save; tools/cache in `%LOCALAPPDATA%` — `DATA-09`
 - [ ] Handling of **SoundCloud** links
 - [ ] Add a button `Open all tracks in MB Picard`
 - [ ] First run: ask for the optional providers (Songlink, Claude) once, not mid-import — `PROD-05`
