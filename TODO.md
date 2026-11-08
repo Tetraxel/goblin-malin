@@ -1,26 +1,79 @@
 # TODO
 
-## 🔴 Release Blocker:
+> State of 2026-11-08 (`main` @ `4db1d64`, working towards **v0.2.0**).
+> IDs like `DL-01` or `DATA-02` point to [AUDIT-v0.2.0.md](AUDIT-v0.2.0.md), which has the evidence and the suggested fix for each.
+> Per-project roadmap: [docs/projects/](docs/projects/README.md) (`P24`, `P25`… below).
 
-- [ ] Save the tasks into the disk as a session
-- [ ] Status per service (Spotify, Ytdlp, etc...) instead of per task
-- [ ] Set MusicBrainzReleaseId
-- [ ] Easier cookies.txt extraction for yt-dlp (drag and drop ? step by step instructions?)
-- [ ] Better way to select the app path in settings
+## 🔴 Release blockers (v0.2.0)
+
+- [ ] **ffmpeg / ffprobe download is broken for fresh installs** — GitHub moved BtbN/FFmpeg-Builds (`301`) and the app doesn't follow it: follow redirects, new repo/URL, `PATH` fallback on Windows, show the real error — `DL-01`
+- [ ] **Protect the user's data files** — `sessions.json` / `settings.json`: validate the shape, strip a BOM, move a damaged file aside (`*.corrupt-<date>`) instead of overwriting it, keep a rolling `.bak`, add a `version` + migration step before the data model changes — `DATA-02`, `DATA-03`
+- [ ] **Stop persisting `general.appDataDir`** — `cache/`, `bin/` and `app.log` follow a stale saved path instead of the live data folder — `DATA-04`
+- [ ] **Release pipeline** — make `release.yml` depend on CI, use `--frozen-lockfile` (today's `--immutable` does nothing on Yarn 1), check tag == `package.json` version, publish to npm before/independently of the exe; then bump to `0.2.0` — `REL-03`, `REL-02`
+- [ ] **Match confidence ignores non-Latin letters** (two different Japanese/Russian songs score as an exact match) — Unicode-aware normalisation, empty ≠ equal — `MD-01`
+- [ ] **MusicBrainz IDs never reach the saved file** — "Include MusicBrainz tags" setting (the option is hard-coded `false`), show the MB ID rows, set `MusicBrainzReleaseId` — `MD-03`, `P27/T27.4`
+- [ ] Status per service (Spotify, Ytdlp, etc...) instead of per task — `P25`
+- [ ] Easier `cookies.txt` extraction for yt-dlp (drag and drop? step by step instructions?) — `P24/T24.3`
+- [ ] Better way to select the app path / folders in settings (a path picker; the temp folder defaults to a sub-folder of the Music library) — `P24/T24.4`, `DATA-08`
 
 ## 🔵 Release backlog
 
-- [ ] Handling of **Soundcloud** links
-- [ ] Add **Soulseek** download
+**Bugs / safety**
+
+- [ ] A way to quit from the keyboard (`Ctrl+C` does nothing today): rebindable `Ctrl+Q` / double `Ctrl+C`, documented — `UI-02`
+- [ ] Pasting a URL into a text field opens the Import modal and also types it into the field: use Ink's `usePaste` — `UI-01`
+- [ ] Self-update must exit through `exitApp()`; handle `uncaughtException` / `SIGTERM` / `SIGHUP` so the terminal is restored and the session saved — `DATA-06`, `DATA-07`
+- [ ] Surface persistence failures, retry on exit, lock against a second instance — `DATA-05`
+- [ ] Logging: log a task id not the whole task, serialise `Error`s, rotate `app.log` instead of truncating it — `DATA-10`
+- [ ] Don't cache fallbacks / "not found" for 90 days; de-duplicate in-flight calls — `MD-02`
+- [ ] Stale selection after deleting the last task; settings row at 80 columns; "terminal too small" message below ~66 columns — `UI-07`, `UI-04`, `UI-06`
+
+**Product**
+
+- [ ] Output format choice (keep the original codec / MP3 / FLAC) — every save is a `.flac` today, even from Opus — `PROD-03`
+- [ ] Embed cover art — `PROD-04`
+- [ ] Temp downloads: move the default out of the Music library, clean unselected candidates after a save, implement or drop the 24 h clean-up; tools/cache in `%LOCALAPPDATA%` — `DATA-08`, `DATA-09`
+- [ ] Handling of **SoundCloud** links
 - [ ] Add a button `Open all tracks in MB Picard`
+- [ ] First run: ask for the optional providers (Songlink, Claude) once, not mid-import — `PROD-05`
+
+**Housekeeping**
+
+- [ ] README: features, shortcuts, how to quit, data/log locations, privacy (update check, Songlink/Claude), troubleshooting — `DOC-03`
+- [ ] Delete or regenerate `docs/audit/*` (stale; `CLAUDE.md` tells agents to read it first) — `DOC-01`
+- [ ] `CHANGELOG.md` for 0.2.0, `.gitattributes`, licence check for the bundled audio samples — `DOC-07`
+- [ ] Dependencies: `axios`/`ws` resolutions, `adm-zip` 0.6.x, minor bumps — `DEP-02`, `DEP-03`
+- [ ] Type-check and lint `tests/` and `scripts/`, hermetic e2e tests (fixtures with their own `appDataDir`), unit tests green on Linux CI, then enable them there — `TEST-01`, `TEST-02`
+- [ ] Remaining `REL-03` / `REL-07` leftovers: `patch-pkg-compat.mjs`, undeclared `esbuild` in `scripts/`, drop `emitDecoratorMetadata`
+
+## 🟣 Promised by the former `README-TARGET` but not built yet
+
+Decide per release whether each is wanted.
+
+- [ ] Import from **Deezer, Apple Music, Tidal** (and SoundCloud) + matching provider toggles in Settings — `P28`
+- [ ] MusicBrainz options: "import files into Picard on save"; `Ctrl+M` opens the saved file in Picard
+- [ ] Auto-save to the output folder; auto-relocate missing files + a "Lost the link to the file" warning (relocation exists as `Ctrl+F` only) — `P23/T23.4`
+- [ ] `[K]` keep this download and delete the others; `[Ctrl+R]` relaunch downloading + a "Source metadata have changed" banner
+- [ ] BPM / Key / Genres from some provider (the three rows always show "—")
+- [ ] Waveform scrubber in the preview (today a plain progress bar)
+- [ ] `Enter` saves from the source row (today `S` saves and `Enter` selects) — or keep it as is
 
 ## 🟡 Nice to have
 
 - [ ] Add provider links to each metadata row: Artist, Album, Track
-- [ ] Handle Spotify albums as input
-- [ ] Handle Spotify playlists as input
 - [ ] Drag and drop tracks
-- [ ] Copy/Edit cell values
 - [ ] Parse links before calling SongLink to better display them
-- [ ] Button to rerun a task without using the cache (only for this task)
-- [ ] Optional logging output to a file
+- [ ] Optional logging output to a file (today `app.log` is always written)
+- [ ] Music library & duplicate detection — `P23`
+- [ ] Search-based / text import — `P26`
+- [ ] Audio verification (duration/fingerprint) — `P27`
+- [ ] Claude as an assistant (pick the best source, fix metadata) — `P29`
+
+## ✅ Done (removed from the lists above)
+
+- [x] Save the tasks to disk as sessions (+ archive)
+- [x] **Soulseek** download provider
+- [x] Handle Spotify albums and playlists as input (and YouTube playlists), with live refresh
+- [x] Copy / edit cell values
+- [x] Button to rerun a task without the cache (Restart / Re-fetch / Re-discover bypass it)
+- [x] Audit quick wins (uncommitted until you commit them): `yarn build` fixed (`REL-01`), CI added, `engines` Node ≥ 22, `postinstall` can't fail an install, dead dependencies removed, "Clear temporary downloads" made safe and confirmed (`DATA-01`), `.env.example` and doc links fixed, dotenv banner silenced

@@ -4,7 +4,7 @@
 
 - **What this is:** A keyboard-driven terminal UI (Ink/React) for downloading and tagging music tracks from streaming platforms.
 - **Current state:** Working POC for one pipeline — Spotify URL → YouTube search → yt-dlp download.
-    - Run the local script [TREE.ps1](TREE.ps1) to get the full project tree
+    - Run the local script [scripts/TREE.ps1](scripts/TREE.ps1) to get the full project tree
 - **Target state:** See [README.md](README.md) and [docs/designs/](docs/designs/) (screenshots contain the most detail).
 
 ## Key documents
