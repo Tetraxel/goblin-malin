@@ -1,12 +1,63 @@
 # Goblin Malin — pre-release audit for `v0.2.0`
 
-|                      |                                                                                                           |
-| -------------------- | --------------------------------------------------------------------------------------------------------- |
-| **Date**             | 2026-11-08                                                                                                |
-| **Audited**          | `main` @ `4db1d64` (package version `0.1.15`; npm `latest` is `0.1.14`)                                   |
-| **Method**           | Static review + dependency/registry checks + headless TUI scenarios + throw-away repro scripts. Everything marked _verified_ was reproduced or proven from the exact code path. |
-| **Auditor**          | Claude (orchestrator) + 8 sub-agents (Sonnet 5.5, max effort). **The sub-agents were cut off by the account's 5-hour rate limit (resets 17:40 Paris time)**, see [Coverage & limits](#coverage--limits). |
-| **Status**           | Findings that have been fixed were removed from this file: what is left is open. (Side effects of the audit are listed at the very end.) |
+- [Goblin Malin — pre-release audit for `v0.2.0`](#goblin-malin--pre-release-audit-for-v020)
+    - [1. Read this first](#1-read-this-first)
+        - [Counts](#counts)
+        - [Already fixed](#already-fixed)
+    - [2. Findings](#2-findings)
+        - [A. Build, release \& packaging](#a-build-release--packaging)
+            - [REL-02 — `package.json` says `0.1.15`, but nothing was ever released under that number (registry is at `0.1.14`)](#rel-02--packagejson-says-0115-but-nothing-was-ever-released-under-that-number-registry-is-at-0114)
+            - [REL-03 — The actions in the release workflow are pinned by tag, not by commit SHA](#rel-03--the-actions-in-the-release-workflow-are-pinned-by-tag-not-by-commit-sha)
+            - [REL-07 — Packaging leftovers: the `pkg` patch script, undeclared imports in `scripts/`, `emitDecoratorMetadata`](#rel-07--packaging-leftovers-the-pkg-patch-script-undeclared-imports-in-scripts-emitdecoratormetadata)
+        - [B. Dependencies \& supply chain](#b-dependencies--supply-chain)
+            - [DEP-02 — `yarn audit`: 97 advisories (0 critical, 57 high, 37 moderate, 3 low); reachable runtime chains](#dep-02--yarn-audit-97-advisories-0-critical-57-high-37-moderate-3-low-reachable-runtime-chains)
+            - [DEP-03 — Outdated dependencies](#dep-03--outdated-dependencies)
+        - [C. Data safety, persistence \& state](#c-data-safety-persistence--state)
+            - [DATA-08 — The temp folder lives inside the Music library and nothing cleans it; several settings are dead](#data-08--the-temp-folder-lives-inside-the-music-library-and-nothing-cleans-it-several-settings-are-dead)
+            - [DATA-09 — About 460 MB of tool binaries live under `%APPDATA%` (Roaming)](#data-09--about-460-mb-of-tool-binaries-live-under-appdata-roaming)
+            - [DATA-10 — Logging is heavy and not useful: whole tasks in every record, `Error`s serialize to `{}`, file truncated at start](#data-10--logging-is-heavy-and-not-useful-whole-tasks-in-every-record-errors-serialize-to--file-truncated-at-start)
+        - [D. Download pipeline](#d-download-pipeline)
+            - [DL-01 — Tool downloads: no integrity check, duplicated helpers, one archive fetched twice](#dl-01--tool-downloads-no-integrity-check-duplicated-helpers-one-archive-fetched-twice)
+        - [E. Metadata \& discovery](#e-metadata--discovery)
+            - [MD-03 — MusicBrainz IDs can never be written to a saved file](#md-03--musicbrainz-ids-can-never-be-written-to-a-saved-file)
+            - [MD-04 — Provider-key branching in core code contradicts the extensibility rule; hardcoded Spotify market](#md-04--provider-key-branching-in-core-code-contradicts-the-extensibility-rule-hardcoded-spotify-market)
+        - [F. UI / TUI behaviour](#f-ui--tui-behaviour)
+            - [UI-03 — Import reads the clipboard with blocking `execSync`; Linux support limited to `xclip`](#ui-03--import-reads-the-clipboard-with-blocking-execsync-linux-support-limited-to-xclip)
+            - [UI-04 — The read-only "App directory" row garbles label and value when the row is narrow](#ui-04--the-read-only-app-directory-row-garbles-label-and-value-when-the-row-is-narrow)
+            - [UI-05 — A hardcoded key label in the empty state violates the "live hints" rule](#ui-05--a-hardcoded-key-label-in-the-empty-state-violates-the-live-hints-rule)
+            - [UI-06 — The main layout needs ~66 columns; below that the toolbar scrolls off and columns jam together](#ui-06--the-main-layout-needs-66-columns-below-that-the-toolbar-scrolls-off-and-columns-jam-together)
+            - [UI-07 — After deleting/archiving the last task the selection index is stale](#ui-07--after-deletingarchiving-the-last-task-the-selection-index-is-stale)
+        - [G. Security](#g-security)
+            - [❌ SEC-02 — A copy of the secrets file sits in the repository root (kept on purpose)](#-sec-02--a-copy-of-the-secrets-file-sits-in-the-repository-root-kept-on-purpose)
+        - [H. Tests, CI \& tooling](#h-tests-ci--tooling)
+            - [TEST-01 — `tests/` and `scripts/` are never type-checked or linted; `format:check` fails on 74 files](#test-01--tests-and-scripts-are-never-type-checked-or-linted-formatcheck-fails-on-74-files)
+            - [TEST-02 — The e2e smoke test runs against the developer's real data dir; fixtures are not hermetic](#test-02--the-e2e-smoke-test-runs-against-the-developers-real-data-dir-fixtures-are-not-hermetic)
+            - [TEST-03 — A stale example scenario passes for the wrong reason](#test-03--a-stale-example-scenario-passes-for-the-wrong-reason)
+            - [TEST-04 — The harness emulator mis-measures emoji, adding a spurious `││`](#test-04--the-harness-emulator-mis-measures-emoji-adding-a-spurious-)
+            - [TEST-05 — Test coverage misses the places where this audit found the data-loss bugs](#test-05--test-coverage-misses-the-places-where-this-audit-found-the-data-loss-bugs)
+        - [I. Docs, instructions \& repository hygiene](#i-docs-instructions--repository-hygiene)
+            - [DOC-01 — `docs/audit/*` is stale, and `CLAUDE.md` tells agents to read it first](#doc-01--docsaudit-is-stale-and-claudemd-tells-agents-to-read-it-first)
+            - [DOC-03 — The README is missing what a v0.2.0 user needs](#doc-03--the-readme-is-missing-what-a-v020-user-needs)
+            - [DOC-04 — `docs/projects/` link to source files that were removed](#doc-04--docsprojects-link-to-source-files-that-were-removed)
+            - [DOC-06 — Project rules in `.claude/CLAUDE.md` are git-ignored](#doc-06--project-rules-in-claudeclaudemd-are-git-ignored)
+            - [DOC-07 — Repo-root clutter and no changelog](#doc-07--repo-root-clutter-and-no-changelog)
+        - [J. Product \& UX](#j-product--ux)
+            - [PROD-01 — Target-design features are still missing (for release scoping)](#prod-01--target-design-features-are-still-missing-for-release-scoping)
+            - [PROD-03 — Every saved track is a FLAC, even when the source is lossy](#prod-03--every-saved-track-is-a-flac-even-when-the-source-is-lossy)
+            - [PROD-04 — No cover art is ever embedded](#prod-04--no-cover-art-is-ever-embedded)
+            - [PROD-05 — First-run friction observed in the live run](#prod-05--first-run-friction-observed-in-the-live-run)
+        - [K. Candidates to verify (found while reading, not confirmed)](#k-candidates-to-verify-found-while-reading-not-confirmed)
+    - [3. Verified OK (checked, no problem)](#3-verified-ok-checked-no-problem)
+    - [4. Coverage \& limits](#4-coverage--limits)
+    - [5. Side effects of this audit](#5-side-effects-of-this-audit)
+
+|             |                                                                                                                                                                                                          |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Date**    | 2026-11-08                                                                                                                                                                                               |
+| **Audited** | `main` @ `4db1d64` (package version `0.1.15`; npm `latest` is `0.1.14`)                                                                                                                                  |
+| **Method**  | Static review + dependency/registry checks + headless TUI scenarios + throw-away repro scripts. Everything marked _verified_ was reproduced or proven from the exact code path.                          |
+| **Auditor** | Claude (orchestrator) + 8 sub-agents (Sonnet 5.5, max effort). **The sub-agents were cut off by the account's 5-hour rate limit (resets 17:40 Paris time)**, see [Coverage & limits](#coverage--limits). |
+| **Status**  | Findings that have been fixed were removed from this file: what is left is open. (Side effects of the audit are listed at the very end.)                                                                 |
 
 ---
 
@@ -14,28 +65,30 @@
 
 The two blockers found here — `yarn build` failing, and a fresh install unable to bootstrap ffmpeg/ffprobe — are **fixed** and gone from this file, like every other finding that was fully fixed (see [Already fixed](#already-fixed)). What `v0.2.0` still needs, in the order I would fix it:
 
-| # | ID | Sev. | One-liner |
-|---|----|------|-----------|
-| 1 | [DEP-02](#dep-02) | medium | 97 `yarn audit` advisories; the runtime chains (`axios`, `adm-zip`, `ws`) need deliberate bumps |
+| #   | ID                | Sev.   | One-liner                                                                                       |
+| --- | ----------------- | ------ | ----------------------------------------------------------------------------------------------- |
+| 1   | [DEP-02](#dep-02) | medium | 97 `yarn audit` advisories; the runtime chains (`axios`, `adm-zip`, `ws`) need deliberate bumps |
 
 ### Counts
 
 <!-- COUNTS-TABLE -->
-| Area | blocker | high | medium | low | total |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Build, release & packaging (`REL-`) |  |  |  | 3 | 3 |
-| Dependencies & supply chain (`DEP-`) |  |  | 1 | 1 | 2 |
-| Data safety, persistence & state (`DATA-`) |  |  | 3 |  | 3 |
-| Download pipeline (`DL-`) |  |  |  | 1 | 1 |
-| Metadata & discovery (`MD-`) |  |  | 1 | 1 | 2 |
-| UI / TUI behaviour (`UI-`) |  |  |  | 5 | 5 |
-| Security (`SEC-`) |  |  |  | 1 | 1 |
-| Tests, CI & tooling (`TEST-`) |  |  | 2 | 3 | 5 |
-| Docs, instructions & hygiene (`DOC-`) |  |  | 2 | 3 | 5 |
-| Product & UX (`PROD-`) |  |  | 3 | 1 | 4 |
-| **Total** | **0** | **0** | **12** | **19** | **31** |
+
+| Area                                       | blocker |  high | medium |    low |  total |
+| ------------------------------------------ | ------: | ----: | -----: | -----: | -----: |
+| Build, release & packaging (`REL-`)        |         |       |        |      3 |      3 |
+| Dependencies & supply chain (`DEP-`)       |         |       |      1 |      1 |      2 |
+| Data safety, persistence & state (`DATA-`) |         |       |      3 |        |      3 |
+| Download pipeline (`DL-`)                  |         |       |        |      1 |      1 |
+| Metadata & discovery (`MD-`)               |         |       |      1 |      1 |      2 |
+| UI / TUI behaviour (`UI-`)                 |         |       |        |      5 |      5 |
+| Security (`SEC-`)                          |         |       |        |      1 |      1 |
+| Tests, CI & tooling (`TEST-`)              |         |       |      2 |      3 |      5 |
+| Docs, instructions & hygiene (`DOC-`)      |         |       |      2 |      3 |      5 |
+| Product & UX (`PROD-`)                     |         |       |      3 |      1 |      4 |
+| **Total**                                  |   **0** | **0** | **12** | **19** | **31** |
 
 Plus 9 unconfirmed candidates in [section K](#k-candidates-to-verify-found-while-reading-not-confirmed) (not counted).
+
 <!-- /COUNTS-TABLE -->
 
 ### Already fixed
@@ -51,7 +104,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 ### A. Build, release & packaging
 
 <a id="rel-02"></a>
+
 #### REL-02 — `package.json` says `0.1.15`, but nothing was ever released under that number (registry is at `0.1.14`)
+
 **low · packaging · verified (GitHub API + npm registry)**
 
 - **Where:** `.github/workflows/release.yml`, `package.json:3` (`0.1.15`).
@@ -60,7 +115,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Fix:** bump to `0.2.0` in the release commit and tag `v0.2.0` only after a green dry-run (see REL-03). Also check what the in-app updater does for users whose installed version is higher than the latest release.
 
 <a id="rel-03"></a>
+
 #### REL-03 — The actions in the release workflow are pinned by tag, not by commit SHA
+
 **low · packaging · verified**
 
 - **Where:** `.github/workflows/release.yml`, `.github/workflows/ci.yml`.
@@ -68,7 +125,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Fix:** pin each action to a full commit SHA (with the tag as a comment) and let Dependabot (`github-actions` ecosystem) bump them.
 
 <a id="rel-07"></a>
+
 #### REL-07 — Packaging leftovers: the `pkg` patch script, undeclared imports in `scripts/`, `emitDecoratorMetadata`
+
 **low · maintainability · verified**
 
 - **Where:** `scripts/patch-pkg-compat.mjs` (12 KB, patches `node_modules` for the abandoned `pkg` packaging; still runs at dev install), `scripts/build-sea.mjs` (imports undeclared `esbuild`; other `scripts/` import `react-reconciler`/`yoga-layout` without declaring them), `tsconfig.json` (`emitDecoratorMetadata`).
@@ -78,22 +137,26 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 ### B. Dependencies & supply chain
 
 <a id="dep-02"></a>
+
 #### DEP-02 — `yarn audit`: 97 advisories (0 critical, 57 high, 37 moderate, 3 low); reachable runtime chains
+
 **medium · security · verified (audit run today)**
 
-| Chain (root dependency) | Advisories | Runtime? | Comment / fix |
-| --- | --- | --- | --- |
-| `typescript-eslint` → minimatch/brace-expansion | 28 | dev only | bump (`8.72.x`) |
-| `ytmusic-api` → `axios` 1.16.0 → follow-redirects/form-data | 24 | **runtime** | patched axios is `≥1.18/1.20`; `ytmusic-api 5.3.1` is the latest release (Feb 2026) → add a `resolutions` entry for `axios`; exploitability is low (fixed YouTube Music URLs) |
-| `eslint` → js-yaml | 16 | dev only | bump |
-| `vitest` → vite/postcss/nanoid | 13 | dev only | bump to a patched 4.x/5.x |
-| `adm-zip` 0.5.17 | 8 | **runtime** | used to unzip the downloaded ffmpeg/ffprobe; fixed only in `0.6.x` (outside `^0.5.17`) → deliberate bump + check `extractEntryTo` use in `ffmpeg-setup.ts`/`ffprobe-setup.ts`; archives come from fixed vendor URLs, so risk is moderate, but there is no integrity check (see DL-01) |
-| `eslint-plugin-react-hooks` → babel/browserslist/zod | 5 | dev only | bump |
-| `ink` → `ws` 8.20.0 | 2 | **runtime** | patched `ws ≥ 8.21` → `ink` 7.1.x or a `resolutions` pin |
-| `tsup` | 1 | dev only | bump |
+| Chain (root dependency)                                     | Advisories | Runtime?    | Comment / fix                                                                                                                                                                                                                                                                         |
+| ----------------------------------------------------------- | ---------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `typescript-eslint` → minimatch/brace-expansion             | 28         | dev only    | bump (`8.72.x`)                                                                                                                                                                                                                                                                       |
+| `ytmusic-api` → `axios` 1.16.0 → follow-redirects/form-data | 24         | **runtime** | patched axios is `≥1.18/1.20`; `ytmusic-api 5.3.1` is the latest release (Feb 2026) → add a `resolutions` entry for `axios`; exploitability is low (fixed YouTube Music URLs)                                                                                                         |
+| `eslint` → js-yaml                                          | 16         | dev only    | bump                                                                                                                                                                                                                                                                                  |
+| `vitest` → vite/postcss/nanoid                              | 13         | dev only    | bump to a patched 4.x/5.x                                                                                                                                                                                                                                                             |
+| `adm-zip` 0.5.17                                            | 8          | **runtime** | used to unzip the downloaded ffmpeg/ffprobe; fixed only in `0.6.x` (outside `^0.5.17`) → deliberate bump + check `extractEntryTo` use in `ffmpeg-setup.ts`/`ffprobe-setup.ts`; archives come from fixed vendor URLs, so risk is moderate, but there is no integrity check (see DL-01) |
+| `eslint-plugin-react-hooks` → babel/browserslist/zod        | 5          | dev only    | bump                                                                                                                                                                                                                                                                                  |
+| `ink` → `ws` 8.20.0                                         | 2          | **runtime** | patched `ws ≥ 8.21` → `ink` 7.1.x or a `resolutions` pin                                                                                                                                                                                                                              |
+| `tsup`                                                      | 1          | dev only    | bump                                                                                                                                                                                                                                                                                  |
 
 <a id="dep-03"></a>
+
 #### DEP-03 — Outdated dependencies
+
 **low · deps · verified (`yarn outdated`)**
 
 `ink` 7.0.2 → 7.1.1 (8.0.0 latest) · `react` 19.2.6 → 19.3.1 · `ytdlp-nodejs` 3.4.4 → 3.4.5 · `slsk-client` 1.1.0 → 2.0.2 (major; unmaintained-looking, see Soulseek note in Coverage) · `musicbrainz-api` 1.2.1 → 2.0.1 · `typescript` 6.0.3 → 7.0.2 · `vitest` 4.1.9 → 5.1.0 · `@types/node` 25 → 26 · `eslint` 9 → 10, `prettier`, `tsx`, `typescript-eslint`, `playwright` minor bumps. Do the minor/patch bumps with the build and tests green; defer majors.
@@ -101,7 +164,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 ### C. Data safety, persistence & state
 
 <a id="data-08"></a>
+
 #### DATA-08 — The temp folder lives inside the Music library and nothing cleans it; several settings are dead
+
 **medium · product · verified by reading**
 
 - **Where:** `src/flows/musicDownloadFlow/settings.ts:50-84`, `src/flows/musicDownloadFlow/buildFlowSettingsItems.ts:199-218` (UI commented out).
@@ -110,7 +175,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Fix:** default the temp dir to the OS cache dir, implement the 24 h cleanup or delete the dead settings, delete a task's unselected candidates once a file is saved.
 
 <a id="data-09"></a>
+
 #### DATA-09 — About 460 MB of tool binaries live under `%APPDATA%` (Roaming)
+
 **medium · product · verified for sizes; the Roaming consequence is likely**
 
 - **Where:** `src/constants.ts:12-19`, `src/utils/{ffmpeg,ffprobe,mpv}-setup.ts`, `…/ytdlp-setup.ts`.
@@ -118,17 +185,21 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Fix:** `%LOCALAPPDATA%` / `~/Library/Caches` / `$XDG_CACHE_HOME` for `bin/` and `cache/`; consider an audio-only ffmpeg build or the system ffmpeg; document the footprint.
 
 <a id="data-10"></a>
+
 #### DATA-10 — Logging is heavy and not useful: whole tasks in every record, `Error`s serialize to `{}`, file truncated at start
+
 **medium · performance/observability · verified (live run + code)**
 
 - **Where:** `src/base/logger/logger.ts:12` (`fs.writeFileSync(logsPath, "")`), `:43` (winston `format.json()`), `:62-68` (every record gets `task`); 49 call sites of the form `logger.warn|error("…", { error })` (e.g. `env.ts`, the `unhandledRejection` handler).
 - **What:** (a) every log record produced inside a task embeds the **entire `Task` object** (`_snapshotCache`, `attributes`, `activeAbortBySourceIndex`, …): 17 of the first 21 lines of a one-track run, ≈ 2.1 KB per line on average (max 4.3 KB) for a task that has only just started. A finished task is 3–30 KB (median 3.3 KB, p90 5 KB, max 30 KB across the 130 tasks of the developer's real `sessions.json`), and the file transport always keeps DEBUG, so a 100-track batch with ~100 lines per track is tens of MB per run — all stringified synchronously on the UI thread. (b) `JSON.stringify(new Error("x"))` is `{}`: the one `warn` of the live run reads `{"details":{"error":{}}, "message":"Phase A search failed for spotify"}` — the reason is lost (the same message also pops up in the footer for any user without Spotify credentials). (c) `app.log` is truncated at every start, so the previous session's log — the one you want after a crash — is erased the moment the app restarts (a harness run truncated the developer's real `%APPDATA%/goblin-malin/app.log`).
-- **Fix:** log a task *reference* (`taskId`, URL) instead of the object; add an error serializer (`format.errors({ stack: true })` plus a replacer that maps `Error` → `{ name, message, stack }`); rotate (`app.log` → `app.log.1`) instead of truncating; cap the file size.
+- **Fix:** log a task _reference_ (`taskId`, URL) instead of the object; add an error serializer (`format.errors({ stack: true })` plus a replacer that maps `Error` → `{ name, message, stack }`); rotate (`app.log` → `app.log.1`) instead of truncating; cap the file size.
 
 ### D. Download pipeline
 
 <a id="dl-01"></a>
+
 #### DL-01 — Tool downloads: no integrity check, duplicated helpers, one archive fetched twice
+
 **low · hardening · follow-ups to the (fixed) ffmpeg/ffprobe bootstrap bug**
 
 - **What is still open:** (1) the downloaded binaries (ffmpeg, ffprobe, yt-dlp, mpv) are not SHA256-verified; (2) `src/utils/mpv-setup.ts` still carries its own copies of the old `httpsGetJson`/download helpers (no status check, no timeout) instead of `src/utils/http.ts` — mpv is optional and falls back to a `PATH` copy on purpose, so it raises no alert; (3) on a first run ffmpeg and ffprobe each download the same ~200 MB archive.
@@ -137,7 +208,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 ### E. Metadata & discovery
 
 <a id="md-03"></a>
+
 #### MD-03 — MusicBrainz IDs can never be written to a saved file
+
 **medium · product · verified by reading**
 
 - **Where:** `src/flows/musicDownloadFlow/saveSettings.ts:36-42` (`getSaveSettings()` hard-codes `includeMusicBrainzTags: false`), `…/utils/compiledMetadataToTags.ts:20`, `…/utils/downloadTask.ts:989`.
@@ -145,7 +218,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Fix:** expose it as a setting (default on, as the former `README-TARGET` promised) and wire `getSaveSettings()` to it; decide the scope of the "release id" blocker.
 
 <a id="md-04"></a>
+
 #### MD-04 — Provider-key branching in core code contradicts the extensibility rule; hardcoded Spotify market
+
 **low · maintainability · verified**
 
 - **Where:** `src/flows/musicDownloadFlow/contextualActions.ts:398,405` (`serviceKey === "musicBrainz"`), `…/utils/downloadTask.ts:690` (`platform === "youtubeMusic"`), `…/claude/convertClaudeToTrack.ts:20-22`, `…/spotify/SpotifyService.ts:465` (`"FR"` market, with a `TODO`), stale TODO in `…/musicbrainz/MusicBrainzService.ts:9` ("once MusicBrainz is activated").
@@ -155,7 +230,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 ### F. UI / TUI behaviour
 
 <a id="ui-03"></a>
+
 #### UI-03 — Import reads the clipboard with blocking `execSync`; Linux support limited to `xclip`
+
 **low · performance/ux · verified (timed)**
 
 - **Where:** `src/components/ImportModal/clipboard.ts:7-19`.
@@ -163,7 +240,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Fix:** `await clipboardy.read()` with a visible message when empty/unavailable.
 
 <a id="ui-04"></a>
+
 #### UI-04 — The read-only "App directory" row garbles label and value when the row is narrow
+
 **low · ux (layout) · verified (harness at 140/120/100/80 columns; also found independently by the TUI agent)**
 
 - **Where:** `src/components/SettingsModal/SettingsItemRow.tsx:133-141` (`case "readonlyText"`), `src/settings/buildGlobalSettingsItems.ts:59`.
@@ -171,7 +250,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Fix:** `<Box flexShrink={0}>` around the label/marker, `wrap="truncate-middle"` on the value.
 
 <a id="ui-05"></a>
+
 #### UI-05 — A hardcoded key label in the empty state violates the "live hints" rule
+
 **low · maintainability · verified**
 
 - **Where:** `src/components/TaskListPanel/TaskListPanel.tsx:372` (`Press Ctrl+V to import music URLs`); `src/components/WelcomeModal/intro/tour.ts` mentions key names twice.
@@ -179,7 +260,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Fix:** `<Hint label="import music URLs" shortcutId="global.import" />`; check the tour strings the same way.
 
 <a id="ui-06"></a>
+
 #### UI-06 — The main layout needs ~66 columns; below that the toolbar scrolls off and columns jam together
+
 **low · ux (layout) · verified (harness sweep on a copy of the 50-task fixture)**
 
 - **What:** sizes tested: 100×30, 80×24, 76/72/68×24 are fine; at **64×24** and **60×20** rows are wider than the terminal, wrap (`No s` / `ta…`) and push the toolbar/header out of the screen (the top of the snapshot is a task row); at 50×16, 40×12 the columns collapse (`4v…wg…✓ 0No sta…`); 30×10 and 20×8 are unreadable. No crash, no exception at any size (`exitCode` stays `null`, no stack text), but also no "terminal too small" message or minimum-size guard (the Settings modal degrades more gracefully than the main screen).
@@ -187,7 +270,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Fix:** below a minimum (e.g. 66×16) render a single line "Terminal too small — need at least 66×16 (now W×H)"; hide low-priority columns (SPOTIFY/YOUTUBE/MB) progressively; see the `flexShrink` guidance in `CLAUDE.md`.
 
 <a id="ui-07"></a>
+
 #### UI-07 — After deleting/archiving the last task the selection index is stale
+
 **low · bug · verified (harness)**
 
 - **Where:** task selection state in `src/hooks/useFocusManager.ts` (`selectedTaskIndex` is not clamped when the list shrinks).
@@ -197,6 +282,7 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 ### G. Security
 
 <a id="sec-02"></a>
+
 #### ❌ SEC-02 — A copy of the secrets file sits in the repository root (kept on purpose)
 
 **❌❌❌ WON'T DO ❌❌❌** — the owner decided to keep this as is.
@@ -210,7 +296,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 ### H. Tests, CI & tooling
 
 <a id="test-01"></a>
+
 #### TEST-01 — `tests/` and `scripts/` are never type-checked or linted; `format:check` fails on 74 files
+
 **medium · tests · verified**
 
 - **Where:** `tsconfig.json` (`include: ["src/**/*"]`), `package.json` (`lint: eslint src/`), `eslint.config.js` (ignores `scripts/`), `.prettierrc.json`.
@@ -218,7 +306,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Fix:** add a `tsconfig.test.json` (`tests`, `scripts`) to `type-check`, lint `tests/`, run `prettier --write` once and enforce it in CI.
 
 <a id="test-02"></a>
+
 #### TEST-02 — The e2e smoke test runs against the developer's real data dir; fixtures are not hermetic
+
 **medium · tests · verified**
 
 - **Where:** `tests/e2e/smoke.test.ts` (no `dataDir`), `tests/e2e/perf.test.ts` (uses a tracked fixture dir directly).
@@ -226,7 +316,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Fix:** have the harness always copy the fixture into a temp dir and rewrite `appDataDir`/output dirs; set `GOBLIN_DATA_DIR` for every e2e test.
 
 <a id="test-03"></a>
+
 #### TEST-03 — A stale example scenario passes for the wrong reason
+
 **low · tests · verified**
 
 - **Where:** `scripts/tui-test/examples/navigate-settings.json`.
@@ -234,14 +326,18 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Fix:** press → three times and assert on modal-specific text (`Search settings…`).
 
 <a id="test-04"></a>
+
 #### TEST-04 — The harness emulator mis-measures emoji, adding a spurious `││`
+
 **low · tests · reported (TUI agent)**
 
 - **What:** `@xterm/headless` uses its default Unicode-6 width table, so emoji (😉, 🏆) are 1 cell wide in snapshots while the app (via `string-width`) assumes 2; rows containing an emoji show an extra `│` at the right edge. Looks like an app layout bug, isn't.
 - **Fix:** load `@xterm/addon-unicode11` in `scripts/tui-test/termEmulator.ts`.
 
 <a id="test-05"></a>
+
 #### TEST-05 — Test coverage misses the places where this audit found the data-loss bugs
+
 **low · tests · verified (import map of `tests/`)**
 
 - **What:** 26 unit files / 220 tests. No tests for `settingsStore` edge cases, `sessionStore` load/corruption, the shortcut registry dispatch, the updater (`isNewer`, installer detection), `envFile`, or any UI hook/component beyond the windowing helpers and `useConfirmModal`. `downloadTask.ts` is exercised indirectly by 7 tests.
@@ -250,7 +346,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 ### I. Docs, instructions & repository hygiene
 
 <a id="doc-01"></a>
+
 #### DOC-01 — `docs/audit/*` is stale, and `CLAUDE.md` tells agents to read it first
+
 **medium · docs · verified**
 
 - **Where:** `docs/audit/*.md` (last touched 2026-04-21), `CLAUDE.md` ("Read this before exploring the codebase").
@@ -258,21 +356,27 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Fix:** delete or regenerate it (the project tree in `scripts/TREE.ps1` + a short architecture note); update the `CLAUDE.md` pointer.
 
 <a id="doc-03"></a>
+
 #### DOC-03 — The README is missing what a v0.2.0 user needs
+
 **medium · docs · verified**
 
 - **What:** the macOS section is not in the table of contents; the feature list mentions only Spotify/YouTube + yt-dlp (not Soulseek, MusicBrainz, Songlink, Claude, playlist/album import, sessions, archive, mouse, replace-saved-file); no keyboard-shortcut table and no "how to quit" (UI-02); no data/log locations per OS, no `GOBLIN_DATA_DIR`; no privacy notes (update check calls `api.github.com`; Songlink/Claude send data to third parties after consent); no troubleshooting (cookies, ffmpeg, mpv); screenshots are from May.
 - **Fix:** add these sections; also check `yarn global add` (not available on Yarn ≥2).
 
 <a id="doc-04"></a>
+
 #### DOC-04 — `docs/projects/` link to source files that were removed
+
 **low · docs · verified (link checker over all 49 markdown files)**
 
 - `docs/projects/p20`, `p20b` and `p22` link to `src/base/flow/*`, `FlowSelector.tsx` and `musicDownloadFlow.ts` (removed).
 - **Fix:** keep the historical docs but mark them as superseded (or drop the dead links).
 
 <a id="doc-06"></a>
+
 #### DOC-06 — Project rules in `.claude/CLAUDE.md` are git-ignored
+
 **low · docs · verified**
 
 - **Where:** `.gitignore:2` (`.claude/`).
@@ -280,7 +384,9 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Fix:** move those rules into the tracked root `CLAUDE.md`, or ignore only `.claude/settings.local.json`.
 
 <a id="doc-07"></a>
+
 #### DOC-07 — Repo-root clutter and no changelog
+
 **low · hygiene · verified**
 
 - **What:** `(copie).env` (kept on purpose, see SEC-02), `app.log`, `test-tui-pretty.log`, `.tmp.driveupload/`, and untracked `MusicBrainzCell.tsx.txt`, `inputs.txt`, `urls.txt`, `sfx.md`, `icon.png` (some are the owner's local notes). `src/assets/sounds/intro` holds 59 sample files that the owner's notes describe as Splice samples copied unchanged — **check Splice's licence before redistributing them in a public npm package/repo**. No `CHANGELOG`, `.gitattributes` (line endings matter: the release runs on Windows and the bin file needs an LF shebang), `.nvmrc` or `SECURITY.md`; `package.json` lacks `homepage`/`bugs`; `"license": "SEE LICENSE IN LICENSE"` (custom licence) deserves a README note.
@@ -289,40 +395,44 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 ### J. Product & UX
 
 <a id="prod-01"></a>
+
 #### PROD-01 — Target-design features are still missing (for release scoping)
+
 **medium · product · verified (grep of `src/` against `docs/README-TARGET.md` and `docs/designs/*.png`)**
 
 - **`docs/README-TARGET.md` (and its screenshots) vs the code today** — checked claim by claim:
 
-  | What the target document promises | Today |
-  | --- | --- |
-  | Import from Spotify, YouTube, YouTube Music | ✅ exists |
-  | Import from **SoundCloud, Deezer, Apple Music, Tidal** | ❌ no parser for them (URL recognition is purely the registered Spotify/YouTube services); they only appear as *discovered* links via Songlink |
-  | Settings → Metadata toggles for Spotify, **Deezer, Apple Music, Tidal, YouTube, SoundCloud**, MusicBrainz | ❌ only Spotify and YouTube (+ Songlink, MusicBrainz, Claude as discovery providers) |
-  | MusicBrainz options: **import files into Picard on save**, **include MusicBrainz IDs in tags by default** | ❌ neither (the tag option is hard-coded `false`, see MD-03) |
-  | Download settings: yt-dlp + Soulseek, default output folder | ✅ exists |
-  | **Auto-save, auto-delete temp downloads after 24 h, auto-relocate missing files** | ❌ schema keys only; UI commented out, no code reads them (DATA-08) |
-  | `Ctrl+S` saves and exits Settings | ✅ exists |
-  | Import modal: `Ctrl+V`, list of detected URLs, Enter / Esc | ✅ exists (plus start options: fetch metadata & download / metadata only / nothing) |
-  | Metadata screen: TAG? checkbox, fetch primary + discover on other platforms | ✅ exists |
-  | Favorite `F`, reject `Del`, reorder `Shift+↑/↓`, editable compiled-metadata row | ✅ exists |
-  | Fields: Title, Artists, Duration, Album, Year, Track #, BPM, Key, Genres | ✅ rows exist — but **no provider ever fills BPM, Key or Genres** (always "—"); ISRC is shown too |
-  | Fields: **MusicBrainz IDs** (track, album, artist, album artist, release group) shown in the panel | ❌ not shown (not in the field list); present in the data model only, and never written to files |
-  | Download screen: DL? checkbox, searches yt-dlp and Soulseek, previews format/size/duration/tags | ✅ exists (Soulseek needs credentials) |
-  | Preview with a **waveform** scrubber | 🟡 a plain `█░` progress bar with click-to-seek and `Shift+←/→` ±5 s — no waveform |
-  | `Space` plays a preview | ✅ exists |
-  | `Enter` saves the file | 🟡 saving is `S` on the source row today (Enter selects the source) |
-  | Previously saved → "file on disk" state; changed source/metadata → side-by-side diff | ✅ exists (recent commits) |
-  | `Ctrl+F` relocate; "**Lost the link to the file**" warning | 🟡 `Ctrl+F` relocate exists (manual path prompt); no code detects a missing file or shows the warning |
-  | `Ctrl+M` **open the file in MusicBrainz Picard** | ❌ no binding. Only a contextual "Open in MusicBrainz Picard" action exists for a *discovered MusicBrainz recording* (via Picard's local `127.0.0.1:8000` endpoint) — it opens the recording, not your file |
-  | Design screenshots: `[K] Keep & delete other`, `[Ctrl+R] Relaunch downloading`, "Source metadata have changed" banner, "Include MusicBrainz tags" checkbox | ❌ none of them exists |
+    | What the target document promises                                                                                                                          | Today                                                                                                                                                                                                       |
+    | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | Import from Spotify, YouTube, YouTube Music                                                                                                                | ✅ exists                                                                                                                                                                                                   |
+    | Import from **SoundCloud, Deezer, Apple Music, Tidal**                                                                                                     | ❌ no parser for them (URL recognition is purely the registered Spotify/YouTube services); they only appear as _discovered_ links via Songlink                                                              |
+    | Settings → Metadata toggles for Spotify, **Deezer, Apple Music, Tidal, YouTube, SoundCloud**, MusicBrainz                                                  | ❌ only Spotify and YouTube (+ Songlink, MusicBrainz, Claude as discovery providers)                                                                                                                        |
+    | MusicBrainz options: **import files into Picard on save**, **include MusicBrainz IDs in tags by default**                                                  | ❌ neither (the tag option is hard-coded `false`, see MD-03)                                                                                                                                                |
+    | Download settings: yt-dlp + Soulseek, default output folder                                                                                                | ✅ exists                                                                                                                                                                                                   |
+    | **Auto-save, auto-delete temp downloads after 24 h, auto-relocate missing files**                                                                          | ❌ schema keys only; UI commented out, no code reads them (DATA-08)                                                                                                                                         |
+    | `Ctrl+S` saves and exits Settings                                                                                                                          | ✅ exists                                                                                                                                                                                                   |
+    | Import modal: `Ctrl+V`, list of detected URLs, Enter / Esc                                                                                                 | ✅ exists (plus start options: fetch metadata & download / metadata only / nothing)                                                                                                                         |
+    | Metadata screen: TAG? checkbox, fetch primary + discover on other platforms                                                                                | ✅ exists                                                                                                                                                                                                   |
+    | Favorite `F`, reject `Del`, reorder `Shift+↑/↓`, editable compiled-metadata row                                                                            | ✅ exists                                                                                                                                                                                                   |
+    | Fields: Title, Artists, Duration, Album, Year, Track #, BPM, Key, Genres                                                                                   | ✅ rows exist — but **no provider ever fills BPM, Key or Genres** (always "—"); ISRC is shown too                                                                                                           |
+    | Fields: **MusicBrainz IDs** (track, album, artist, album artist, release group) shown in the panel                                                         | ❌ not shown (not in the field list); present in the data model only, and never written to files                                                                                                            |
+    | Download screen: DL? checkbox, searches yt-dlp and Soulseek, previews format/size/duration/tags                                                            | ✅ exists (Soulseek needs credentials)                                                                                                                                                                      |
+    | Preview with a **waveform** scrubber                                                                                                                       | 🟡 a plain `█░` progress bar with click-to-seek and `Shift+←/→` ±5 s — no waveform                                                                                                                          |
+    | `Space` plays a preview                                                                                                                                    | ✅ exists                                                                                                                                                                                                   |
+    | `Enter` saves the file                                                                                                                                     | 🟡 saving is `S` on the source row today (Enter selects the source)                                                                                                                                         |
+    | Previously saved → "file on disk" state; changed source/metadata → side-by-side diff                                                                       | ✅ exists (recent commits)                                                                                                                                                                                  |
+    | `Ctrl+F` relocate; "**Lost the link to the file**" warning                                                                                                 | 🟡 `Ctrl+F` relocate exists (manual path prompt); no code detects a missing file or shows the warning                                                                                                       |
+    | `Ctrl+M` **open the file in MusicBrainz Picard**                                                                                                           | ❌ no binding. Only a contextual "Open in MusicBrainz Picard" action exists for a _discovered MusicBrainz recording_ (via Picard's local `127.0.0.1:8000` endpoint) — it opens the recording, not your file |
+    | Design screenshots: `[K] Keep & delete other`, `[Ctrl+R] Relaunch downloading`, "Source metadata have changed" banner, "Include MusicBrainz tags" checkbox | ❌ none of them exists                                                                                                                                                                                      |
 
 - **Implemented beyond the design:** sessions, archive, playlist/album import with live refresh, replace-saved-file diff, Songlink/MusicBrainz/Claude discovery, Soulseek provider, mouse support, in-app tour.
 - **Decision needed:** which of these are in/out of `v0.2.0`.
 - _Update: `docs/README-TARGET.md` was deleted at the owner's request; every promise in the table that is not built yet is now listed in `TODO.md` under "Promised by the former README-TARGET but not built yet". The `docs/designs/*.png` screenshots were kept (`CLAUDE.md` points to them)._
 
 <a id="prod-03"></a>
+
 #### PROD-03 — Every saved track is a FLAC, even when the source is lossy
+
 **medium · product · verified (live run: ffprobe on the saved file)**
 
 - **Where:** `src/flows/musicDownloadFlow/utils/cleanOutputDir.ts:20-21` ("Every saved track is a FLAC; its extension is not up to the user", `OUTPUT_EXTENSION = ".flac"`), yt-dlp invoked with `--audio-format flac`, `utils/metadata.ts` (`cleanAndTagFlac`).
@@ -330,14 +440,18 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Fix:** let the user choose "keep original / FLAC / MP3 V0 / Opus"; default to the original container for lossy sources and reserve `.flac` for real lossless sources; tag the transcode in a comment field.
 
 <a id="prod-04"></a>
+
 #### PROD-04 — No cover art is ever embedded
+
 **medium · product · verified (live run + grep)**
 
 - **What:** the saved FLAC has `TITLE`, `ARTIST`, `album_artist` and `ENCODER` tags and only one audio stream — no picture. A grep of `src/` for cover/artwork/picture/APIC finds no code that downloads or embeds artwork (Spotify/YouTube Music both provide thumbnails). For a "download and tag" tool, missing artwork is one of the first things users notice in a player; the former `README-TARGET` didn't promise it either, so decide whether it is in scope for 0.2.0.
 - **Fix:** download the best thumbnail/album image and embed it (`flac-tagger` supports pictures; `node-id3` supports `image`), with a size cap and a setting to disable.
 
 <a id="prod-05"></a>
+
 #### PROD-05 — First-run friction observed in the live run
+
 **low · ux · verified**
 
 - **What:** (a) the first import is interrupted by **two** back-to-back consent dialogs for optional providers (Songlink, then Claude) while the row only says `Waiting for your an…` (truncated) — a new user has not heard of either; (b) with no Spotify credentials a YouTube import logs `[WARN] Phase A search failed for spotify` in the footer for every task (no explanation, see DATA-10); (c) with only YouTube + MusicBrainz available, a YouTube-origin track ends up with just title/artist/duration (no album, year, ISRC, cover) and nothing tells the user that Spotify credentials or Songlink would fill them in; (d) completed tasks keep their TAG?/DL? checkboxes ticked, and the next import + Run flipped the already-saved first row from `✅ Saved` back to `⌛ Queued` — confirm whether re-running finished tasks is intended.
@@ -379,7 +493,7 @@ Eight sub-agents were launched in parallel for: download pipeline, metadata/disc
 
 - **The real end-to-end pipeline** was exercised by me only for **one YouTube Music URL** (import → YouTube metadata → MusicBrainz → yt-dlp download → save to FLAC, with the developer's existing ffmpeg/yt-dlp copied into an isolated data dir, so the then-broken ffmpeg bootstrap, since fixed, did not bite) and **one Spotify track in scrape mode** (metadata + YouTube match). Not audited: tag writing in depth (ID3 for non-FLAC, empty-field/erase behaviour, multi-artist handling), the "replace saved file" flow and its diff, file-name sanitising (Windows reserved names, long paths, collisions, cross-drive rename), the overwrite policy, yt-dlp cookies handling, binary integrity (no checksums exist), zip extraction safety, preview playback (mpv) and process cleanup, albums/playlists (collections), non-YouTube/Spotify URLs.
 - **Soulseek** (credentials, remote file-name handling, `slsk-client` 1.1.0 vs 2.x), **the Claude provider's process spawn** (shell use, prompt-injection surface, consent flow), Songlink/MusicBrainz rate limiting and User-Agent policy, URL parsing/import fuzzing.
-- **UI static review** against `CLAUDE.md` (flexShrink/indentation/`#alias` violations, focus/modal management, accessibility, render performance) beyond the candidates in section K; *runtime* resize, large sessions (2,000+ tasks), NO_COLOR/non-TTY, idle CPU/memory. (A static terminal-size sweep from 100×30 down to 20×8 was done — see UI-06.)
+- **UI static review** against `CLAUDE.md` (flexShrink/indentation/`#alias` violations, focus/modal management, accessibility, render performance) beyond the candidates in section K; _runtime_ resize, large sessions (2,000+ tasks), NO_COLOR/non-TTY, idle CPU/memory. (A static terminal-size sweep from 100×30 down to 20×8 was done — see UI-06.)
 - **Docs/tests deep review**: claim-by-claim README/CLAUDE.md check, project status table (P1–P29 vs reality), coverage numbers, harness cleanup of orphan processes, `yarn test` full run.
 - **Core**: updater edge cases (pre-release tags, installer detection), prototype-pollution in `deepMerge`, two-instance behaviour beyond the pid lock file added for DATA-05.
 
@@ -387,6 +501,6 @@ The sub-agents keep their context: after 17:40 they can be resumed to finish the
 
 ## 5. Side effects of this audit
 
-- While testing the settings row (UI-04) I briefly pointed a *scratch copy's* persisted `appDataDir` at `%APPDATA%/goblin-malin` (the owner's real installed-app folder). The harness runs then **rewrote `app.log` (truncated by the app at start, see DATA-10) and re-saved `cache/api-cache` there**. `sessions.json`, `settings.json`, `.env`, `install.json` and `bin/` were not touched (their timestamps are unchanged). This was DATA-04 in action (fixed: the data folder is no longer read from `settings.json`).
+- While testing the settings row (UI-04) I briefly pointed a _scratch copy's_ persisted `appDataDir` at `%APPDATA%/goblin-malin` (the owner's real installed-app folder). The harness runs then **rewrote `app.log` (truncated by the app at start, see DATA-10) and re-saved `cache/api-cache` there**. `sessions.json`, `settings.json`, `.env`, `install.json` and `bin/` were not touched (their timestamps are unchanged). This was DATA-04 in action (fixed: the data folder is no longer read from `settings.json`).
 - Network use: one YouTube Music download (~40 MB) and one Spotify scrape plus a few MusicBrainz lookups (Songlink and Claude were declined; no credentials or cookies were used or copied — only `yt-dlp`, `ffmpeg`, `ffprobe` were copied into an isolated temp data dir).
 - My isolated scratch data dirs (`%TEMP%/gm-o`, `gm-live`, `gm-sweep`, with the copied binaries and the 39 MB test download) were deleted afterwards. The remaining scratch files (scripts, scenario JSONs, the sub-agents' partial work) live under `%TEMP%/claude/.../scratchpad`.
