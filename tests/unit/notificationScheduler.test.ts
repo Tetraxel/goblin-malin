@@ -3,6 +3,13 @@ import { notificationScheduler } from "#base/notificationScheduler";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+// Frames are real timers (16ms), so a fixed sleep is flaky on a loaded CI runner (Windows especially):
+// poll for the condition instead and only fail after a generous deadline.
+async function waitFor(cond: () => boolean, timeoutMs = 2000): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (!cond() && Date.now() < deadline) await sleep(5);
+}
+
 afterEach(() => notificationScheduler.setSyncMode(false));
 
 describe("notificationScheduler", () => {
@@ -13,7 +20,8 @@ describe("notificationScheduler", () => {
         };
         for (let i = 0; i < 100; i++) notificationScheduler.schedule(fn);
         expect(calls).toBe(0); // deferred, not synchronous
-        await sleep(40);
+        await waitFor(() => calls >= 1);
+        await sleep(40); // let a (wrong) second flush show up
         expect(calls).toBe(1); // 100 dirty marks → a single flush call
     });
 
@@ -23,7 +31,7 @@ describe("notificationScheduler", () => {
         notificationScheduler.schedule(() => a++);
         notificationScheduler.schedule(() => b++);
         notificationScheduler.schedule(() => a++); // same identity as first? no — new closure
-        await sleep(40);
+        await waitFor(() => a >= 2 && b >= 1);
         // Two of the three closures are distinct references; the third is also distinct,
         // so all three run once → a=2, b=1.
         expect(a).toBe(2);
@@ -38,7 +46,7 @@ describe("notificationScheduler", () => {
             notificationScheduler.schedule(second); // must not run inside this flush
         };
         notificationScheduler.schedule(first);
-        await sleep(40);
+        await waitFor(() => order.length >= 2); // `second` ran in a later frame, after `first` returned
         expect(order).toEqual(["first", "second"]);
     });
 
@@ -63,7 +71,7 @@ describe("notificationScheduler", () => {
             throw new Error("bad subscriber");
         });
         notificationScheduler.schedule(() => good++);
-        await sleep(40);
+        await waitFor(() => good >= 1);
         expect(good).toBe(1);
     });
 });
