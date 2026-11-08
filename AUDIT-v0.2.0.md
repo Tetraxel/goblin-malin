@@ -16,32 +16,31 @@ The two blockers found here — `yarn build` failing, and a fresh install unable
 
 | # | ID | Sev. | One-liner |
 |---|----|------|-----------|
-| 1 | [MD-01](#md-01) | high | Match confidence is blind to every non-ASCII letter: two different Japanese/Russian/Greek songs score as an exact match |
-| 2 | [DEP-02](#dep-02) | medium | 97 `yarn audit` advisories; the runtime chains (`axios`, `adm-zip`, `ws`) need deliberate bumps |
+| 1 | [DEP-02](#dep-02) | medium | 97 `yarn audit` advisories; the runtime chains (`axios`, `adm-zip`, `ws`) need deliberate bumps |
 
 ### Counts
 
 <!-- COUNTS-TABLE -->
 | Area | blocker | high | medium | low | total |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Build, release & packaging (`REL-`) |  |  | 1 | 3 | 4 |
+| Build, release & packaging (`REL-`) |  |  |  | 3 | 3 |
 | Dependencies & supply chain (`DEP-`) |  |  | 1 | 1 | 2 |
 | Data safety, persistence & state (`DATA-`) |  |  | 3 |  | 3 |
 | Download pipeline (`DL-`) |  |  |  | 1 | 1 |
-| Metadata & discovery (`MD-`) |  | 1 | 2 | 1 | 4 |
+| Metadata & discovery (`MD-`) |  |  | 1 | 1 | 2 |
 | UI / TUI behaviour (`UI-`) |  |  |  | 5 | 5 |
 | Security (`SEC-`) |  |  |  | 2 | 2 |
 | Tests, CI & tooling (`TEST-`) |  |  | 2 | 3 | 5 |
 | Docs, instructions & hygiene (`DOC-`) |  |  | 2 | 3 | 5 |
 | Product & UX (`PROD-`) |  |  | 3 | 1 | 4 |
-| **Total** | **0** | **1** | **14** | **20** | **35** |
+| **Total** | **0** | **0** | **12** | **20** | **32** |
 
 Plus 9 unconfirmed candidates in [section K](#k-candidates-to-verify-found-while-reading-not-confirmed) (not counted).
 <!-- /COUNTS-TABLE -->
 
 ### Already fixed
 
-Removed from this file once fixed and committed (what was found, the fix and how it was checked are in the file's git history: `git log -p -- AUDIT-v0.2.0.md`): **REL-01** (`yarn build`), **REL-04** (`engines`), **REL-05** (`postinstall`), **DEP-01** (unused dependencies), **DATA-01** ("Clear temporary downloads"), **DATA-02** and **DATA-03** (`sessions.json` / `settings.json` validation, quarantine, `.bak`, versioning), **DATA-04** (the data folder is derived, never stored), **DATA-05** (visible write failures, bounded retry on close, unique temp names, one instance per data folder), **DATA-06** (self-update exits through `exitApp()`), **DATA-07** (crash/signal handlers restore the terminal and save; console patch moved to the entry points), **UI-01** (a link pasted into a focused text field stays in the field; scheme-less links and `spotify:` URIs are understood), **UI-02** (`Ctrl+Q`, rebindable `global.quit`, asks first; a second press quits at once), **DOC-02** (`.env.example`), **DOC-05** (`TODO.md`), **PROD-02** (dotenv banner), and the ffmpeg/ffprobe bootstrap bug of **DL-01**. Findings that were only partly fixed (**REL-03**, **REL-07**, **DEP-02**, **DOC-04**, **DL-01**) keep just the part that is still open.
+Removed from this file once fixed and committed (what was found, the fix and how it was checked are in the file's git history: `git log -p -- AUDIT-v0.2.0.md`): **REL-01** (`yarn build`), **REL-04** (`engines`), **REL-05** (`postinstall`), **DEP-01** (unused dependencies), **DATA-01** ("Clear temporary downloads"), **DATA-02** and **DATA-03** (`sessions.json` / `settings.json` validation, quarantine, `.bak`, versioning), **DATA-04** (the data folder is derived, never stored), **DATA-05** (visible write failures, bounded retry on close, unique temp names, one instance per data folder), **DATA-06** (self-update exits through `exitApp()`), **DATA-07** (crash/signal handlers restore the terminal and save; console patch moved to the entry points), **MD-01** (confidence normalisation keeps every script and strips only accents; empty names score 0; live/remix/karaoke/cover versions are penalised; `tests/unit/confidence.test.ts`), **MD-02** (scraped Spotify answers are never cached; "nothing found" discovery results are kept 1 day, not 90; concurrent identical calls share one request; `tests/unit/cache.test.ts` — caches written before the fix may still hold old entries until they expire or "Clear cache"), **REL-06** (no more `prepack`/`postpack`: the README carries absolute image URLs, `patch-readme.mjs` is gone), **UI-01** (a link pasted into a focused text field stays in the field; scheme-less links and `spotify:` URIs are understood), **UI-02** (`Ctrl+Q`, rebindable `global.quit`, asks first; a second press quits at once), **DOC-02** (`.env.example`), **DOC-05** (`TODO.md`), **PROD-02** (dotenv banner), and the ffmpeg/ffprobe bootstrap bug of **DL-01**. Findings that were only partly fixed (**REL-03**, **REL-07**, **DEP-02**, **DOC-04**, **DL-01**) keep just the part that is still open.
 
 ---
 
@@ -67,14 +66,6 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Where:** `.github/workflows/release.yml`, `.github/workflows/ci.yml`.
 - **What:** `actions/*@v4` and `softprops/action-gh-release@v2` are floating tags: whoever controls the tag can change what runs in a job that holds `id-token: write` (npm publish) and `contents: write`. (The rest of this finding — no checks before releasing, publish order, the no-op `--immutable` guard, tag/version mismatch, checkout of the dispatched tag, `npm@latest`, no dry-run — is fixed.)
 - **Fix:** pin each action to a full commit SHA (with the tag as a comment) and let Dependabot (`github-actions` ecosystem) bump them.
-
-<a id="rel-06"></a>
-#### REL-06 — `prepack`/`postpack` rewrite the README and `git checkout` it afterwards
-**medium · packaging · verified by reading**
-
-- **Where:** `package.json` scripts `prepack: node scripts/patch-readme.mjs`, `postpack: git checkout -- README.md`.
-- **What:** `npm pack`/`npm publish` rewrite `README.md` in place (relative image paths → `raw.githubusercontent.com/.../main/...`) and `postpack` discards **any uncommitted edit to README.md**. The URLs are pinned to the `main` branch, so a published version's README images change when `main` changes (or break if images move).
-- **Fix:** generate the patched README into a temp dir / use `publishConfig`-free approach (absolute image URLs committed in the README), and never run `git checkout` from a package script.
 
 <a id="rel-07"></a>
 #### REL-07 — Packaging leftovers: the `pkg` patch script, undeclared imports in `scripts/`, `emitDecoratorMetadata`
@@ -144,24 +135,6 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **Fix:** verify checksums where the vendor publishes them, move `mpv-setup.ts` onto `#utils/http`, and have ffmpeg and ffprobe share one download (extract both binaries from the same archive).
 
 ### E. Metadata & discovery
-
-<a id="md-01"></a>
-#### MD-01 — The confidence score is blind to every non-ASCII letter
-**high · bug · verified (root cause by reading + the metadata agent's score experiments)**
-
-- **Where:** `src/flows/musicDownloadFlow/utils/confidence.ts:3-8` (`normalize`: `.toLowerCase().trim().replace(/[^\w\s]/g, "")`).
-- **What:** in JavaScript `\w` is ASCII-only, so this strips every Cyrillic, Greek, Arabic, CJK, Hangul… letter **and** every accented Latin letter (`Beyoncé` → `beyonc`). A title or artist written in a non-Latin script normalizes to an empty/blank string, and two blank strings compare as an *exact* match. Measured scores (0–100): Cyrillic **different titles and different artists** with the same duration = **60**, the same as identical Cyrillic titles (60); Japanese *identical* track = 20 but a **different** Japanese track by a different artist = 20; Korean exact + year = 30; Greek identical = 60; accents only differing = 85. The discovery code uses the score to rank, to auto-pick, and (for the Claude last-resort provider) to accept results at `LAST_RESORT_MIN_CONFIDENCE = 50`: a *different* Cyrillic song passes (60 ≥ 50) while a correct Japanese match (20) is rejected.
-- **Other observations from the same experiments:** same title + same duration by a *different artist* (cover/karaoke) scores 60 and passes the last-resort threshold; a *live* version with the same duration scores 85 and a remaster 75; "Love" vs "Love Me Do" (substring) 55 — the title/artist/duration formula cannot discriminate versions.
-- **Impact:** wrong silent matches for any non-Latin catalogue, no matches for others; accent handling is only accidentally consistent.
-- **Fix:** normalize with `s.normalize("NFKD").replace(/\p{M}/gu, "")` and keep `\p{L}\p{N}` (`/[^\p{L}\p{N}\s]/gu`); treat empty-after-normalization as "no information" (0 points), not as equal; add version-marker penalties (live/remix/karaoke/cover) and unit tests with the cases above.
-
-<a id="md-02"></a>
-#### MD-02 — Degraded and negative results are cached for 90 days; scraped Spotify data has no ISRC
-**medium · bug · reported (reproduced by the metadata agent's script; output kept)**
-
-- **Where:** `src/utils/cache.ts` (`@Cached`, `ttl` 90 days, caches `null`/`""` and "not found" objects), `SpotifyService.getTrackMetadata` (`@Cached()`), `MusicBrainzDiscoveryService.discoverFromUri`, `SonglinkService.discoverFromUri`.
-- **What:** (a) when the official Spotify API fails and the scrape fallback answers, the scraped result is cached under the **same key** as an official one; after the user fixes the credentials the same URL keeps returning the scraped data (`isrc: undefined`) for 90 days ("cached fallback served"). (b) "notFound" anchors and empty lists are cached 90 days (only the Claude provider uses a short TTL — the author's own comment says "a 'nothing found' shouldn't stick for months"): MusicBrainz data added tomorrow, or a transient error mapped to "notFound", sticks. (c) Concurrent cold calls are not de-duplicated (3 calls → 3 network requests). (d) Scrape mode yields no ISRC, so ISRC-exact matching is impossible and discovery falls back to fuzzy name matching (see MD-01).
-- **Fix:** include the auth mode/provenance in the cache key or don't cache fallbacks; short TTL (e.g. 1 day) or no caching for negative results; in-flight de-dupe (`Map<key, Promise>`); say in the UI/README what scrape mode loses.
 
 <a id="md-03"></a>
 #### MD-03 — MusicBrainz IDs can never be written to a saved file

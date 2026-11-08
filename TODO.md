@@ -8,7 +8,6 @@
 
 - [ ] **Stop persisting `general.appDataDir`** — `cache/`, `bin/` and `app.log` follow a stale saved path instead of the live data folder — `DATA-04`
 - [ ] **Release 0.2.0** — bump `package.json` to `0.2.0`, rehearse with a `dry_run` of `release.yml`, then tag `v0.2.0` — `REL-02` (the pipeline itself is fixed; only action SHA-pinning is left, `REL-03`)
-- [ ] **Match confidence ignores non-Latin letters** (two different Japanese/Russian songs score as an exact match) — Unicode-aware normalisation, empty ≠ equal — `MD-01`
 - [ ] **MusicBrainz IDs never reach the saved file** — "Include MusicBrainz tags" setting (the option is hard-coded `false`), show the MB ID rows, set `MusicBrainzReleaseId` — `MD-03`, `P27/T27.4`
 - [ ] Status per service (Spotify, Ytdlp, etc...) instead of per task — `P25`
 - [ ] Easier `cookies.txt` extraction for yt-dlp (drag and drop? step by step instructions?) — `P24/T24.3`
@@ -23,7 +22,6 @@
 - [ ] Self-update must exit through `exitApp()`; handle `uncaughtException` / `SIGTERM` / `SIGHUP` so the terminal is restored and the session saved — `DATA-06`, `DATA-07`
 - [ ] Surface persistence failures, retry on exit, lock against a second instance — `DATA-05`
 - [ ] Logging: log a task id not the whole task, serialise `Error`s, rotate `app.log` instead of truncating it — `DATA-10`
-- [ ] Don't cache fallbacks / "not found" for 90 days; de-duplicate in-flight calls — `MD-02`
 - [ ] Stale selection after deleting the last task; settings row at 80 columns; "terminal too small" message below ~66 columns — `UI-07`, `UI-04`, `UI-06`
 
 **Product**
