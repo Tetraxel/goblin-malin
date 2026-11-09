@@ -1025,6 +1025,11 @@
   resolved "https://registry.yarnpkg.com/@vitest/spy/-/spy-5.1.0.tgz#0a10d0ca39c0df70951715ba1081dd186a451c23"
   integrity sha512-2DPO5OMHWKrBngC+fCmTQqemNF0gidRhp3lxbBmRhW+M1XJrfgPpqNqWVevXtn2f2ufD5ZaR1B6B641aAlcX5A==
 
+"@xterm/addon-unicode11@^0.9.0":
+  version "0.9.0"
+  resolved "https://registry.yarnpkg.com/@xterm/addon-unicode11/-/addon-unicode11-0.9.0.tgz#e1811bb75d9d783c36bd7126066d8084be70c799"
+  integrity sha512-FxDnYcyuXhNl+XSqGZL/t0U9eiNb/q3EWT5rYkQT/zuig8Gz/VagnQANKHdDWFM2lTMk9ly0EFQxxxtZUoRetw==
+
 "@xterm/headless@^6.0.0":
   version "6.0.0"
   resolved "https://registry.yarnpkg.com/@xterm/headless/-/headless-6.0.0.tgz#a839dee397c49834bb220fa5951d60f4b7f0aa11"

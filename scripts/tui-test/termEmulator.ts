@@ -1,12 +1,21 @@
 import { createRequire } from "node:module";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { Terminal as ITerminal, ITerminalInitOnlyOptions, ITerminalOptions, IBufferCell } from "@xterm/headless";
+import type {
+    Terminal as ITerminal,
+    ITerminalAddon,
+    ITerminalInitOnlyOptions,
+    ITerminalOptions,
+    IBufferCell,
+} from "@xterm/headless";
 
 const _require = createRequire(import.meta.url);
 
 const { Terminal } = _require("@xterm/headless") as {
     Terminal: new (options?: ITerminalOptions & ITerminalInitOnlyOptions) => ITerminal;
+};
+const { Unicode11Addon } = _require("@xterm/addon-unicode11") as {
+    Unicode11Addon: new () => ITerminalAddon;
 };
 
 // Standard xterm-256color 256-color palette
@@ -96,6 +105,9 @@ export class TermEmulator {
         this.cols = cols;
         this.rows = rows;
         this.terminal = new Terminal({ cols, rows, allowProposedApi: true });
+        // xterm's default Unicode-6 table counts emoji as 1 cell; the app (string-width) counts 2.
+        this.terminal.loadAddon(new Unicode11Addon());
+        this.terminal.unicode.activeVersion = "11";
     }
 
     feed(data: string): void {
