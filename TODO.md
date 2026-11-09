@@ -37,9 +37,9 @@
 - [ ] README: features, shortcuts, how to quit, data/log locations, privacy (update check, Songlink/Claude), troubleshooting — `DOC-03`
 - [ ] Delete or regenerate `docs/audit/*` (stale; `CLAUDE.md` tells agents to read it first) — `DOC-01`
 - [ ] `CHANGELOG.md` for 0.2.0, `.gitattributes`, licence check for the bundled audio samples — `DOC-07`
-- [ ] Dependencies: `axios`/`ws` resolutions, `adm-zip` 0.6.x, minor bumps — `DEP-02`, `DEP-03`
+- [ ] Dependencies left: `zod` advisory (waits for `ytmusic-api` on zod 4), ESLint 10 (waits for `eslint-plugin-react`; add `cause`s), TypeScript 7 (waits for `typescript-eslint`) — `DEP-02`, `DEP-03`
 - [ ] Type-check and lint `tests/` and `scripts/`, hermetic e2e tests (fixtures with their own `appDataDir`), unit tests green on Linux CI, then enable them there — `TEST-01`, `TEST-02`
-- [ ] Remaining `REL-03` / `REL-07` leftovers: `patch-pkg-compat.mjs`, undeclared `esbuild` in `scripts/`, drop `emitDecoratorMetadata`
+- [ ] Remaining `REL-03` / `REL-07` leftovers: pin release actions by SHA, drop `emitDecoratorMetadata` (and then `@swc/core`)
 - [ ] **Linux has no working ffmpeg/ffprobe download** — `resolveFfmpegSource` has a macOS branch and treats everything else as Windows (fetches the win64 zip); check, and either add a Linux build or state Linux is unsupported
 
 ## 🟣 Promised by the former `README-TARGET` but not built yet

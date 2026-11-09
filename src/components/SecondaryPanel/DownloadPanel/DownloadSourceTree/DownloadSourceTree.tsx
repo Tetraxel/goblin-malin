@@ -154,6 +154,11 @@ function itemHeight(item: TreeItem, index: number, items: TreeItem[]): number {
     }
 }
 
+/** Lines that head the rows under them: the provider header, the "used …" line, the query lines. */
+function isRowContext(item: TreeItem): boolean {
+    return item.type === "provider-header" || item.type === "metadata-header" || item.type === "query-lines";
+}
+
 /** Whether the player is on this source's file (the downloaded one, or the copy saved from it). */
 function playbackOf(source: TrackDownloadSource, nowPlaying: NowPlaying): "playing" | "paused" | undefined {
     if (!nowPlaying) return undefined;
@@ -217,11 +222,16 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
           );
     // The "show more" row hangs off the row above it: keep it in view together with that row.
     const focusItemIndex = treeItems[focusedRowIndex + 1]?.type === "more-row" ? focusedRowIndex + 1 : focusedRowIndex;
+    // The provider header, "used …" line and query lines right above a row belong with it: scrolling back
+    // up to the first row of a group shows them too, so the top of the list is reachable again.
+    let contextIndex = focusedRowIndex;
+    while (!onSaved && contextIndex > 0 && isRowContext(treeItems[contextIndex - 1])) contextIndex--;
     const { start: windowStart, end: windowEnd } = computeWindow(
         treeItems.map((item, i) => itemHeight(item, i, treeItems)),
         focusItemIndex,
         scrollStart,
-        height
+        height,
+        contextIndex
     );
     if (windowStart !== scrollStart) setScrollStart(windowStart);
     useWheelTarget(treeRef, (delta) =>

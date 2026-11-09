@@ -1,5 +1,5 @@
 import * as path from "path";
-import { SlskFile } from "slsk-client";
+import { FileAttribute, type FileAttributes, type SearchResult } from "slsk-client";
 
 // Files bigger than this are less interesting — likely a whole album/rip
 // rather than a single track.
@@ -43,7 +43,35 @@ export type RankingQuery = {
     trackTitle: string;
     albumName?: string;
     extension: string;
+    /** The track's length, when the metadata knows it. */
+    durationMs?: number;
 };
+
+/**
+ * How far a file's duration may drift from the track's before it is taken for another recording (a DJ set,
+ * an album rip, another version). Checked twice: on the length the peer announces in its search result, and
+ * on the length measured in the downloaded file, for peers that announce none.
+ */
+export const DURATION_TOLERANCE_MS = 10_000;
+
+/** The audio details a peer announced for a file. Any of them can be missing: peers send what they want. */
+export type AnnouncedAudio = {
+    durationMs?: number;
+    bitrateKbps?: number;
+    sampleRateHz?: number;
+    bitDepth?: number;
+};
+
+export function announcedAudio(result: { attribs?: FileAttributes }): AnnouncedAudio {
+    const attribs = result.attribs ?? {};
+    const seconds = attribs[FileAttribute.Duration];
+    return {
+        durationMs: seconds ? seconds * 1000 : undefined,
+        bitrateKbps: attribs[FileAttribute.Bitrate] || undefined,
+        sampleRateHz: attribs[FileAttribute.SampleRate] || undefined,
+        bitDepth: attribs[FileAttribute.BitDepth] || undefined,
+    };
+}
 
 /**
  * Score a search result for ranking — higher is better, -1 means disqualified.
@@ -52,26 +80,40 @@ export type RankingQuery = {
  *
  * A peer with no free upload slot is NOT disqualified: its file is still a real result worth
  * listing (it would just wait in that peer's queue). `rankResults` sorts those after every
- * free-slot result instead.
+ * free-slot result instead, and among them a shorter queue scores higher.
  */
-export function calculateResultWeight(result: SlskFile, query: RankingQuery): number {
+export function calculateResultWeight(result: SearchResult, query: RankingQuery): number {
     const { folderPath, fileName, fileExtension } = parseFilePath(result.file);
+    const audio = announcedAudio(result);
 
     if (fileExtension !== query.extension) return -1;
     if (contains(fileName, "remix") !== contains(query.trackTitle, "remix")) return -1;
+    // Not worth downloading only to measure it and throw it away.
+    if (
+        query.durationMs != null &&
+        audio.durationMs != null &&
+        Math.abs(audio.durationMs - query.durationMs) > DURATION_TOLERANCE_MS
+    ) {
+        return -1;
+    }
 
     const sizeInMB = result.size / (1024 * 1024);
     let score =
         sizeInMB > MAX_PREFERRED_SIZE_MB
             ? Math.log(result.size) / 10 - (sizeInMB - MAX_PREFERRED_SIZE_MB) / 10
             : Math.log(result.size) / 10;
-    score += result.bitrate ? result.bitrate / 2000 : 0;
+    score += audio.bitrateKbps ? audio.bitrateKbps / 2000 : 0;
     score += Math.log(result.speed) / 20;
 
     if (contains(fileName, "extended")) score *= 3.0;
     if (contains(fileName, "club mix")) score *= 2.0;
     if (contains(fileName, query.trackTitle)) score *= 1.3;
     if (query.albumName && contains(folderPath, query.albumName)) score *= 1.3;
+    // Below CD quality, the file was downsampled somewhere along the way; 24-bit is a real hi-res master.
+    if (audio.sampleRateHz != null && audio.sampleRateHz < 44_100) score *= 0.5;
+    if (audio.bitDepth != null && audio.bitDepth >= 24) score *= 1.1;
+    // Every file already waiting in that peer's queue is a wait before ours starts.
+    if (!result.slots && result.queueLength) score /= 1 + Math.log1p(result.queueLength) / 3;
 
     return score;
 }
@@ -81,10 +123,9 @@ export function calculateResultWeight(result: SlskFile, query: RankingQuery): nu
  * Peers with a free upload slot come first (the only ones worth downloading from automatically —
  * a queued peer can take far longer than the download timeout), each group ordered by weight.
  * The same peer can answer a search more than once, so the exact same file (user + path)
- * is only kept once — slsk-client also keys its downloads by `user_file`, so duplicates
- * would collide inside the library anyway.
+ * is only kept once.
  */
-export function rankResults(results: SlskFile[], query: RankingQuery, limit = Infinity): SlskFile[] {
+export function rankResults(results: SearchResult[], query: RankingQuery, limit = Infinity): SearchResult[] {
     const seen = new Set<string>();
     const unique = results.filter((result) => {
         const key = `${result.user}\0${result.file}`;

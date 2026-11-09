@@ -1,11 +1,9 @@
 import { APP_VERSION } from "#constants";
-import { IS_SEA } from "./installSource";
 
 export interface UpdateInfo {
     hasUpdate: boolean;
     latestVersion: string;
     releaseUrl: string;
-    downloadUrl: string | null;
 }
 
 function isNewer(local: string, remote: string): boolean {
@@ -24,17 +22,11 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
             signal: AbortSignal.timeout(8000),
         });
         if (!res.ok) return null;
-        const data = (await res.json()) as {
-            tag_name: string;
-            html_url: string;
-            assets: Array<{ name: string; browser_download_url: string }>;
-        };
-        const exeAsset = IS_SEA ? data.assets.find((a) => a.name.endsWith(".exe")) : undefined;
+        const data = (await res.json()) as { tag_name: string; html_url: string };
         return {
             hasUpdate: isNewer(APP_VERSION, data.tag_name),
             latestVersion: data.tag_name.replace(/^v/, ""),
             releaseUrl: data.html_url,
-            downloadUrl: exeAsset?.browser_download_url ?? null,
         };
     } catch {
         return null;

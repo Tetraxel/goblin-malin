@@ -6,7 +6,9 @@ import { useCallback, useEffect, useState } from "react";
  * that reflect the current size of the terminal (rows and columns in stdout).
  */
 export function useScreenSize() {
-    const { stdout } = useStdout();
+    // Ink 8 types stdout as a generic stream; the app always renders to the terminal
+    // (process.stdout, a TTY), which has rows/columns.
+    const stdout = useStdout().stdout as NodeJS.WriteStream;
     const getSize = useCallback(() => ({ height: stdout.rows, width: stdout.columns }), [stdout]);
     const [size, setSize] = useState(getSize);
 

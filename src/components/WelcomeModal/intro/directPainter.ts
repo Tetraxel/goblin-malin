@@ -18,7 +18,7 @@ export class DirectPainter {
     private writing = false;
     private lastFullPaint = 0;
 
-    constructor(private readonly stdout: NodeJS.WriteStream) {}
+    constructor(private readonly stdout: NodeJS.WritableStream) {}
 
     /** Forget what's on screen, so the next frame repaints everything. */
     invalidate(): void {

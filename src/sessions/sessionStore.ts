@@ -4,7 +4,7 @@ import { EventEmitter } from "events";
 import { DEFAULT_APP_DATA_DIR } from "#constants";
 import { globalLogger } from "#base/logger/logger";
 import { dataFileNoticeBridge } from "#base/bridges/dataFileNoticeBridge";
-import { isPlainObject, loadDataFile, Parsed, refreshBackup, runMigrations } from "#utils/dataFile";
+import { isPlainObject, loadDataFile, Parsed, refreshBackup, renameReplacing, runMigrations } from "#utils/dataFile";
 import { StoredSession, SessionsFile } from "./types";
 
 export const SESSIONS_PATH = path.join(DEFAULT_APP_DATA_DIR, "sessions.json");
@@ -21,6 +21,12 @@ const RETRY_MAX_MS = 30_000;
 /** How long `flush()` keeps retrying a failing write before giving up (it must fit inside the close timeout). */
 const FLUSH_TIMEOUT_MS = 4000;
 const FLUSH_RETRY_MS = 150;
+/**
+ * Failed writes in a row before the user is told. A file held for a moment by another program is already
+ * retried inside each write; this keeps one unlucky moment from becoming a dialog. The third failure comes
+ * at least ~1.5 s after the first (sooner retries happen when new changes arrive meanwhile).
+ */
+const NOTIFY_AFTER_FAILURES = 3;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -79,7 +85,11 @@ export class SessionStore {
     private readOnly = false;
     private backedUp = false;
 
-    constructor(private readonly filePath: string = SESSIONS_PATH) {}
+    constructor(
+        private readonly filePath: string = SESSIONS_PATH,
+        /** Waits between quick retries of a briefly locked file inside one write (tests shorten them). */
+        private readonly renameRetryDelaysMs?: readonly number[]
+    ) {}
 
     static getInstance(): SessionStore {
         if (!SessionStore.instance) SessionStore.instance = new SessionStore();
@@ -95,7 +105,7 @@ export class SessionStore {
 
     private writing = false;
     private dirty = false;
-    /** Consecutive failed writes; the user is told on the first one only, then again after a success. */
+    /** Consecutive failed writes; the user is told once per streak (see NOTIFY_AFTER_FAILURES). */
     private failures = 0;
     private retryTimer: NodeJS.Timeout | null = null;
     private tmpCounter = 0;
@@ -136,9 +146,10 @@ export class SessionStore {
                 tmp = `${this.filePath}.${process.pid}.${this.tmpCounter++}.tmp`;
                 // Compact JSON: smaller payload → faster stringify + write.
                 await fs.promises.writeFile(tmp, JSON.stringify(snapshot), "utf-8");
-                await fs.promises.rename(tmp, this.filePath);
+                await renameReplacing(tmp, this.filePath, this.renameRetryDelaysMs);
                 tmp = null;
             }
+            if (this.failures > 0) globalLogger.info(`Sessions file saved again after ${this.failures} failed attempt(s)`);
             this.failures = 0;
         } catch (error) {
             // Persistence failures must not crash the UI: keep the data in memory and retry.
@@ -150,12 +161,12 @@ export class SessionStore {
         }
     }
 
-    /** Logs the failure, tells the user once per streak, and schedules a retry with a growing delay. */
+    /** Logs the failure, tells the user once a streak lasts, and schedules a retry with a growing delay. */
     private onWriteFailed(error: unknown): void {
         this.failures++;
         const reason = error instanceof Error ? error.message : String(error);
         globalLogger.warn(`Could not save the sessions file (attempt ${this.failures}): ${reason}`);
-        if (this.failures === 1) {
+        if (this.failures === NOTIFY_AFTER_FAILURES) {
             dataFileNoticeBridge.report({
                 title: "Your sessions couldn't be saved",
                 message: `Writing ${this.filePath} failed (${reason}). Your work is kept in memory and saving is retried, but if the app closes before it succeeds, the latest changes are lost. Check that the disk isn't full and that no other program (antivirus, sync) is locking the file.`,

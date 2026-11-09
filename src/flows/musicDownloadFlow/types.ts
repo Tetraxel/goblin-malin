@@ -360,6 +360,13 @@ export type SourceCandidate = {
     sizeBytes?: number;
     /** A short caveat worth showing next to the row (e.g. "queued": the peer has no free slot). */
     note?: string;
+    /** What the provider says about the audio before it is downloaded (Soulseek peers announce some of it). */
+    audio?: {
+        durationMs?: number;
+        bitrateKbps?: number;
+        sampleRateHz?: number;
+        bitDepth?: number;
+    };
 };
 
 /**

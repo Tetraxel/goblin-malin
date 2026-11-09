@@ -38,6 +38,34 @@ function readJsonFile(filePath: string): ReadResult {
 
 export const backupPath = (filePath: string): string => `${filePath}.bak`;
 
+/** Errors Windows gives while another program (antivirus, indexer, sync, an editor's watcher) briefly has the target open. */
+const TRANSIENT_RENAME_ERRORS = new Set(["EPERM", "EACCES", "EBUSY"]);
+/** Waits between quick retries: ~0.6 s in all, about how long such a scan holds a file. */
+const RENAME_RETRY_DELAYS_MS = [20, 40, 80, 160, 300];
+
+/**
+ * `rename(from, to)` that replaces `to`, retrying a few times when Windows reports the target as briefly
+ * locked (the same thing `graceful-fs` does for npm). Any other error, or a lock that outlasts the retries,
+ * is thrown.
+ */
+export async function renameReplacing(
+    from: string,
+    to: string,
+    delaysMs: readonly number[] = RENAME_RETRY_DELAYS_MS
+): Promise<void> {
+    for (let attempt = 0; ; attempt++) {
+        try {
+            await fs.promises.rename(from, to);
+            return;
+        } catch (error) {
+            const code = (error as NodeJS.ErrnoException).code;
+            const delay = delaysMs[attempt];
+            if (delay === undefined || !code || !TRANSIENT_RENAME_ERRORS.has(code)) throw error;
+            await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+    }
+}
+
 const stamp = (): string => new Date().toISOString().replace(/[:.]/g, "-");
 
 /** Moves a damaged file out of the way (copying it if it can't be moved). Returns where it went, or `null`. */

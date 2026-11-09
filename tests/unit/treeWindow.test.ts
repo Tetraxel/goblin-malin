@@ -41,6 +41,20 @@ describe("computeWindow", () => {
         expect(end).toBeGreaterThan(4);
     });
 
+    test("scrolling up to a group's first row also shows the headers above it", () => {
+        // 0 provider header, 1 "used …" line, 2..29 rows; window was scrolled down to start at row 5.
+        expect(computeWindow(ones(30), 2, 5, 10, 0)).toEqual({ start: 0, end: 10 });
+    });
+
+    test("headers above the cursor don't move a window that already shows the cursor", () => {
+        expect(computeWindow(ones(30), 14, 0, 10, 12)).toEqual({ start: 5, end: 15 });
+    });
+
+    test("when the headers don't all fit, the cursor wins and the top headers are cut", () => {
+        // 6 lines of headers (0..5) above the cursor at 6, in a 4-line box.
+        expect(computeWindow(ones(10), 6, 8, 4, 0)).toEqual({ start: 3, end: 7 });
+    });
+
     test("always includes the cursor even when it is taller than the box", () => {
         const { start, end } = computeWindow([1, 1, 8], 2, 0, 5);
         expect(start).toBeLessThanOrEqual(2);

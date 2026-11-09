@@ -5,6 +5,10 @@ import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { ConfirmModalConfig } from "./useConfirmModal";
 import { Hint } from "../Hint";
+import type { FocusableWindow } from "#hooks/useFocusManager";
+
+/** Windows rendered after `ConfirmModal` in `AppInner`, i.e. drawn on top of it. */
+const DRAWN_ABOVE: ReadonlySet<FocusableWindow> = new Set(["tempCleanupModal", "updateModal"]);
 
 interface ConfirmModalProps {
     pendingConfig: ConfirmModalConfig | null;
@@ -39,6 +43,16 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             switchBack();
         };
     }, [pendingConfig, switchWindow, switchBack]);
+
+    // This dialog is drawn above the other windows, so it must also own the keyboard. A window that takes
+    // focus on its own after the dialog opened (e.g. the setup wizard a task asks for) would otherwise get the
+    // keys meant for it, and the dialog could not be answered or closed. Closing it then returns focus to
+    // that window. The few windows drawn above this dialog (see `AppInner`) keep their focus.
+    useEffect(() => {
+        if (pendingConfig && activeWindow !== "confirmModal" && !DRAWN_ABOVE.has(activeWindow)) {
+            switchWindow("confirmModal");
+        }
+    }, [pendingConfig, activeWindow, switchWindow]);
 
     const choiceCount = pendingConfig?.choices.length ?? 1;
     const isActive = pendingConfig !== null && activeWindow === "confirmModal";

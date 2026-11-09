@@ -3,14 +3,12 @@ name: Release
 # Pipeline (nothing becomes public until everything before it has passed):
 #
 #   verify ──┐
-#   check  ──┼─> build-exe ──> publish-npm ──> github-release
-#            ┘
+#   check  ──┴─> publish-npm ──> github-release
 #
 #   verify          the tag must be `v` + the version in package.json
 #   check           the full CI workflow (type-check, lint, build, unit tests) on the tagged commit
-#   build-exe       builds the Windows exe and keeps it as a workflow artifact (not public yet)
 #   publish-npm     `npm publish` -- the one step that cannot be undone, so it runs after everything that can fail
-#   github-release  attaches the already-built exe to the GitHub release
+#   github-release  creates the GitHub release for the tag (release notes generated from the commits)
 #
 # Trigger it by pushing a `v*` tag. To rehearse, run it by hand (Actions -> Release -> Run workflow) with
 # `dry_run` ticked: it does everything except publish to npm and create the GitHub release (`npm pack --dry-run`
@@ -67,40 +65,9 @@ jobs:
         with:
             ref: ${{ inputs.tag || github.ref }}
 
-    build-exe:
-        name: Build Windows exe
-        needs: [verify, check]
-        runs-on: windows-latest
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  ref: ${{ inputs.tag || github.ref }}
-
-            - uses: actions/setup-node@v4
-              with:
-                  node-version: "22"
-                  cache: yarn
-
-            # `--frozen-lockfile` is the Yarn 1 flag that fails on a stale yarn.lock (`--immutable` is Yarn 2+ and
-            # is silently ignored by Yarn 1, which then rewrites the lockfile).
-            - name: Install dependencies
-              run: yarn install --frozen-lockfile
-
-            - name: Build
-              run: yarn build
-
-            - name: Package executable
-              run: yarn package:win
-
-            - uses: actions/upload-artifact@v4
-              with:
-                  name: goblin-malin-win-x64
-                  path: releases/windows/goblin-malin-win-x64.exe
-                  if-no-files-found: error
-
     publish-npm:
         name: Publish to npm
-        needs: [build-exe]
+        needs: [verify, check]
         runs-on: ubuntu-latest
         permissions:
             contents: read
@@ -121,6 +88,8 @@ jobs:
             - name: Update npm
               run: npm install -g npm@11
 
+            # `--frozen-lockfile` is the Yarn 1 flag that fails on a stale yarn.lock (`--immutable` is Yarn 2+ and
+            # is silently ignored by Yarn 1, which then rewrites the lockfile).
             - name: Install dependencies
               run: yarn install --frozen-lockfile
 
@@ -143,14 +112,9 @@ jobs:
         permissions:
             contents: write
         steps:
-            - uses: actions/download-artifact@v4
-              with:
-                  name: goblin-malin-win-x64
-                  path: release-assets
-
             - uses: softprops/action-gh-release@v2
               with:
-                  files: release-assets/goblin-malin-win-x64.exe
                   tag_name: ${{ env.TAG }}
+                  generate_release_notes: true
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

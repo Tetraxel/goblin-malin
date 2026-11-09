@@ -4,7 +4,7 @@ import { useClickTarget } from "#base/mouse/useMouseTarget";
 import { useTheme } from "#base/themeContext";
 import { TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 import { getProvenanceDisplay } from "#flows/musicDownloadFlow/utils/provenance";
-import { formatBytes } from "#components/SecondaryPanel/DownloadPanel/utils";
+import { formatAnnouncedAudio, formatBytes } from "#components/SecondaryPanel/DownloadPanel/utils";
 import { PlaybackIndicator } from "#components/PlaybackIndicator";
 import { StateBadge } from "../StateBadge";
 
@@ -43,6 +43,8 @@ export function SourceFileRow({
     const candidate = source.candidate;
     const sizeBytes = source.fileInfo?.sizeBytes ?? candidate?.sizeBytes;
     const sizeText = sizeBytes != null ? formatBytes(sizeBytes) : "";
+    // Until the file is here, the quality its provider announced (the real one replaces it once probed).
+    const announcedText = localFile ? "" : formatAnnouncedAudio(candidate?.audio);
     const provenance = getProvenanceDisplay(source.fileInfo);
     const provenanceColor =
         provenance.tone === "success"
@@ -130,6 +132,13 @@ export function SourceFileRow({
                 <Box minWidth={provenance.badge.length + 1} paddingLeft={1} flexShrink={0}>
                     <Text color={provenanceColor} dimColor={source.isRejected} strikethrough={source.isRejected}>
                         {provenance.badge}
+                    </Text>
+                </Box>
+            )}
+            {announcedText !== "" && (
+                <Box paddingLeft={1} flexShrink={0}>
+                    <Text color={theme.text.secondary} dimColor strikethrough={source.isRejected}>
+                        {announcedText}
                     </Text>
                 </Box>
             )}

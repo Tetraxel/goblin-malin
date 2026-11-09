@@ -7,8 +7,7 @@ import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { Hint } from "../Hint";
 import { APP_VERSION } from "#constants";
-import { IS_SEA, getInstaller, getUpdateArgv, getUpdateCommand } from "#updater/installSource";
-import { openUrl } from "#utils/openUrl";
+import { getInstaller, getUpdateArgv, getUpdateCommand } from "#updater/installSource";
 import { globalLogger } from "#base/logger/logger";
 import { exitApp } from "#utils/exitApp";
 
@@ -42,8 +41,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
         };
     }, []);
 
-    // npm: 0 = run update command, 1 = open release page
-    // SEA: single option (open release page), selectedIndex unused
+    // 0 = run update command, 1 = open release page
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [pkgStatus, setPkgStatus] = useState<PkgUpdateState>("idle");
     const [pkgOutput, setPkgOutput] = useState<string[]>([]);
@@ -53,14 +51,6 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     }, [switchBack]);
 
     const handleConfirm = useCallback(() => {
-        if (IS_SEA) {
-            // open package is pre-bundled as a shim in SEA builds and may fail silently;
-            // openUrl uses the platform's native opener directly (no shell).
-            openUrl(releaseUrl);
-            switchBack();
-            return;
-        }
-
         if (pkgStatus === "done") {
             // Through the normal close, so the pending session is saved and the terminal is restored.
             exitApp();
@@ -136,7 +126,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                 defaultShortcut: { key: "upArrow" },
                 label: "",
                 handler: () => {
-                    if (!IS_SEA && pkgStatus === "idle") setSelectedIndex(0);
+                    if (pkgStatus === "idle") setSelectedIndex(0);
                 },
             },
             {
@@ -144,7 +134,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                 defaultShortcut: { key: "downArrow" },
                 label: "",
                 handler: () => {
-                    if (!IS_SEA && pkgStatus === "idle") setSelectedIndex(1);
+                    if (pkgStatus === "idle") setSelectedIndex(1);
                 },
             },
         ],
@@ -153,9 +143,8 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     if (!isActive) return null;
 
     const modalWidth = Math.min(100, terminalWidth - 4);
-    // SEA has no progress states — always "idle" from the modal's perspective
-    const isIdle = IS_SEA || pkgStatus === "idle";
-    const isInProgress = !IS_SEA && pkgStatus === "running";
+    const isIdle = pkgStatus === "idle";
+    const isInProgress = pkgStatus === "running";
 
     return (
         <Box
@@ -194,38 +183,29 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
 
                 {isIdle && (
                     <Box flexDirection="column" marginTop={1}>
-                        {IS_SEA ? (
-                            <Box flexDirection="row" flexShrink={0}>
-                                <Text color={theme.ui.focusIndicator}>☛ Open release page</Text>
-                            </Box>
-                        ) : (
-                            <>
-                                <Box flexDirection="row" flexShrink={0}>
-                                    <Text color={selectedIndex === 0 ? theme.ui.focusIndicator : theme.text.primary}>
-                                        {selectedIndex === 0 ? "☛ " : "  "}
-                                        {"Update with "}
-                                    </Text>
-                                    <Text
-                                        color={selectedIndex === 0 ? theme.ui.focusIndicator : theme.action.primary}
-                                        underline={selectedIndex === 0}
-                                        bold
-                                    >
-                                        {updateCommand}
-                                    </Text>
-                                </Box>
-                                <Box flexDirection="row" flexShrink={0}>
-                                    <Text color={selectedIndex === 1 ? theme.ui.focusIndicator : theme.text.primary}>
-                                        {selectedIndex === 1 ? "☛ " : "  "}
-                                        Open release page
-                                    </Text>
-                                </Box>
-                            </>
-                        )}
+                        <Box flexDirection="row" flexShrink={0}>
+                            <Text color={selectedIndex === 0 ? theme.ui.focusIndicator : theme.text.primary}>
+                                {selectedIndex === 0 ? "☛ " : "  "}
+                                {"Update with "}
+                            </Text>
+                            <Text
+                                color={selectedIndex === 0 ? theme.ui.focusIndicator : theme.action.primary}
+                                underline={selectedIndex === 0}
+                                bold
+                            >
+                                {updateCommand}
+                            </Text>
+                        </Box>
+                        <Box flexDirection="row" flexShrink={0}>
+                            <Text color={selectedIndex === 1 ? theme.ui.focusIndicator : theme.text.primary}>
+                                {selectedIndex === 1 ? "☛ " : "  "}
+                                Open release page
+                            </Text>
+                        </Box>
                     </Box>
                 )}
 
-                {/* npm: running */}
-                {!IS_SEA && pkgStatus === "running" && (
+                {pkgStatus === "running" && (
                     <Box flexDirection="column" marginTop={1}>
                         <Text color={theme.ui.focusIndicator}>Updating via {installer}...</Text>
                         {pkgOutput.map((line, i) => (
@@ -236,16 +216,14 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                     </Box>
                 )}
 
-                {/* npm: done */}
-                {!IS_SEA && pkgStatus === "done" && (
+                {pkgStatus === "done" && (
                     <Box flexDirection="column" marginTop={1}>
                         <Text color={theme.status.success}>Updated successfully.</Text>
                         <Text dimColor>Restart to use v{latestVersion}.</Text>
                     </Box>
                 )}
 
-                {/* npm: error */}
-                {!IS_SEA && pkgStatus === "error" && (
+                {pkgStatus === "error" && (
                     <Box flexDirection="column" marginTop={1}>
                         <Text color={theme.status.error}>Update failed.</Text>
                         {pkgOutput.map((line, i) => (
@@ -259,7 +237,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                 <Box marginTop={1} flexDirection="row">
                     {isIdle && (
                         <>
-                            {!IS_SEA && <Hint label="Select" shortcutIds={["updateModal.up", "updateModal.down"]} />}
+                            <Hint label="Select" shortcutIds={["updateModal.up", "updateModal.down"]} />
                             <Hint label="Confirm" shortcutId="updateModal.confirm" />
                             <Hint label="Dismiss" shortcutId="updateModal.close" />
                         </>

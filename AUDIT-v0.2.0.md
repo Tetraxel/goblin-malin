@@ -8,10 +8,10 @@
         - [A. Build, release \& packaging](#a-build-release--packaging)
             - [REL-02 — `package.json` says `0.1.15`, but nothing was ever released under that number (registry is at `0.1.14`)](#rel-02--packagejson-says-0115-but-nothing-was-ever-released-under-that-number-registry-is-at-0114)
             - [REL-03 — The actions in the release workflow are pinned by tag, not by commit SHA](#rel-03--the-actions-in-the-release-workflow-are-pinned-by-tag-not-by-commit-sha)
-            - [REL-07 — Packaging leftovers: the `pkg` patch script, undeclared imports in `scripts/`, `emitDecoratorMetadata`](#rel-07--packaging-leftovers-the-pkg-patch-script-undeclared-imports-in-scripts-emitdecoratormetadata)
+            - [REL-07 — Packaging leftover: `emitDecoratorMetadata` keeps a hidden swc build path](#rel-07--packaging-leftover-emitdecoratormetadata-keeps-a-hidden-swc-build-path)
         - [B. Dependencies \& supply chain](#b-dependencies--supply-chain)
-            - [DEP-02 — `yarn audit`: 97 advisories (0 critical, 57 high, 37 moderate, 3 low); reachable runtime chains](#dep-02--yarn-audit-97-advisories-0-critical-57-high-37-moderate-3-low-reachable-runtime-chains)
-            - [DEP-03 — Outdated dependencies](#dep-03--outdated-dependencies)
+            - [DEP-02 — `yarn audit`: 1 advisory left (`zod` via `ytmusic-api`), no fix available](#dep-02--yarn-audit-1-advisory-left-zod-via-ytmusic-api-no-fix-available)
+            - [DEP-03 — Outdated dependencies: two majors deferred](#dep-03--outdated-dependencies-two-majors-deferred)
         - [C. Data safety, persistence \& state](#c-data-safety-persistence--state)
             - [❌ DATA-09 — About 460 MB of tool binaries live under `%APPDATA%` (Roaming)](#-data-09--about-460-mb-of-tool-binaries-live-under-appdata-roaming)
         - [E. Metadata \& discovery](#e-metadata--discovery)
@@ -63,7 +63,7 @@ The two blockers found here — `yarn build` failing, and a fresh install unable
 
 | #   | ID                | Sev.   | One-liner                                                                                       |
 | --- | ----------------- | ------ | ----------------------------------------------------------------------------------------------- |
-| 1   | [DEP-02](#dep-02) | medium | 97 `yarn audit` advisories; the runtime chains (`axios`, `adm-zip`, `ws`) need deliberate bumps |
+| 1   | [DEP-02](#dep-02) | low    | 1 `yarn audit` advisory left (`zod` via `ytmusic-api`); it waits for upstream                   |
 
 ### Counts
 
@@ -72,7 +72,7 @@ The two blockers found here — `yarn build` failing, and a fresh install unable
 | Area                                       | blocker |  high | medium |    low |  total |
 | ------------------------------------------ | ------: | ----: | -----: | -----: | -----: |
 | Build, release & packaging (`REL-`)        |         |       |        |      3 |      3 |
-| Dependencies & supply chain (`DEP-`)       |         |       |      1 |      1 |      2 |
+| Dependencies & supply chain (`DEP-`)       |         |       |        |      2 |      2 |
 | Data safety, persistence & state (`DATA-`) |         |       |      1 |        |      1 |
 | Metadata & discovery (`MD-`)               |         |       |      1 |      1 |      2 |
 | UI / TUI behaviour (`UI-`)                 |         |       |        |      5 |      5 |
@@ -80,7 +80,7 @@ The two blockers found here — `yarn build` failing, and a fresh install unable
 | Tests, CI & tooling (`TEST-`)              |         |       |      2 |      3 |      5 |
 | Docs, instructions & hygiene (`DOC-`)      |         |       |      2 |      3 |      5 |
 | Product & UX (`PROD-`)                     |         |       |      3 |      1 |      4 |
-| **Total**                                  |   **0** | **0** | **10** | **18** | **28** |
+| **Total**                                  |   **0** | **0** |  **9** | **19** | **28** |
 
 Plus 9 unconfirmed candidates in [section K](#k-candidates-to-verify-found-while-reading-not-confirmed) (not counted).
 
@@ -88,7 +88,7 @@ Plus 9 unconfirmed candidates in [section K](#k-candidates-to-verify-found-while
 
 ### Already fixed
 
-Removed from this file once fixed and committed (what was found, the fix and how it was checked are in the file's git history: `git log -p -- AUDIT-v0.2.0.md`): **REL-01** (`yarn build`), **REL-04** (`engines`), **REL-05** (`postinstall`), **DEP-01** (unused dependencies), **DATA-01** ("Clear temporary downloads"), **DATA-02** and **DATA-03** (`sessions.json` / `settings.json` validation, quarantine, `.bak`, versioning), **DATA-04** (the data folder is derived, never stored), **DATA-05** (visible write failures, bounded retry on close, unique temp names, one instance per data folder), **DATA-06** (self-update exits through `exitApp()`), **DATA-07** (crash/signal handlers restore the terminal and save; console patch moved to the entry points), **MD-01** (confidence normalisation keeps every script and strips only accents; empty names score 0; live/remix/karaoke/cover versions are penalised; `tests/unit/confidence.test.ts`), **MD-02** (scraped Spotify answers are never cached; "nothing found" discovery results are kept 1 day, not 90; concurrent identical calls share one request; `tests/unit/cache.test.ts` — caches written before the fix may still hold old entries until they expire or "Clear cache"), **REL-06** (no more `prepack`/`postpack`: the README carries absolute image URLs, `patch-readme.mjs` is gone), **SEC-01** (`openUrl` spawns the native opener with an argv array — no shell, http(s) only; the updater takes a program + args from `getUpdateArgv`, with the version validated as semver, and uses a shell only on Windows for the `.cmd` shims; `tests/unit/shellSafety.test.ts`), **UI-01** (a link pasted into a focused text field stays in the field; scheme-less links and `spotify:` URIs are understood), **UI-02** (`Ctrl+Q`, rebindable `global.quit`, asks first; a second press quits at once), **DOC-02** (`.env.example`), **DOC-05** (`TODO.md`), **PROD-02** (dotenv banner), **DATA-08** (temporary downloads are cleaned by how recently a session used them — manual age picker, start-up reminder, opt-in 48 h auto-clean, size row in Settings, sources marked "File not found" after a clean-up; the dead `autoDeleteTempAfter24h`, `autoSaveToOutputDir` and `autoRelocateMissingFiles` settings are gone; moving the default folder out of the Music library and deleting unselected candidates after a save are in `TODO.md`), the ffmpeg/ffprobe bootstrap bug and then the rest of **DL-01** (yt-dlp and ffmpeg downloads are SHA-256-verified when the vendor publishes a checksum list and only warn when it can't be fetched; mpv, whose vendor publishes none, is not verified; `mpv-setup.ts` is on `#utils/http`; ffmpeg and ffprobe share one archive download), and **DATA-10** (the log file gets a task id instead of the whole task, `Error`s are serialised, and the previous session's log is kept as `app.prev.log` instead of being truncated; 10 MB cap per file). Findings that were only partly fixed (**REL-03**, **REL-07**, **DEP-02**, **DOC-04**) keep just the part that is still open.
+Removed from this file once fixed and committed (what was found, the fix and how it was checked are in the file's git history: `git log -p -- AUDIT-v0.2.0.md`): **REL-01** (`yarn build`), **REL-04** (`engines`), **REL-05** (`postinstall`), **DEP-01** (unused dependencies), **DATA-01** ("Clear temporary downloads"), **DATA-02** and **DATA-03** (`sessions.json` / `settings.json` validation, quarantine, `.bak`, versioning), **DATA-04** (the data folder is derived, never stored), **DATA-05** (visible write failures, bounded retry on close, unique temp names, one instance per data folder), **DATA-06** (self-update exits through `exitApp()`), **DATA-07** (crash/signal handlers restore the terminal and save; console patch moved to the entry points), **MD-01** (confidence normalisation keeps every script and strips only accents; empty names score 0; live/remix/karaoke/cover versions are penalised; `tests/unit/confidence.test.ts`), **MD-02** (scraped Spotify answers are never cached; "nothing found" discovery results are kept 1 day, not 90; concurrent identical calls share one request; `tests/unit/cache.test.ts` — caches written before the fix may still hold old entries until they expire or "Clear cache"), **REL-06** (no more `prepack`/`postpack`: the README carries absolute image URLs, `patch-readme.mjs` is gone), **SEC-01** (`openUrl` spawns the native opener with an argv array — no shell, http(s) only; the updater takes a program + args from `getUpdateArgv`, with the version validated as semver, and uses a shell only on Windows for the `.cmd` shims; `tests/unit/shellSafety.test.ts`), **UI-01** (a link pasted into a focused text field stays in the field; scheme-less links and `spotify:` URIs are understood), **UI-02** (`Ctrl+Q`, rebindable `global.quit`, asks first; a second press quits at once), **DOC-02** (`.env.example`), **DOC-05** (`TODO.md`), **PROD-02** (dotenv banner), **DATA-08** (temporary downloads are cleaned by how recently a session used them — manual age picker, start-up reminder, opt-in 48 h auto-clean, size row in Settings, sources marked "File not found" after a clean-up; the dead `autoDeleteTempAfter24h`, `autoSaveToOutputDir` and `autoRelocateMissingFiles` settings are gone; moving the default folder out of the Music library and deleting unselected candidates after a save are in `TODO.md`), the ffmpeg/ffprobe bootstrap bug and then the rest of **DL-01** (yt-dlp and ffmpeg downloads are SHA-256-verified when the vendor publishes a checksum list and only warn when it can't be fetched; mpv, whose vendor publishes none, is not verified; `mpv-setup.ts` is on `#utils/http`; ffmpeg and ffprobe share one archive download), **DATA-10** (the log file gets a task id instead of the whole task, `Error`s are serialised, and the previous session's log is kept as `app.prev.log` instead of being truncated; 10 MB cap per file), and most of **DEP-02** / **DEP-03** (`yarn audit` 97 → 1: every minor/patch bump plus a refresh of the transitive dependencies clears the `axios`, `ws`, `vite`, `js-yaml`, babel chains without any `resolutions`; `adm-zip` 0.6.1, which ships its own types so `@types/adm-zip` is gone; `ink` 8 (no more `ws`; two type-only fixes for its generic `stdout`), `react` 19.3, `musicbrainz-api` 2 (checked live: ISRC search, name search, lookup), `vitest` 5 (with `vite` now declared, it is no longer bundled), `tsup` 9 (`esbuild` 0.28), `dotenv` 18, `strip-ansi` 7, `@types/node` 26, `slsk-client` 2 (a new promise-based API: `SoulseekService` ported, its own typings replace `src/types/slsk-client.d.ts`; downloads are now really cancelled, so the abandon-and-sweep-orphan-files workaround is gone, and rows show download progress); one dev-only `resolutions` entry moves `@typescript-eslint/typescript-estree`'s `minimatch` to 11), and the packaging part of **REL-07** (the Windows exe is dropped — `npm install -g goblin-malin` is the only install path: `build-sea.mjs`, `package:win`, `postject`, the `pkg`-era `patch-pkg-compat.mjs` and the release workflow's exe job are gone, the update modal lost its exe branch; the exe build had been broken since `a4266c0` anyway, top-level `await` in `src/cli.ts`). Findings that were only partly fixed (**REL-03**, **REL-07**, **DEP-02**, **DEP-03**, **DOC-04**) keep just the part that is still open.
 
 ---
 
@@ -121,40 +121,36 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 
 <a id="rel-07"></a>
 
-#### REL-07 — Packaging leftovers: the `pkg` patch script, undeclared imports in `scripts/`, `emitDecoratorMetadata`
+#### REL-07 — Packaging leftover: `emitDecoratorMetadata` keeps a hidden swc build path
 
 **low · maintainability · verified**
 
-- **Where:** `scripts/patch-pkg-compat.mjs` (12 KB, patches `node_modules` for the abandoned `pkg` packaging; still runs at dev install), `scripts/build-sea.mjs` (imports undeclared `esbuild`; other `scripts/` import `react-reconciler`/`yoga-layout` without declaring them), `tsconfig.json` (`emitDecoratorMetadata`).
-- **What:** the exe is built with Node SEA (`build-sea.mjs`). The compat patch may still be what lets the esbuild SEA bundle resolve `flac-tagger` (`exports` without `require`), so don't delete it blindly — re-document what it is for. `@swc/core` is **not** dead: tsup loads it automatically because `emitDecoratorMetadata` is on, and that swc path is what made the former build break (a stray non-UTF-8 byte, a type-only import kept alive as a value import) invisible to `tsc`/`eslint`/`tsx`.
-- **Fix:** keep/rename the patch only if the SEA build needs it; declare `esbuild`, `react-reconciler`/`yoga-layout` if scripts import them; drop `emitDecoratorMetadata` (nothing reads `design:*` metadata; `Cached` is a plain method decorator), which removes the swc path; add a UTF-8 check in CI and the `@typescript-eslint/consistent-type-imports` lint rule so the same failure class can't come back.
+- **Where:** `tsconfig.json` (`emitDecoratorMetadata`), `@swc/core` in `devDependencies`.
+- **What:** `@swc/core` is **not** dead: tsup loads it automatically because `emitDecoratorMetadata` is on, and that swc path is what made the former build break (a stray non-UTF-8 byte, a type-only import kept alive as a value import) invisible to `tsc`/`eslint`/`tsx`.
+- **Fix:** drop `emitDecoratorMetadata` (nothing reads `design:*` metadata; `Cached` is a plain method decorator), which removes the swc path, then `@swc/core`; add a UTF-8 check in CI and the `@typescript-eslint/consistent-type-imports` lint rule so the same failure class can't come back.
 
 ### B. Dependencies & supply chain
 
 <a id="dep-02"></a>
 
-#### DEP-02 — `yarn audit`: 97 advisories (0 critical, 57 high, 37 moderate, 3 low); reachable runtime chains
+#### DEP-02 — `yarn audit`: 1 advisory left (`zod` via `ytmusic-api`), no fix available
 
-**medium · security · verified (audit run today)**
+**low · security · verified (`yarn audit`, 2026-11-08)**
 
-| Chain (root dependency)                                     | Advisories | Runtime?    | Comment / fix                                                                                                                                                                                                                                                                         |
-| ----------------------------------------------------------- | ---------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `typescript-eslint` → minimatch/brace-expansion             | 28         | dev only    | bump (`8.72.x`)                                                                                                                                                                                                                                                                       |
-| `ytmusic-api` → `axios` 1.16.0 → follow-redirects/form-data | 24         | **runtime** | patched axios is `≥1.18/1.20`; `ytmusic-api 5.3.1` is the latest release (Feb 2026) → add a `resolutions` entry for `axios`; exploitability is low (fixed YouTube Music URLs)                                                                                                         |
-| `eslint` → js-yaml                                          | 16         | dev only    | bump                                                                                                                                                                                                                                                                                  |
-| `vitest` → vite/postcss/nanoid                              | 13         | dev only    | bump to a patched 4.x/5.x                                                                                                                                                                                                                                                             |
-| `adm-zip` 0.5.17                                            | 8          | **runtime** | used to unzip the downloaded ffmpeg/ffprobe; fixed only in `0.6.x` (outside `^0.5.17`) → deliberate bump + check `extractEntryTo` use in `ffmpeg-setup.ts`/`ffprobe-setup.ts`; archives come from fixed vendor URLs, so risk is moderate (the ffmpeg archive is SHA-256-verified against the vendor's list since DL-01) |
-| `eslint-plugin-react-hooks` → babel/browserslist/zod        | 5          | dev only    | bump                                                                                                                                                                                                                                                                                  |
-| `ink` → `ws` 8.20.0                                         | 2          | **runtime** | patched `ws ≥ 8.21` → `ink` 7.1.x or a `resolutions` pin                                                                                                                                                                                                                              |
-| `tsup`                                                      | 1          | dev only    | bump                                                                                                                                                                                                                                                                                  |
+- **Where:** `ytmusic-api` 5.3.1 (the latest release) → `zod` `^3.23.8` (3.25.76). The advisory ("Zod can exhaust memory while validating oversized constrained…", high) is fixed only in `zod ≥ 4.6.6`; there is no patched 3.x.
+- **What:** a `resolutions` entry to zod 4 would break `ytmusic-api`: it imports `ZodFirstPartyTypeKind`, a zod 3 internal that zod 4 no longer exports. It only validates YouTube Music's own responses (fixed URLs), so exposure is low.
+- **Fix:** wait for a `ytmusic-api` release on zod 4 (or replace the library), then bump. Also: drop the dev-only `resolutions` entry for `**/@typescript-eslint/typescript-estree/minimatch` once `typescript-eslint` itself depends on `minimatch ≥ 11.0.1`.
 
 <a id="dep-03"></a>
 
-#### DEP-03 — Outdated dependencies
+#### DEP-03 — Outdated dependencies: two majors deferred
 
-**low · deps · verified (`yarn outdated`)**
+**low · deps · verified (`yarn outdated`, 2026-11-08)**
 
-`ink` 7.0.2 → 7.1.1 (8.0.0 latest) · `react` 19.2.6 → 19.3.1 · `ytdlp-nodejs` 3.4.4 → 3.4.5 · `slsk-client` 1.1.0 → 2.0.2 (major; unmaintained-looking, see Soulseek note in Coverage) · `musicbrainz-api` 1.2.1 → 2.0.1 · `typescript` 6.0.3 → 7.0.2 · `vitest` 4.1.9 → 5.1.0 · `@types/node` 25 → 26 · `eslint` 9 → 10, `prettier`, `tsx`, `typescript-eslint`, `playwright` minor bumps. Do the minor/patch bumps with the build and tests green; defer majors.
+Everything else is on its latest version. Left, each tried and backed out:
+
+- **`eslint` / `@eslint/js` 9 → 10:** `eslint-plugin-react` 7.37.5 (latest) does not support ESLint 10 (its peer range stops at `^9.7`) and crashes on `settings.react.version: "detect"` (`contextOrFilename.getFilename is not a function`). With a fixed `version` it runs, but the new recommended `preserve-caught-error` rule reports 14 errors (`throw new Error(…)` in a `catch` without `{ cause }`). Do it when the plugin supports v10, together with adding the `cause`s.
+- **`typescript` 6 → 7:** `typescript-eslint` 8.72.1 requires `typescript <6.1.0`. Wait for it.
 
 ### C. Data safety, persistence & state
 

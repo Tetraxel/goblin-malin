@@ -1,4 +1,5 @@
 ﻿import { providerDisplayRegistry } from "#base/providerDisplay";
+import type { SourceCandidate } from "#flows/musicDownloadFlow/types";
 
 export function getProviderColor(provider: string): string {
     return providerDisplayRegistry.get(provider).color;
@@ -18,4 +19,14 @@ export function tagValue(tags: Record<string, string | string[]> | undefined, ke
     const v = tags[key] ?? tags[key.toLowerCase()];
     if (!v) return "—";
     return Array.isArray(v) ? v.join(", ") : v;
+}
+
+/** "24/96" when the bit depth and sample rate are known, else "320k", else nothing. */
+export function formatAnnouncedAudio(audio: SourceCandidate["audio"]): string {
+    if (!audio) return "";
+    if (audio.bitDepth && audio.sampleRateHz) {
+        const khz = audio.sampleRateHz / 1000;
+        return `${audio.bitDepth}/${Number.isInteger(khz) ? khz : khz.toFixed(1)}`;
+    }
+    return audio.bitrateKbps ? `${audio.bitrateKbps}k` : "";
 }

@@ -2,7 +2,6 @@ import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import os from "os";
-import { execFileSync } from "child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -26,9 +25,8 @@ function getAppDataDir() {
     }
 }
 
-// The compat patch script only exists in a dev checkout (it is not part of the published package).
-const patchScript = join(__dirname, "patch-pkg-compat.mjs");
-const isDevCheckout = existsSync(patchScript);
+// The sources only exist in a dev checkout (the published package ships `dist/`, not `src/`).
+const isDevCheckout = existsSync(join(__dirname, "..", "src", "cli.ts"));
 
 // Remembering which package manager installed us is a nicety for the updater, never a reason to fail an
 // install: an unwritable home (Docker, CI, restricted accounts, sudo) must not abort `npm i -g goblin-malin`.
@@ -45,9 +43,4 @@ if (!isDevCheckout) {
     } catch (error) {
         console.warn(`goblin-malin: could not save the install source (${error instanceof Error ? error.message : error}).`);
     }
-}
-
-// Run compat patch only in dev
-if (isDevCheckout) {
-    execFileSync(process.execPath, [patchScript], { stdio: "inherit" });
 }

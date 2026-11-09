@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import type { SlskFile } from "slsk-client";
+import { FileAttribute, type SearchResult } from "slsk-client";
 import {
     cleanSearchTerm,
     calculateResultWeight,
@@ -9,15 +9,18 @@ import {
     DEFAULT_RESULTS_LIMIT,
     MAX_DOWNLOAD_ATTEMPTS,
     MAX_HIDDEN_RESULTS,
+    announcedAudio,
 } from "#flows/musicDownloadFlow/services/download-providers/soulseek/ranking";
+import { formatAnnouncedAudio } from "#components/SecondaryPanel/DownloadPanel/utils";
 
-function file(overrides: Partial<SlskFile> = {}): SlskFile {
+/** A search result; `bitrate` (kbps) lands in `attribs`, where slsk-client reports it. */
+function file({ bitrate = 1000, ...overrides }: Partial<SearchResult> & { bitrate?: number } = {}): SearchResult {
     return {
         user: "someuser",
         file: "@@someuser\\Music\\Artist - Title.flac",
         size: 30 * 1024 * 1024,
         slots: true,
-        bitrate: 1000,
+        attribs: { [FileAttribute.Bitrate]: bitrate },
         speed: 500,
         ...overrides,
     };
@@ -142,5 +145,59 @@ describe("remoteFileName", () => {
         expect(remoteFileName("@@u\\Goodbye (2026)\\Jersey\\Jersey - Goodbye - 02 - U&I.flac")).toBe(
             "Jersey - Goodbye - 02 - U&I.flac"
         );
+    });
+});
+
+describe("announced audio", () => {
+    const query = { artistName: "Artist", trackTitle: "Title", extension: "flac", durationMs: 200_000 };
+    const withAttribs = (attribs: SearchResult["attribs"], overrides: Partial<SearchResult> = {}) =>
+        file({ ...overrides, attribs });
+
+    test("reads duration (seconds → ms), bitrate, sample rate and bit depth from the peer's attributes", () => {
+        expect(
+            announcedAudio({
+                attribs: {
+                    [FileAttribute.Duration]: 200,
+                    [FileAttribute.Bitrate]: 1000,
+                    [FileAttribute.SampleRate]: 96_000,
+                    [FileAttribute.BitDepth]: 24,
+                },
+            })
+        ).toEqual({ durationMs: 200_000, bitrateKbps: 1000, sampleRateHz: 96_000, bitDepth: 24 });
+        expect(announcedAudio({})).toEqual({});
+    });
+
+    test("disqualifies a file whose announced length is not the track's", () => {
+        expect(calculateResultWeight(withAttribs({ [FileAttribute.Duration]: 3600 }), query)).toBe(-1);
+        expect(calculateResultWeight(withAttribs({ [FileAttribute.Duration]: 205 }), query)).toBeGreaterThan(0);
+        // No announced length: kept, the downloaded file is measured instead.
+        expect(calculateResultWeight(withAttribs({}), query)).toBeGreaterThan(0);
+    });
+
+    test("prefers 24-bit and ranks below-CD sample rates down", () => {
+        const cd = calculateResultWeight(withAttribs({ [FileAttribute.BitDepth]: 16, [FileAttribute.SampleRate]: 44_100 }), query);
+        const hiRes = calculateResultWeight(withAttribs({ [FileAttribute.BitDepth]: 24, [FileAttribute.SampleRate]: 96_000 }), query);
+        const low = calculateResultWeight(withAttribs({ [FileAttribute.SampleRate]: 22_050 }), query);
+        expect(hiRes).toBeGreaterThan(cd);
+        expect(low).toBeLessThan(cd);
+    });
+
+    test("among queued peers, a shorter queue ranks first", () => {
+        const ranked = rankResults(
+            [
+                file({ user: "long", slots: false, queueLength: 200 }),
+                file({ user: "short", slots: false, queueLength: 1 }),
+            ],
+            query
+        );
+        expect(ranked.map((r) => r.user)).toEqual(["short", "long"]);
+    });
+
+    test("formats what the row shows before the file is downloaded", () => {
+        expect(formatAnnouncedAudio({ bitDepth: 24, sampleRateHz: 96_000, bitrateKbps: 3000 })).toBe("24/96");
+        expect(formatAnnouncedAudio({ bitDepth: 16, sampleRateHz: 44_100 })).toBe("16/44.1");
+        expect(formatAnnouncedAudio({ bitrateKbps: 320 })).toBe("320k");
+        expect(formatAnnouncedAudio({ durationMs: 1000 })).toBe("");
+        expect(formatAnnouncedAudio(undefined)).toBe("");
     });
 });

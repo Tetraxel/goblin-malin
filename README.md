@@ -6,6 +6,7 @@
         - [Installation with `yarn`](#installation-with-yarn)
         - [Installation with `pnpm`](#installation-with-pnpm)
         - [Installation on Windows](#installation-on-windows)
+        - [Installation on macOS](#installation-on-macos)
     - [Steps](#steps)
     - [Running the project as a developer](#running-the-project-as-a-developer)
     - [Launching the app through js code](#launching-the-app-through-js-code)
@@ -57,11 +58,14 @@ pnpm add -g  goblin-malin
 
 ### Installation on Windows
 
-[![Windows](https://img.shields.io/badge/-Windows_x64-blue.svg?style=flat&logo=windows&logoColor=%23ffffff&color=%230078d4)](https://github.com/Tetraxel/goblin-malin/releases/latest/download/goblin-malin-win-x64.exe)
+Install with any of the package managers above (`npm` is the simplest), e.g. in PowerShell:
 
-```bash
-goblin-malin.exe
+```ps1
+npm install -g goblin-malin
+goblin-malin
 ```
+
+`yt-dlp`, `ffmpeg` and `mpv` (for in-app audio playback) are downloaded automatically on first run.
 
 ### Installation on macOS
 

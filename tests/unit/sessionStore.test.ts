@@ -211,18 +211,19 @@ describe("SessionStore write failures", () => {
     const blockTarget = () => fs.mkdirSync(file);
     const unblockTarget = () => fs.rmSync(file, { recursive: true, force: true });
 
-    test("a failing write is reported once, kept in memory, and flush() gives up instead of hanging", async () => {
-        const store = new SessionStore(file);
+    test("a write that keeps failing is reported once, kept in memory, and flush() gives up instead of hanging", async () => {
+        const store = new SessionStore(file, [1]);
         store.getAll();
         blockTarget();
 
         store.upsertSession(session("a"));
         store.upsertSession(session("b"));
         const started = Date.now();
-        const saved = await store.flush(400);
+        // Long enough for several failed attempts (150 + 300 + 600 ms waits between them).
+        const saved = await store.flush(1500);
 
         expect(saved).toBe(false);
-        expect(Date.now() - started).toBeLessThan(2000);
+        expect(Date.now() - started).toBeLessThan(3000);
         expect(store.getAll().map((s) => s.id)).toEqual(["b", "a"]);
         expect(notices).toHaveLength(1);
         expect(notices[0].title).toContain("couldn't be saved");
@@ -230,8 +231,20 @@ describe("SessionStore write failures", () => {
         expect(fs.readdirSync(dir).filter((name) => name.endsWith(".tmp"))).toEqual([]);
     });
 
+    test("a single failed write is retried without bothering the user", async () => {
+        const store = new SessionStore(file, [1]);
+        store.getAll();
+        blockTarget();
+        store.upsertSession(session("a"));
+        expect(await store.flush(100)).toBe(false);
+
+        unblockTarget();
+        expect(await store.flush()).toBe(true);
+        expect(notices).toEqual([]);
+    });
+
     test("once the disk accepts the write again, flush() saves what was pending", async () => {
-        const store = new SessionStore(file);
+        const store = new SessionStore(file, [1]);
         store.getAll();
         blockTarget();
         store.upsertSession(session("a"));

@@ -1,7 +1,6 @@
 import fs from "fs";
 import path from "path";
-import slsk from "slsk-client";
-import type { SlskFile, SoulseekClient } from "slsk-client";
+import { DownloadCancelledError, SlskClient, type SearchResult } from "slsk-client";
 import { DownloadService, DownloadUpdateCallback } from "../../../downloadService";
 import { ProviderDisplay } from "#base/providerDisplay";
 import { ProviderSettingsSchema } from "#base/providerSettings";
@@ -31,35 +30,27 @@ import {
     DEFAULT_RESULTS_LIMIT,
     MAX_DOWNLOAD_ATTEMPTS,
     MAX_HIDDEN_RESULTS,
+    DURATION_TOLERANCE_MS,
+    announcedAudio,
 } from "./ranking";
 import { SoulseekCell } from "./SoulseekCell";
 
-// slsk-client's own login handshake timeout (passed as `timeout` to connect())
-// defaults to just 2000ms if unset — far too short for a real round-trip to the
-// Soulseek server, so it must always be overridden explicitly.
+// slsk-client's login timeout defaults to 2000ms, far too short for a real round-trip to the Soulseek
+// server, so it is always set explicitly.
 const LOGIN_TIMEOUT_MS = 20_000;
-// Outer safety net around the whole connect() call, slightly above LOGIN_TIMEOUT_MS
-// so the library's own "timeout login" error (more specific) wins in the normal
-// case; this only fires if something hangs before the library's own timer starts.
-const CONNECT_TIMEOUT_MS = 25_000;
+// A download fails after this long without any progress (queue updates count as progress). Downloads are
+// cancellable, so the transfer really stops: nothing is left running or written behind our back.
 const DOWNLOAD_TIMEOUT_MS = 60_000;
+// How often a download waiting in a peer's queue asks for its place. Each answer counts as progress for
+// DOWNLOAD_TIMEOUT_MS, so it must come well within it (slsk-client's default, 60 s, would race it).
+const QUEUE_POLL_INTERVAL_MS = 20_000;
 const DEFAULT_SEARCH_TIMEOUT_MS = 5000;
-// How far a candidate's real (ffprobe-measured) duration may drift from the
-// track metadata's duration before it's rejected as a wrong match (e.g. a
-// DJ set or album rip that happened to match the filename search).
-const DURATION_TOLERANCE_MS = 10_000;
 
-// slsk-client cannot cancel an in-flight peer file transfer (see
-// abandonAndReconnect below) — a transfer we've already abandoned can still
-// finish afterward, and slsk-client's own bookkeeping for it is gone by then,
-// so it falls back to writing `${user}-${token}.mp3` (token = 8 hex chars,
-// hardcoded ".mp3" regardless of actual format) relative to process.cwd()
-// instead of our chosen destPath. We can't intercept that write, so we sweep
-// for and delete it afterward instead.
-const ORPHAN_FILE_PATTERN = /^.+-[0-9a-f]{8}\.mp3$/i;
-// Grace period after abandoning a download before sweeping for its orphan —
-// gives the background transfer a chance to actually land first.
-const ORPHAN_SWEEP_DELAY_MS = 30_000;
+/**
+ * What a row keeps to download its file again later. Rows saved by older versions hold a slsk-client 1.x
+ * result (`bitrate` instead of `attribs`), so only the fields both versions share are relied on.
+ */
+type Candidate = Pick<SearchResult, "user" | "file" | "size" | "slots"> & Partial<Pick<SearchResult, "attribs">>;
 
 type Extension = "flac" | "mp3";
 
@@ -142,70 +133,54 @@ export class SoulseekService extends DownloadService {
     // service the task's compiled (merged + user-overridden) metadata instead.
     public override readonly usesCompiledMetadataForQuery = true;
 
-    private static client: SoulseekClient | null = null;
+    private static client: SlskClient | null = null;
 
     constructor(task: DownloadTask, logger: Logger) {
         super("SoulseekService", task, logger);
     }
 
-    private connectWithTimeout(user: string, pass: string): Promise<SoulseekClient> {
-        return new Promise((resolve, reject) => {
-            const timer = setTimeout(() => reject(new Error("Soulseek connect timed out")), CONNECT_TIMEOUT_MS);
-            slsk.connect({ user, pass, timeout: LOGIN_TIMEOUT_MS }, (err, client) => {
-                clearTimeout(timer);
-                if (err) {
-                    reject(err);
-                    return;
-                }
-                resolve(client);
-            });
+    /**
+     * Logs in with a new client. It shares nothing and uploads nothing (slsk-client's defaults, spelled out),
+     * picks a dropped server connection up again by itself, and listens for incoming peer connections, which
+     * lets peers behind a firewall reach us. A busy listening port only costs those peers, so it is a warning.
+     */
+    private async login(user: string, pass: string): Promise<SlskClient> {
+        const client = new SlskClient({
+            timeout: LOGIN_TIMEOUT_MS,
+            uploads: false,
+            queuePollInterval: QUEUE_POLL_INTERVAL_MS,
         });
+        client.on("listen-error", (error) =>
+            this.logger.warn(`Soulseek can't accept incoming peer connections (port ${client.incomingPort})`, { error })
+        );
+        client.on("server-error", (error) => this.logger.warn("Soulseek server connection error", { error }));
+        try {
+            await client.login(user, pass);
+            return client;
+        } catch (error) {
+            client.destroy();
+            throw error;
+        }
     }
 
-    private async getClient(): Promise<SoulseekClient> {
+    private async getClient(): Promise<SlskClient> {
         return this.runExclusive("init", async () => {
             if (!SoulseekService.client) {
                 const values = await this.env.getVariablesWithWizard(SoulseekService.setupWizard);
-                SoulseekService.client = await this.connectWithTimeout(
-                    values.SOULSEEK_USERNAME,
-                    values.SOULSEEK_PASSWORD
-                );
-                void this.sweepOrphanedDownloads(); // catch leftovers from a previous run/crash
+                SoulseekService.client = await this.login(values.SOULSEEK_USERNAME, values.SOULSEEK_PASSWORD);
             }
             return SoulseekService.client;
         });
     }
 
-    /** Drop the cached connection so the next getClient() call reconnects. */
+    /** Drop the cached connection so the next getClient() call logs in again. */
     private reconnect(): void {
         SoulseekService.client?.destroy();
         SoulseekService.client = null;
     }
 
-    /**
-     * Delete any `${user}-${token}.mp3` files slsk-client's own fallback wrote to
-     * process.cwd() for a transfer we could no longer track (see
-     * abandonAndReconnect). Best-effort — errors are logged, never thrown, since
-     * this is opportunistic cleanup, not part of the download itself.
-     */
-    private async sweepOrphanedDownloads(): Promise<void> {
-        try {
-            const cwd = process.cwd();
-            const entries = await fs.promises.readdir(cwd);
-            const orphans = entries.filter((f) => ORPHAN_FILE_PATTERN.test(f));
-            for (const orphan of orphans) {
-                await fs.promises.unlink(path.join(cwd, orphan)).catch(() => {});
-            }
-            if (orphans.length > 0) {
-                this.logger.info(`Cleaned up ${orphans.length} orphaned Soulseek file(s) slsk-client wrote to ${cwd}`);
-            }
-        } catch (error) {
-            this.logger.warn("Failed to sweep for orphaned Soulseek downloads", { error });
-        }
-    }
-
     /** One automatic reconnect-and-retry if the shared connection looks dead. */
-    private async withReconnect<T>(fn: (client: SoulseekClient) => Promise<T>): Promise<T> {
+    private async withReconnect<T>(fn: (client: SlskClient) => Promise<T>): Promise<T> {
         const client = await this.getClient();
         try {
             return await fn(client);
@@ -229,87 +204,61 @@ export class SoulseekService extends DownloadService {
     }
 
     /** What a row (or a not-yet-listed result) records about the remote file and its peer. */
-    private candidateStub(file: SlskFile): HiddenCandidate {
+    private candidateStub(file: Candidate, note: string | undefined = file.slots ? undefined : "queued"): HiddenCandidate {
+        const audio = announcedAudio(file);
         return {
             providerDetail: file.user,
             candidate: {
                 name: remoteFileName(file.file),
                 sizeBytes: file.size,
-                note: file.slots ? undefined : "queued",
+                note,
+                ...(Object.values(audio).some((v) => v != null) ? { audio } : {}),
             },
             retryPayload: file,
         };
     }
 
-    private searchOnce(query: string, timeoutMs: number): Promise<SlskFile[]> {
-        return this.withReconnect(
-            (client) =>
-                new Promise<SlskFile[]>((resolve, reject) => {
-                    client.search({ req: query, timeout: timeoutMs }, (err, res) => {
-                        if (err) {
-                            reject(err);
-                            return;
-                        }
-                        resolve(res ?? []);
-                    });
-                })
-        );
+    private searchOnce(query: string, timeoutMs: number): Promise<SearchResult[]> {
+        return this.withReconnect((client) => client.search({ req: query, timeout: timeoutMs }));
     }
 
-    // slsk-client has no way to cancel one in-flight peer transfer, so simply
-    // giving up *waiting* on it (the old approach here) let it keep running in the
-    // background. The peer file-transfer socket is opened by slsk-client's internal
-    // download-peer-file module as a raw, untracked connection (never registered in
-    // its `peers` map), so — unlike a stalled search/chat connection — even
-    // destroying the whole client via reconnect() does NOT close it. It genuinely
-    // cannot be cancelled through any public API. When it eventually finishes,
-    // slsk-client's own bookkeeping for that transfer is already gone, so it falls
-    // through to *its* internal fallback: writing straight to `${user}-${token}.mp3`
-    // relative to process.cwd() (see
-    // node_modules/slsk-client/lib/peer/download-peer-file.js) instead of our
-    // chosen destPath. Since we can't prevent that write, sweepOrphanedDownloads()
-    // is scheduled to delete it once it's had time to land. reconnect() still runs
-    // here too — separately useful in case the *connection* itself (not just this
-    // one transfer) is actually the thing that's stuck.
-    private abandonAndReconnect(reject: (error: Error) => void, error: Error): void {
-        this.logger.warn(`Abandoning Soulseek download (${error.message}); reconnecting the client`);
-        this.reconnect();
-        setTimeout(() => void this.sweepOrphanedDownloads(), ORPHAN_SWEEP_DELAY_MS).unref();
-        reject(error);
-    }
-
-    private downloadCandidate(file: SlskFile, destPath: string, signal?: AbortSignal): Promise<void> {
-        return new Promise<void>((resolve, reject) => {
-            const cleanup = () => {
-                clearTimeout(timer);
-                signal?.removeEventListener("abort", onAbort);
-            };
-            const onAbort = () => {
-                cleanup();
-                this.abandonAndReconnect(reject, makeAbortError());
-            };
-            signal?.addEventListener("abort", onAbort, { once: true });
-            const timer = setTimeout(() => {
-                cleanup();
-                this.abandonAndReconnect(reject, new Error("Soulseek download timed out"));
-            }, DOWNLOAD_TIMEOUT_MS);
-
-            this.getClient()
-                .then((client) => {
-                    client.download({ file, path: destPath }, (err) => {
-                        cleanup();
-                        if (err) {
-                            reject(err);
-                            return;
-                        }
-                        resolve();
-                    });
-                })
-                .catch((error) => {
-                    cleanup();
-                    reject(error);
-                });
+    /**
+     * Downloads one file to `destPath`, reporting progress as a 0–1 ratio. Aborting `signal` cancels the
+     * transfer itself (it rejects with an AbortError); a peer silent for DOWNLOAD_TIMEOUT_MS fails it.
+     */
+    private async downloadCandidate(
+        file: Candidate,
+        destPath: string,
+        signal: AbortSignal,
+        onProgress: (ratio: number) => void,
+        onQueued: (place: number | undefined) => void
+    ): Promise<void> {
+        const client = await this.getClient();
+        throwIfAborted(signal);
+        const download = client.download({
+            user: file.user,
+            file: file.file,
+            size: file.size,
+            path: destPath,
+            timeout: DOWNLOAD_TIMEOUT_MS,
+            signal,
         });
+        download.on("progress", ({ progress }) => {
+            if (progress !== undefined) onProgress(progress);
+        });
+        // Place 0 means the transfer is starting: progress takes over from there.
+        download.on("status", (status) => {
+            if (status === "queued") onQueued(undefined);
+        });
+        download.on("queue", (place) => {
+            if (place > 0) onQueued(place);
+        });
+        try {
+            await download;
+        } catch (error) {
+            if (error instanceof DownloadCancelledError || signal.aborted) throw makeAbortError();
+            throw error;
+        }
     }
 
     async downloadTrack(
@@ -391,7 +340,7 @@ export class SoulseekService extends DownloadService {
                 // top `resultsLimit` become rows; a bounded remainder is kept behind a "show more" row.
                 const ranked = rankResults(
                     results,
-                    { artistName, trackTitle, albumName, extension },
+                    { artistName, trackTitle, albumName, extension, durationMs: trackMetadata.duration ?? undefined },
                     resultsLimit + MAX_HIDDEN_RESULTS
                 );
                 if (ranked.length === 0) {
@@ -419,7 +368,7 @@ export class SoulseekService extends DownloadService {
                 // "pending"; the others are "skipped" from the start (still downloadable by hand).
                 // The last row carries the stubs of everything not listed.
                 const listedRow = (
-                    candidate: SlskFile,
+                    candidate: SearchResult,
                     state: "pending" | "skipped",
                     isLastListed: boolean
                 ): TrackDownloadSource => ({
@@ -525,7 +474,7 @@ export class SoulseekService extends DownloadService {
      */
     private async attemptSingleCandidate(
         trackMetadata: TrackMetadata,
-        candidate: SlskFile,
+        candidate: Candidate,
         extension: Extension,
         tempDir: string,
         onUpdate: DownloadUpdateCallback | undefined,
@@ -541,21 +490,32 @@ export class SoulseekService extends DownloadService {
         const onOuterAbort = () => candidateController.abort();
         signal?.addEventListener("abort", onOuterAbort, { once: true });
 
-        // No `progress` here — slsk-client's download() has no byte-level progress
-        // callback (unlike yt-dlp), so there's nothing real to report. StateBadge
-        // shows a plain "DOWNLOADING" without a percentage when progress is unset.
-        onUpdate?.(
-            {
-                state: "downloading",
-                provider: "soulseek",
-                track: trackMetadata,
-                downloadedAt: new Date(),
-                selected: false,
-                ...this.candidateStub(candidate),
-                query,
-            },
-            { attemptId, abort: () => candidateController.abort() }
-        );
+        // No `progress` until the peer starts sending: StateBadge then shows a plain "DOWNLOADING", and the
+        // note says where the file stands in the peer's queue while it waits there.
+        const downloadingRow = (progress?: number, note?: string): TrackDownloadSource => ({
+            state: "downloading",
+            provider: "soulseek",
+            track: trackMetadata,
+            downloadedAt: new Date(),
+            selected: false,
+            ...this.candidateStub(candidate, note),
+            query,
+            ...(progress !== undefined ? { progress } : {}),
+        });
+        const abort = () => candidateController.abort();
+        onUpdate?.(downloadingRow(), { attemptId, abort });
+        // Progress arrives with every chunk: the row is only updated when the whole percentage changes.
+        let shownPercent = -1;
+        const onProgress = (ratio: number) => {
+            const percent = Math.floor(ratio * 100);
+            if (percent === shownPercent) return;
+            shownPercent = percent;
+            onUpdate?.(downloadingRow(percent), { attemptId, abort });
+        };
+        const onQueued = (place: number | undefined) => {
+            if (shownPercent >= 0) return; // already transferring
+            onUpdate?.(downloadingRow(undefined, place ? `queued #${place}` : "queued"), { attemptId, abort });
+        };
 
         const destPath = path.join(
             tempDir,
@@ -563,7 +523,7 @@ export class SoulseekService extends DownloadService {
         );
 
         try {
-            await this.downloadCandidate(candidate, destPath, candidateController.signal);
+            await this.downloadCandidate(candidate, destPath, candidateController.signal, onProgress, onQueued);
 
             if (trackMetadata.duration != null) {
                 const probed = await probeAudio(destPath);
@@ -617,7 +577,7 @@ export class SoulseekService extends DownloadService {
     /**
      * Manually retry one specific previously-found candidate — e.g. a "skipped" or
      * "failed" row the user wants downloaded anyway. `retryPayload` is the exact
-     * `SlskFile` this service attached to that row earlier.
+     * search result this service attached to that row earlier.
      */
     async retryCandidate(
         trackMetadata: TrackMetadata,
@@ -625,7 +585,7 @@ export class SoulseekService extends DownloadService {
         onUpdate?: DownloadUpdateCallback,
         signal?: AbortSignal
     ): Promise<TrackDownloadSource> {
-        const candidate = retryPayload as SlskFile;
+        const candidate = retryPayload as Candidate;
         const extension = path.win32.extname(candidate.file).slice(1).toLowerCase() as Extension;
 
         const tempDir = getTempDownloadDir();
@@ -659,7 +619,7 @@ export class SoulseekService extends DownloadService {
         trackMetadata: TrackMetadata,
         filePath: string,
         extension: Extension,
-        candidate?: SlskFile
+        candidate?: Candidate
     ): Promise<TrackDownloadSource> {
         const artistName = trackMetadata.artists?.[0]?.name ?? "Unknown Artist";
         const localFile: LocalFile = {

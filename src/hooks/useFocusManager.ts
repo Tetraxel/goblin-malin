@@ -191,12 +191,12 @@ export const useFocusManager = ({
     }
 
     const switchWindow = useCallback((window: FocusableWindow) => {
-        setFocusState((prev) => ({
-            ...prev,
-            previousWindow: prev.activeWindow,
-            activeWindow: window,
-            returningFromWindow: undefined,
-        }));
+        // Already there: keep `previousWindow`, or a later switchBack would "return" to the same window.
+        setFocusState((prev) =>
+            prev.activeWindow === window
+                ? prev
+                : { ...prev, previousWindow: prev.activeWindow, activeWindow: window, returningFromWindow: undefined }
+        );
     }, []);
 
     const switchBack = useCallback(() => {

@@ -7,9 +7,6 @@ import { spawn } from "child_process";
  * or `%VAR%` in it are plain data and cannot break out into command execution. Only http(s) URLs are
  * accepted, and the value handed to the opener is the parsed `href` (which percent-encodes quotes/spaces).
  *
- * Why not the `open` package: in SEA builds it is pre-bundled with a placeholder `import.meta.url` and can
- * fail silently, so SEA-reachable call sites need this native path.
- *
  * Failures are swallowed: there is nothing useful to tell the user about a browser that didn't open.
  * Returns whether an opener was launched.
  */
