@@ -41,6 +41,8 @@ if (!isDevCheckout) {
             JSON.stringify({ installer: detectInstaller(), installedAt: new Date().toISOString() })
         );
     } catch (error) {
-        console.warn(`goblin-malin: could not save the install source (${error instanceof Error ? error.message : error}).`);
+        console.warn(
+            `goblin-malin: could not save the install source (${error instanceof Error ? error.message : error}).`
+        );
     }
 }

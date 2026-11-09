@@ -9,6 +9,7 @@ import { resolveKey } from "./keyMap.ts";
 import { renderToImageBrowser } from "./screenshotBrowser.ts";
 import { renderToImagePowerShell } from "./screenshotPowerShell.ts";
 import { analyzeProfileFile } from "./profiling/analyze.ts";
+import { createIsolatedDataDir, DEFAULT_FIXTURE } from "./isolatedDataDir.ts";
 import type { InteractionMark } from "./profiling/types.ts";
 import type { HarnessEvent, HarnessResult, RunOptions, Scenario, Snapshot } from "./types.ts";
 
@@ -27,7 +28,9 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
     const profileCfg = scenario.profile?.enabled ? scenario.profile : undefined;
     const marks: InteractionMark[] = [];
     let interactionIdx = 0;
-    const profileOut = profileCfg ? path.join(os.tmpdir(), "goblin-tui-test", `profile-${Date.now()}.jsonl`) : undefined;
+    const profileOut = profileCfg
+        ? path.join(os.tmpdir(), "goblin-tui-test", `profile-${Date.now()}.jsonl`)
+        : undefined;
     if (profileOut) {
         fs.mkdirSync(path.dirname(profileOut), { recursive: true });
         try {
@@ -57,18 +60,18 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
     for (const [k, v] of Object.entries(process.env)) {
         if (v !== undefined) ptyEnv[k] = v;
     }
-    const dataDirOverride = scenario.dataDir
-        ? path.isAbsolute(scenario.dataDir)
-            ? scenario.dataDir
-            : path.resolve(ROOT, scenario.dataDir)
-        : undefined;
+    // The app always runs on a throwaway copy of the fixture, never on the fixture itself (see isolatedDataDir.ts).
+    const fixtureDir = path.resolve(ROOT, scenario.dataDir ?? DEFAULT_FIXTURE);
+    const isolated = createIsolatedDataDir(fixtureDir);
+    const keepDataDir = !!process.env["GOBLIN_TUI_KEEP_DATA"];
+    if (keepDataDir) console.error(`[tui-test] data folder kept at ${isolated.dir}`);
     const slowMode = !!(process.env["GOBLIN_SLOW"] ?? scenario.env?.["GOBLIN_SLOW"]);
     Object.assign(ptyEnv, scenario.env ?? {}, {
         TERM: "xterm-256color",
         FORCE_COLOR: "1",
         COLORTERM: "truecolor",
         GOBLIN_NO_AUDIO: "1",
-        ...(dataDirOverride ? { GOBLIN_DATA_DIR: dataDirOverride } : {}),
+        GOBLIN_DATA_DIR: isolated.dir,
         ...(profileOut ? { DEV: "true", GOBLIN_PROFILE_OUT: profileOut } : {}),
     });
 
@@ -88,10 +91,14 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
     // Sets idle CPU priority + single-core affinity. Both settings are inherited
     // by child processes (cmd → yarn → node), so the whole app runs under constraint.
     if (slowMode) {
-        try { os.setPriority(ptyProcess.pid, os.constants.priority.PRIORITY_LOW); } catch {}
+        try {
+            os.setPriority(ptyProcess.pid, os.constants.priority.PRIORITY_LOW);
+        } catch {}
         if (process.platform === "win32") {
             spawnSync("powershell.exe", [
-                "-NoProfile", "-NonInteractive", "-Command",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
                 `(Get-Process -Id ${ptyProcess.pid}).ProcessorAffinity = 1`,
             ]);
         }
@@ -200,7 +207,10 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
                     let found = false;
                     while (Date.now() - start < timeoutMs) {
                         await termEmulator.flush();
-                        if (termEmulator.readScreen().includes(step.text)) { found = true; break; }
+                        if (termEmulator.readScreen().includes(step.text)) {
+                            found = true;
+                            break;
+                        }
                         await new Promise<void>((r) => setTimeout(r, 100));
                     }
                     const ms = Date.now() - start;
@@ -258,7 +268,12 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
                 case "screenshot-powershell": {
                     await termEmulator.flush();
                     const imgPath = path.join(os.tmpdir(), "goblin-tui-test", `${step.name}.png`);
-                    await renderToImagePowerShell(termEmulator.cols, termEmulator.rows, termEmulator.readScreenAnsi(), imgPath);
+                    await renderToImagePowerShell(
+                        termEmulator.cols,
+                        termEmulator.rows,
+                        termEmulator.readScreenAnsi(),
+                        imgPath
+                    );
                     emit({ type: "screenshot", name: step.name, path: imgPath });
                     break;
                 }
@@ -267,10 +282,13 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
         stepsCompleted = true;
     } finally {
         if (appExitCode === null) {
-            try { ptyProcess.kill(); } catch {}
+            try {
+                ptyProcess.kill();
+            } catch {}
         }
         // Allow time for the exit event to fire
         await new Promise<void>((r) => setTimeout(r, 300));
+        if (!keepDataDir) isolated.dispose();
     }
 
     const result: HarnessResult = { snapshots, metrics, exitCode: appExitCode };

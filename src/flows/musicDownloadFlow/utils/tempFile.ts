@@ -45,7 +45,12 @@ export function findExistingTempFile(
  * file would silently skip a fresh attempt; call this instead before searching
  * again, so retries don't just pile up unused files in the temp dir either.
  */
-export function deleteExistingTempFiles(providerLabel: string, metadata: TrackMetadata, format: string, dir: string): void {
+export function deleteExistingTempFiles(
+    providerLabel: string,
+    metadata: TrackMetadata,
+    format: string,
+    dir: string
+): void {
     if (!metadata.uri || !fs.existsSync(dir)) return;
     const prefix = getTempFilePrefix(providerLabel, metadata);
     for (const file of fs.readdirSync(dir)) {

@@ -30,7 +30,7 @@ const NOTIFY_AFTER_FAILURES = 3;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-const emptyFile =(): SessionsFile => ({ version: SESSIONS_FILE_VERSION, lastSessionId: null, sessions: [] });
+const emptyFile = (): SessionsFile => ({ version: SESSIONS_FILE_VERSION, lastSessionId: null, sessions: [] });
 
 const isStoredSession = (value: unknown): value is StoredSession =>
     isPlainObject(value) && typeof value.id === "string" && Array.isArray(value.tasks);
@@ -149,7 +149,8 @@ export class SessionStore {
                 await renameReplacing(tmp, this.filePath, this.renameRetryDelaysMs);
                 tmp = null;
             }
-            if (this.failures > 0) globalLogger.info(`Sessions file saved again after ${this.failures} failed attempt(s)`);
+            if (this.failures > 0)
+                globalLogger.info(`Sessions file saved again after ${this.failures} failed attempt(s)`);
             this.failures = 0;
         } catch (error) {
             // Persistence failures must not crash the UI: keep the data in memory and retry.

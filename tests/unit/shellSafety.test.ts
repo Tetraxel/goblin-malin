@@ -4,7 +4,7 @@ const spawnMock = vi.hoisted(() =>
     vi.fn(() => ({
         on: () => ({ unref: () => {} }),
         unref: () => {},
-    })),
+    }))
 );
 vi.mock("child_process", () => ({ spawn: spawnMock }));
 

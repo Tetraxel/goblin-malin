@@ -68,7 +68,11 @@ export class Logger {
                     new winston.transports.File({
                         filename: logsPath,
                         level: "debug",
-                        format: winston.format.combine(toPlainData(), winston.format.timestamp(), winston.format.json()),
+                        format: winston.format.combine(
+                            toPlainData(),
+                            winston.format.timestamp(),
+                            winston.format.json()
+                        ),
                         maxsize: MAX_LOG_BYTES,
                         maxFiles: 2,
                         tailable: true,

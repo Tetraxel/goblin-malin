@@ -94,8 +94,7 @@ export function formatLogRows(log: LogMetadata, width: number): LogRow[] {
 
     // Get task attrs once for both uri display and brand color.
     const attrs = log.task?.getAttributes?.() as
-        | { uri?: { platform: string; type: string; id: string }; recognizedServiceKey?: string }
-        | undefined;
+        { uri?: { platform: string; type: string; id: string }; recognizedServiceKey?: string } | undefined;
     const recognizedServiceKey = attrs?.recognizedServiceKey;
     const serviceDisplay = recognizedServiceKey ? providerDisplayRegistry.get(recognizedServiceKey) : null;
     const uriColor = serviceDisplay ? serviceDisplay.color : "cyan";

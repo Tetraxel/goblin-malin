@@ -399,7 +399,7 @@ describe("opening a session", () => {
         expect(Date.now() - Date.parse(stored.updatedAt)).toBeGreaterThan(59 * DAY);
         const states = m.orchestrator
             .getTasks()
-            .map((t) => (t.getAttributes() as unknown as MusicDownloadTaskAttributes))
+            .map((t) => t.getAttributes() as unknown as MusicDownloadTaskAttributes)
             .map((a) => (a.kind === "track" ? a.downloadSources[0].localFile?.state : undefined));
         expect(states).toEqual(["found", "not_found"]);
     });

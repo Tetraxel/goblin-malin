@@ -144,14 +144,21 @@ describe("findTempAge", () => {
 describe("markMissingInSnapshot", () => {
     const snapshot = (state: string, p = filePath(1)) => ({
         id: "t",
-        attributes: { kind: "track", downloadSources: [{ localFile: { state, path: p, name: "n" } }, { provider: "x" }] },
+        attributes: {
+            kind: "track",
+            downloadSources: [{ localFile: { state, path: p, name: "n" } }, { provider: "x" }],
+        },
     });
 
     test("flips a found source whose file is gone to not_found, leaving the rest as it was", () => {
         const before = snapshot("found");
         const after = markMissingInSnapshot(before, () => true);
         expect(after).not.toBe(before);
-        expect(after.attributes.downloadSources[0].localFile).toEqual({ state: "not_found", path: filePath(1), name: "n" });
+        expect(after.attributes.downloadSources[0].localFile).toEqual({
+            state: "not_found",
+            path: filePath(1),
+            name: "n",
+        });
         expect(after.attributes.downloadSources[1]).toBe(before.attributes.downloadSources[1]);
         // The input is never modified: it may be a stored session.
         expect(before.attributes.downloadSources[0].localFile!.state).toBe("found");
@@ -164,6 +171,7 @@ describe("markMissingInSnapshot", () => {
         expect(markMissingInSnapshot(alreadyMissing, () => true)).toBe(alreadyMissing);
         const collection = { id: "c", attributes: { kind: "collection", childTaskIds: [] } };
         expect(markMissingInSnapshot(collection, () => true)).toBe(collection);
-        expect(markMissingInSnapshot({ id: "x" }, () => true)).toEqual({ id: "x" });
+        const noAttributes: { id: string; attributes?: unknown } = { id: "x" };
+        expect(markMissingInSnapshot(noAttributes, () => true)).toEqual({ id: "x" });
     });
 });

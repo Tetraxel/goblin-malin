@@ -1,0 +1,10 @@
+dist/
+node_modules/
+data/
+downloads/
+samples/
+releases/
+logs/
+# Generated / captured data, not hand-written
+scripts/tui-test/fixtures/
+scripts/tui-test/profiling/baselines/

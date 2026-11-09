@@ -9,7 +9,10 @@ function isInside(event: MouseEvent, node: DOMElement | null): boolean {
     const bounds = getVisibleScreenBounds(node);
     if (!bounds) return false;
     return (
-        event.x >= bounds.x && event.x < bounds.x + bounds.width && event.y >= bounds.y && event.y < bounds.y + bounds.height
+        event.x >= bounds.x &&
+        event.x < bounds.x + bounds.width &&
+        event.y >= bounds.y &&
+        event.y < bounds.y + bounds.height
     );
 }
 

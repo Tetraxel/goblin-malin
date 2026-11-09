@@ -44,7 +44,7 @@ describe("toLoggable (DATA-10)", () => {
 
         let deep: Record<string, unknown> = {};
         const root = deep;
-        for (let i = 0; i < 20; i++) deep = (deep.next = {});
+        for (let i = 0; i < 20; i++) deep = deep.next = {};
         expect(JSON.stringify(toLoggable(root))).toContain("[Object]");
     });
 

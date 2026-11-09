@@ -54,7 +54,13 @@ export const TabBar: React.FC<TabBarProps> = ({ width, tabs, activeTabKey, split
                         >
                             <Text color={theme.text.primary} bold={isActive}>{`[${tab.key}] `}</Text>
                             <Text
-                                color={isActive ? theme.action.primary : isHovered ? theme.ui.tabHover : theme.ui.tabInactive}
+                                color={
+                                    isActive
+                                        ? theme.action.primary
+                                        : isHovered
+                                          ? theme.ui.tabHover
+                                          : theme.ui.tabInactive
+                                }
                                 bold={isActive}
                                 underline={isHovered}
                             >

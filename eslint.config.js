@@ -4,26 +4,27 @@ import reactPlugin from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 
 export default tseslint.config(
-  { ignores: ["dist/", "node_modules/", "scripts/"] },
+    { ignores: ["dist/", "node_modules/", "scripts/tui-test/fixtures/", "scripts/*.mjs"] },
 
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
+    js.configs.recommended,
+    ...tseslint.configs.recommended,
 
-  {
-    plugins: {
-      react: reactPlugin,
-      "react-hooks": reactHooks,
-    },
-    settings: {
-      react: { version: "detect" },
-    },
-    rules: {
-      ...reactPlugin.configs.recommended.rules,
-      ...reactHooks.configs.recommended.rules,
-      "react/react-in-jsx-scope": "off",
-      "react/prop-types": "off",
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
-    },
-  },
+    {
+        plugins: {
+            react: reactPlugin,
+            "react-hooks": reactHooks,
+        },
+        settings: {
+            react: { version: "detect" },
+        },
+        rules: {
+            ...reactPlugin.configs.recommended.rules,
+            ...reactHooks.configs.recommended.rules,
+            "react/react-in-jsx-scope": "off",
+            "react/prop-types": "off",
+            "no-empty": ["error", { allowEmptyCatch: true }], // best-effort `try { ... } catch {}` is intentional
+            "@typescript-eslint/no-explicit-any": "warn",
+            "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+        },
+    }
 );

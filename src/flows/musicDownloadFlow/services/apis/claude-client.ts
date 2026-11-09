@@ -23,13 +23,7 @@ import { Semaphore } from "#utils/semaphore";
  */
 
 export type ClaudeErrorCode =
-    | "not-installed"
-    | "not-logged-in"
-    | "quota"
-    | "timeout"
-    | "aborted"
-    | "failed"
-    | "bad-output";
+    "not-installed" | "not-logged-in" | "quota" | "timeout" | "aborted" | "failed" | "bad-output";
 
 export class ClaudeCliError extends Error {
     constructor(

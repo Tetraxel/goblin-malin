@@ -25,7 +25,11 @@ const noKey: Key = {
     capsLock: false,
     numLock: false,
 };
-const press = (overrides: Partial<Key>, time: number): LastPress => ({ input: "", key: { ...noKey, ...overrides }, time });
+const press = (overrides: Partial<Key>, time: number): LastPress => ({
+    input: "",
+    key: { ...noKey, ...overrides },
+    time,
+});
 
 const escTwice = { key: "escape", doubleTap: true } as const;
 

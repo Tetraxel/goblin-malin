@@ -26,9 +26,7 @@ function source(
         downloadedAt: new Date(),
         selected: false,
         isRejected,
-        fileInfo: fileInfo
-            ? { format: "flac", sizeBytes: 0, durationMs: 0, embeddedTags: {}, ...fileInfo }
-            : undefined,
+        fileInfo: fileInfo ? { format: "flac", sizeBytes: 0, durationMs: 0, embeddedTags: {}, ...fileInfo } : undefined,
     };
 }
 
@@ -70,20 +68,12 @@ describe("pickAutoSelectedIndex", () => {
     });
 
     test("skips non-downloaded sources entirely", () => {
-        const sources = [
-            source("failed"),
-            source("downloading"),
-            source("downloaded", { provenance: "lossless" }),
-        ];
+        const sources = [source("failed"), source("downloading"), source("downloaded", { provenance: "lossless" })];
         expect(pickAutoSelectedIndex(sources, true)).toBe(2);
     });
 
     test("skipped candidates (never attempted because an earlier one won) are ignored", () => {
-        const sources = [
-            source("downloaded", { provenance: "lossless" }),
-            source("skipped"),
-            source("skipped"),
-        ];
+        const sources = [source("downloaded", { provenance: "lossless" }), source("skipped"), source("skipped")];
         expect(pickAutoSelectedIndex(sources, true)).toBe(0);
     });
 

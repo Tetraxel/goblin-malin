@@ -300,7 +300,7 @@ export class SpotifyService extends MetadataService {
             if (error instanceof Error && /\b404\b/.test(error.message)) {
                 throw new CollectionAccessError(
                     "Spotify could not find this playlist (404). It may be private.",
-                    "Spotify returned \"not found\" for this playlist. This usually means it is private: " +
+                    'Spotify returned "not found" for this playlist. This usually means it is private: ' +
                         "the app can only read public playlists. Make it public in Spotify " +
                         "(playlist ⋯ menu → Make public), then refetch. Spotify-made playlists can also be unreadable."
                 );

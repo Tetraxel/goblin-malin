@@ -30,9 +30,7 @@ describe("mouseRegistry", () => {
 describe("extractMouseEvents", () => {
     test("decodes a left press into 0-based coordinates", () => {
         const { events, rest } = extractMouseEvents("\u001b[<0;40;9M");
-        expect(events).toEqual([
-            { type: "press", button: "left", x: 39, y: 8, ctrl: false, shift: false, alt: false },
-        ]);
+        expect(events).toEqual([{ type: "press", button: "left", x: 39, y: 8, ctrl: false, shift: false, alt: false }]);
         expect(rest).toBe("");
     });
 
@@ -49,17 +47,13 @@ describe("extractMouseEvents", () => {
 
     test("decodes hover motion (no button held) as a move event", () => {
         const { events, rest } = extractMouseEvents("\u001b[<35;10;10M");
-        expect(events).toEqual([
-            { type: "move", button: "none", x: 9, y: 9, ctrl: false, shift: false, alt: false },
-        ]);
+        expect(events).toEqual([{ type: "move", button: "none", x: 9, y: 9, ctrl: false, shift: false, alt: false }]);
         expect(rest).toBe("");
     });
 
     test("decodes a drag as a move with the held button", () => {
         const { events } = extractMouseEvents("\u001b[<32;3;4M");
-        expect(events).toEqual([
-            { type: "move", button: "left", x: 2, y: 3, ctrl: false, shift: false, alt: false },
-        ]);
+        expect(events).toEqual([{ type: "move", button: "left", x: 2, y: 3, ctrl: false, shift: false, alt: false }]);
     });
 
     test("leaves keystrokes in the same chunk untouched", () => {

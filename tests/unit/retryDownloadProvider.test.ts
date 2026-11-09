@@ -185,7 +185,11 @@ describe("retryDownloadProvider", () => {
         await task.retryDownloadProvider("soulseek");
 
         expect(sourcesOf(task)[0].selected).toBe(true);
-        expect(sourcesOf(task).slice(1).some((s) => s.selected)).toBe(false);
+        expect(
+            sourcesOf(task)
+                .slice(1)
+                .some((s) => s.selected)
+        ).toBe(false);
     });
 
     test("does nothing for a provider that has no rows", async () => {

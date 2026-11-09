@@ -85,7 +85,7 @@ describe("httpsGetJson", () => {
     });
 
     test("rejects a non-200 answer with the URL and the status in the message", async () => {
-        const error = await httpsGetJson(`${base}/gone`).catch((e) => e);
+        const error = (await httpsGetJson(`${base}/gone`).catch((e: unknown) => e)) as HttpError;
         expect(error).toBeInstanceOf(HttpError);
         expect(error.status).toBe(404);
         expect(error.message).toContain("404");

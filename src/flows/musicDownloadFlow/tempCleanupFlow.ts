@@ -9,13 +9,7 @@ import { SessionManager } from "#sessions/sessionManager";
 import { SettingsStore } from "#settings/settingsStore";
 import { getMusicSettings } from "./settings";
 import { getTempDownloadDir } from "./saveSettings";
-import {
-    ProtectedPath,
-    TempGroup,
-    checkTempFolder,
-    deleteTempGroups,
-    scanTempGroups,
-} from "./utils/tempDownloads";
+import { ProtectedPath, TempGroup, checkTempFolder, deleteTempGroups, scanTempGroups } from "./utils/tempDownloads";
 import {
     AUTO_CLEAN_AGE,
     REMINDER_INTERVAL_MS,
@@ -59,8 +53,7 @@ function protectedPaths(): ProtectedPath[] {
 }
 
 type Inspection =
-    | { ok: true; dir: string; groups: TempGroup[]; index: TempUseIndex }
-    | { ok: false; dir: string; reason: string };
+    { ok: true; dir: string; groups: TempGroup[]; index: TempUseIndex } | { ok: false; dir: string; reason: string };
 
 /** The folder's temp files and who uses them, as they are right now. */
 async function inspect(dir: string = getTempDownloadDir()): Promise<Inspection> {
@@ -279,7 +272,13 @@ export async function getTempUsage(dir: string): Promise<TempUsage> {
         if (!found.ok) return { ok: false, reason: found.reason };
         const total = sumGroups(found.groups);
         const unused = sumGroups(selectTempGroups(found.groups, found.index, REMINDER_MIN_AGE));
-        return { ok: true, files: total.files, bytes: total.bytes, unusedFiles: unused.files, unusedBytes: unused.bytes };
+        return {
+            ok: true,
+            files: total.files,
+            bytes: total.bytes,
+            unusedFiles: unused.files,
+            unusedBytes: unused.bytes,
+        };
     } catch (error) {
         return { ok: false, reason: error instanceof Error ? error.message : String(error) };
     }

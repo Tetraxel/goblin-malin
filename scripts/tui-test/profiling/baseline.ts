@@ -29,12 +29,16 @@ export function loadBaseline(scenario: string): Baseline | undefined {
     }
 }
 
-export function saveBaseline(scenario: string, components: ComponentStat[], totals: { commits: number; reactMs: number }): void {
+export function saveBaseline(
+    scenario: string,
+    components: ComponentStat[],
+    totals: { commits: number; reactMs: number }
+): void {
     const map: Baseline["components"] = {};
     for (const c of components) {
         map[c.name] = {
             renders: c.renders,
-            selfMsP50: Math.round(c.selfMsTotal / Math.max(1, c.renders) * 1000) / 1000,
+            selfMsP50: Math.round((c.selfMsTotal / Math.max(1, c.renders)) * 1000) / 1000,
             selfMsP95: c.selfMsP95,
         };
     }

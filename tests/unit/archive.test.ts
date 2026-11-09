@@ -57,7 +57,8 @@ const savedSource = (filePath: string) => ({
 });
 
 function makeTask(id: string, attributes: MusicDownloadTaskAttributes) {
-    return new m.TaskCtor({ id, attributes, logger: m.logger }) as Task<MusicDownloadTaskAttributes>;
+    // Typed as the base `Task` because that is what the code under test takes (the attributes are a union there).
+    return new m.TaskCtor({ id, attributes, logger: m.logger }) as unknown as Task;
 }
 
 describe("archive helpers", () => {

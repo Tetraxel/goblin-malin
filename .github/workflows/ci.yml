@@ -51,11 +51,15 @@ jobs:
             - name: Install dependencies
               run: yarn install --frozen-lockfile
 
+            # Covers `src/` and, through scripts/tui-test/tsconfig.json, `tests/` and the TUI harness.
             - name: Type-check
               run: yarn type-check
 
             - name: Lint
               run: yarn lint
+
+            - name: Format
+              run: yarn format:check
 
             - name: Build
               run: yarn build
@@ -64,6 +68,6 @@ jobs:
             # been run on Linux yet). Drop the `if` once they are green on ubuntu too.
             - name: Unit tests
               if: runner.os == 'Windows'
-              run: npx vitest run tests/unit
+              run: npx vitest run tests/unit --coverage
               env:
                   GOBLIN_NO_AUDIO: "1"

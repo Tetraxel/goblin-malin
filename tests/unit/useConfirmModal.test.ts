@@ -1,56 +1,14 @@
-import { EventEmitter } from "events";
-import React from "react";
-import { render } from "ink";
-import { afterEach, describe, expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import { useConfirmModal, type ConfirmModalConfig } from "../../src/components/ConfirmModal/useConfirmModal";
-
-/** Minimal stand-ins for the terminal streams Ink needs, so a hook can run without a real TTY. */
-class FakeStdout extends EventEmitter {
-    columns = 80;
-    rows = 24;
-    isTTY = false;
-    write(): boolean {
-        return true;
-    }
-}
-class FakeStdin extends EventEmitter {
-    isTTY = false;
-    setEncoding(): void {}
-    setRawMode(): void {}
-    resume(): void {}
-    pause(): void {}
-    ref(): void {}
-    unref(): void {}
-    read(): null {
-        return null;
-    }
-}
+import { mountHook, tick } from "./helpers/mountHook";
 
 type Modal = ReturnType<typeof useConfirmModal>;
 
-let unmount: (() => void) | null = null;
-afterEach(() => unmount?.());
-
 /** Mounts the hook and returns an accessor for its latest value. */
-function mountHook(): { current: () => Modal } {
-    let latest: Modal | null = null;
-    const Host = () => {
-        latest = useConfirmModal();
-        return null;
-    };
-    const instance = render(React.createElement(Host), {
-        stdout: new FakeStdout() as never,
-        stderr: new FakeStdout() as never,
-        stdin: new FakeStdin() as never,
-        debug: true,
-        patchConsole: false,
-        exitOnCtrlC: false,
-    });
-    unmount = () => instance.unmount();
-    return { current: () => latest as unknown as Modal };
+function mountModal(): { current: () => Modal } {
+    return mountHook(() => useConfirmModal(), undefined);
 }
 
-const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 20));
 const dialog = (title: string, log: string[] = []): ConfirmModalConfig => ({
     title,
     message: title,
@@ -62,7 +20,7 @@ const dialog = (title: string, log: string[] = []): ConfirmModalConfig => ({
 
 describe("useConfirmModal", () => {
     test("openConfirmModal still replaces whatever is open (unchanged behaviour)", async () => {
-        const host = mountHook();
+        const host = mountModal();
         host.current().openConfirmModal(dialog("first"));
         host.current().openConfirmModal(dialog("second"));
         await tick();
@@ -70,14 +28,14 @@ describe("useConfirmModal", () => {
     });
 
     test("openConfirmModalWhenFree shows at once when nothing is open", async () => {
-        const host = mountHook();
+        const host = mountModal();
         host.current().openConfirmModalWhenFree(dialog("alert"));
         await tick();
         expect(host.current().pendingConfig?.title).toBe("alert");
     });
 
     test("openConfirmModalWhenFree waits for an open dialog instead of replacing it", async () => {
-        const host = mountHook();
+        const host = mountModal();
         host.current().openConfirmModal(dialog("question"));
         await tick();
 
@@ -95,7 +53,7 @@ describe("useConfirmModal", () => {
     });
 
     test("waiting dialogs appear in the order they were requested, also after a cancel", async () => {
-        const host = mountHook();
+        const host = mountModal();
         const log: string[] = [];
         host.current().openConfirmModal(dialog("question", log));
         host.current().openConfirmModalWhenFree(dialog("a", log));
@@ -115,7 +73,7 @@ describe("useConfirmModal", () => {
     });
 
     test("a dialog opened by a waiting request is itself protected from the next one", async () => {
-        const host = mountHook();
+        const host = mountModal();
         host.current().openConfirmModalWhenFree(dialog("a"));
         host.current().openConfirmModalWhenFree(dialog("b")); // same tick: "a" has not rendered yet
         await tick();

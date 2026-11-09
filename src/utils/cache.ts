@@ -61,7 +61,11 @@ export interface CacheOptions {
 const inFlight = new Map<string, Promise<unknown>>();
 
 /** Runs `compute` through the persistent cache. Exported for tests; use the `@Cached` decorator in services. */
-export async function cachedCall<T>(cacheKey: string, compute: () => Promise<T>, options: CacheOptions = {}): Promise<T> {
+export async function cachedCall<T>(
+    cacheKey: string,
+    compute: () => Promise<T>,
+    options: CacheOptions = {}
+): Promise<T> {
     // Return existing cache value ONLY if cache is globally enabled and not skipped for this call
     const shouldSkip = !cacheGloballyEnabled || skipCacheStorage.getStore() === true;
     if (!shouldSkip) {

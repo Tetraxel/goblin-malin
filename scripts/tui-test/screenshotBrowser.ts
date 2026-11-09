@@ -9,7 +9,7 @@ export async function renderToImageBrowser(
     cols: number,
     rows: number,
     rawData: string,
-    outputPath: string,
+    outputPath: string
 ): Promise<void> {
     const { chromium } = await import("playwright");
 

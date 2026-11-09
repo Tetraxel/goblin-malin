@@ -6,7 +6,7 @@ export interface UpdateInfo {
     releaseUrl: string;
 }
 
-function isNewer(local: string, remote: string): boolean {
+export function isNewer(local: string, remote: string): boolean {
     const parse = (v: string) => v.replace(/^v/, "").split(".").map(Number);
     const [lMaj = 0, lMin = 0, lPatch = 0] = parse(local);
     const [rMaj = 0, rMin = 0, rPatch = 0] = parse(remote);

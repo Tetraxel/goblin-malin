@@ -13,10 +13,22 @@ const { Terminal } = _require("@xterm/headless") as {
 function palette256ToRgb(index: number): [number, number, number] {
     if (index < 16) {
         const SYSTEM: [number, number, number][] = [
-            [0, 0, 0], [128, 0, 0], [0, 128, 0], [128, 128, 0],
-            [0, 0, 128], [128, 0, 128], [0, 128, 128], [192, 192, 192],
-            [128, 128, 128], [255, 0, 0], [0, 255, 0], [255, 255, 0],
-            [0, 0, 255], [255, 0, 255], [0, 255, 255], [255, 255, 255],
+            [0, 0, 0],
+            [128, 0, 0],
+            [0, 128, 0],
+            [128, 128, 0],
+            [0, 0, 128],
+            [128, 0, 128],
+            [0, 128, 128],
+            [192, 192, 192],
+            [128, 128, 128],
+            [255, 0, 0],
+            [0, 255, 0],
+            [255, 255, 0],
+            [0, 0, 255],
+            [255, 0, 255],
+            [0, 255, 255],
+            [255, 255, 255],
         ];
         return SYSTEM[index] ?? [0, 0, 0];
     }
@@ -117,7 +129,10 @@ export class TermEmulator {
 
         for (let row = 0; row < this.terminal.rows; row++) {
             const line = buffer.getLine(row);
-            if (!line) { lines.push(""); continue; }
+            if (!line) {
+                lines.push("");
+                continue;
+            }
 
             type Seg = { key: string; escape: string; chars: string; bgDefault: boolean };
             const segs: Seg[] = [];
@@ -169,8 +184,11 @@ export class TermEmulator {
         // Primary: CascadiaMono (Windows Terminal's font — best terminal symbol coverage).
         // Falls back to DejaVu/Menlo on other platforms, then Consolas as last resort.
         const primaryCandidates: Array<[string, string | null]> = [
-            ["C:\\Windows\\Fonts\\CascadiaMono.ttf", null],         // variable font, bold synthesized
-            ["/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"],
+            ["C:\\Windows\\Fonts\\CascadiaMono.ttf", null], // variable font, bold synthesized
+            [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
+            ],
             ["/System/Library/Fonts/Menlo.ttc", null],
             ["C:\\Windows\\Fonts\\consola.ttf", "C:\\Windows\\Fonts\\consolab.ttf"],
         ];
@@ -179,16 +197,20 @@ export class TermEmulator {
             try {
                 GlobalFonts.registerFromPath(regular, "TermFont");
                 fontFamily = "TermFont";
-                if (bold) { try { GlobalFonts.registerFromPath(bold, "TermFont"); } catch {} }
+                if (bold) {
+                    try {
+                        GlobalFonts.registerFromPath(bold, "TermFont");
+                    } catch {}
+                }
                 break;
             } catch {}
         }
 
         // Fallbacks for glyphs the primary font lacks (emoji, broad misc symbols)
         const fallbacks: Array<[string, string]> = [
-            ["C:\\Windows\\Fonts\\seguisym.ttf", "TermSymbols"],   // misc symbols & arrows (U+26xx, U+2Bxx)
-            ["C:\\Windows\\Fonts\\seguiemj.ttf", "TermEmoji"],     // emoji (😉 etc.)
-            ["C:\\Windows\\Fonts\\msgothic.ttc", "TermGothic"],    // broad BMP coverage
+            ["C:\\Windows\\Fonts\\seguisym.ttf", "TermSymbols"], // misc symbols & arrows (U+26xx, U+2Bxx)
+            ["C:\\Windows\\Fonts\\seguiemj.ttf", "TermEmoji"], // emoji (😉 etc.)
+            ["C:\\Windows\\Fonts\\msgothic.ttc", "TermGothic"], // broad BMP coverage
             ["/usr/share/fonts/truetype/noto/NotoSansSymbols2.ttf", "TermSymbols"],
             ["/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf", "TermEmoji"],
         ];

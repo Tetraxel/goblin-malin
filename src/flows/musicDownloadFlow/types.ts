@@ -210,12 +210,7 @@ export type TrackMetadata =
 
 // Which fields of the source metadata were used to find a result
 export type SearchKey =
-    | "url"
-    | "isrc"
-    | "trackName"
-    | "artistName"
-    | "trackName+artistName"
-    | "trackName+artistName+isrc";
+    "url" | "isrc" | "trackName" | "artistName" | "trackName+artistName" | "trackName+artistName+isrc";
 
 // One path that led to a given URI being discovered
 export type DiscoverySource = {

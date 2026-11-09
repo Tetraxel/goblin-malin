@@ -197,7 +197,10 @@ describe("SettingsStore only stores what differs from the defaults", () => {
     });
 
     test("music settings saved with their defaults store only the overrides", () => {
-        const defaults = { download: { outputDir: "A", preferLossless: false }, metadata: { providers: { x: { enabled: true } } } };
+        const defaults = {
+            download: { outputDir: "A", preferLossless: false },
+            metadata: { providers: { x: { enabled: true } } },
+        };
         const store = new SettingsStore(file);
         store.writeMusicSettings(deepMerge(defaults, { download: { outputDir: "B" } }), defaults);
 
@@ -233,7 +236,7 @@ describe("deepDiff", () => {
 
 describe("the data folder is never stored", () => {
     test("a stored appDataDir is ignored on load and dropped on the next write", () => {
-        const stale = { ...userFile, general: { theme: "light", appDataDir: "C:\Users\someone-else\goblin-malin" } };
+        const stale = { ...userFile, general: { theme: "light", appDataDir: "C:\\Users\\someone-else\\goblin-malin" } };
         fs.writeFileSync(file, JSON.stringify(stale));
         const store = new SettingsStore(file);
 

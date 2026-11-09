@@ -73,9 +73,7 @@ type TreeItem =
 
 /** A place the cursor can be: the pinned saved file, a provider's header, or one download row. */
 type NavTarget =
-    | { kind: "saved" }
-    | { kind: "provider"; provider: DownloadProvider }
-    | { kind: "source"; index: number };
+    { kind: "saved" } | { kind: "provider"; provider: DownloadProvider } | { kind: "source"; index: number };
 
 function getProviderDisplay(provider: string): {
     label: string;

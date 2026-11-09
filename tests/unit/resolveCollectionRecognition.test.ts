@@ -4,12 +4,16 @@ import { MetadataService } from "#flows/musicDownloadFlow/metadataService";
 import type { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { resolveCollectionRecognition } from "#flows/musicDownloadFlow/utils/resolveCollectionRecognition";
 import { ParsedUrl } from "#base/urlParser";
+import type { Logger } from "#base/logger/logger";
 
 // Minimal fixture services — registering a class (rather than a factory function)
 // is what populates ServiceRegistry.getAllConstructors(), which
 // resolveCollectionRecognition walks. Never instantiated, so the abstract methods
 // just need to satisfy the type checker.
 class FakeSpotify extends MetadataService {
+    constructor(task: DownloadTask, logger: Logger) {
+        super("FakeSpotify", task, logger);
+    }
     static override parseUrl(url: string): ParsedUrl | null {
         const m = url.match(/open\.spotify\.com\/(album|playlist|track)\/([a-zA-Z0-9]+)/);
         if (!m) return null;
@@ -24,6 +28,9 @@ class FakeSpotify extends MetadataService {
 }
 
 class FakeYoutube extends MetadataService {
+    constructor(task: DownloadTask, logger: Logger) {
+        super("FakeYoutube", task, logger);
+    }
     static override parseUrl(url: string): ParsedUrl | null {
         if (!url.includes("youtube.com/playlist")) return null;
         const id = new URL(url).searchParams.get("list");
@@ -56,10 +63,7 @@ describe("resolveCollectionRecognition", () => {
     });
 
     test("recognizes a YouTube Music playlist URL", () => {
-        const result = resolveCollectionRecognition(
-            "https://music.youtube.com/playlist?list=PL123",
-            buildRegistry()
-        );
+        const result = resolveCollectionRecognition("https://music.youtube.com/playlist?list=PL123", buildRegistry());
         expect(result).toEqual({ serviceKey: "youtube", collectionKind: "playlist", sourceId: "PL123" });
     });
 

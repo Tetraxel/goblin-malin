@@ -22,24 +22,24 @@ Scenarios are JSON files in `scripts/tui-test/examples/`.
 {
     "terminal": { "cols": 128, "rows": 64 }, // optional, defaults: 200×50
     "dataDir": "scripts/tui-test/fixtures/empty", // optional: sets GOBLIN_DATA_DIR
-    "steps": [ /* ...see step types below... */ ]
+    "steps": [/* ...see step types below... */],
 }
 ```
 
 ## Step types
 
-| Step | Purpose |
-|------|---------|
-| `{ "type": "key", "key": "Enter" }` | Send a key. See key reference below. |
-| `{ "type": "type", "text": "hello" }` | Type raw text. |
-| `{ "type": "wait", "ms": 500 }` | Fixed delay. |
-| `{ "type": "stable" }` | Wait for terminal output to stop for 300ms (app finished rendering). Add `"timeout": 8000` or `"quiescenceMs": 500` to tune. |
-| `{ "type": "waitForContent", "text": "No task" }` | Block until the given text appears on screen. Add `"timeout": 10000` (ms). |
-| `{ "type": "assert", "contains": "Settings" }` | Fail immediately if the text is not on screen. |
-| `{ "type": "snapshot", "name": "my-state" }` | Capture terminal state. Accessible in output as `result.snapshots["my-state"].plain` (text) or `.ansi` (with colors). |
-| `{ "type": "screenshot", "name": "my-shot" }` | Render a PNG via the built-in terminal emulator. Fast, no external dependency, but fonts and glyphs are approximate. |
+| Step                                                     | Purpose                                                                                                                                                                                                           |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{ "type": "key", "key": "Enter" }`                      | Send a key. See key reference below.                                                                                                                                                                              |
+| `{ "type": "type", "text": "hello" }`                    | Type raw text.                                                                                                                                                                                                    |
+| `{ "type": "wait", "ms": 500 }`                          | Fixed delay.                                                                                                                                                                                                      |
+| `{ "type": "stable" }`                                   | Wait for terminal output to stop for 300ms (app finished rendering). Add `"timeout": 8000` or `"quiescenceMs": 500` to tune.                                                                                      |
+| `{ "type": "waitForContent", "text": "No task" }`        | Block until the given text appears on screen. Add `"timeout": 10000` (ms).                                                                                                                                        |
+| `{ "type": "assert", "contains": "Settings" }`           | Fail immediately if the text is not on screen.                                                                                                                                                                    |
+| `{ "type": "snapshot", "name": "my-state" }`             | Capture terminal state. Accessible in output as `result.snapshots["my-state"].plain` (text) or `.ansi` (with colors).                                                                                             |
+| `{ "type": "screenshot", "name": "my-shot" }`            | Render a PNG via the built-in terminal emulator. Fast, no external dependency, but fonts and glyphs are approximate.                                                                                              |
 | `{ "type": "screenshot-powershell", "name": "my-shot" }` | Render a PNG via Windows Terminal — real font, box-drawing, emoji. Saved to `%TEMP%\goblin-tui-test\<name>.png`. Closest to what the user actually sees, but slower (~3–5s). **Preferred for visual validation.** |
-| `{ "type": "screenshot-browser", "name": "my-shot" }` | ⚠️ Deprecated. Render a PNG via headless Edge + xterm.js. |
+| `{ "type": "screenshot-browser", "name": "my-shot" }`    | ⚠️ Deprecated. Render a PNG via headless Edge + xterm.js.                                                                                                                                                         |
 
 ## Key reference
 
@@ -68,21 +68,23 @@ Single characters pass through as-is: `"D"`, `"E"`, `"1"`, `"y"`, etc.
 
 ## Fixtures
 
-| Fixture | Sessions | Tasks | State |
-|---|---|---|---|
-| `empty` | 0 | 0 | Blank slate — no sessions, no cache. Start here for onboarding flows. |
-| `50-tasks` | 1 | 50 | Tasks are `pending` — Spotify URLs imported but metadata not yet fetched. |
-| `50-tasks-with-metadata` | 1 | 50 | Tasks are `finished` — Spotify + YouTube metadata fetched, Songlink and MusicBrainz anchors resolved. |
+| Fixture                  | Sessions | Tasks | State                                                                                                 |
+| ------------------------ | -------- | ----- | ----------------------------------------------------------------------------------------------------- |
+| `empty`                  | 0        | 0     | Blank slate — no sessions, no cache. Start here for onboarding flows.                                 |
+| `50-tasks`               | 1        | 50    | Tasks are `pending` — Spotify URLs imported but metadata not yet fetched.                             |
+| `50-tasks-with-metadata` | 1        | 50    | Tasks are `finished` — Spotify + YouTube metadata fetched, Songlink and MusicBrainz anchors resolved. |
 
-Set the fixture with `"dataDir"` in the scenario:
+Set the fixture with `"dataDir"` in the scenario (default: `empty`):
 
 ```jsonc
 { "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata", "steps": [ ... ] }
 ```
 
+**A scenario never runs on the fixture itself.** The runner copies it (without `bin/`, logs, locks and `.bak` files) into a fresh temp folder, points `GOBLIN_DATA_DIR` at the copy, sets `music.download.outputDir` and `outputTemporaryDir` to folders inside the copy, and deletes the copy afterwards. So a run cannot modify the tracked fixtures, touch your real data folder or scan `~/Music` (which used to pop up the "temporary downloads are piling up" dialog mid-scenario). Set `GOBLIN_TUI_KEEP_DATA=1` to keep the copy for inspection; its path is printed to stderr.
+
 ## Render profiling
 
-Screenshots tell you *what* rendered; profiling tells you *how expensively*. With profiling enabled, the harness boots the app through an instrumented entrypoint that records, on **every React commit**, each component's render time, render count, mount-vs-update, and **why it rendered** (which prop/state changed) — then attributes all of it to the keystroke that caused it.
+Screenshots tell you _what_ rendered; profiling tells you _how expensively_. With profiling enabled, the harness boots the app through an instrumented entrypoint that records, on **every React commit**, each component's render time, render count, mount-vs-update, and **why it rendered** (which prop/state changed) — then attributes all of it to the keystroke that caused it.
 
 ```bash
 # Enable on any scenario without editing it:
@@ -114,13 +116,13 @@ The JSON result gains a `profile` field; `--pretty` prints a `profile` section.
 
 Anomaly rules are **component-agnostic** — they enumerate every component, so a newly-added slow component is caught without naming it anywhere.
 
-| Rule | Severity | Meaning |
-|---|---|---|
-| `commit-cascade` | **error** | One keystroke caused more commits than `maxCommitsPerInteraction` — an effect loop / runaway `setState`. Machine-independent → fails CI. |
-| `slow-interaction` | warn | One keystroke spent over `maxInteractionReactMs` in React. |
-| `slow-commit` | warn | A single commit exceeded `maxCommitDurationMs`. |
-| `slow-component` | warn | A component's p95 self render exceeded `maxComponentSelfMsP95`. |
-| `wasted-renders` | warn | An interaction caused more than `maxWastedRendersPerInteraction` app-component parent-only re-renders (Ink primitives excluded). |
+| Rule               | Severity  | Meaning                                                                                                                                  |
+| ------------------ | --------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `commit-cascade`   | **error** | One keystroke caused more commits than `maxCommitsPerInteraction` — an effect loop / runaway `setState`. Machine-independent → fails CI. |
+| `slow-interaction` | warn      | One keystroke spent over `maxInteractionReactMs` in React.                                                                               |
+| `slow-commit`      | warn      | A single commit exceeded `maxCommitDurationMs`.                                                                                          |
+| `slow-component`   | warn      | A component's p95 self render exceeded `maxComponentSelfMsP95`.                                                                          |
+| `wasted-renders`   | warn      | An interaction caused more than `maxWastedRendersPerInteraction` app-component parent-only re-renders (Ink primitives excluded).         |
 
 Only `commit-cascade` is an `error` because absolute ms vary by machine (dev `tsx` runs slower than a built binary); ms-based rules are **advisory warnings**. The `render profile` vitest test (`tests/e2e/perf.test.ts`) fails only on `error`-severity anomalies. Override defaults per scenario:
 

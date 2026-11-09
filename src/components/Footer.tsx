@@ -57,12 +57,14 @@ export const Footer: React.FC = () => {
                 {showStats ? (
                     <Text>
                         <Text color={theme.text.muted}>fps </Text>
-                        <Text color={fpsColor} bold>{String(fps).padStart(2)}</Text>
-                        <Text color={theme.text.muted}>  min </Text>
+                        <Text color={fpsColor} bold>
+                            {String(fps).padStart(2)}
+                        </Text>
+                        <Text color={theme.text.muted}> min </Text>
                         <Text color={theme.text.secondary}>{String(minFps).padStart(2)}</Text>
-                        <Text color={theme.text.muted}>  max </Text>
+                        <Text color={theme.text.muted}> max </Text>
                         <Text color={theme.text.secondary}>{String(maxFps).padStart(2)}</Text>
-                        <Text color={theme.text.muted}>  </Text>
+                        <Text color={theme.text.muted}> </Text>
                         <Text color={theme.text.secondary}>{renderMs.toFixed(1)}</Text>
                         <Text color={theme.text.muted}>ms</Text>
                     </Text>

@@ -137,7 +137,10 @@ describe("showMoreSources", () => {
         const task = m.makeTask([
             row("ytdlp", "downloaded"),
             row("soulseek", "skipped", { ...stub(1) }),
-            row("soulseek", "skipped", { ...stub(2), moreCandidates: Array.from({ length: 25 }, (_, i) => stub(i + 3)) }),
+            row("soulseek", "skipped", {
+                ...stub(2),
+                moreCandidates: Array.from({ length: 25 }, (_, i) => stub(i + 3)),
+            }),
             row("ytdlp", "failed"),
         ]);
 

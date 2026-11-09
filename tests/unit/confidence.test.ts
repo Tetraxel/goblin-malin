@@ -5,7 +5,7 @@ import type { TrackMetadata } from "#flows/musicDownloadFlow/types";
 function track(
     trackName: string,
     artist: string,
-    opts: { duration?: number; year?: string; album?: string; isrc?: string } = {},
+    opts: { duration?: number; year?: string; album?: string; isrc?: string } = {}
 ): TrackMetadata {
     return {
         id: "x",
@@ -14,15 +14,16 @@ function track(
         artists: [{ type: "artist", name: artist }],
         duration: opts.duration,
         isrc: opts.isrc,
-        album: opts.year || opts.album
-            ? {
-                  id: "a",
-                  url: "https://example.com/a",
-                  uri: "A",
-                  albumName: opts.album ?? "",
-                  releaseDate: opts.year,
-              }
-            : undefined,
+        album:
+            opts.year || opts.album
+                ? {
+                      id: "a",
+                      url: "https://example.com/a",
+                      uri: "A",
+                      albumName: opts.album ?? "",
+                      releaseDate: opts.year,
+                  }
+                : undefined,
     } as unknown as TrackMetadata;
 }
 

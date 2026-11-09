@@ -14,7 +14,10 @@ export type Step =
 
 export type Scenario = {
     terminal?: { cols?: number; rows?: number };
-    /** Path to the data directory for the app (relative to project root or absolute). Sets GOBLIN_DATA_DIR. */
+    /**
+     * Fixture data folder (relative to project root or absolute). It is copied into a throwaway folder that
+     * becomes GOBLIN_DATA_DIR, so a run never modifies the fixture. Defaults to `fixtures/empty`.
+     */
     dataDir?: string;
     steps: Step[];
     env?: Record<string, string>;

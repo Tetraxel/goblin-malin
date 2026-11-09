@@ -204,7 +204,10 @@ export class SoulseekService extends DownloadService {
     }
 
     /** What a row (or a not-yet-listed result) records about the remote file and its peer. */
-    private candidateStub(file: Candidate, note: string | undefined = file.slots ? undefined : "queued"): HiddenCandidate {
+    private candidateStub(
+        file: Candidate,
+        note: string | undefined = file.slots ? undefined : "queued"
+    ): HiddenCandidate {
         const audio = announcedAudio(file);
         return {
             providerDetail: file.user,

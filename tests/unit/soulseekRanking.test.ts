@@ -175,8 +175,14 @@ describe("announced audio", () => {
     });
 
     test("prefers 24-bit and ranks below-CD sample rates down", () => {
-        const cd = calculateResultWeight(withAttribs({ [FileAttribute.BitDepth]: 16, [FileAttribute.SampleRate]: 44_100 }), query);
-        const hiRes = calculateResultWeight(withAttribs({ [FileAttribute.BitDepth]: 24, [FileAttribute.SampleRate]: 96_000 }), query);
+        const cd = calculateResultWeight(
+            withAttribs({ [FileAttribute.BitDepth]: 16, [FileAttribute.SampleRate]: 44_100 }),
+            query
+        );
+        const hiRes = calculateResultWeight(
+            withAttribs({ [FileAttribute.BitDepth]: 24, [FileAttribute.SampleRate]: 96_000 }),
+            query
+        );
         const low = calculateResultWeight(withAttribs({ [FileAttribute.SampleRate]: 22_050 }), query);
         expect(hiRes).toBeGreaterThan(cd);
         expect(low).toBeLessThan(cd);

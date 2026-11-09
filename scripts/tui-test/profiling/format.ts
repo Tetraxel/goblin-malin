@@ -30,7 +30,9 @@ export function formatProfile(p: ProfileReport): string {
 
     // Top components by total self time.
     lines.push("\n  " + BOLD + "top components (by self ms)" + R);
-    lines.push(`  ${GRAY}${"component".padEnd(28)}${"renders".padStart(8)}${"self ms".padStart(10)}${"p95".padStart(8)}${"wasted".padStart(8)}${R}`);
+    lines.push(
+        `  ${GRAY}${"component".padEnd(28)}${"renders".padStart(8)}${"self ms".padStart(10)}${"p95".padStart(8)}${"wasted".padStart(8)}${R}`
+    );
     for (const c of p.components.slice(0, 15)) {
         const wastedColor = c.wasted > 0 ? YELLOW : GRAY;
         lines.push(
@@ -73,7 +75,10 @@ export function formatProfile(p: ProfileReport): string {
         } else {
             const reg = p.baseline.regressions.length;
             const nc = p.baseline.newComponents.length;
-            lines.push(`\n  ${GRAY}baseline${R} ${reg === 0 ? GREEN + "no regressions" + R : RED + reg + " regression(s)" + R}` + (nc > 0 ? ` ${DIM}(${nc} new component(s))${R}` : ""));
+            lines.push(
+                `\n  ${GRAY}baseline${R} ${reg === 0 ? GREEN + "no regressions" + R : RED + reg + " regression(s)" + R}` +
+                    (nc > 0 ? ` ${DIM}(${nc} new component(s))${R}` : "")
+            );
         }
     }
 

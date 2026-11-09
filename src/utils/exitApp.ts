@@ -35,7 +35,9 @@ export function restoreTerminal(): void {
 function finish(note?: string): never {
     // Back on the normal screen the closing box is gone: leave one line saying it really ended.
     const lines = ["Goblin Malin closed.", ...(note ? [note] : [])];
-    process.stdout.write(DISABLE_MOUSE + LEAVE_ALT_SCREEN_COMMAND + lines.join(String.fromCharCode(13, 10)) + String.fromCharCode(13, 10));
+    process.stdout.write(
+        DISABLE_MOUSE + LEAVE_ALT_SCREEN_COMMAND + lines.join(String.fromCharCode(13, 10)) + String.fromCharCode(13, 10)
+    );
     releaseInstanceLock();
     process.exit(0);
 }

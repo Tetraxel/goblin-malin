@@ -86,7 +86,16 @@ function aggregateComponents(commits: CommitRecord[]): ComponentStat[] {
         for (const comp of commit.components) {
             let s = stats.get(comp.name);
             if (!s) {
-                s = { name: comp.name, renders: 0, mounts: 0, updates: 0, selfMsTotal: 0, selfMsMax: 0, selfMsP95: 0, wasted: 0 };
+                s = {
+                    name: comp.name,
+                    renders: 0,
+                    mounts: 0,
+                    updates: 0,
+                    selfMsTotal: 0,
+                    selfMsMax: 0,
+                    selfMsP95: 0,
+                    wasted: 0,
+                };
                 stats.set(comp.name, s);
                 selfTimes.set(comp.name, []);
             }
@@ -255,7 +264,10 @@ export function analyzeRecords(records: ProfileRecord[], options: AnalyzeOptions
     // Baseline: regenerate or compare (keyed by scenario name).
     if (options.scenario) {
         if (options.updateBaseline) {
-            saveBaseline(options.scenario, components, { commits: report.totals.commits, reactMs: report.totals.reactMs });
+            saveBaseline(options.scenario, components, {
+                commits: report.totals.commits,
+                reactMs: report.totals.reactMs,
+            });
             report.baseline = { exists: true, updated: true, regressions: [], newComponents: [] };
         } else {
             const cmp = compareToBaseline(options.scenario, components);

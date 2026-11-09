@@ -6,16 +6,20 @@
         { "type": "waitForContent", "text": "No task to run", "timeout": 5000 },
         { "type": "snapshot", "name": "initial" },
 
+        // Toolbar order: Run, Sessions, Archive, Settings, Exit: Settings is 3 presses of → from the start.
+        { "type": "key", "key": "ArrowRight" },
         { "type": "key", "key": "ArrowRight" },
         { "type": "key", "key": "ArrowRight" },
         { "type": "key", "key": "Enter" },
         { "type": "stable" },
+        // "Settings" is a permanent toolbar label, so assert on text only the modal shows.
+        { "type": "assert", "contains": "Search settings" },
         { "type": "snapshot", "name": "settings-open" },
 
         { "type": "key", "key": "ArrowDown" },
         { "type": "key", "key": "ArrowDown" },
         { "type": "stable" },
-        { "type": "assert", "contains": "Settings" },
+        { "type": "assert", "contains": "Search settings" },
         { "type": "snapshot", "name": "settings-navigated" },
 
         { "type": "key", "key": "Escape" },

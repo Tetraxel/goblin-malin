@@ -113,10 +113,10 @@ export type TempAgeSummary = {
 };
 
 export function sumGroups(groups: TempGroup[]): { files: number; bytes: number } {
-    return groups.reduce(
-        (sum, g) => ({ files: sum.files + g.files.length, bytes: sum.bytes + g.bytes }),
-        { files: 0, bytes: 0 }
-    );
+    return groups.reduce((sum, g) => ({ files: sum.files + g.files.length, bytes: sum.bytes + g.bytes }), {
+        files: 0,
+        bytes: 0,
+    });
 }
 
 /** For every offered age, how much would go — so the dialog can show it while the user flips through them. */

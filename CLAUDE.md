@@ -56,8 +56,9 @@ Registered metadata services: `spotify`, `youtube`. Discovery services: `songlin
 
 ```bash
 yarn run dev  # start the TUI (use this)
-yarn run type-check  # Check typescript errors
-yarn run lint  # Check eslint errors
+yarn run type-check  # Check typescript errors (src/, tests/ and the TUI harness)
+yarn run lint  # Check eslint errors (src/, tests/, scripts/)
+yarn run format:check  # Check prettier (yarn run format to fix)
 ```
 
 ## TUI test harness

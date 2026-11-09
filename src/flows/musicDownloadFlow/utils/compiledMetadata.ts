@@ -11,16 +11,7 @@ import {
 export type FieldAttribution = Platform | "manual" | "none";
 
 export type CompiledMetadataField =
-    | "trackName"
-    | "artists"
-    | "duration"
-    | "isrc"
-    | "album"
-    | "year"
-    | "trackNumber"
-    | "bpm"
-    | "key"
-    | "genres";
+    "trackName" | "artists" | "duration" | "isrc" | "album" | "year" | "trackNumber" | "bpm" | "key" | "genres";
 
 export type MusicBrainzIds = {
     recording?: string;

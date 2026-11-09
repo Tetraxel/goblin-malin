@@ -10,7 +10,9 @@ const profile = flags.includes("--profile");
 const updateBaseline = flags.includes("--update-baseline");
 
 if (!scenarioPath) {
-    process.stderr.write("Usage: tsx scripts/tui-test/cli.ts <scenario.json> [--pretty] [--profile] [--update-baseline]\n");
+    process.stderr.write(
+        "Usage: tsx scripts/tui-test/cli.ts <scenario.json> [--pretty] [--profile] [--update-baseline]\n"
+    );
     process.exit(1);
 }
 
