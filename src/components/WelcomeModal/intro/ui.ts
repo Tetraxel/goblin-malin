@@ -1,4 +1,4 @@
-import { Canvas, RGB, hex, mix, scale } from "./canvas";
+import { type Canvas, type RGB, hex, mix, scale } from "./canvas";
 import { clamp01 } from "./easing";
 
 // Cell-space drawing helpers for the app tour: text, panels, keycaps. Panel fills are

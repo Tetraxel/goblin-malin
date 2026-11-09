@@ -1,7 +1,7 @@
 import { TaskOrchestrator } from "#base/task/orchestrator";
 import { StatusType } from "#base/task/task-status";
-import { DownloadTask } from "./utils/downloadTask";
-import { CollectionTask } from "./utils/collectionTask";
+import { type DownloadTask } from "./utils/downloadTask";
+import { type CollectionTask } from "./utils/collectionTask";
 
 /** Queue every candidate task and start processing. */
 export async function runAll(): Promise<void> {

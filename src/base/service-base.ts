@@ -1,8 +1,8 @@
 import { EventEmitter } from "events";
-import { Logger } from "./logger/logger";
-import { Task } from "./task/task";
+import { type Logger } from "./logger/logger";
+import { type Task } from "./task/task";
 import { Env } from "./env";
-import { StatusType, TaskStatus } from "./task/task-status";
+import { StatusType, type TaskStatus } from "./task/task-status";
 
 export abstract class ServiceBase extends EventEmitter {
     public id: string;

@@ -1,7 +1,7 @@
-import { Task } from "./task/task";
-import { Logger } from "./logger/logger";
-import { ServiceFactory } from "./service-registry";
-import { ServiceBase } from "./service-base";
+import { type Task } from "./task/task";
+import { type Logger } from "./logger/logger";
+import { type ServiceFactory } from "./service-registry";
+import { type ServiceBase } from "./service-base";
 
 // A scope ensures each service is instantiated only once per task but with different logger for each task
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

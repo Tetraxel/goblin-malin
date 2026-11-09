@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fpsTracker, FpsStats, EMPTY_FPS_STATS } from "#base/fpsTracker";
+import { fpsTracker, type FpsStats, EMPTY_FPS_STATS } from "#base/fpsTracker";
 
 /**
  * Returns live FPS statistics measured by Ink's onRender callback.

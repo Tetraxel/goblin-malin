@@ -1,6 +1,6 @@
-import { StatusAttributes, TaskStatus } from "./task-status";
-import { TaskPrompt, UserPrompt } from "./task-prompt";
-import { Logger } from "../logger/logger";
+import { type StatusAttributes, TaskStatus } from "./task-status";
+import { TaskPrompt, type UserPrompt } from "./task-prompt";
+import { type Logger } from "../logger/logger";
 import { notificationScheduler } from "../notificationScheduler";
 
 export interface DownloadTaskData {

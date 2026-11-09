@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Box } from "ink";
 import { useTheme } from "#base/themeContext";
-import { Task, TaskSnapshot } from "#base/task/task";
-import { CursorPosition, Updater } from "#hooks/useFocusManager";
-import { MusicDownloadTaskAttributes, MetadataGroupState, MetadataOverrides } from "#flows/musicDownloadFlow/types";
+import { type Task, type TaskSnapshot } from "#base/task/task";
+import { type CursorPosition, type Updater } from "#hooks/useFocusManager";
+import {
+    type MusicDownloadTaskAttributes,
+    type MetadataGroupState,
+    type MetadataOverrides,
+} from "#flows/musicDownloadFlow/types";
 import { computeCompiledMetadata, pickGroupRepresentative } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { navigableFields } from "#flows/musicDownloadFlow/utils/metadataFields";
 import { MetadataSourceList } from "./MetadataSourceList";

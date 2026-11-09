@@ -32,7 +32,6 @@
 - [ ] `CHANGELOG.md` for 0.2.0, `.gitattributes`, licence check for the bundled audio samples — `DOC-07`
 - [ ] Dependencies left: `zod` advisory (waits for `ytmusic-api` on zod 4), ESLint 10 (waits for `eslint-plugin-react`; add `cause`s), TypeScript 7 (waits for `typescript-eslint`) — `DEP-02`, `DEP-03`
 - [ ] Get the unit tests green on Linux CI, then enable them there (they only run on Windows now)
-- [ ] Remaining `REL-07` leftover: drop `emitDecoratorMetadata` (and then `@swc/core`)
 - [ ] **Linux has no working ffmpeg/ffprobe download** — `resolveFfmpegSource` has a macOS branch and treats everything else as Windows (fetches the win64 zip); check, and either add a Linux build or state Linux is unsupported
 
 ## 🟣 Promised by the former `README-TARGET` but not built yet

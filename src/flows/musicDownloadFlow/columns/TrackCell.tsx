@@ -1,8 +1,8 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
+import { type ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { PlaybackIndicator } from "#components/PlaybackIndicator";
-import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import { computeCompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 
 export const TrackCell = React.memo(function TrackCell({

@@ -1,4 +1,4 @@
-import { TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import { type TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 
 // Lower rank = preferred. Sources without fileInfo/provenance (or a still-failed
 // source) rank last so they're never picked over a real downloaded file.

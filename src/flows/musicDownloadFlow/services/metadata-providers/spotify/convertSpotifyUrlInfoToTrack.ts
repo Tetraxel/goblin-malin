@@ -1,5 +1,5 @@
 import { type Details } from "../../apis/spotify-url-info-client";
-import { TrackMetadata, TrackUri } from "#flows/musicDownloadFlow/types";
+import { type TrackMetadata, type TrackUri } from "#flows/musicDownloadFlow/types";
 
 function parseArtistNames(artistName: string | undefined): { type: "artist"; name: string }[] {
     if (!artistName) return [];

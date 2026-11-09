@@ -1,6 +1,6 @@
 import { describe, test, expect } from "vitest";
 import { getProvenanceDisplay } from "#flows/musicDownloadFlow/utils/provenance";
-import { FileInfo } from "#flows/musicDownloadFlow/types";
+import { type FileInfo } from "#flows/musicDownloadFlow/types";
 
 function fileInfo(overrides: Partial<FileInfo> = {}): FileInfo {
     return { format: "flac", sizeBytes: 0, durationMs: 0, embeddedTags: {}, ...overrides };

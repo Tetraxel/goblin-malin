@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { Task, TaskAttributes } from "#base/task/task";
+import { Task, type TaskAttributes } from "#base/task/task";
 import { globalLogger } from "#base/logger/logger";
 import { buildVisibleTaskOrder } from "#flows/musicDownloadFlow/utils/buildVisibleTaskOrder";
 

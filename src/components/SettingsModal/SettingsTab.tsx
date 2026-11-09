@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { itemRowHeight, SettingsItem } from "#settings/buildSettingsItems";
+import { itemRowHeight, type SettingsItem } from "#settings/buildSettingsItems";
 import { SettingsItemRow } from "./SettingsItemRow";
 import { SearchBar } from "../SearchBar";
 

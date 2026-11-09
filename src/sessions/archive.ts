@@ -1,7 +1,7 @@
-import { Task } from "#base/task/task";
-import { computeCompiledMetadata, CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
-import { MusicDownloadTaskAttributes, TrackDownloadSource } from "#flows/musicDownloadFlow/types";
-import { ArchivedTaskSnapshot, SessionTaskSnapshot, StoredSession } from "./types";
+import { type Task } from "#base/task/task";
+import { computeCompiledMetadata, type CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
+import { type MusicDownloadTaskAttributes, type TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import { type ArchivedTaskSnapshot, type SessionTaskSnapshot, type StoredSession } from "./types";
 
 /** Display-ready view of one archived task, derived from its stored snapshot. */
 export interface ArchivedEntry {

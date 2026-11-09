@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, useMemo, ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { setMouseActiveWindow } from "#base/mouse/clickableWindows";
-import { useFocusManager, FocusState } from "#hooks/useFocusManager";
+import { useFocusManager, type FocusState } from "#hooks/useFocusManager";
 
 type FocusManager = ReturnType<typeof useFocusManager>;
 

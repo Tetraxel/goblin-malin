@@ -1,5 +1,5 @@
 import type { Key } from "ink";
-import { Shortcut, matchesShortcut } from "#types/actions";
+import { type Shortcut, matchesShortcut } from "#types/actions";
 
 /** Max gap between the two presses of a `doubleTap` shortcut. */
 export const DOUBLE_TAP_MS = 500;

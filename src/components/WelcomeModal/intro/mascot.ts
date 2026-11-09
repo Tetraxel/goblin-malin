@@ -1,4 +1,4 @@
-import { Canvas, RGB, hex, mix, scale } from "./canvas";
+import { type Canvas, type RGB, hex, mix, scale } from "./canvas";
 import { clamp01, smoothstep } from "./easing";
 
 // The Goblin Malin mascot: a glossy yellow smiley with big dark eyes and an open grin,

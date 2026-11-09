@@ -58,6 +58,7 @@
         "type-check:src": "tsc --noEmit",
         "type-check:tui": "tsc --noEmit --project scripts/tui-test/tsconfig.json",
         "lint": "eslint src/ tests/ scripts/",
+        "check:utf8": "node scripts/check-utf8.mjs",
         "format": "prettier --write src/ tests/ scripts/",
         "format:check": "prettier --check src/ tests/ scripts/",
         "postinstall": "node scripts/save-install-source.mjs",
@@ -90,7 +91,6 @@
     "devDependencies": {
         "@eslint/js": "^9.39.5",
         "@napi-rs/canvas": "^1.1.0",
-        "@swc/core": "^1.16.22",
         "@types/node": "^26.6.6",
         "@types/react": "^19.3.0",
         "@vitest/coverage-v8": "5.1.0",

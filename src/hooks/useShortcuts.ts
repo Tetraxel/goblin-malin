@@ -1,6 +1,11 @@
 import { useEffect, useRef } from "react";
-import { shortcutRegistry, ShortcutEntry, HintLineEntry, HintLineLeft } from "#base/shortcuts/ShortcutRegistry";
-import { Shortcut } from "#types/actions";
+import {
+    shortcutRegistry,
+    type ShortcutEntry,
+    type HintLineEntry,
+    type HintLineLeft,
+} from "#base/shortcuts/ShortcutRegistry";
+import { type Shortcut } from "#types/actions";
 import { SettingsStore } from "#settings/settingsStore";
 
 export interface ShortcutDef {

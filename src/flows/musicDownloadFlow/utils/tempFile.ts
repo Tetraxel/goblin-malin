@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
-import { TrackMetadata } from "#flows/musicDownloadFlow/types";
+import { type TrackMetadata } from "#flows/musicDownloadFlow/types";
 
 function formatDurationMs(ms: number): string {
     const totalSeconds = Math.floor(ms / 1000);

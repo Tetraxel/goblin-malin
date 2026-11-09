@@ -1,7 +1,7 @@
 import { ServiceBase } from "#base/service-base";
-import { Logger } from "#base/logger/logger";
-import { TrackMetadata, DiscoveryResult, Platform } from "./types";
-import { DownloadTask } from "./utils/downloadTask";
+import { type Logger } from "#base/logger/logger";
+import { type TrackMetadata, type DiscoveryResult, type Platform } from "./types";
+import { type DownloadTask } from "./utils/downloadTask";
 
 // What the pipeline already knows when it calls a discovery service.
 export type DiscoveryContext = {

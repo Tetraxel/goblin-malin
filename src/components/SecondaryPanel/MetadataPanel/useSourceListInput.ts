@@ -1,8 +1,8 @@
 import React from "react";
 import open from "open";
 import clipboard from "clipboardy";
-import { MetadataGroupState } from "#flows/musicDownloadFlow/types";
-import { CursorPosition } from "#hooks/useFocusManager";
+import { type MetadataGroupState } from "#flows/musicDownloadFlow/types";
+import { type CursorPosition } from "#hooks/useFocusManager";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { Uri } from "#components/SecondaryPanel/MetadataPanel/Uri";

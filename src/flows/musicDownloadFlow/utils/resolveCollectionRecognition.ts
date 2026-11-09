@@ -1,5 +1,5 @@
-import { ServiceRegistry } from "#base/service-registry";
-import { MetadataService } from "../metadataService";
+import { type ServiceRegistry } from "#base/service-registry";
+import { type MetadataService } from "../metadataService";
 import type { DownloadTask } from "./downloadTask";
 
 export type CollectionRecognition = {

@@ -1,8 +1,8 @@
 import React from "react";
-import { Key } from "ink";
-import { Shortcut, matchesShortcut, getShortcutLiteral } from "#types/actions";
+import { type Key } from "ink";
+import { type Shortcut, matchesShortcut, getShortcutLiteral } from "#types/actions";
 import { cache } from "#utils/cache";
-import { LastPress, isDoubleTap } from "./doubleTap";
+import { type LastPress, isDoubleTap } from "./doubleTap";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 

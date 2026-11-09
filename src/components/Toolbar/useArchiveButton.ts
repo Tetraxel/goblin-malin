@@ -1,4 +1,4 @@
-import { ToolbarButtonHook } from "#components/Toolbar/Toolbar";
+import { type ToolbarButtonHook } from "#components/Toolbar/Toolbar";
 import { useArchivedCount } from "#components/ArchiveModal/useArchive";
 import { useFocusActions } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";

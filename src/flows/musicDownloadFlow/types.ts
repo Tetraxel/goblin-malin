@@ -1,4 +1,4 @@
-import { IRecordingMatch, IReleaseGroupMatch, IRelease } from "musicbrainz-api";
+import { type IRecordingMatch, type IReleaseGroupMatch, type IRelease } from "musicbrainz-api";
 
 //----------------------//
 //     MUSICBRAINZ      //

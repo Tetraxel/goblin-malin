@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { SessionStore } from "#sessions/sessionStore";
 import { SessionManager } from "#sessions/sessionManager";
-import { StoredSession } from "#sessions/types";
+import { type StoredSession } from "#sessions/types";
 import { sessionMatchesQuery } from "#sessions/sessionSearch";
 
 export function useSessions(query: string): {

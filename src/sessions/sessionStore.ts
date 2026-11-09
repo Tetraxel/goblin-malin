@@ -4,8 +4,15 @@ import { EventEmitter } from "events";
 import { DEFAULT_APP_DATA_DIR } from "#constants";
 import { globalLogger } from "#base/logger/logger";
 import { dataFileNoticeBridge } from "#base/bridges/dataFileNoticeBridge";
-import { isPlainObject, loadDataFile, Parsed, refreshBackup, renameReplacing, runMigrations } from "#utils/dataFile";
-import { StoredSession, SessionsFile } from "./types";
+import {
+    isPlainObject,
+    loadDataFile,
+    type Parsed,
+    refreshBackup,
+    renameReplacing,
+    runMigrations,
+} from "#utils/dataFile";
+import { type StoredSession, type SessionsFile } from "./types";
 
 export const SESSIONS_PATH = path.join(DEFAULT_APP_DATA_DIR, "sessions.json");
 

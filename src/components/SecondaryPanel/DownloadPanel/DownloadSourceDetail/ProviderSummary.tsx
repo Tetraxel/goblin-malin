@@ -2,7 +2,7 @@ import React from "react";
 import { Box, Text } from "ink";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
-import { DownloadProvider, TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import { type DownloadProvider, type TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 import { Hint } from "#components/Hint";
 import { PanelFrame } from "./PanelFrame";
 

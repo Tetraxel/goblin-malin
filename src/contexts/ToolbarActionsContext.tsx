@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useRef, ReactNode, MutableRefObject } from "react";
+import React, { createContext, useContext, useRef, type ReactNode, type MutableRefObject } from "react";
 
 type ToolbarActionsRef = MutableRefObject<((() => void) | undefined)[]>;
 

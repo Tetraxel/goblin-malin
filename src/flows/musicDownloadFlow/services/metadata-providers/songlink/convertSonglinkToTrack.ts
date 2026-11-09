@@ -1,4 +1,4 @@
-import { TrackMetadata, TrackUri, Platform, APIProvider } from "#flows/musicDownloadFlow/types";
+import { type TrackMetadata, type TrackUri, type Platform, type APIProvider } from "#flows/musicDownloadFlow/types";
 import type { SonglinkResponse, Entity, PlatformLink } from "../../apis/songlink-client";
 
 // Platforms we can produce TrackMetadata for (union members we know about)

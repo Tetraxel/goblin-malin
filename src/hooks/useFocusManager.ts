@@ -1,6 +1,6 @@
 ﻿import { useState, useCallback, useMemo } from "react";
 import { useScreenSize } from "./useScreenSize";
-import { SetupWizardConfig } from "#base/setupWizard";
+import { type SetupWizardConfig } from "#base/setupWizard";
 
 export type CursorPosition =
     | { type: "compiled" }

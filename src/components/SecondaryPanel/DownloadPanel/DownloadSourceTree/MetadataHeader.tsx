@@ -2,7 +2,7 @@
 import { Box, Text } from "ink";
 import { useTheme } from "#base/themeContext";
 import { providerDisplayRegistry } from "#base/providerDisplay";
-import { TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import { type TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 import { Uri } from "../../MetadataPanel/Uri";
 
 interface MetadataHeaderProps {

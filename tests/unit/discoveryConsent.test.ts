@@ -9,7 +9,7 @@ vi.mock("#flows/musicDownloadFlow/settings", () => ({
 }));
 
 import { SettingsStore } from "#settings/settingsStore";
-import { consentBridge, ConsentRequest } from "#base/bridges/consentBridge";
+import { consentBridge, type ConsentRequest } from "#base/bridges/consentBridge";
 import { discoveryServiceRegistry } from "#flows/musicDownloadFlow/registries";
 import { DiscoveryMetadataService } from "#flows/musicDownloadFlow/discoveryMetadataService";
 import { ensureDiscoveryConsent, getUnansweredConsentKeys } from "#flows/musicDownloadFlow/utils/discoveryConsent";

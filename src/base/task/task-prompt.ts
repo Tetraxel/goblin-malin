@@ -1,5 +1,5 @@
-import { StatusType, TaskStatus } from "./task-status";
-import { SetupWizardConfig } from "../setupWizard";
+import { StatusType, type TaskStatus } from "./task-status";
+import { type SetupWizardConfig } from "../setupWizard";
 
 export enum PromptType {
     Confirm = "confirm",

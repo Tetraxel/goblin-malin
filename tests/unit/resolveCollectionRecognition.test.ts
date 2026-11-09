@@ -3,7 +3,7 @@ import { ServiceRegistry } from "#base/service-registry";
 import { MetadataService } from "#flows/musicDownloadFlow/metadataService";
 import type { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { resolveCollectionRecognition } from "#flows/musicDownloadFlow/utils/resolveCollectionRecognition";
-import { ParsedUrl } from "#base/urlParser";
+import { type ParsedUrl } from "#base/urlParser";
 import type { Logger } from "#base/logger/logger";
 
 // Minimal fixture services — registering a class (rather than a factory function)

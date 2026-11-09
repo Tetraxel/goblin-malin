@@ -1,5 +1,5 @@
 import { providerDisplayRegistry } from "#base/providerDisplay";
-import { Canvas, RGB, hex } from "./canvas";
+import { type Canvas, type RGB, hex } from "./canvas";
 import { toRGB } from "./ui";
 
 // Shared pieces of the app tour: layout, demo data, palette, and the scene signature.

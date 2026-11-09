@@ -2,11 +2,11 @@
 import * as path from "path";
 import { EventEmitter } from "events";
 import { DEFAULT_APP_DATA_DIR } from "#constants";
-import { AppSettings, DEFAULT_APP_SETTINGS } from "./appSettings";
-import { DeepPartial } from "#utils/types";
+import { type AppSettings, DEFAULT_APP_SETTINGS } from "./appSettings";
+import { type DeepPartial } from "#utils/types";
 import { deepMerge } from "#utils/deepMerge";
 import { deepDiff } from "#utils/deepDiff";
-import { isPlainObject, loadDataFile, Parsed, refreshBackup, runMigrations } from "#utils/dataFile";
+import { isPlainObject, loadDataFile, type Parsed, refreshBackup, runMigrations } from "#utils/dataFile";
 
 export const SETTINGS_PATH = path.join(DEFAULT_APP_DATA_DIR, "settings.json");
 

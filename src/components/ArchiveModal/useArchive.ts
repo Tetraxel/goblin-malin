@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { SessionStore } from "#sessions/sessionStore";
 import { SessionManager } from "#sessions/sessionManager";
-import { StoredSession } from "#sessions/types";
-import { ArchivedEntry, archivedEntryMatches, buildArchivedEntries, countArchived } from "#sessions/archive";
+import { type StoredSession } from "#sessions/types";
+import { type ArchivedEntry, archivedEntryMatches, buildArchivedEntries, countArchived } from "#sessions/archive";
 
 /**
  * The current session's stored record. Re-reads when the store changes (archive/restore/persist)

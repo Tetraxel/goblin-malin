@@ -1,10 +1,10 @@
-﻿import { DeepPartial } from "#utils/types";
+﻿import { type DeepPartial } from "#utils/types";
 import { clearCache } from "#utils/cache";
 import { getAppDataDir } from "#utils/appPaths";
 import { THEME_KEYS } from "#base/theme";
 import { LogLevel } from "#base/logger/types";
-import { AppSettings } from "./appSettings";
-import { SettingsItem } from "./buildSettingsItems";
+import { type AppSettings } from "./appSettings";
+import { type SettingsItem } from "./buildSettingsItems";
 
 const LOG_LEVELS: readonly string[] = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR];
 

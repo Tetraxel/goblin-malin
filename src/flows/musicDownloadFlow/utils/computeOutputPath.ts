@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { CompiledMetadata } from "./compiledMetadata";
+import { type CompiledMetadata } from "./compiledMetadata";
 
 /**
  * The file name a track is saved under. `override` is a name the user chose for this track; it is

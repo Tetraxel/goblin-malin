@@ -1,4 +1,4 @@
-import { FileInfo } from "#flows/musicDownloadFlow/types";
+import { type FileInfo } from "#flows/musicDownloadFlow/types";
 
 export type ProvenanceTone = "success" | "warning" | "neutral";
 

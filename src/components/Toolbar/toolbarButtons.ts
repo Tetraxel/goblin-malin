@@ -1,4 +1,4 @@
-import { ToolbarButtonHook } from "./Toolbar";
+import { type ToolbarButtonHook } from "./Toolbar";
 import { useRunAllButton } from "#flows/musicDownloadFlow/toolbar/useRunAllButton";
 import { useSessionsButton } from "./useSessionsButton";
 import { useArchiveButton } from "./useArchiveButton";

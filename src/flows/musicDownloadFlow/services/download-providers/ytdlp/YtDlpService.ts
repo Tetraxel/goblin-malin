@@ -1,25 +1,25 @@
 ﻿import fs from "fs";
 import path from "path";
-import { FormatOptions, QualityOptions, YtDlp } from "ytdlp-nodejs";
+import { type FormatOptions, type QualityOptions, YtDlp } from "ytdlp-nodejs";
 import stripAnsi from "strip-ansi";
-import { DownloadService, DownloadUpdateCallback } from "../../../downloadService";
-import { ProviderDisplay } from "#base/providerDisplay";
-import { ProviderSettingsSchema } from "#base/providerSettings";
+import { DownloadService, type DownloadUpdateCallback } from "../../../downloadService";
+import { type ProviderDisplay } from "#base/providerDisplay";
+import { type ProviderSettingsSchema } from "#base/providerSettings";
 import { StatusType } from "#base/task/task-status";
-import { Logger } from "#base/logger/logger";
+import { type Logger } from "#base/logger/logger";
 import { getBinDir } from "#utils/appPaths";
 import { makeAbortError } from "#utils/errors";
 import { ensureFfmpeg } from "#utils/ffmpeg-setup";
 import {
-    APIProvider,
-    TrackMetadata,
-    TrackDownloadSource,
-    DownloadProgressInfo,
-    DownloadQueryField,
-    LocalFile,
-    FileInfo,
+    type APIProvider,
+    type TrackMetadata,
+    type TrackDownloadSource,
+    type DownloadProgressInfo,
+    type DownloadQueryField,
+    type LocalFile,
+    type FileInfo,
 } from "#flows/musicDownloadFlow/types";
-import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { type DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { readFileInfo } from "#flows/musicDownloadFlow/utils/readFileInfo";
 import { ensureYtDlpSetup } from "./ytdlp-setup";
 import { YtDlpCell } from "./YtDlpCell";

@@ -3,7 +3,7 @@ import { Box, Text, type DOMElement } from "ink";
 import { useClickTarget } from "#base/mouse/useMouseTarget";
 import type { CursorPosition } from "#hooks/useFocusManager";
 import { useTheme } from "#base/themeContext";
-import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
+import { type CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { formatDuration } from "../utils";
 
 const COMPILED_PREFIX = "🏆 Compiled Metadata: ";

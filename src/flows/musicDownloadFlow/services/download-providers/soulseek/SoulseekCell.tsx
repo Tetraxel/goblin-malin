@@ -1,8 +1,8 @@
 import React from "react";
 import path from "path";
 import { Text } from "ink";
-import { ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
-import { MusicDownloadTaskAttributes, TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import { type ColumnComponent } from "#components/TaskListPanel/TaskListPanel";
+import { type MusicDownloadTaskAttributes, type TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 import { localFileName } from "#flows/musicDownloadFlow/utils/localFileName";
 
 // Unlike yt-dlp (always exactly one row), Soulseek can produce several candidate

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
 import { useTheme } from "#base/themeContext";
-import { TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import { type TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 import { formatDuration } from "../../utils";
 import { formatBytes } from "../utils";
 

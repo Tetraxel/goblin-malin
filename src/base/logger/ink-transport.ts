@@ -1,4 +1,4 @@
-import { LogEntry } from "winston";
+import { type LogEntry } from "winston";
 import Transport from "winston-transport";
 
 // How long buffered log entries wait before being delivered to subscribers. A

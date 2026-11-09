@@ -1,4 +1,4 @@
-import { MusicBrainzApi, IRecording } from "musicbrainz-api";
+import { MusicBrainzApi, type IRecording } from "musicbrainz-api";
 import { APP_VERSION } from "#constants";
 
 const MUSICBRAINZ_APP_NAME = "goblin-malin";

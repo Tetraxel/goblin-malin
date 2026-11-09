@@ -1,6 +1,6 @@
 import { describe, test, expect } from "vitest";
 import { pickAutoSelectedIndex } from "#flows/musicDownloadFlow/utils/sourceSelection";
-import { TrackDownloadSource, TrackMetadata, FileInfo } from "#flows/musicDownloadFlow/types";
+import { type TrackDownloadSource, type TrackMetadata, type FileInfo } from "#flows/musicDownloadFlow/types";
 
 const track: TrackMetadata = {
     id: "abc",

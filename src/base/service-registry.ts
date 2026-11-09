@@ -1,10 +1,10 @@
-import { Logger } from "./logger/logger";
+import { type Logger } from "./logger/logger";
 import { ServiceBase } from "./service-base";
 import { ServiceScope } from "./service-scope";
-import { Task } from "./task/task";
-import { ProviderDisplay, providerDisplayRegistry } from "./providerDisplay";
-import { ParsedUrl, CollectionExpansion, urlParserRegistry } from "./urlParser";
-import { ProviderConsent, ProviderSettingsSchema } from "./providerSettings";
+import { type Task } from "./task/task";
+import { type ProviderDisplay, providerDisplayRegistry } from "./providerDisplay";
+import { type ParsedUrl, type CollectionExpansion, urlParserRegistry } from "./urlParser";
+import { type ProviderConsent, type ProviderSettingsSchema } from "./providerSettings";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ServiceFactory<TTask extends Task<any>, TService extends ServiceBase> = (

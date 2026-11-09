@@ -9,9 +9,9 @@ import { TOOLBAR_LOGO_CELL } from "../Toolbar/Toolbar";
 import { MpvMix } from "#utils/mpvMix";
 import { DirectPainter } from "./intro/directPainter";
 import { exitApp } from "#utils/exitApp";
-import { FINALE, IntroOutro, renderIntroCanvas, T } from "./intro/introScene";
+import { FINALE, type IntroOutro, renderIntroCanvas, T } from "./intro/introScene";
 import { INTRO_CUES, OUTRO_CUES, OUTRO_SONG_END, SOUND_VOLUME } from "./intro/introSounds";
-import { TourOptions } from "./intro/tourShared";
+import { type TourOptions } from "./intro/tourShared";
 import { toRGB } from "./intro/ui";
 
 // The intro needs fluid motion, so it runs its own ~30fps clock instead of the shared

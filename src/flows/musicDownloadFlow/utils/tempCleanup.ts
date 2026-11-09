@@ -1,5 +1,5 @@
 import { localFilePaths } from "./missingLocalFiles";
-import { TempGroup, tempFileStem } from "./tempDownloads";
+import { type TempGroup, tempFileStem } from "./tempDownloads";
 
 /**
  * Which temporary downloads are safe to delete.

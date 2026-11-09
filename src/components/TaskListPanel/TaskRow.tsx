@@ -1,10 +1,10 @@
 ﻿import React from "react";
 import { Box, Text } from "ink";
-import { Task } from "#base/task/task";
-import { Theme } from "#base/theme";
+import { type Task } from "#base/task/task";
+import { type Theme } from "#base/theme";
 import { useTheme } from "#base/themeContext";
 import { useTask } from "#hooks/useTask";
-import { CalculatedColumn, PlaybackState } from "./TaskListPanel";
+import { type CalculatedColumn, type PlaybackState } from "./TaskListPanel";
 
 function getRowBackground(
     theme: Theme,

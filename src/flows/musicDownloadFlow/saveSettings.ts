@@ -1,4 +1,4 @@
-﻿import { getMusicSettings, StoredProviderSettings } from "./settings";
+﻿import { getMusicSettings, type StoredProviderSettings } from "./settings";
 
 export interface SaveSettings {
     outputDir: string;

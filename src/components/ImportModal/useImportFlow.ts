@@ -1,14 +1,14 @@
 ﻿import { useState, useCallback } from "react";
-import { PendingImport } from "./ImportModal";
+import { type PendingImport } from "./ImportModal";
 import { useFocusChrome } from "#contexts/FocusContext";
 import { globalLogger } from "#base/logger/logger";
 import { readClipboard } from "./clipboard";
 import { detectUrls } from "./detectUrls";
-import { createTasksFromUrls, importTasks, MusicTask } from "#flows/musicDownloadFlow/taskFactory";
+import { createTasksFromUrls, importTasks, type MusicTask } from "#flows/musicDownloadFlow/taskFactory";
 import { useTheme } from "#base/themeContext";
 import { SessionManager } from "#sessions/sessionManager";
 import { getArchivedTaskIds } from "#sessions/archive";
-import { ConfirmModalConfig } from "#components/ConfirmModal/useConfirmModal";
+import { type ConfirmModalConfig } from "#components/ConfirmModal/useConfirmModal";
 
 export function useImportFlow(openConfirmModal: (config: ConfirmModalConfig) => void) {
     const theme = useTheme();

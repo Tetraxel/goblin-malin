@@ -1,7 +1,7 @@
 ﻿import React from "react";
 import { Text } from "ink";
-import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
-import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import { type ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
+import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
 export const ToDownloadCell = React.memo(function ToDownloadCell({
     task,

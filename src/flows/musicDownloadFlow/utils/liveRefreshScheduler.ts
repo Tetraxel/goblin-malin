@@ -1,6 +1,6 @@
 import { TaskOrchestrator } from "#base/task/orchestrator";
 import { globalLogger } from "#base/logger/logger";
-import { CollectionTask } from "./collectionTask";
+import { type CollectionTask } from "./collectionTask";
 import { getMusicSettings } from "../settings";
 
 // How often the scheduler checks for due playlists — independent of the user's

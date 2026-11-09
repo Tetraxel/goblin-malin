@@ -1,9 +1,9 @@
 ﻿import { ServiceBase } from "#base/service-base";
-import { Task } from "#base/task/task";
-import { Logger } from "#base/logger/logger";
-import { ParsedUrl, CollectionExpansion } from "#base/urlParser";
-import { TrackMetadata, SearchTrackResult } from "./types";
-import { DownloadTask } from "./utils/downloadTask";
+import { type Task } from "#base/task/task";
+import { type Logger } from "#base/logger/logger";
+import { type ParsedUrl, type CollectionExpansion } from "#base/urlParser";
+import { type TrackMetadata, type SearchTrackResult } from "./types";
+import { type DownloadTask } from "./utils/downloadTask";
 
 /**
  * Abstract base class for metadata providers.

@@ -6,7 +6,7 @@ import { LogPanel } from "./LogPanel";
 import { MetadataPanel } from "./MetadataPanel/MetadataPanel";
 import { DownloadPanel } from "./DownloadPanel/DownloadPanel";
 import { TabBar } from "../TabBar";
-import { Task } from "#base/task/task";
+import { type Task } from "#base/task/task";
 
 const SECONDARY_TABS = [
     { key: "3", label: "Metadata Sources" },

@@ -1,9 +1,9 @@
 ﻿import React, { useMemo, useRef } from "react";
 import { Box, Text, type DOMElement } from "ink";
-import { Task, TaskSnapshot } from "#base/task/task";
+import { type Task, type TaskSnapshot } from "#base/task/task";
 import { useTheme } from "#base/themeContext";
 import { useFocusChrome, useFocusTaskList } from "#contexts/FocusContext";
-import { Shortcut, ContextualActions, ContextualActionBar } from "#types/actions";
+import { type Shortcut, type ContextualActions, type ContextualActionBar } from "#types/actions";
 import { ActionBar } from "./ActionBar";
 import { DynamicHintBar } from "#components/DynamicHintBar/DynamicHintBar";
 import { TaskRow } from "./TaskRow";

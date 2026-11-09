@@ -1,6 +1,6 @@
-import { globalLogger, Logger } from "../logger/logger";
+import { globalLogger, type Logger } from "../logger/logger";
 import { notificationScheduler } from "../notificationScheduler";
-import { Task } from "./task";
+import { type Task } from "./task";
 import { StatusType } from "./task-status";
 
 type OrchestratorSubscriber = (orchestrator: TaskOrchestrator) => void;

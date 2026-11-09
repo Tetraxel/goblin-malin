@@ -1,13 +1,13 @@
 ﻿import React from "react";
 import { Box, Text } from "ink";
-import { Theme } from "#base/theme";
+import { type Theme } from "#base/theme";
 import { useTheme } from "#base/themeContext";
-import { StatusAttributes, StatusType } from "#base/task/task-status";
-import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
+import { type StatusAttributes, StatusType } from "#base/task/task-status";
+import { type ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { AnimatedIcon, Icon } from "#components/AnimatedIcon";
 import { useGlobalTicker } from "#hooks/useGlobalTicker";
 import { formatRelativeTime } from "#utils/string";
-import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
 function getStatusIcon(status: StatusType): React.ReactNode | null {
     switch (status) {

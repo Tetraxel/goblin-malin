@@ -1,24 +1,24 @@
 import fs from "fs";
 import path from "path";
 import { DownloadCancelledError, SlskClient, type SearchResult } from "slsk-client";
-import { DownloadService, DownloadUpdateCallback } from "../../../downloadService";
-import { ProviderDisplay } from "#base/providerDisplay";
-import { ProviderSettingsSchema } from "#base/providerSettings";
-import { SetupWizardConfig } from "#base/setupWizard";
+import { DownloadService, type DownloadUpdateCallback } from "../../../downloadService";
+import { type ProviderDisplay } from "#base/providerDisplay";
+import { type ProviderSettingsSchema } from "#base/providerSettings";
+import { type SetupWizardConfig } from "#base/setupWizard";
 import { StatusType } from "#base/task/task-status";
-import { Logger } from "#base/logger/logger";
+import { type Logger } from "#base/logger/logger";
 import { makeAbortError, throwIfAborted } from "#utils/errors";
 import { probeAudio } from "#utils/probeAudio";
 import {
-    APIProvider,
-    TrackMetadata,
-    TrackDownloadSource,
-    DownloadQueryField,
-    LocalFile,
-    FileInfo,
-    HiddenCandidate,
+    type APIProvider,
+    type TrackMetadata,
+    type TrackDownloadSource,
+    type DownloadQueryField,
+    type LocalFile,
+    type FileInfo,
+    type HiddenCandidate,
 } from "#flows/musicDownloadFlow/types";
-import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { type DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { readFileInfo } from "#flows/musicDownloadFlow/utils/readFileInfo";
 import { getTempDownloadDir, getDownloadProviderSettings } from "../../../saveSettings";
 import { generateTempFilename, deleteExistingTempFiles } from "#flows/musicDownloadFlow/utils/tempFile";

@@ -3,12 +3,16 @@ import { Box } from "ink";
 import fs from "fs";
 import path from "path";
 import { useFocusActions, useFocusChrome, useFocusSecondaryPanel } from "#contexts/FocusContext";
-import { Task, TaskSnapshot } from "#base/task/task";
+import { type Task, type TaskSnapshot } from "#base/task/task";
 import { StatusType } from "#base/task/task-status";
 import { useTheme } from "#base/themeContext";
-import { DownloadProvider, MusicDownloadTaskAttributes, TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import {
+    type DownloadProvider,
+    type MusicDownloadTaskAttributes,
+    type TrackDownloadSource,
+} from "#flows/musicDownloadFlow/types";
 import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
-import { computeCompiledMetadata, CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
+import { computeCompiledMetadata, type CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { getSaveSettings } from "#flows/musicDownloadFlow/saveSettings";
 import { computeOutputPath, samePath } from "#flows/musicDownloadFlow/utils/computeOutputPath";
 import { isSameDir } from "#flows/musicDownloadFlow/utils/cleanOutputDir";

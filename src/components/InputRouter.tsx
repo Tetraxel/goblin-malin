@@ -1,10 +1,10 @@
-import React from "react";
+import type React from "react";
 import { useFocusActions, useFocusChrome, useFocusSecondaryPanel } from "#contexts/FocusContext";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useToolbarShortcuts, useTaskListShortcuts, usePromptShortcuts } from "#hooks/useKeyHandlers";
-import { Task } from "#base/task/task";
-import { ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
-import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import { type Task } from "#base/task/task";
+import { type ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
+import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import { useImportActions } from "#contexts/ImportActionsContext";
 import { statsDisplay } from "#base/statsDisplay";
 import { getInstance } from "#utils/mpvPlayer";

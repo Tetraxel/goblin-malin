@@ -23,6 +23,11 @@ export default tseslint.config(
             "react/react-in-jsx-scope": "off",
             "react/prop-types": "off",
             "no-empty": ["error", { allowEmptyCatch: true }], // best-effort `try { ... } catch {}` is intentional
+            // Type-only imports must say `import type`, so a bundler never keeps them alive as value imports.
+            "@typescript-eslint/consistent-type-imports": [
+                "error",
+                { fixStyle: "inline-type-imports", disallowTypeAnnotations: false },
+            ],
             "@typescript-eslint/no-explicit-any": "warn",
             "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
         },

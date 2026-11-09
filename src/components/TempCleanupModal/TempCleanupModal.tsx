@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useSyncExternalStore } from "react";
 import { Box, Text } from "ink";
 import { AnimatedIcon, Icon } from "#components/AnimatedIcon";
-import { tempCleanupBridge, TempCleanupView } from "#base/bridges/tempCleanupBridge";
+import { tempCleanupBridge, type TempCleanupView } from "#base/bridges/tempCleanupBridge";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusActions } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";

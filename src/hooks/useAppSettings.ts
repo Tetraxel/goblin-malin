@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { SettingsStore } from "#settings/settingsStore";
-import { AppSettings } from "#settings/appSettings";
+import { type AppSettings } from "#settings/appSettings";
 
 /** Live-updating snapshot of the global app settings. */
 export function useAppSettings(): AppSettings {

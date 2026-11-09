@@ -1,5 +1,5 @@
 import { getAssetPath } from "#utils/appPaths";
-import { MixCue } from "#utils/mpvMix";
+import { type MixCue } from "#utils/mpvMix";
 import { FINALE, T } from "./introScene";
 import { FETCH, PASTE, sceneStart } from "./tour";
 import { COMPARE, DOWNLOAD, PREVIEW, SAVE } from "./tourSteps";

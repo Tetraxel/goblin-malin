@@ -1,16 +1,16 @@
 import { useFocusActions, useFocusChrome, useFocusTaskList } from "#contexts/FocusContext";
 import { useToolbarActionsRef } from "#contexts/ToolbarActionsContext";
-import { Task } from "#base/task/task";
+import { type Task } from "#base/task/task";
 import { PromptType } from "#base/task/task-prompt";
 import { useActivePrompt } from "#components/PromptModal/useActivePrompt";
-import { useShortcuts, ShortcutDef } from "#hooks/useShortcuts";
+import { useShortcuts, type ShortcutDef } from "#hooks/useShortcuts";
 import { getContextualShortcutIds } from "#types/actions";
 import { globalLogger } from "#base/logger/logger";
 import { getInstance } from "#utils/mpvPlayer";
 import { firstPlayableFilePath } from "#flows/musicDownloadFlow/utils/playingTask";
-import { ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
+import { type ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
 import { buildContextualActionBar } from "#flows/musicDownloadFlow/contextualActions";
-import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import type { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import type { CollectionTask } from "#flows/musicDownloadFlow/utils/collectionTask";
 

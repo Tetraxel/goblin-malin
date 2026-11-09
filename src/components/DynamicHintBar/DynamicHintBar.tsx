@@ -1,6 +1,11 @@
 import React, { useReducer, useEffect } from "react";
 import { Box, Text } from "ink";
-import { shortcutRegistry, ActiveHintContext, HintLineEntry, ShortcutEntry } from "#base/shortcuts/ShortcutRegistry";
+import {
+    shortcutRegistry,
+    type ActiveHintContext,
+    type HintLineEntry,
+    type ShortcutEntry,
+} from "#base/shortcuts/ShortcutRegistry";
 import { getShortcutLiteral } from "#types/actions";
 import { useTheme } from "#base/themeContext";
 

@@ -1,7 +1,7 @@
-import { Canvas, RGB, hex, mix, scale } from "./canvas";
+import { type Canvas, type RGB, hex, mix, scale } from "./canvas";
 import { clamp01, easeInOutSine, easeOutBack, easeOutCubic, hash, lerp, progress, smoothstep } from "./easing";
 import { drawKeycap, drawPanel, drawText, elbowPath, fade, fillCells, spinner, typed, Wires } from "./ui";
-import { C, DEMO, provider, SceneDraw, TourLayout, TourOptions } from "./tourShared";
+import { C, DEMO, provider, type SceneDraw, type TourLayout, type TourOptions } from "./tourShared";
 import {
     COMPARE,
     DOWNLOAD,

@@ -7,7 +7,7 @@ import { ToolbarButtonInvoker } from "./ToolbarButtonInvoker";
 import { TOOLBAR_BUTTONS } from "./toolbarButtons";
 import { Separator } from "../Separator";
 import { TabBar } from "../TabBar";
-import { UpdateInfo } from "#updater/updateChecker";
+import { type UpdateInfo } from "#updater/updateChecker";
 import { UpdateBadge } from "./UpdateBadge";
 import { useCurrentSessionName } from "./useCurrentSessionName";
 import { APP_VERSION } from "#constants";

@@ -1,4 +1,5 @@
-import React, { useRef } from "react";
+import type React from "react";
+import { useRef } from "react";
 import { useInput } from "ink";
 import { shortcutRegistry } from "#base/shortcuts/ShortcutRegistry";
 import { textInputFocus } from "#base/textInputFocus";

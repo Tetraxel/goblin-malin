@@ -1,4 +1,4 @@
-import { SetupWizardConfig } from "./setupWizard";
+import { type SetupWizardConfig } from "./setupWizard";
 
 export type ProviderSettingDef =
     | { label: string; defaultValue: boolean; kind: "checkbox" }

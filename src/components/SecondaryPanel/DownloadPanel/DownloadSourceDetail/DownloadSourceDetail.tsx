@@ -7,9 +7,9 @@ import * as fs from "fs";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useWheelTarget } from "#base/mouse/useMouseTarget";
 import { useTheme } from "#base/themeContext";
-import { MetadataOverrides, TrackDownloadSource } from "#flows/musicDownloadFlow/types";
-import { CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
-import { FIELDS, FieldDef, compiledFieldValues } from "#flows/musicDownloadFlow/utils/metadataFields";
+import { type MetadataOverrides, type TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import { type CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
+import { FIELDS, type FieldDef, compiledFieldValues } from "#flows/musicDownloadFlow/utils/metadataFields";
 import { readDiskFieldValues } from "#flows/musicDownloadFlow/utils/diskTagValues";
 import {
     computeOutputFilename,
@@ -37,10 +37,10 @@ import { useFilePlayback } from "../useFilePlayback";
 import { DownloadInProgress } from "./DownloadInProgress";
 import { DetailRow } from "./DetailRow";
 import { DiffCell, SourceCell, COMPACT_LABEL_W } from "./DiffCell";
-import { AttributesHeader, ClickableBox, FocusRow, FocusRowEdit, editRowLines } from "./FocusRow";
+import { AttributesHeader, ClickableBox, FocusRow, type FocusRowEdit, editRowLines } from "./FocusRow";
 import { OutputFolderBlock } from "./OutputFolderBlock";
 import { PanelFrame } from "./PanelFrame";
-import { windowRows, WindowRow } from "./windowRows";
+import { windowRows, type WindowRow } from "./windowRows";
 import { formatDuration } from "../../utils";
 
 interface DownloadSourceDetailProps {

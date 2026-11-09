@@ -8,13 +8,13 @@ import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { SessionStore } from "#sessions/sessionStore";
 import { SessionManager } from "#sessions/sessionManager";
-import { StoredSession } from "#sessions/types";
+import { type StoredSession } from "#sessions/types";
 import { getSessionMatches, clampToMatch } from "#sessions/sessionSearch";
 import { Hint } from "../Hint";
 import { SearchBar } from "../SearchBar";
 import { HighlightedText } from "../HighlightedText";
 import { useSessions } from "./useSessions";
-import { ConfirmModalConfig } from "../ConfirmModal/useConfirmModal";
+import { type ConfirmModalConfig } from "../ConfirmModal/useConfirmModal";
 
 // title(1) + search(4) + footer(1) + margins/border/padding
 const MODAL_OVERHEAD = 14;

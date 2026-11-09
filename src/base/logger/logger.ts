@@ -3,7 +3,7 @@ import path from "path";
 import winston from "winston";
 import { inkTransport } from "./ink-transport";
 import { toLoggable } from "./serialize";
-import { LogMetadata, LogLevel, LogDetails } from "./types";
+import { type LogMetadata, LogLevel, type LogDetails } from "./types";
 import { getCurrentTask } from "#base/task/taskContext";
 import { getLogsPath } from "#utils/appPaths";
 

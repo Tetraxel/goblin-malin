@@ -1,4 +1,4 @@
-import { Canvas, RGB, hex, hsv, mix, scale } from "./canvas";
+import { type Canvas, type RGB, hex, hsv, mix, scale } from "./canvas";
 import { clamp01, hash } from "./easing";
 
 // Stateless particle systems: each particle's position is a closed-form function of

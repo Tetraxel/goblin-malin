@@ -1,4 +1,4 @@
-import { LocalFile } from "../types";
+import { type LocalFile } from "../types";
 
 /**
  * The file name (with extension) shown for a downloaded file. `LocalFile.name` is only the stem, so

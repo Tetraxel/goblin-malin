@@ -1,4 +1,4 @@
-import { Platform, TrackUri, TrackUriParts } from "../types";
+import { type Platform, type TrackUri, type TrackUriParts } from "../types";
 
 // Serialize the structured URI to its canonical "PLATFORM::TRACK::ID" string form.
 export function formatTrackUri(parts: TrackUriParts): TrackUri {

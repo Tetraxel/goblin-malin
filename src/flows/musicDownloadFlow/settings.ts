@@ -1,6 +1,6 @@
 ﻿import * as os from "os";
 import * as path from "path";
-import { ServiceRegistry } from "#base/service-registry";
+import { type ServiceRegistry } from "#base/service-registry";
 import { SettingsStore } from "#settings/settingsStore";
 import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
 

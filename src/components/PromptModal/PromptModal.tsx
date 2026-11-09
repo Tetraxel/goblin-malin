@@ -2,7 +2,7 @@
 import { Box, Text } from "ink";
 import { TextInput } from "#components/TextInput";
 import SelectInput from "ink-select-input";
-import { Task } from "#base/task/task";
+import { type Task } from "#base/task/task";
 import { PromptType } from "#base/task/task-prompt";
 import { useActivePrompt } from "./useActivePrompt";
 import { useFocusActions } from "#contexts/FocusContext";

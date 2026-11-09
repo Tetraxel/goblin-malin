@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
-import { ConfirmModalConfig } from "./useConfirmModal";
+import { type ConfirmModalConfig } from "./useConfirmModal";
 import { Hint } from "../Hint";
 import type { FocusableWindow } from "#hooks/useFocusManager";
 

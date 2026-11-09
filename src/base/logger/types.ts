@@ -1,4 +1,4 @@
-import { Task } from "../task/task";
+import { type Task } from "../task/task";
 
 export enum LogLevel {
     INFO = "INFO",

@@ -1,7 +1,7 @@
-import { Canvas, RGB, hex, hsv, mix, scale } from "./canvas";
+import { type Canvas, type RGB, hex, hsv, mix, scale } from "./canvas";
 import { clamp01, easeInOutSine, easeOutBack, easeOutCubic, hash, lerp, progress, smoothstep, wobble } from "./easing";
 import { drawPanel, drawText, fade, fillCells, spinner, typed, UI_Z } from "./ui";
-import { C, DEMO, provider, Rect, TourLayout } from "./tourShared";
+import { C, DEMO, provider, type Rect, type TourLayout } from "./tourShared";
 
 // Tour steps 3–6: compare & compile, download, preview, save. Each step's key moments
 // are in step-local seconds; the task table (tour.ts) reads them to update its row.

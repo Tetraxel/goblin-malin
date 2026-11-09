@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
-import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import { type ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
+import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import { Uri } from "#components/SecondaryPanel/MetadataPanel/Uri";
 import { formatTrackUri } from "#flows/musicDownloadFlow/utils/trackUri";
 import { providerDisplayRegistry } from "#base/providerDisplay";

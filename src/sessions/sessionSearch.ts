@@ -1,4 +1,4 @@
-import { StoredSession, SessionTaskSnapshot } from "./types";
+import { type StoredSession, type SessionTaskSnapshot } from "./types";
 
 export function sessionMatchesQuery(session: StoredSession, q: string): boolean {
     if (!q) return true;

@@ -1,4 +1,4 @@
-import { Canvas, Frame } from "./canvas";
+import { type Canvas, type Frame } from "./canvas";
 
 // Paints intro frames straight to the terminal, bypassing Ink. Going through Ink costs
 // ~30ms per frame (it re-parses every row character by character, re-renders the whole

@@ -6,10 +6,10 @@ import { useScreenSize } from "#hooks/useScreenSize";
 import { useAppSettings } from "#hooks/useAppSettings";
 import { useFocusContext } from "#contexts/FocusContext";
 import { inkTransport } from "#base/logger/ink-transport";
-import { LogLevel, LogMetadata } from "#base/logger/types";
-import { Task } from "#base/task/task";
+import { LogLevel, type LogMetadata } from "#base/logger/types";
+import { type Task } from "#base/task/task";
 import { useTheme } from "#base/themeContext";
-import { formatLogRows, LogRow } from "./logFormat";
+import { formatLogRows, type LogRow } from "./logFormat";
 
 // Rows moved per wheel notch (the arrow keys move one).
 const WHEEL_ROWS = 3;

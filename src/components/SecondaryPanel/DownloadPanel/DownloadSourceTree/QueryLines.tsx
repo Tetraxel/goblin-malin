@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { useTheme } from "#base/themeContext";
-import { DownloadQueryField } from "#flows/musicDownloadFlow/types";
+import { type DownloadQueryField } from "#flows/musicDownloadFlow/types";
 
 interface QueryLinesProps {
     query: DownloadQueryField[];

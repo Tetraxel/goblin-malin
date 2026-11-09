@@ -1,7 +1,7 @@
 ﻿import { ServiceBase } from "#base/service-base";
-import { Logger } from "#base/logger/logger";
-import { TrackMetadata, TrackDownloadSource, APIProvider } from "./types";
-import { DownloadTask } from "./utils/downloadTask";
+import { type Logger } from "#base/logger/logger";
+import { type TrackMetadata, type TrackDownloadSource, type APIProvider } from "./types";
+import { type DownloadTask } from "./utils/downloadTask";
 
 export type DownloadUpdateOptions = {
     attemptId?: string;

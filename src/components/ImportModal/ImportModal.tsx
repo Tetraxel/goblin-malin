@@ -2,7 +2,7 @@
 import { Box, Text } from "ink";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
-import { DetectedUrl, SupportedPlatform } from "./detectUrls";
+import { type DetectedUrl, type SupportedPlatform } from "./detectUrls";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
 import { Hint } from "../Hint";

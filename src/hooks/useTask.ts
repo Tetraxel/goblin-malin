@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from "react";
-import { Task } from "#base/task/task";
+import { type Task } from "#base/task/task";
 
 /**
  * Hook that subscribes to a Task instance and returns its current state.

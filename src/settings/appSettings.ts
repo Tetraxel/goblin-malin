@@ -1,5 +1,5 @@
 import { LogLevel } from "#base/logger/types";
-import { Shortcut } from "#types/actions";
+import { type Shortcut } from "#types/actions";
 
 export type AppSettings = {
     general: {

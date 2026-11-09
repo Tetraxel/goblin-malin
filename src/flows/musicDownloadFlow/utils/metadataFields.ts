@@ -1,5 +1,5 @@
-﻿import { MetadataResultState, StandardArtist } from "#flows/musicDownloadFlow/types";
-import { CompiledMetadata, CompiledMetadataField } from "./compiledMetadata";
+﻿import { type MetadataResultState, type StandardArtist } from "#flows/musicDownloadFlow/types";
+import { type CompiledMetadata, type CompiledMetadataField } from "./compiledMetadata";
 
 export type FieldDef = {
     key: CompiledMetadataField;

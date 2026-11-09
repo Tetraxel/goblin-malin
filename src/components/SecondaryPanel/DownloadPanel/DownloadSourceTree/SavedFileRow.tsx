@@ -4,7 +4,7 @@ import { Box, Text, type DOMElement } from "ink";
 import { useClickTarget, useHoverTarget } from "#base/mouse/useMouseTarget";
 import { useTheme } from "#base/themeContext";
 import { providerDisplayRegistry } from "#base/providerDisplay";
-import { TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import { type TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 import { getProvenanceDisplay } from "#flows/musicDownloadFlow/utils/provenance";
 import { formatBytes } from "#components/SecondaryPanel/DownloadPanel/utils";
 import { PlaybackIndicator } from "#components/PlaybackIndicator";

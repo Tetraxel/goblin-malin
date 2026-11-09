@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getInstance, PlayerStatus } from "#utils/mpvPlayer";
+import { getInstance, type PlayerStatus } from "#utils/mpvPlayer";
 
 export interface FilePlayback {
     isPlaying: boolean;

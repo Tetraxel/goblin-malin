@@ -1,4 +1,4 @@
-import { DeepPartial } from "./types";
+import { type DeepPartial } from "./types";
 
 export function deepMerge<T>(target: T, source: DeepPartial<T>): T {
     if (typeof source !== "object" || source === null) return source as unknown as T;

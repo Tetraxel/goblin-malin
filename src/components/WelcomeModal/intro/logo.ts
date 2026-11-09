@@ -1,4 +1,4 @@
-import { Canvas, RGB, hex, hsv, mix, scale } from "./canvas";
+import { type Canvas, type RGB, hex, hsv, mix, scale } from "./canvas";
 import { hash, smoothstep } from "./easing";
 
 // The big two-row "GOBLIN / MALIN" title: a 5×7 pixel font scaled up, with a moving

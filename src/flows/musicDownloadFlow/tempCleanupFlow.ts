@@ -1,7 +1,7 @@
 import os from "os";
 import path from "path";
 import { globalLogger } from "#base/logger/logger";
-import { tempCleanupBridge, TempCleanupOption } from "#base/bridges/tempCleanupBridge";
+import { tempCleanupBridge, type TempCleanupOption } from "#base/bridges/tempCleanupBridge";
 import { DEFAULT_APP_DATA_DIR } from "#constants";
 import { getBinDir } from "#utils/appPaths";
 import { formatSize } from "#utils/formatBytes";
@@ -9,13 +9,19 @@ import { SessionManager } from "#sessions/sessionManager";
 import { SettingsStore } from "#settings/settingsStore";
 import { getMusicSettings } from "./settings";
 import { getTempDownloadDir } from "./saveSettings";
-import { ProtectedPath, TempGroup, checkTempFolder, deleteTempGroups, scanTempGroups } from "./utils/tempDownloads";
+import {
+    type ProtectedPath,
+    type TempGroup,
+    checkTempFolder,
+    deleteTempGroups,
+    scanTempGroups,
+} from "./utils/tempDownloads";
 import {
     AUTO_CLEAN_AGE,
     REMINDER_INTERVAL_MS,
     REMINDER_MIN_AGE,
-    TempAge,
-    TempUseIndex,
+    type TempAge,
+    type TempUseIndex,
     buildTempUseIndex,
     findTempAge,
     selectTempGroups,

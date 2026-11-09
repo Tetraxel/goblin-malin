@@ -1,10 +1,10 @@
-﻿import { DeepPartial } from "#utils/types";
-import { ProviderConstructorLike, ProviderSettingsSchema } from "#base/providerSettings";
-import { ServiceRegistry } from "#base/service-registry";
-import { SetupWizardConfig } from "#base/setupWizard";
+﻿import { type DeepPartial } from "#utils/types";
+import { type ProviderConstructorLike, type ProviderSettingsSchema } from "#base/providerSettings";
+import { type ServiceRegistry } from "#base/service-registry";
+import { type SetupWizardConfig } from "#base/setupWizard";
 import { providerDisplayRegistry } from "#base/providerDisplay";
-import { SettingsItem } from "#settings/buildSettingsItems";
-import { MusicDownloadFlowSettings } from "./settings";
+import { type SettingsItem } from "#settings/buildSettingsItems";
+import { type MusicDownloadFlowSettings } from "./settings";
 import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
 import { runTempCleanup } from "./tempCleanupFlow";
 

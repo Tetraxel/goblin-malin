@@ -1,14 +1,14 @@
 import { Task } from "#base/task/task";
 import { TaskScoped } from "#base/task/taskContext";
 import { TaskOrchestrator } from "#base/task/orchestrator";
-import { Logger } from "#base/logger/logger";
-import { StatusAttributes, StatusType } from "#base/task/task-status";
+import { type Logger } from "#base/logger/logger";
+import { type StatusAttributes, StatusType } from "#base/task/task-status";
 import { CollectionAccessError } from "#base/collectionAccessError";
 import { collectionHintBridge } from "#base/bridges/collectionHintBridge";
 import { SettingsStore } from "#settings/settingsStore";
 import { SafeAction } from "#utils/decorators";
 import { throwIfAborted } from "#utils/errors";
-import { CollectionDownloadTask } from "../types";
+import { type CollectionDownloadTask } from "../types";
 import { metadataServiceRegistry } from "../registries";
 import { getMusicSettings } from "../settings";
 import { metadataLimiter } from "./stageLimiters";

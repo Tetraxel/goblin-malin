@@ -61,6 +61,10 @@ jobs:
             - name: Format
               run: yarn format:check
 
+            # A stray non-UTF-8 byte passes tsc/eslint/tsx but can break the production bundle (REL-07).
+            - name: UTF-8 check
+              run: yarn check:utf8
+
             - name: Build
               run: yarn build
 

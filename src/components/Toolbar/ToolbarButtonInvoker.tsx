@@ -1,6 +1,6 @@
 ﻿import { Box, Text, type DOMElement } from "ink";
 import React, { useLayoutEffect, useRef } from "react";
-import { ToolbarButtonHook } from "./Toolbar";
+import { type ToolbarButtonHook } from "./Toolbar";
 import { useToolbarButtonMouse } from "./useToolbarButtonMouse";
 import { useHoverTarget } from "#base/mouse/useMouseTarget";
 import { useToolbarActionsRef } from "#contexts/ToolbarActionsContext";

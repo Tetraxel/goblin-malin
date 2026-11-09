@@ -1,9 +1,9 @@
 import { globalLogger } from "#base/logger/logger";
-import { StatusAttributes } from "#base/task/task-status";
+import { type StatusAttributes } from "#base/task/task-status";
 import { DownloadTask } from "./downloadTask";
 import { taskIdFromUrl } from "./taskId";
 import { resolveTrackRecognition } from "./resolveTrackRecognition";
-import { TrackDownloadTask } from "../types";
+import { type TrackDownloadTask } from "../types";
 import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "../registries";
 import { getMusicSettings } from "../settings";
 

@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { DiscoverySource, SearchKey } from "#flows/musicDownloadFlow/types";
+import { type DiscoverySource, type SearchKey } from "#flows/musicDownloadFlow/types";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
 import { Uri } from "./Uri";

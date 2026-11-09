@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
 import { useFocusChrome, useFocusSecondaryPanel } from "#contexts/FocusContext";
 import { inkTransport } from "#base/logger/ink-transport";
-import { LogMetadata } from "#base/logger/types";
+import { type LogMetadata } from "#base/logger/types";
 import { useTheme } from "#base/themeContext";
 import { statsDisplay } from "#base/statsDisplay";
 import { useFps } from "#hooks/useFps";

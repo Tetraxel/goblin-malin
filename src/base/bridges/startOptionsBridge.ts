@@ -1,4 +1,4 @@
-import { StartOptionsRequest } from "#types/actions";
+import { type StartOptionsRequest } from "#types/actions";
 
 type Opener = (request: StartOptionsRequest) => void;
 

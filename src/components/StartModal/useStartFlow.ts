@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { StartOptionsRequest } from "#types/actions";
+import { type StartOptionsRequest } from "#types/actions";
 
 export function useStartFlow() {
     const [pendingStart, setPendingStart] = useState<StartOptionsRequest | null>(null);

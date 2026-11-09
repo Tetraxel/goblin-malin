@@ -1,13 +1,13 @@
 import { globalLogger } from "#base/logger/logger";
 import { TaskOrchestrator } from "#base/task/orchestrator";
-import { TaskSnapshot } from "#base/task/task";
-import { DownloadTask } from "./utils/downloadTask";
+import { type TaskSnapshot } from "#base/task/task";
+import { type DownloadTask } from "./utils/downloadTask";
 import { CollectionTask } from "./utils/collectionTask";
 import { buildTrackTask, reviveTrackTask } from "./utils/buildTrackTask";
 import { taskIdFromUrl } from "./utils/taskId";
 import { resolveCollectionRecognition } from "./utils/resolveCollectionRecognition";
 import { reviveTaskDates } from "./utils/reviveTaskDates";
-import { MusicDownloadTaskAttributes, TrackDownloadTask, CollectionDownloadTask } from "./types";
+import { type MusicDownloadTaskAttributes, type TrackDownloadTask, type CollectionDownloadTask } from "./types";
 import { metadataServiceRegistry } from "./registries";
 
 const logger = globalLogger.createChild({ service: "MusicDownload" });

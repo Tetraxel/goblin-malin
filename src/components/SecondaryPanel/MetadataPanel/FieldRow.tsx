@@ -4,9 +4,9 @@ import { TextInput } from "#components/TextInput";
 import { useClickTarget } from "#base/mouse/useMouseTarget";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
-import { Theme } from "#base/theme";
-import { FieldAttribution } from "#flows/musicDownloadFlow/utils/compiledMetadata";
-import { FieldDef } from "#flows/musicDownloadFlow/utils/metadataFields";
+import { type Theme } from "#base/theme";
+import { type FieldAttribution } from "#flows/musicDownloadFlow/utils/compiledMetadata";
+import { type FieldDef } from "#flows/musicDownloadFlow/utils/metadataFields";
 
 function getPlatformColor(apiProvider: string): string {
     return providerDisplayRegistry.get(apiProvider).colorSubtle;

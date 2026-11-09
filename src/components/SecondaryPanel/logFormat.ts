@@ -2,7 +2,7 @@ import { inspect } from "util";
 import stripAnsi from "strip-ansi";
 import cliTruncate from "cli-truncate";
 import wrapAnsi from "wrap-ansi";
-import { LogDetails, LogLevel, LogMetadata } from "#base/logger/types";
+import { type LogDetails, LogLevel, type LogMetadata } from "#base/logger/types";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { sanitizeInput } from "#utils/string";
 

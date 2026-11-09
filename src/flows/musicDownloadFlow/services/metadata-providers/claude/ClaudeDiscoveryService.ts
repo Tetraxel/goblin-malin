@@ -1,11 +1,11 @@
-import { Logger } from "#base/logger/logger";
-import { ProviderDisplay, providerDisplayRegistry } from "#base/providerDisplay";
-import { ProviderConsent, ProviderSettingsSchema } from "#base/providerSettings";
+import { type Logger } from "#base/logger/logger";
+import { type ProviderDisplay, providerDisplayRegistry } from "#base/providerDisplay";
+import { type ProviderConsent, type ProviderSettingsSchema } from "#base/providerSettings";
 import { StatusType } from "#base/task/task-status";
 import { Cached } from "#utils/cache";
 import type { TrackMetadata, DiscoveryResult, SearchKey } from "#flows/musicDownloadFlow/types";
-import { DiscoveryContext, DiscoveryMetadataService } from "#flows/musicDownloadFlow/discoveryMetadataService";
-import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { type DiscoveryContext, DiscoveryMetadataService } from "#flows/musicDownloadFlow/discoveryMetadataService";
+import { type DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { getMusicSettings } from "#flows/musicDownloadFlow/settings";
 import {
     ClaudeClient,
@@ -14,7 +14,7 @@ import {
     DEFAULT_CLAUDE_COMMAND,
     DEFAULT_CLAUDE_MODEL,
 } from "../../apis/claude-client";
-import { ClaudeLink, claudeLinksToTracks } from "./convertClaudeToTrack";
+import { type ClaudeLink, claudeLinksToTracks } from "./convertClaudeToTrack";
 import {
     CLAUDE_DISCOVERY_SYSTEM_PROMPT,
     // `type` matters: it is used in the signature of the @Cached() method below, and the swc pass that

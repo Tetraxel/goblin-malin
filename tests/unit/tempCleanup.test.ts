@@ -3,14 +3,14 @@ import {
     ACTIVE_FILE_GUARD_MS,
     AUTO_CLEAN_AGE,
     TEMP_AGES,
-    TempUseGroup,
+    type TempUseGroup,
     buildTempUseIndex,
     findTempAge,
     selectTempGroups,
     summarizeByAge,
 } from "#flows/musicDownloadFlow/utils/tempCleanup";
 import { markMissingInSnapshot } from "#flows/musicDownloadFlow/utils/missingLocalFiles";
-import { TempGroup, tempFileStem } from "#flows/musicDownloadFlow/utils/tempDownloads";
+import { type TempGroup, tempFileStem } from "#flows/musicDownloadFlow/utils/tempDownloads";
 
 // Which temporary downloads may go. The rule these pin: a file is kept while a session that points at it was used
 // recently — however old the session or the file is — and a file nobody points at is judged by its own age.

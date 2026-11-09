@@ -1,7 +1,7 @@
-﻿import { Task } from "./task/task";
-import { Logger } from "./logger/logger";
+﻿import { type Task } from "./task/task";
+import { type Logger } from "./logger/logger";
 import { EnvironmentError } from "#exceptions/EnvironmentError";
-import { SetupWizardConfig } from "./setupWizard";
+import { type SetupWizardConfig } from "./setupWizard";
 import { saveEnvVar, saveEnvVarsGroup } from "#utils/envFile";
 import { SettingsStore } from "#settings/settingsStore";
 

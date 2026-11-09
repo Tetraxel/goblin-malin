@@ -2,9 +2,9 @@ import React, { useRef } from "react";
 import { Box, Text, type DOMElement } from "ink";
 import { useClickTarget } from "#base/mouse/useMouseTarget";
 import type { CursorPosition } from "#hooks/useFocusManager";
-import { MetadataResultState } from "#flows/musicDownloadFlow/types";
+import { type MetadataResultState } from "#flows/musicDownloadFlow/types";
 import { useTheme } from "#base/themeContext";
-import { Theme } from "#base/theme";
+import { type Theme } from "#base/theme";
 import { Uri } from "./Uri";
 import { DiscoverySourceLine } from "./DiscoverySourceLine";
 

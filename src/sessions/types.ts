@@ -1,5 +1,5 @@
-import { TaskSnapshot } from "#base/task/task";
-import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import { type TaskSnapshot } from "#base/task/task";
+import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
 export type SessionTaskSnapshot = TaskSnapshot<MusicDownloadTaskAttributes>;
 

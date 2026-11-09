@@ -1,4 +1,10 @@
-import { TrackMetadata, TrackUri, Platform, APIProvider, StandardArtist } from "#flows/musicDownloadFlow/types";
+import {
+    type TrackMetadata,
+    type TrackUri,
+    type Platform,
+    type APIProvider,
+    type StandardArtist,
+} from "#flows/musicDownloadFlow/types";
 import type { IRecording } from "musicbrainz-api";
 
 // Maps a streaming-platform URL to the Platform key we use internally, extracting the

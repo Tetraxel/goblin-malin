@@ -1,5 +1,5 @@
 import { providerDisplayRegistry } from "#base/providerDisplay";
-import { ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
+import { type ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
 import { UrlCell } from "./columns/UrlCell";
 import { ArtistCell } from "./columns/ArtistCell";
 import { TrackCell } from "./columns/TrackCell";
@@ -8,7 +8,7 @@ import { ToTagCell } from "./columns/ToTagCell";
 import { ToDownloadCell } from "./columns/ToDownloadCell";
 import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
 import { getMusicSettings, saveMusicSettings } from "./settings";
-import { MusicDownloadTaskAttributes } from "./types";
+import { type MusicDownloadTaskAttributes } from "./types";
 
 export type PrimaryMode = "metadata" | "download";
 

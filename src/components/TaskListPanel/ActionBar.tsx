@@ -1,12 +1,12 @@
 ﻿import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
-import { Task } from "#base/task/task";
+import { type Task } from "#base/task/task";
 import { useTheme } from "#base/themeContext";
 import { useFocusChrome, useFocusTaskList } from "#contexts/FocusContext";
-import { ActionBarRow, getContextualShortcutIds } from "#types/actions";
-import { ColumnDefinition } from "./TaskListPanel";
+import { type ActionBarRow, getContextualShortcutIds } from "#types/actions";
+import { type ColumnDefinition } from "./TaskListPanel";
 import { buildContextualActionBar } from "#flows/musicDownloadFlow/contextualActions";
-import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import type { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import type { CollectionTask } from "#flows/musicDownloadFlow/utils/collectionTask";
 import { Hint } from "../Hint";

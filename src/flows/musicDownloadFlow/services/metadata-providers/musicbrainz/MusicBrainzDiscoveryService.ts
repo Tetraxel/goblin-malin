@@ -1,11 +1,11 @@
-import { Logger } from "#base/logger/logger";
-import { ProviderDisplay } from "#base/providerDisplay";
-import { ProviderSettingsSchema } from "#base/providerSettings";
+import { type Logger } from "#base/logger/logger";
+import { type ProviderDisplay } from "#base/providerDisplay";
+import { type ProviderSettingsSchema } from "#base/providerSettings";
 import { StatusType } from "#base/task/task-status";
 import { Cached } from "#utils/cache";
 import type { TrackMetadata, DiscoveryResult } from "#flows/musicDownloadFlow/types";
 import { DiscoveryMetadataService } from "#flows/musicDownloadFlow/discoveryMetadataService";
-import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { type DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { MusicBrainzClient } from "../../apis/musicbrainz-client";
 import { extractTracksFromMusicBrainzRecording } from "./convertMusicBrainzToTrack";
 import { MusicBrainzCell } from "./MusicBrainzCell";

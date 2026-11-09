@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
-import { StartOptionsRequest } from "#types/actions";
+import { type StartOptionsRequest } from "#types/actions";
 import { Hint } from "../Hint";
 
 interface StartModalProps {

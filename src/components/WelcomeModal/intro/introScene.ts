@@ -1,10 +1,10 @@
-import { Canvas, RGB, hex, mix } from "./canvas";
+import { Canvas, type RGB, hex, mix } from "./canvas";
 import { easeInOutSine, easeOutBack, easeOutCubic, lerp, progress, smoothstep, wobble } from "./easing";
-import { drawLogo, LogoLine, TEXT_HEIGHT, textWidth } from "./logo";
-import { drawMascot, MascotPose } from "./mascot";
+import { drawLogo, type LogoLine, TEXT_HEIGHT, textWidth } from "./logo";
+import { drawMascot, type MascotPose } from "./mascot";
 import { drawBurst, drawDust, drawOrbit } from "./particles";
 import { drawTour, TOUR_DURATION, tourMascotHints } from "./tour";
-import { TourLayout, tourLayout, TourOptions } from "./tourShared";
+import { type TourLayout, tourLayout, type TourOptions } from "./tourShared";
 import { drawText, fade } from "./ui";
 
 // Scene 1 — "the awakening":

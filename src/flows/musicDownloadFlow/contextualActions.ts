@@ -2,20 +2,20 @@ import clipboard from "clipboardy";
 import open from "open";
 import { TaskOrchestrator } from "#base/task/orchestrator";
 import { providerDisplayRegistry } from "#base/providerDisplay";
-import { ContextualActionBar, ContextualActions } from "#types/actions";
-import { ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
+import { type ContextualActionBar, type ContextualActions } from "#types/actions";
+import { type ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
 import { runWithoutCache } from "#utils/cache";
 import { startOptionsBridge } from "#base/bridges/startOptionsBridge";
 import { deleteConfirmBridge } from "#base/bridges/deleteConfirmBridge";
-import { DownloadTask } from "./utils/downloadTask";
-import { CollectionTask } from "./utils/collectionTask";
+import { type DownloadTask } from "./utils/downloadTask";
+import { type CollectionTask } from "./utils/collectionTask";
 import { runSelected } from "./runController";
 import { metadataLimiter, downloadLimiter } from "./utils/stageLimiters";
 import type { Task } from "#base/task/task";
 import type { Semaphore } from "#utils/semaphore";
 import { globalLogger } from "#base/logger/logger";
 import { SessionManager } from "#sessions/sessionManager";
-import { MusicDownloadTaskAttributes, TrackDownloadTask, CollectionDownloadTask } from "./types";
+import { type MusicDownloadTaskAttributes, type TrackDownloadTask, type CollectionDownloadTask } from "./types";
 
 // Suppress the re-throw from @SafeAction — logging is already handled by the decorator.
 const fire = (p: Promise<unknown>): void => {

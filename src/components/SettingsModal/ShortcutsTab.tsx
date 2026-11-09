@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import type { Key } from "ink";
 import { shortcutRegistry } from "#base/shortcuts/ShortcutRegistry";
 import { SettingsStore } from "#settings/settingsStore";
-import { Shortcut, getShortcutLiteral } from "#types/actions";
+import { type Shortcut, getShortcutLiteral } from "#types/actions";
 import { ClickArea } from "#base/mouse/ClickArea";
 import { useTheme } from "#base/themeContext";
 import { SearchBar } from "../SearchBar";

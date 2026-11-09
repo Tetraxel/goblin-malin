@@ -1,5 +1,5 @@
-import { Task, TaskAttributes } from "#base/task/task";
-import { MusicDownloadTaskAttributes } from "../types";
+import { type Task, type TaskAttributes } from "#base/task/task";
+import { type MusicDownloadTaskAttributes } from "../types";
 
 /**
  * Reorders the orchestrator's flat task list for display: each collection

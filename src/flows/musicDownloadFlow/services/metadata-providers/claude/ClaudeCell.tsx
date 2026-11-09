@@ -1,9 +1,9 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { providerDisplayRegistry } from "#base/providerDisplay";
-import { ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
+import { type ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { AnimatedIcon, Icon } from "#components/AnimatedIcon";
-import { MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
+import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 
 const PROVIDER_KEY = "claude";
 

@@ -2,7 +2,7 @@ import React, { useRef } from "react";
 import { Box, Text, type DOMElement } from "ink";
 import { useClickTarget } from "#base/mouse/useMouseTarget";
 import type { CursorPosition } from "#hooks/useFocusManager";
-import { MetadataGroupState } from "#flows/musicDownloadFlow/types";
+import { type MetadataGroupState } from "#flows/musicDownloadFlow/types";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
 

@@ -2,7 +2,7 @@ import { stat } from "fs/promises";
 import * as path from "path";
 import { readFlacTags } from "flac-tagger";
 import NodeID3 from "node-id3";
-import { FileInfo, Provenance } from "#flows/musicDownloadFlow/types";
+import { type FileInfo, type Provenance } from "#flows/musicDownloadFlow/types";
 import { probeAudio } from "#utils/probeAudio";
 
 const ID3_TAG_MAP: Record<string, string | undefined> = {

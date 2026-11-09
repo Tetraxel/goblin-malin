@@ -1,4 +1,8 @@
-import { MusicDownloadTaskAttributes, TrackDownloadTask, CollectionDownloadTask } from "#flows/musicDownloadFlow/types";
+import {
+    type MusicDownloadTaskAttributes,
+    type TrackDownloadTask,
+    type CollectionDownloadTask,
+} from "#flows/musicDownloadFlow/types";
 
 function reviveTrackDates(attrs: TrackDownloadTask): TrackDownloadTask {
     return {

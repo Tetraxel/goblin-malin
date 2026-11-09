@@ -6,19 +6,19 @@ import { useShortcuts } from "#hooks/useShortcuts";
 import { useTheme } from "#base/themeContext";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { SettingsStore } from "#settings/settingsStore";
-import { AppSettings } from "#settings/appSettings";
+import { type AppSettings } from "#settings/appSettings";
 import { buildGlobalSettingsItems } from "#settings/buildGlobalSettingsItems";
-import { filterSettingsItems, isInteractive, SettingsItem } from "#settings/buildSettingsItems";
+import { filterSettingsItems, isInteractive, type SettingsItem } from "#settings/buildSettingsItems";
 import { getMusicSettings, saveMusicSettings } from "#flows/musicDownloadFlow/settings";
 import { buildMusicSettingsItems } from "#flows/musicDownloadFlow/buildFlowSettingsItems";
-import { describeTempUsage, getTempUsage, TempUsage } from "#flows/musicDownloadFlow/tempCleanupFlow";
+import { describeTempUsage, getTempUsage, type TempUsage } from "#flows/musicDownloadFlow/tempCleanupFlow";
 import { deepMerge } from "#utils/deepMerge";
-import { DeepPartial } from "#utils/types";
+import { type DeepPartial } from "#utils/types";
 import { shortcutRegistry } from "#base/shortcuts/ShortcutRegistry";
 import { ShortcutsTab, buildShortcutsTabItems, buildShortcutFromKey } from "./ShortcutsTab";
 import { SettingsTab } from "./SettingsTab";
 import { Hint } from "../Hint";
-import { ConfirmModalConfig } from "../ConfirmModal/useConfirmModal";
+import { type ConfirmModalConfig } from "../ConfirmModal/useConfirmModal";
 
 // Rows consumed by modal chrome: marginY(6) + borders(2) + paddingY(2) + title(1) + marginTop(1) + marginTop(1) + footer(1) = 14
 // Search bars live inside each tab component and subtract their own SEARCH_H from the height budget.

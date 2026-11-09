@@ -10,14 +10,14 @@ import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { globalLogger } from "#base/logger/logger";
-import { Task } from "#base/task/task";
+import { type Task } from "#base/task/task";
 import { SessionManager } from "#sessions/sessionManager";
-import { ArchivedEntry, findSavedTaskIds } from "#sessions/archive";
+import { type ArchivedEntry, findSavedTaskIds } from "#sessions/archive";
 import { getInstance as getPlayer } from "#utils/mpvPlayer";
 import { Hint } from "../Hint";
 import { SearchBar } from "../SearchBar";
 import { HighlightedText } from "../HighlightedText";
-import { ConfirmModalConfig } from "../ConfirmModal/useConfirmModal";
+import { type ConfirmModalConfig } from "../ConfirmModal/useConfirmModal";
 import { formatDuration } from "../SecondaryPanel/utils";
 import { useArchive } from "./useArchive";
 

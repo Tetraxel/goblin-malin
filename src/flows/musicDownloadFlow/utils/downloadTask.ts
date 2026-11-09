@@ -1,21 +1,21 @@
 import fs from "fs/promises";
 import { Task } from "#base/task/task";
 import { TaskScoped } from "#base/task/taskContext";
-import { globalLogger, Logger } from "#base/logger/logger";
-import { ServiceRegistry } from "#base/service-registry";
-import { ServiceScope } from "#base/service-scope";
+import { globalLogger, type Logger } from "#base/logger/logger";
+import { type ServiceRegistry } from "#base/service-registry";
+import { type ServiceScope } from "#base/service-scope";
 import { providerDisplayRegistry } from "#base/providerDisplay";
-import { StatusAttributes, StatusType } from "#base/task/task-status";
+import { type StatusAttributes, StatusType } from "#base/task/task-status";
 import { throwIfAborted } from "#utils/errors";
 import {
-    TrackDownloadTask,
-    TrackMetadata,
-    TrackDownloadSource,
-    MetadataGroupState,
-    MetadataResultState,
-    DiscoverySource,
-    DiscoveryResult,
-    Platform,
+    type TrackDownloadTask,
+    type TrackMetadata,
+    type TrackDownloadSource,
+    type MetadataGroupState,
+    type MetadataResultState,
+    type DiscoverySource,
+    type DiscoveryResult,
+    type Platform,
 } from "#flows/musicDownloadFlow/types";
 import { runWithoutCache } from "#utils/cache";
 import { overwriteConfirmBridge } from "#base/bridges/overwriteConfirmBridge";
@@ -29,9 +29,9 @@ import { compiledFieldValues } from "./metadataFields";
 import { compiledMetadataToTags } from "./compiledMetadataToTags";
 import { computeOutputPath, isOutputPathTaken } from "./computeOutputPath";
 import { pickAutoSelectedIndex } from "./sourceSelection";
-import { MetadataService } from "../metadataService";
-import { DiscoveryMetadataService } from "../discoveryMetadataService";
-import { DownloadService, DownloadUpdateOptions } from "../downloadService";
+import { type MetadataService } from "../metadataService";
+import { type DiscoveryMetadataService } from "../discoveryMetadataService";
+import { type DownloadService, type DownloadUpdateOptions } from "../downloadService";
 import { getSaveSettings } from "../saveSettings";
 import { getMusicSettings } from "../settings";
 

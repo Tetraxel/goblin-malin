@@ -3,7 +3,11 @@ import { Box, Text, type DOMElement } from "ink";
 import { useWheelTarget } from "#base/mouse/useMouseTarget";
 import { useTheme } from "#base/themeContext";
 import { providerDisplayRegistry } from "#base/providerDisplay";
-import { TrackDownloadSource, DownloadProvider, DownloadQueryField } from "#flows/musicDownloadFlow/types";
+import {
+    type TrackDownloadSource,
+    type DownloadProvider,
+    type DownloadQueryField,
+} from "#flows/musicDownloadFlow/types";
 import type { Updater } from "#hooks/useFocusManager";
 import { togglePlayback } from "#utils/togglePlayback";
 import { playableFilePath } from "#flows/musicDownloadFlow/utils/playableFile";
