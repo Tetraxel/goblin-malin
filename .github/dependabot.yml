@@ -1,0 +1,8 @@
+version: 2
+updates:
+    # Only the GitHub Actions pinned by commit SHA in .github/workflows/ (REL-03).
+    # npm dependencies are deliberately not listed: they are bumped by hand (see DEP-03).
+    - package-ecosystem: "github-actions"
+      directory: "/"
+      schedule:
+          interval: "monthly"

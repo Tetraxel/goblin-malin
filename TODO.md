@@ -6,7 +6,7 @@
 
 ## 🔴 Release blockers (v0.2.0)
 
-- [ ] **Release 0.2.0** — bump `package.json` to `0.2.0`, rehearse with a `dry_run` of `release.yml`, then tag `v0.2.0` — `REL-02` (the pipeline itself is fixed; only action SHA-pinning is left, `REL-03`)
+- [ ] **Release 0.2.0** — bump `package.json` to `0.2.0`, rehearse with a `dry_run` of `release.yml`, then tag `v0.2.0` — `REL-02` (the pipeline itself is fixed and its actions are pinned by SHA, `REL-03`)
 - [ ] **MusicBrainz IDs never reach the saved file** — "Include MusicBrainz tags" setting (the option is hard-coded `false`), show the MB ID rows, set `MusicBrainzReleaseId` — `MD-03`, `P27/T27.4`
 - [ ] Status per service (Spotify, Ytdlp, etc...) instead of per task — `P25`
 - [ ] Easier `cookies.txt` extraction for yt-dlp (drag and drop? step by step instructions?) — `P24/T24.3`
@@ -32,7 +32,7 @@
 - [ ] `CHANGELOG.md` for 0.2.0, `.gitattributes`, licence check for the bundled audio samples — `DOC-07`
 - [ ] Dependencies left: `zod` advisory (waits for `ytmusic-api` on zod 4), ESLint 10 (waits for `eslint-plugin-react`; add `cause`s), TypeScript 7 (waits for `typescript-eslint`) — `DEP-02`, `DEP-03`
 - [ ] Get the unit tests green on Linux CI, then enable them there (they only run on Windows now)
-- [ ] Remaining `REL-03` / `REL-07` leftovers: pin release actions by SHA, drop `emitDecoratorMetadata` (and then `@swc/core`)
+- [ ] Remaining `REL-07` leftover: drop `emitDecoratorMetadata` (and then `@swc/core`)
 - [ ] **Linux has no working ffmpeg/ffprobe download** — `resolveFfmpegSource` has a macOS branch and treats everything else as Windows (fetches the win64 zip); check, and either add a Linux build or state Linux is unsupported
 
 ## 🟣 Promised by the former `README-TARGET` but not built yet
