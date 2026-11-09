@@ -1,0 +1,12 @@
+# Normalise line endings to LF in the repository and in checkouts.
+# The release runs on Windows and the bin file needs an LF shebang.
+* text=auto eol=lf
+
+# Binary assets: never touch.
+*.png binary
+*.jpg binary
+*.gif binary
+*.wav binary
+*.mp3 binary
+*.flac binary
+*.ogg binary

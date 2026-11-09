@@ -88,6 +88,10 @@
         "type": "git",
         "url": "git+https://github.com/Tetraxel/goblin-malin.git"
     },
+    "homepage": "https://github.com/Tetraxel/goblin-malin#readme",
+    "bugs": {
+        "url": "https://github.com/Tetraxel/goblin-malin/issues"
+    },
     "devDependencies": {
         "@eslint/js": "^9.39.5",
         "@napi-rs/canvas": "^1.1.0",
