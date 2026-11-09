@@ -32,4 +32,25 @@ export interface SetupWizardConfig {
     modes?: WizardMode[]; // if present → wizard shows a mode chooser
     /** If set, saved env vars are grouped under a labelled section comment in .env */
     envSection?: { name: string; url?: string };
+    /**
+     * One line telling the user what completing this setup unlocks. Settings shows it under the
+     * provider's "Setup Wizard" row for as long as the setup is not complete (see `isSetupComplete`).
+     */
+    benefits?: string;
+}
+
+/**
+ * Whether the wizard has been filled in: every required field of the active mode has a value.
+ * By convention a mode without fields is the credential-less, limited option (e.g. a scraped page),
+ * so choosing it does not count as complete.
+ */
+export function isSetupComplete(config: SetupWizardConfig, env: NodeJS.ProcessEnv = process.env): boolean {
+    let fields = config.fields;
+    if (config.modes && config.modes.length > 0) {
+        const selected = config.modeEnvVar ? env[config.modeEnvVar] : undefined;
+        const mode = config.modes.find((m) => m.id === selected) ?? config.modes[0];
+        if (mode.fields.length === 0) return false;
+        fields = mode.fields;
+    }
+    return fields.every((f) => f.required === false || !!env[f.envVar]?.trim());
 }

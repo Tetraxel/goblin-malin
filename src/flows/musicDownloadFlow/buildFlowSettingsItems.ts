@@ -1,7 +1,7 @@
 ﻿import { type DeepPartial } from "#utils/types";
 import { type ProviderConstructorLike, type ProviderSettingsSchema } from "#base/providerSettings";
 import { type ServiceRegistry } from "#base/service-registry";
-import { type SetupWizardConfig } from "#base/setupWizard";
+import { type SetupWizardConfig, isSetupComplete } from "#base/setupWizard";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { type SettingsItem } from "#settings/buildSettingsItems";
 import { type MusicDownloadFlowSettings } from "./settings";
@@ -55,6 +55,10 @@ function providerItems(
                     } as DeepPartial<MusicDownloadFlowSettings>)
                 ),
         });
+        // What finishing the setup would unlock — only while it is unfinished.
+        if (wizard.benefits && !isSetupComplete(wizard)) {
+            items.push({ kind: "note", indent: 4, text: wizard.benefits });
+        }
     }
 
     for (const [settingKey, def] of Object.entries(schema)) {

@@ -25,7 +25,6 @@
             - [PROD-01 — Target-design features are still missing (for release scoping)](#prod-01--target-design-features-are-still-missing-for-release-scoping)
             - [PROD-03 — Every saved track is a FLAC, even when the source is lossy](#prod-03--every-saved-track-is-a-flac-even-when-the-source-is-lossy)
             - [PROD-04 — No cover art is ever embedded](#prod-04--no-cover-art-is-ever-embedded)
-            - [PROD-05 — First-run friction observed in the live run](#prod-05--first-run-friction-observed-in-the-live-run)
         - [K. Candidates to verify (found while reading, not confirmed)](#k-candidates-to-verify-found-while-reading-not-confirmed)
     - [3. Verified OK (checked, no problem)](#3-verified-ok-checked-no-problem)
     - [4. Coverage \& limits](#4-coverage--limits)
@@ -62,8 +61,8 @@ The two blockers found here — `yarn build` failing, and a fresh install unable
 | UI / TUI behaviour (`UI-`)                 |         |       |        |     1 |      1 |
 | Security (`SEC-`)                          |         |       |        |     1 |      1 |
 | Docs, instructions & hygiene (`DOC-`)      |         |       |        |     1 |      1 |
-| Product & UX (`PROD-`)                     |         |       |      3 |     1 |      4 |
-| **Total**                                  |   **0** | **0** |  **5** | **8** | **13** |
+| Product & UX (`PROD-`)                     |         |       |      3 |       |      3 |
+| **Total**                                  |   **0** | **0** |  **5** | **7** | **12** |
 
 Plus 8 unconfirmed candidates in [section K](#k-candidates-to-verify-found-while-reading-not-confirmed) (not counted).
 
@@ -246,15 +245,6 @@ Everything else is on its latest version. Left, each tried and backed out:
 
 - **What:** the saved FLAC has `TITLE`, `ARTIST`, `album_artist` and `ENCODER` tags and only one audio stream — no picture. A grep of `src/` for cover/artwork/picture/APIC finds no code that downloads or embeds artwork (Spotify/YouTube Music both provide thumbnails). For a "download and tag" tool, missing artwork is one of the first things users notice in a player; the former `README-TARGET` didn't promise it either, so decide whether it is in scope for 0.2.0.
 - **Fix:** download the best thumbnail/album image and embed it (`flac-tagger` supports pictures; `node-id3` supports `image`), with a size cap and a setting to disable.
-
-<a id="prod-05"></a>
-
-#### PROD-05 — First-run friction observed in the live run
-
-**low · ux · verified**
-
-- **What:** (a) the first import is interrupted by **two** back-to-back consent dialogs for optional providers (Songlink, then Claude) while the row only says `Waiting for your an…` (truncated) — a new user has not heard of either; (b) with no Spotify credentials a YouTube import logs `[WARN] Phase A search failed for spotify` in the footer for every task (no explanation; the reason is now logged, DATA-10); (c) with only YouTube + MusicBrainz available, a YouTube-origin track ends up with just title/artist/duration (no album, year, ISRC, cover) and nothing tells the user that Spotify credentials or Songlink would fill them in; (d) completed tasks keep their TAG?/DL? checkboxes ticked, and the next import + Run flipped the already-saved first row from `✅ Saved` back to `⌛ Queued` — confirm whether re-running finished tasks is intended.
-- **Fix:** ask the optional-provider questions once, in the welcome tour/first-run, not mid-run; show a one-line "what you get with Spotify credentials" hint; untick finished tasks (or skip them) when running.
 
 ### K. Candidates to verify (found while reading, not confirmed)
 

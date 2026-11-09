@@ -25,7 +25,6 @@
 - [ ] Temp downloads: move the default out of the Music library (with a one-time migration of the old folder), clean unselected candidates after a save
 - [ ] Handling of **SoundCloud** links
 - [ ] Add a button `Open all tracks in MB Picard`
-- [ ] First run: ask for the optional providers (Songlink, Claude) once, not mid-import — `PROD-05`
 
 **Housekeeping**
 
@@ -62,6 +61,7 @@ Decide per release whether each is wanted.
 - [x] **Docs** — README rewritten for v0.2.0 (`DOC-03`), `docs/audit/*` replaced by `docs/ARCHITECTURE.md` (`DOC-01`), dead links in `docs/projects/` fixed (`DOC-04`)
 - [x] **Tool downloads** — yt-dlp and ffmpeg are SHA-256-verified against the vendor's published list (a missing list only logs a warning; a mismatch deletes the file and fails), `mpv-setup.ts` uses `#utils/http` (mpv's vendor publishes no checksums), ffmpeg and ffprobe share one archive download — `DL-01`
 - [x] **Logging** — task id instead of the whole task, `Error`s serialised, previous session's log kept as `app.prev.log`, 10 MB cap — `DATA-10`
+- [x] **Hint about missing credentials in Settings** — under a provider's "Setup Wizard" row a one-line note says what finishing the setup unlocks (Spotify: album, year and ISRC for YouTube imports); a service declares it as `setupWizard.benefits`
 - [x] Save the tasks to disk as sessions (+ archive)
 - [x] **Soulseek** download provider
 - [x] Handle Spotify albums and playlists as input (and YouTube playlists), with live refresh

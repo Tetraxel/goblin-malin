@@ -100,6 +100,7 @@ export class SpotifyService extends MetadataService {
         providerType: "metadata",
         envSection: { name: "SPOTIFY", url: "https://developer.spotify.com/dashboard" },
         description: [],
+        benefits: "API credentials let YouTube imports be matched on Spotify: album, year and ISRC get filled in.",
         fields: [], // empty — fields live in modes
         modeEnvVar: "SPOTIFY_AUTH_MODE",
         modes: [
