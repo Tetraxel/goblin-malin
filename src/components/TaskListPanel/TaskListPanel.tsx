@@ -9,6 +9,7 @@ import { DynamicHintBar } from "#components/DynamicHintBar/DynamicHintBar";
 import { TaskRow } from "./TaskRow";
 import { useTaskListMouse } from "./useTaskListMouse";
 import { useNowPlaying } from "#hooks/useNowPlaying";
+import { useShortcutLiteral } from "#hooks/useShortcutLiteral";
 import { findPlayingTaskId } from "#flows/musicDownloadFlow/utils/playingTask";
 import { useTaskHeaderShortcuts } from "#hooks/useKeyHandlers";
 import { saveColumnRatios } from "#flows/musicDownloadFlow/taskColumns";
@@ -109,6 +110,7 @@ export const TaskListPanel: React.FC<{
     const { activeWindow, layout } = useFocusChrome();
     const taskListFocus = useFocusTaskList();
     const isWindowActive = activeWindow === "taskList";
+    const importKey = useShortcutLiteral("global.import");
     const fullHeight = layout.taskListHeight;
     const actionBarRows = isWindowActive ? 2 : 0;
     const height = fullHeight - 1 - actionBarRows; // subtract header and action bar
@@ -369,7 +371,7 @@ export const TaskListPanel: React.FC<{
                 {tasks.length === 0 ? (
                     <Box paddingX={4} overflow="hidden">
                         <Text italic color={"gray"}>
-                            Press Ctrl+V to import music URLs
+                            Press {importKey} to import music URLs
                         </Text>
                     </Box>
                 ) : (

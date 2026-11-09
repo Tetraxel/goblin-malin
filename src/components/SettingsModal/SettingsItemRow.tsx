@@ -143,10 +143,17 @@ export const SettingsItemRow: React.FC<SettingsItemRowProps> = ({
         case "readonlyText":
             return (
                 <Box paddingLeft={item.indent} flexShrink={0}>
-                    <Text>{"  " + item.label}</Text>
-                    <Text italic>{" (read-only)"}</Text>
-                    <Text>{": "}</Text>
-                    <Text color={theme.text.secondary}>{item.value}</Text>
+                    {/* Label and marker never shrink; only the value truncates (in the middle, so the path's tail stays visible). */}
+                    <Box flexShrink={0} paddingLeft={2}>
+                        <Text>{item.label}</Text>
+                        <Text italic>{" (read-only)"}</Text>
+                        <Text>{": "}</Text>
+                    </Box>
+                    <Box flexShrink={1} flexGrow={1} minWidth={0}>
+                        <Text color={theme.text.secondary} wrap="truncate-middle">
+                            {item.value}
+                        </Text>
+                    </Box>
                 </Box>
             );
 

@@ -18,11 +18,7 @@
             - [MD-03 — MusicBrainz IDs can never be written to a saved file](#md-03--musicbrainz-ids-can-never-be-written-to-a-saved-file)
             - [MD-04 — Provider-key branching in core code contradicts the extensibility rule; hardcoded Spotify market](#md-04--provider-key-branching-in-core-code-contradicts-the-extensibility-rule-hardcoded-spotify-market)
         - [F. UI / TUI behaviour](#f-ui--tui-behaviour)
-            - [UI-03 — Import reads the clipboard with blocking `execSync`; Linux support limited to `xclip`](#ui-03--import-reads-the-clipboard-with-blocking-execsync-linux-support-limited-to-xclip)
-            - [UI-04 — The read-only "App directory" row garbles label and value when the row is narrow](#ui-04--the-read-only-app-directory-row-garbles-label-and-value-when-the-row-is-narrow)
-            - [UI-05 — A hardcoded key label in the empty state violates the "live hints" rule](#ui-05--a-hardcoded-key-label-in-the-empty-state-violates-the-live-hints-rule)
             - [UI-06 — The main layout needs ~66 columns; below that the toolbar scrolls off and columns jam together](#ui-06--the-main-layout-needs-66-columns-below-that-the-toolbar-scrolls-off-and-columns-jam-together)
-            - [UI-07 — After deleting/archiving the last task the selection index is stale](#ui-07--after-deletingarchiving-the-last-task-the-selection-index-is-stale)
         - [G. Security](#g-security)
             - [❌ SEC-02 — A copy of the secrets file sits in the repository root (kept on purpose)](#-sec-02--a-copy-of-the-secrets-file-sits-in-the-repository-root-kept-on-purpose)
         - [H. Tests, CI \& tooling](#h-tests-ci--tooling)
@@ -75,20 +71,20 @@ The two blockers found here — `yarn build` failing, and a fresh install unable
 | Dependencies & supply chain (`DEP-`)       |         |       |        |      2 |      2 |
 | Data safety, persistence & state (`DATA-`) |         |       |      1 |        |      1 |
 | Metadata & discovery (`MD-`)               |         |       |      1 |      1 |      2 |
-| UI / TUI behaviour (`UI-`)                 |         |       |        |      5 |      5 |
+| UI / TUI behaviour (`UI-`)                 |         |       |        |      1 |      1 |
 | Security (`SEC-`)                          |         |       |        |      1 |      1 |
 | Tests, CI & tooling (`TEST-`)              |         |       |      2 |      3 |      5 |
 | Docs, instructions & hygiene (`DOC-`)      |         |       |      2 |      3 |      5 |
 | Product & UX (`PROD-`)                     |         |       |      3 |      1 |      4 |
-| **Total**                                  |   **0** | **0** |  **9** | **19** | **28** |
+| **Total**                                  |   **0** | **0** |  **9** | **15** | **24** |
 
-Plus 9 unconfirmed candidates in [section K](#k-candidates-to-verify-found-while-reading-not-confirmed) (not counted).
+Plus 8 unconfirmed candidates in [section K](#k-candidates-to-verify-found-while-reading-not-confirmed) (not counted).
 
 <!-- /COUNTS-TABLE -->
 
 ### Already fixed
 
-Removed from this file once fixed and committed (what was found, the fix and how it was checked are in the file's git history: `git log -p -- AUDIT-v0.2.0.md`): **REL-01** (`yarn build`), **REL-04** (`engines`), **REL-05** (`postinstall`), **DEP-01** (unused dependencies), **DATA-01** ("Clear temporary downloads"), **DATA-02** and **DATA-03** (`sessions.json` / `settings.json` validation, quarantine, `.bak`, versioning), **DATA-04** (the data folder is derived, never stored), **DATA-05** (visible write failures, bounded retry on close, unique temp names, one instance per data folder), **DATA-06** (self-update exits through `exitApp()`), **DATA-07** (crash/signal handlers restore the terminal and save; console patch moved to the entry points), **MD-01** (confidence normalisation keeps every script and strips only accents; empty names score 0; live/remix/karaoke/cover versions are penalised; `tests/unit/confidence.test.ts`), **MD-02** (scraped Spotify answers are never cached; "nothing found" discovery results are kept 1 day, not 90; concurrent identical calls share one request; `tests/unit/cache.test.ts` — caches written before the fix may still hold old entries until they expire or "Clear cache"), **REL-06** (no more `prepack`/`postpack`: the README carries absolute image URLs, `patch-readme.mjs` is gone), **SEC-01** (`openUrl` spawns the native opener with an argv array — no shell, http(s) only; the updater takes a program + args from `getUpdateArgv`, with the version validated as semver, and uses a shell only on Windows for the `.cmd` shims; `tests/unit/shellSafety.test.ts`), **UI-01** (a link pasted into a focused text field stays in the field; scheme-less links and `spotify:` URIs are understood), **UI-02** (`Ctrl+Q`, rebindable `global.quit`, asks first; a second press quits at once), **DOC-02** (`.env.example`), **DOC-05** (`TODO.md`), **PROD-02** (dotenv banner), **DATA-08** (temporary downloads are cleaned by how recently a session used them — manual age picker, start-up reminder, opt-in 48 h auto-clean, size row in Settings, sources marked "File not found" after a clean-up; the dead `autoDeleteTempAfter24h`, `autoSaveToOutputDir` and `autoRelocateMissingFiles` settings are gone; moving the default folder out of the Music library and deleting unselected candidates after a save are in `TODO.md`), the ffmpeg/ffprobe bootstrap bug and then the rest of **DL-01** (yt-dlp and ffmpeg downloads are SHA-256-verified when the vendor publishes a checksum list and only warn when it can't be fetched; mpv, whose vendor publishes none, is not verified; `mpv-setup.ts` is on `#utils/http`; ffmpeg and ffprobe share one archive download), **DATA-10** (the log file gets a task id instead of the whole task, `Error`s are serialised, and the previous session's log is kept as `app.prev.log` instead of being truncated; 10 MB cap per file), and most of **DEP-02** / **DEP-03** (`yarn audit` 97 → 1: every minor/patch bump plus a refresh of the transitive dependencies clears the `axios`, `ws`, `vite`, `js-yaml`, babel chains without any `resolutions`; `adm-zip` 0.6.1, which ships its own types so `@types/adm-zip` is gone; `ink` 8 (no more `ws`; two type-only fixes for its generic `stdout`), `react` 19.3, `musicbrainz-api` 2 (checked live: ISRC search, name search, lookup), `vitest` 5 (with `vite` now declared, it is no longer bundled), `tsup` 9 (`esbuild` 0.28), `dotenv` 18, `strip-ansi` 7, `@types/node` 26, `slsk-client` 2 (a new promise-based API: `SoulseekService` ported, its own typings replace `src/types/slsk-client.d.ts`; downloads are now really cancelled, so the abandon-and-sweep-orphan-files workaround is gone, and rows show download progress); one dev-only `resolutions` entry moves `@typescript-eslint/typescript-estree`'s `minimatch` to 11), and the packaging part of **REL-07** (the Windows exe is dropped — `npm install -g goblin-malin` is the only install path: `build-sea.mjs`, `package:win`, `postject`, the `pkg`-era `patch-pkg-compat.mjs` and the release workflow's exe job are gone, the update modal lost its exe branch; the exe build had been broken since `a4266c0` anyway, top-level `await` in `src/cli.ts`). Findings that were only partly fixed (**REL-03**, **REL-07**, **DEP-02**, **DEP-03**, **DOC-04**) keep just the part that is still open.
+Removed from this file once fixed and committed (what was found, the fix and how it was checked are in the file's git history: `git log -p -- AUDIT-v0.2.0.md`): **REL-01** (`yarn build`), **REL-04** (`engines`), **REL-05** (`postinstall`), **DEP-01** (unused dependencies), **DATA-01** ("Clear temporary downloads"), **DATA-02** and **DATA-03** (`sessions.json` / `settings.json` validation, quarantine, `.bak`, versioning), **DATA-04** (the data folder is derived, never stored), **DATA-05** (visible write failures, bounded retry on close, unique temp names, one instance per data folder), **DATA-06** (self-update exits through `exitApp()`), **DATA-07** (crash/signal handlers restore the terminal and save; console patch moved to the entry points), **MD-01** (confidence normalisation keeps every script and strips only accents; empty names score 0; live/remix/karaoke/cover versions are penalised; `tests/unit/confidence.test.ts`), **MD-02** (scraped Spotify answers are never cached; "nothing found" discovery results are kept 1 day, not 90; concurrent identical calls share one request; `tests/unit/cache.test.ts` — caches written before the fix may still hold old entries until they expire or "Clear cache"), **REL-06** (no more `prepack`/`postpack`: the README carries absolute image URLs, `patch-readme.mjs` is gone), **SEC-01** (`openUrl` spawns the native opener with an argv array — no shell, http(s) only; the updater takes a program + args from `getUpdateArgv`, with the version validated as semver, and uses a shell only on Windows for the `.cmd` shims; `tests/unit/shellSafety.test.ts`), **UI-01** (a link pasted into a focused text field stays in the field; scheme-less links and `spotify:` URIs are understood), **UI-02** (`Ctrl+Q`, rebindable `global.quit`, asks first; a second press quits at once), **DOC-02** (`.env.example`), **DOC-05** (`TODO.md`), **PROD-02** (dotenv banner), **DATA-08** (temporary downloads are cleaned by how recently a session used them — manual age picker, start-up reminder, opt-in 48 h auto-clean, size row in Settings, sources marked "File not found" after a clean-up; the dead `autoDeleteTempAfter24h`, `autoSaveToOutputDir` and `autoRelocateMissingFiles` settings are gone; moving the default folder out of the Music library and deleting unselected candidates after a save are in `TODO.md`), the ffmpeg/ffprobe bootstrap bug and then the rest of **DL-01** (yt-dlp and ffmpeg downloads are SHA-256-verified when the vendor publishes a checksum list and only warn when it can't be fetched; mpv, whose vendor publishes none, is not verified; `mpv-setup.ts` is on `#utils/http`; ffmpeg and ffprobe share one archive download), **DATA-10** (the log file gets a task id instead of the whole task, `Error`s are serialised, and the previous session's log is kept as `app.prev.log` instead of being truncated; 10 MB cap per file), and most of **DEP-02** / **DEP-03** (`yarn audit` 97 → 1: every minor/patch bump plus a refresh of the transitive dependencies clears the `axios`, `ws`, `vite`, `js-yaml`, babel chains without any `resolutions`; `adm-zip` 0.6.1, which ships its own types so `@types/adm-zip` is gone; `ink` 8 (no more `ws`; two type-only fixes for its generic `stdout`), `react` 19.3, `musicbrainz-api` 2 (checked live: ISRC search, name search, lookup), `vitest` 5 (with `vite` now declared, it is no longer bundled), `tsup` 9 (`esbuild` 0.28), `dotenv` 18, `strip-ansi` 7, `@types/node` 26, `slsk-client` 2 (a new promise-based API: `SoulseekService` ported, its own typings replace `src/types/slsk-client.d.ts`; downloads are now really cancelled, so the abandon-and-sweep-orphan-files workaround is gone, and rows show download progress); one dev-only `resolutions` entry moves `@typescript-eslint/typescript-estree`'s `minimatch` to 11), and the packaging part of **REL-07** (the Windows exe is dropped — `npm install -g goblin-malin` is the only install path: `build-sea.mjs`, `package:win`, `postject`, the `pkg`-era `patch-pkg-compat.mjs` and the release workflow's exe job are gone, the update modal lost its exe branch; the exe build had been broken since `a4266c0` anyway, top-level `await` in `src/cli.ts`). Also fixed: **UI-03** (the import clipboard is read asynchronously through `clipboardy`, with a visible message when it is empty or unreadable), **UI-04** (the read-only settings row keeps its label and truncates only the value), **UI-05** (the empty-state hint shows the live `global.import` binding) and **UI-07** (the task cursor is clamped and stale multi-selected ids are pruned whenever the task list changes; `tests/unit/reconcileTaskSelection.test.ts`). Findings that were only partly fixed (**REL-03**, **REL-07**, **DEP-02**, **DEP-03**, **DOC-04**) keep just the part that is still open.
 
 ---
 
@@ -190,36 +186,6 @@ Everything else is on its latest version. Left, each tried and backed out:
 
 ### F. UI / TUI behaviour
 
-<a id="ui-03"></a>
-
-#### UI-03 — Import reads the clipboard with blocking `execSync`; Linux support limited to `xclip`
-
-**low · performance/ux · verified (timed)**
-
-- **Where:** `src/components/ImportModal/clipboard.ts:7-19`.
-- **What:** `readClipboard()` is `async` but runs `execSync('powershell -command "Get-Clipboard"')` (Windows; 224–258 ms measured here, more on a cold start/AV), `pbpaste`, or `xclip -selection clipboard -o` — synchronous, so the whole TUI freezes meanwhile. On Linux without `xclip` (Wayland: `wl-paste`; or `xsel`) it silently returns `""` and Ctrl+V looks dead. `clipboardy` (already a dependency, imported in 4 other places) does async reads with fallbacks.
-- **Fix:** `await clipboardy.read()` with a visible message when empty/unavailable.
-
-<a id="ui-04"></a>
-
-#### UI-04 — The read-only "App directory" row garbles label and value when the row is narrow
-
-**low · ux (layout) · verified (harness at 140/120/100/80 columns; also found independently by the TUI agent)**
-
-- **Where:** `src/components/SettingsModal/SettingsItemRow.tsx:133-141` (`case "readonlyText"`), `src/settings/buildGlobalSettingsItems.ts:59`.
-- **What:** the row is four sibling `<Text>` nodes (label, `(read-only)`, `:`, value), none with `flexShrink={0}` (the CLAUDE.md "Box shrinking" gotcha). When label + value exceed the width, Yoga shrinks all four and words interleave: at the classic **80×30** terminal with a normal path (`C:/Users/<name>/AppData/Roaming/goblin-malin`, 43 chars): `│    🗁  App         (read-only: C:/Users/axel7/AppData/Roaming/goblin-m  │` / `│  directory                    alin  │`. Fine at 100+ columns with a short path; broken at any width with a long (e.g. dev-checkout) path.
-- **Fix:** `<Box flexShrink={0}>` around the label/marker, `wrap="truncate-middle"` on the value.
-
-<a id="ui-05"></a>
-
-#### UI-05 — A hardcoded key label in the empty state violates the "live hints" rule
-
-**low · maintainability · verified**
-
-- **Where:** `src/components/TaskListPanel/TaskListPanel.tsx:372` (`Press Ctrl+V to import music URLs`); `src/components/WelcomeModal/intro/tour.ts` mentions key names twice.
-- **What:** `global.import` is user-rebindable, but the empty-state text always says Ctrl+V (`CLAUDE.md`: "Never hardcode a key label that maps to a registered shortcut"). Everything else I grepped follows the rule.
-- **Fix:** `<Hint label="import music URLs" shortcutId="global.import" />`; check the tour strings the same way.
-
 <a id="ui-06"></a>
 
 #### UI-06 — The main layout needs ~66 columns; below that the toolbar scrolls off and columns jam together
@@ -229,16 +195,6 @@ Everything else is on its latest version. Left, each tried and backed out:
 - **What:** sizes tested: 100×30, 80×24, 76/72/68×24 are fine; at **64×24** and **60×20** rows are wider than the terminal, wrap (`No s` / `ta…`) and push the toolbar/header out of the screen (the top of the snapshot is a task row); at 50×16, 40×12 the columns collapse (`4v…wg…✓ 0No sta…`); 30×10 and 20×8 are unreadable. No crash, no exception at any size (`exitCode` stays `null`, no stack text), but also no "terminal too small" message or minimum-size guard (the Settings modal degrades more gracefully than the main screen).
 - **Impact:** split panes (tmux, Windows Terminal) narrower than ~66 columns show a broken screen with no hint why.
 - **Fix:** below a minimum (e.g. 66×16) render a single line "Terminal too small — need at least 66×16 (now W×H)"; hide low-priority columns (SPOTIFY/YOUTUBE/MB) progressively; see the `flexShrink` guidance in `CLAUDE.md`.
-
-<a id="ui-07"></a>
-
-#### UI-07 — After deleting/archiving the last task the selection index is stale
-
-**low · bug · verified (harness)**
-
-- **Where:** task selection state in `src/hooks/useFocusManager.ts` (`selectedTaskIndex` is not clamped when the list shrinks).
-- **What:** with the 50-task fixture: select the last row (`Task 50/50`), press `Del` → "Archive / Delete / Cancel" → Enter. Afterwards **no row shows the cursor**, the action bar says `No contextual actions available`, the compiled-metadata panel is empty and `ArrowDown` does nothing; the first `ArrowUp` recovers (`Task 49/49`). (The UI agent's note also suspected phantom entries in `selectedTaskIds` after removals — not verified.)
-- **Fix:** clamp `selectedTaskIndex` (and prune `selectedTaskIds`) whenever `tasks.length` changes; add a unit test for `buildVisibleTaskOrder`/selection.
 
 ### G. Security
 
@@ -424,7 +380,6 @@ These come from the UI agent's running notes before it was cut off. Treat them a
 
 - `useShortcuts` mutates the shortcut registry during render, and `priority`/`exclusive` are captured only at first registration — possible dead shortcuts after remounts.
 - `ink-text-input` 6 inserts Ctrl+letter characters while the same key also fires a registered shortcut (e.g. Ctrl+S/R/N/D inside a focused input).
-- `selectedTaskIds` not pruned when tasks are removed → possible phantom multi-selection (the stale `selectedTaskIndex` half is confirmed as UI-07).
 - SGR mouse sequence split across two stdin chunks leaks garbage text to Ink (`index.tsx` regex extraction).
 - `useShortcutLiteral` doesn't carry a default `doubleTap` into overrides (hint says `F4` while the entry needs `F4 F4`).
 - Light theme: `text.muted #d0d7de` on `#fff` ≈ 1.5:1 contrast; hardcoded `"black"/"white"/"cyan"/"gray"` colors in `UpdateBadge`, `TaskRow`, header, empty state.
@@ -438,7 +393,7 @@ These come from the UI agent's running notes before it was cut off. Treat them a
 
 - `yarn type-check` passes (3.7 s); `yarn lint` passes with **0 warnings** across all 271 `.ts/.tsx` files (it really covers `.tsx`); `vitest run tests/unit` = 176 passed, 1 skipped, in 2 s.
 - Unit tests are properly isolated (`GOBLIN_DATA_DIR` temp dirs) — the e2e smoke test (TEST-02) is the exception.
-- The single `useInput` rule holds (`ShortcutDispatcher` only); virtually all hints go through the registry (UI-05 is the lone literal found).
+- The single `useInput` rule holds (`ShortcutDispatcher` only); virtually all hints go through the registry.
 - Shortcut dispatch semantics (priority + `exclusive`) are sound; the duplicate default keys I inspected live in different scopes.
 - `settings.json` writes are atomic (temp + rename); `sessions.json` writes are atomic and coalesced, off the main thread.
 - A graceful `exitApp()` exists (flush session store + cache, restore terminal, forced exit after 8 s) — crashes and signals now go through `emergencyExit()` (same save + terminal restore).
@@ -462,6 +417,6 @@ The sub-agents keep their context: after 17:40 they can be resumed to finish the
 
 ## 5. Side effects of this audit
 
-- While testing the settings row (UI-04) I briefly pointed a _scratch copy's_ persisted `appDataDir` at `%APPDATA%/goblin-malin` (the owner's real installed-app folder). The harness runs then **rewrote `app.log` (truncated by the app at start at the time; now kept as `app.prev.log`, DATA-10) and re-saved `cache/api-cache` there**. `sessions.json`, `settings.json`, `.env`, `install.json` and `bin/` were not touched (their timestamps are unchanged). This was DATA-04 in action (fixed: the data folder is no longer read from `settings.json`).
+- While testing the settings row I briefly pointed a _scratch copy's_ persisted `appDataDir` at `%APPDATA%/goblin-malin` (the owner's real installed-app folder). The harness runs then **rewrote `app.log` (truncated by the app at start at the time; now kept as `app.prev.log`, DATA-10) and re-saved `cache/api-cache` there**. `sessions.json`, `settings.json`, `.env`, `install.json` and `bin/` were not touched (their timestamps are unchanged). This was DATA-04 in action (fixed: the data folder is no longer read from `settings.json`).
 - Network use: one YouTube Music download (~40 MB) and one Spotify scrape plus a few MusicBrainz lookups (Songlink and Claude were declined; no credentials or cookies were used or copied — only `yt-dlp`, `ffmpeg`, `ffprobe` were copied into an isolated temp data dir).
 - My isolated scratch data dirs (`%TEMP%/gm-o`, `gm-live`, `gm-sweep`, with the copied binaries and the 39 MB test download) were deleted afterwards. The remaining scratch files (scripts, scenario JSONs, the sub-agents' partial work) live under `%TEMP%/claude/.../scratchpad`.

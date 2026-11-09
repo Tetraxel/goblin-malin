@@ -41,11 +41,35 @@ export function useImportFlow(openConfirmModal: (config: ConfirmModalConfig) => 
                 return;
             }
 
-            readClipboard()
-                .then(handle)
-                .catch((err) => globalLogger.error("Clipboard read failed", { err }));
+            const notify = (title: string, message: string) =>
+                openConfirmModal({
+                    title,
+                    message,
+                    choices: [{ label: "OK", color: theme.action.primary }],
+                    accentColor: theme.status.warning,
+                    onConfirm: () => {},
+                });
+
+            readClipboard().then(
+                (raw) => {
+                    if (raw.trim() === "") {
+                        notify("Clipboard is empty", "Copy some music URLs first, then import again.");
+                        return;
+                    }
+                    handle(raw);
+                },
+                (err) => {
+                    globalLogger.error("Clipboard read failed", { err });
+                    notify(
+                        "Can't read the clipboard",
+                        process.platform === "linux"
+                            ? "Install xsel, xclip or wl-clipboard (Wayland) so Goblin Malin can read it."
+                            : "The system clipboard could not be read."
+                    );
+                }
+            );
         },
-        [activeWindow]
+        [activeWindow, openConfirmModal, theme]
     );
 
     const askAboutArchived = useCallback(

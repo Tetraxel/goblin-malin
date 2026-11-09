@@ -107,19 +107,42 @@ type InternalFocusState = Omit<FocusState, "secondaryPanel"> & {
     secondaryPanel: Omit<FocusState["secondaryPanel"], "primaryMode">;
 };
 
+/**
+ * Clamps the task cursor into the list and drops multi-selected ids that no longer exist.
+ * Returns the same object when nothing needs fixing, so callers can skip the state update.
+ */
+export function reconcileTaskSelection(taskList: FocusState["taskList"], taskIds: string[]): FocusState["taskList"] {
+    const maxIndex = Math.max(0, taskIds.length - 1);
+    const selectedTaskIndex = Math.min(taskList.selectedTaskIndex, maxIndex);
+    const alive = new Set(taskIds);
+    const hasStaleIds = [...taskList.selectedTaskIds].some((id) => !alive.has(id));
+    if (selectedTaskIndex === taskList.selectedTaskIndex && !hasStaleIds) return taskList;
+    return {
+        ...taskList,
+        selectedTaskIndex,
+        selectedTaskIds: hasStaleIds
+            ? new Set([...taskList.selectedTaskIds].filter((id) => alive.has(id)))
+            : taskList.selectedTaskIds,
+        // An anchor index/base from before the removal no longer lines up with the list.
+        selectionAnchor: null,
+    };
+}
+
 export const useFocusManager = ({
     toolbarButtonCount,
-    taskCount,
+    taskIds,
     taskColumnCount,
     primaryMode,
     onPrimaryModeChange,
 }: {
     toolbarButtonCount: number;
-    taskCount: number;
+    /** Ids of the visible tasks, in display order. */
+    taskIds: string[];
     taskColumnCount: number;
     primaryMode: "metadata" | "download";
     onPrimaryModeChange: (mode: "metadata" | "download") => void;
 }) => {
+    const taskCount = taskIds.length;
     const { height: terminalHeight, width: terminalWidth } = useScreenSize();
 
     // Stores the user's explicit task-list height; clamped in the layout memo on resize.
@@ -188,6 +211,16 @@ export const useFocusManager = ({
         if (taskColumnCount > 0 && focusState.taskList.selectedColumnIndex > maxCol) {
             setFocusState((prev) => ({ ...prev, taskList: { ...prev.taskList, selectedColumnIndex: maxCol } }));
         }
+    }
+
+    // Same pattern for the task set: after a delete/archive the cursor may point past the end
+    // (no row highlighted, no contextual actions, ArrowDown dead) and the multi-selection may
+    // hold ids of tasks that are gone.
+    const [prevTaskIds, setPrevTaskIds] = useState(taskIds);
+    if (prevTaskIds !== taskIds) {
+        setPrevTaskIds(taskIds);
+        const reconciled = reconcileTaskSelection(focusState.taskList, taskIds);
+        if (reconciled !== focusState.taskList) setFocusState((prev) => ({ ...prev, taskList: reconciled }));
     }
 
     const switchWindow = useCallback((window: FocusableWindow) => {

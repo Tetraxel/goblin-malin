@@ -41,7 +41,7 @@ const FocusStateContext = createContext<FocusState | null>(null);
 export const FocusProvider: React.FC<{
     children: ReactNode;
     toolbarButtonCount: number;
-    taskCount: number;
+    taskIds: string[];
     taskColumnCount: number;
     primaryMode: "metadata" | "download";
     onPrimaryModeChange: (mode: "metadata" | "download") => void;

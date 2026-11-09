@@ -21,7 +21,7 @@
 - [ ] Pasting a URL into a text field opens the Import modal and also types it into the field: use Ink's `usePaste` — `UI-01`
 - [ ] Self-update must exit through `exitApp()`; handle `uncaughtException` / `SIGTERM` / `SIGHUP` so the terminal is restored and the session saved — `DATA-06`, `DATA-07`
 - [ ] Surface persistence failures, retry on exit, lock against a second instance — `DATA-05`
-- [ ] Stale selection after deleting the last task; settings row at 80 columns; "terminal too small" message below ~66 columns — `UI-07`, `UI-04`, `UI-06`
+- [ ] "Terminal too small" message below ~66 columns — `UI-06`
 
 **Product**
 

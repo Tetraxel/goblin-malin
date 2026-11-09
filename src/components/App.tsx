@@ -137,12 +137,15 @@ export const App: React.FC = () => {
         [tasks, collapseVersion] // eslint-disable-line react-hooks/exhaustive-deps
     );
 
+    // Lets the focus manager keep the cursor / multi-selection valid as tasks come and go.
+    const visibleTaskIds = useMemo(() => visibleTasks.map((t) => t.getId()), [visibleTasks]);
+
     return (
         <ThemeProvider>
             <ShortcutRegistryProvider>
                 <FocusProvider
                     toolbarButtonCount={TOOLBAR_BUTTONS.length + (updateInfo ? 1 : 0)}
-                    taskCount={visibleTasks.length}
+                    taskIds={visibleTaskIds}
                     taskColumnCount={columns.length}
                     primaryMode={primaryMode}
                     onPrimaryModeChange={setPrimaryMode}
