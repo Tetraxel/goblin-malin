@@ -1,5 +1,7 @@
 ﻿# P20b — Remove the Flow Abstraction: Tasks
 
+> **Done — kept for history.** This project was delivered, so the files it deletes or splits (`src/base/flow/*`, `FlowSelector.tsx`, `musicDownloadFlow.ts`) are gone and are no longer linked. Where things live now: [docs/ARCHITECTURE.md](../../ARCHITECTURE.md).
+
 ## Context
 
 The "flow" concept (`FlowBase` + `FlowOrchestrator`'s flow registry + `MusicDownloadFlow`) was built for a future with multiple flows (video downloads, a showcaller-style sound/light trigger app). That future never arrived inside this codebase, and the abstraction now costs more than it returns. This project removes the concept — **keeping the parts that are genuinely generic** (the task engine, the service registries, dynamic column/action lists) and deleting the class-shaped indirection around them.
@@ -8,8 +10,8 @@ The "flow" concept (`FlowBase` + `FlowOrchestrator`'s flow registry + `MusicDown
 
 **Dead weight:**
 
-- [flow-base.ts](../../../src/base/flow/flow-base.ts): 137 lines; more than half its methods are `throw Error("Not implemented")` placeholders that exist only so one subclass can override them.
-- [FlowSelector.tsx](../../../src/components/Toolbar/FlowSelector.tsx) is dead — its only call-site is commented out in `Toolbar.tsx`. `useImportButton.ts` is dead (never referenced).
+- `flow-base.ts`: 137 lines; more than half its methods are `throw Error("Not implemented")` placeholders that exist only so one subclass can override them.
+- `FlowSelector.tsx` is dead — its only call-site is commented out in `Toolbar.tsx`. `useImportButton.ts` is dead (never referenced).
 - `FlowOrchestrator.registerFlow/getFlow/getAllFlows/getEnabledFlows` + the `FlowClass` interface serve a registry of exactly one entry.
 
 **The "weird useEffect/state" tax** (the actual pain this project removes):
@@ -60,7 +62,7 @@ _Depends on: T20b.1, T20b.3 (the `computeColumns` module)_
 
 ### T20b.3 — De-class `MusicDownloadFlow` into plain modules
 
-Split the 689-line god class ([musicDownloadFlow.ts](../../../src/flows/musicDownloadFlow/musicDownloadFlow.ts)) by responsibility — same folder, no behavior change:
+Split the 689-line god class (`musicDownloadFlow.ts`) by responsibility — same folder, no behavior change:
 
 | New module | Contents (moved, not rewritten) |
 | ---------- | ------------------------------- |
@@ -69,7 +71,7 @@ Split the 689-line god class ([musicDownloadFlow.ts](../../../src/flows/musicDow
 | `runController.ts` | `runAll`, `runSelected`, `stopAll`, `restartTask` — thin functions over the orchestrator. |
 | `columns.tsx` | `getColumns()` → `computeColumns(mode)` (pure: mode + settings in, `ColumnDefinition[]` out) + `saveColumnRatios()`. |
 | `contextualActions.ts` | `getContextualActionBar` → `buildContextualActionBar(task, ctx)` + the two private builder helpers. |
-| `settings.ts` | Flow-settings accessors as plain functions over `SettingsStore` with a module constant key; delete the `FlowSettings` wrapper class ([flow-settings.ts](../../../src/base/flow/flow-settings.ts)). |
+| `settings.ts` | Flow-settings accessors as plain functions over `SettingsStore` with a module constant key; delete the `FlowSettings` wrapper class (`flow-settings.ts`). |
 | `init.ts` | `initMusicApp(orchestrator)`: provider registration + `applyConcurrencySettings` + the settings-change subscription. Called **once, explicitly, from the entry point** (`cli.ts`/`index.tsx`) — replacing the side-effectful `useState` initializer in App.tsx. |
 
 Singleton state the class carried (`instance`, `tasks` mirror, `maxConcurrentTasks` — declared but ignored since P20) is deleted; the orchestrator already owns the task list.
@@ -80,7 +82,7 @@ _Depends on: T20b.1_
 
 ### T20b.4 — Slim the orchestrator to a task engine
 
-- Delete from [flow-orchestrator.ts](../../../src/base/flow/flow-orchestrator.ts): `flows` set, `registerFlow`, `getFlow`, `getAllFlows`, `getEnabledFlows`, `FlowClass`. Everything else (pump, add/remove/set tasks, abort, subscribe) is untouched.
+- Delete from `flow-orchestrator.ts`: `flows` set, `registerFlow`, `getFlow`, `getAllFlows`, `getEnabledFlows`, `FlowClass`. Everything else (pump, add/remove/set tasks, abort, subscribe) is untouched.
 - Rename `FlowOrchestrator` → `TaskOrchestrator`, move to `src/base/task/orchestrator.ts` next to `task.ts` (mechanical; `id: "flow-orchestrator"` → `"task-orchestrator"`).
 - Delete `flow-base.ts`.
 

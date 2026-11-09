@@ -1,5 +1,7 @@
 # P20 — Performance & Scalability Roadmap
 
+> **Historical note.** Written before P20b removed the flow abstraction: `src/base/flow/` (`FlowBase`, `FlowOrchestrator`, `FlowSettings`) no longer exists. The orchestrator it describes is now [`src/base/task/orchestrator.ts`](../../../src/base/task/orchestrator.ts); references to the old paths below are kept as written and are no longer links.
+
 ## Goal
 
 P19 fixed keystroke-time React cost (memoized cells, sliced focus contexts, deferred
@@ -122,7 +124,7 @@ no durability during the run, and a stall when it finally fires.
 
 ### F5 — The orchestrator polls and scans 🟠
 
-[flow-orchestrator.ts](../../../src/base/flow/flow-orchestrator.ts):
+`flow-orchestrator.ts`:
 - `processTasks()` wakes every **100 ms** and calls `notifySubscribers()` at least
   twice per iteration whether or not anything changed — a permanent 10–20
   notifications/s heartbeat into React and into the `App.tsx` persist subscriber

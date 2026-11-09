@@ -1,6 +1,6 @@
 # Projects
 
-High-level technical projects needed to reach the target product described in the [root README](../../README.md) and [design screenshots](../designs/).
+High-level technical projects needed to reach the target product described in [TODO.md](../../TODO.md) ("Promised … but not built yet") and the [design screenshots](../designs/).
 
 These are not task lists — each project is a self-contained scope of work. Individual tasks are broken out in each project's subfolder.
 

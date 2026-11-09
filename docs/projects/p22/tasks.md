@@ -1,5 +1,7 @@
 # P22 — Soulseek Provider & Source Quality Honesty: Tasks
 
+> **Historical note.** The provider registration described below moved out of `musicDownloadFlow.ts` (removed by P20b) into `initMusicApp()` in [`src/flows/musicDownloadFlow/init.ts`](../../../src/flows/musicDownloadFlow/init.ts).
+
 ## Context
 
 **The product promise is "find the best audio source" — today there is only one source, and it isn't what it claims to be.**
@@ -56,7 +58,7 @@ _Depends on: T22.1_
 
 ### T22.4 — Register the provider
 
-- `this.downloadServiceRegistry.register("soulseek", SoulseekService)` in [musicDownloadFlow.ts](../../../src/flows/musicDownloadFlow/musicDownloadFlow.ts) — per the extensibility philosophy this should be the **only** core change; the download-mode column, settings row, and DownloadPanel provider grouping must appear automatically. Any place that needs a third change is an extensibility bug: fix the registry, not the call-site.
+- `this.downloadServiceRegistry.register("soulseek", SoulseekService)` in `musicDownloadFlow.ts` — per the extensibility philosophy this should be the **only** core change; the download-mode column, settings row, and DownloadPanel provider grouping must appear automatically. Any place that needs a third change is an extensibility bug: fix the registry, not the call-site.
 - Verify the P5 tree renders two provider groups and exclusive selection works across providers.
 
 _Depends on: T22.1, T22.2_

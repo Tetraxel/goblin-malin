@@ -1,12 +1,11 @@
 # TODO
 
-> State of 2026-11-08 (`main`, working towards **v0.2.0**).
+> State of 2026-11-09 (`main`, working towards **v0.2.0**).
 > IDs like `DL-01` or `DATA-04` point to [AUDIT-v0.2.0.md](AUDIT-v0.2.0.md), which has the evidence and the suggested fix for each.
 > Per-project roadmap: [docs/projects/](docs/projects/README.md) (`P24`, `P25`… below).
 
 ## 🔴 Release blockers (v0.2.0)
 
-- [ ] **Stop persisting `general.appDataDir`** — `cache/`, `bin/` and `app.log` follow a stale saved path instead of the live data folder — `DATA-04`
 - [ ] **Release 0.2.0** — bump `package.json` to `0.2.0`, rehearse with a `dry_run` of `release.yml`, then tag `v0.2.0` — `REL-02` (the pipeline itself is fixed; only action SHA-pinning is left, `REL-03`)
 - [ ] **MusicBrainz IDs never reach the saved file** — "Include MusicBrainz tags" setting (the option is hard-coded `false`), show the MB ID rows, set `MusicBrainzReleaseId` — `MD-03`, `P27/T27.4`
 - [ ] Status per service (Spotify, Ytdlp, etc...) instead of per task — `P25`
@@ -17,10 +16,6 @@
 
 **Bugs / safety**
 
-- [ ] A way to quit from the keyboard (`Ctrl+C` does nothing today): rebindable `Ctrl+Q` / double `Ctrl+C`, documented — `UI-02`
-- [ ] Pasting a URL into a text field opens the Import modal and also types it into the field: use Ink's `usePaste` — `UI-01`
-- [ ] Self-update must exit through `exitApp()`; handle `uncaughtException` / `SIGTERM` / `SIGHUP` so the terminal is restored and the session saved — `DATA-06`, `DATA-07`
-- [ ] Surface persistence failures, retry on exit, lock against a second instance — `DATA-05`
 - [ ] "Terminal too small" message below ~66 columns — `UI-06`
 
 **Product**
@@ -34,8 +29,6 @@
 
 **Housekeeping**
 
-- [ ] README: features, shortcuts, how to quit, data/log locations, privacy (update check, Songlink/Claude), troubleshooting — `DOC-03`
-- [ ] Delete or regenerate `docs/audit/*` (stale; `CLAUDE.md` tells agents to read it first) — `DOC-01`
 - [ ] `CHANGELOG.md` for 0.2.0, `.gitattributes`, licence check for the bundled audio samples — `DOC-07`
 - [ ] Dependencies left: `zod` advisory (waits for `ytmusic-api` on zod 4), ESLint 10 (waits for `eslint-plugin-react`; add `cause`s), TypeScript 7 (waits for `typescript-eslint`) — `DEP-02`, `DEP-03`
 - [ ] Get the unit tests green on Linux CI, then enable them there (they only run on Windows now)
@@ -67,6 +60,8 @@ Decide per release whether each is wanted.
 
 ## ✅ Done (removed from the lists above)
 
+- [x] **Data safety and quitting** — the data folder is derived and never stored (`DATA-04`); `Ctrl+Q` (rebindable `global.quit`) quits, asking first (`UI-02`); a link pasted into a focused text field stays there (`UI-01`); self-update exits through `exitApp()`, crash/signal handlers restore the terminal and save (`DATA-06`, `DATA-07`); write failures are surfaced, retried on close, and a second instance is locked out (`DATA-05`)
+- [x] **Docs** — README rewritten for v0.2.0 (`DOC-03`), `docs/audit/*` replaced by `docs/ARCHITECTURE.md` (`DOC-01`), dead links in `docs/projects/` fixed (`DOC-04`)
 - [x] **Tool downloads** — yt-dlp and ffmpeg are SHA-256-verified against the vendor's published list (a missing list only logs a warning; a mismatch deletes the file and fails), `mpv-setup.ts` uses `#utils/http` (mpv's vendor publishes no checksums), ffmpeg and ffprobe share one archive download — `DL-01`
 - [x] **Logging** — task id instead of the whole task, `Error`s serialised, previous session's log kept as `app.prev.log`, 10 MB cap — `DATA-10`
 - [x] Save the tasks to disk as sessions (+ archive)

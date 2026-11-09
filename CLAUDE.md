@@ -3,14 +3,14 @@
 ## Quick orientation
 
 - **What this is:** A keyboard-driven terminal UI (Ink/React) for downloading and tagging music tracks from streaming platforms.
-- **Current state:** Working POC for one pipeline — Spotify URL → YouTube search → yt-dlp download.
+- **Current state:** Working pipeline, heading to v0.2.0 — Spotify / YouTube links, albums and playlists → cross-platform discovery → yt-dlp / Soulseek download → tagged FLAC. See [README.md](README.md) for what a user gets and [TODO.md](TODO.md) for what is left.
     - Run the local script [scripts/TREE.ps1](scripts/TREE.ps1) to get the full project tree
-- **Target state:** See [README.md](README.md) and [docs/designs/](docs/designs/) (screenshots contain the most detail).
+- **Target state:** [docs/designs/](docs/designs/) (screenshots contain the most detail) and the "Promised … but not built yet" list in [TODO.md](TODO.md).
 
 ## Key documents
 
-- [docs/audit/README.md](docs/audit/README.md) — Codebase audit: architecture, data flow, file structure, what's active vs. disabled. Read this before exploring the codebase.
-- [docs/projects/README.md](docs/projects/README.md) — High-level technical projects needed to reach the target product.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — Short architecture map: layers, the task pipeline, provider registries, data on disk. Read this before exploring the codebase.
+- [docs/projects/README.md](docs/projects/README.md) — High-level technical projects (roadmap and history). Older projects may describe code that has since been removed; they say so at the top.
 
 ## Provider extensibility
 
@@ -59,6 +59,7 @@ yarn run dev  # start the TUI (use this)
 yarn run type-check  # Check typescript errors (src/, tests/ and the TUI harness)
 yarn run lint  # Check eslint errors (src/, tests/, scripts/)
 yarn run format:check  # Check prettier (yarn run format to fix)
+yarn test  # Vitest unit + e2e tests (yarn run test:coverage for unit coverage)
 ```
 
 ## TUI test harness
