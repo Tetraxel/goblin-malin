@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useSyncExternalStore } from "react";
 import { Box } from "ink";
 import { Footer } from "./Footer";
 import { TerminalTooSmall } from "./TerminalTooSmall";
 import { isTerminalTooSmall } from "#utils/terminalSize";
+import { introState } from "#utils/introState";
 import { Separator } from "./Separator";
 import { PromptModal } from "./PromptModal/PromptModal";
 import { ImportModal } from "./ImportModal/ImportModal";
@@ -48,6 +49,8 @@ export const AppInner: React.FC<{
     const theme = useTheme();
     const { pendingConfig, openConfirmModal, openConfirmModalWhenFree, handleConfirm, handleCancel } =
         useConfirmModal();
+    // Notices raised by background work wait for the welcome intro to close: they would land in its animation.
+    const introOpen = useSyncExternalStore(introState.subscribe, introState.isOpen);
     const tooSmall = isTerminalTooSmall(terminalWidth, terminalHeight);
     useQuitShortcut(openConfirmModal, pendingConfig, !tooSmall);
     const { pendingImport, openImportFlow, handleImportConfirm, handleImportCancel } = useImportFlow(openConfirmModal);
@@ -265,7 +268,7 @@ Check your internet connection, then try again.`,
                     <WelcomeModal terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
 
                     <ConfirmModal
-                        pendingConfig={pendingConfig}
+                        pendingConfig={introOpen ? null : pendingConfig}
                         terminalHeight={terminalHeight}
                         terminalWidth={terminalWidth}
                         onConfirm={handleConfirm}

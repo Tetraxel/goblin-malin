@@ -9,6 +9,7 @@ import { TOOLBAR_LOGO_CELL } from "../Toolbar/Toolbar";
 import { MpvMix } from "#utils/mpvMix";
 import { DirectPainter } from "./intro/directPainter";
 import { exitApp } from "#utils/exitApp";
+import { introState } from "#utils/introState";
 import { FINALE, type IntroOutro, renderIntroCanvas, T } from "./intro/introScene";
 import { INTRO_CUES, OUTRO_CUES, OUTRO_SONG_END, SOUND_VOLUME } from "./intro/introSounds";
 import { type TourOptions } from "./intro/tourShared";
@@ -79,6 +80,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ terminalHeight, term
         setClosingAt(null);
         startedAt.current = null;
         switchBack();
+        introState.close(); // the dialogs held back during the intro may show now
     }, [dontShowAgain, switchBack]);
 
     // First press plays the outro; a second press (or no animations) closes right away.

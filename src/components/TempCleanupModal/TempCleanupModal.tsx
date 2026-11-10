@@ -6,6 +6,7 @@ import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusActions } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { formatSize } from "#utils/formatBytes";
+import { introState } from "#utils/introState";
 import { Hint } from "../Hint";
 
 interface TempCleanupModalProps {
@@ -35,7 +36,9 @@ export const TempCleanupModal: React.FC<TempCleanupModalProps> = ({ terminalHeig
     const theme = useTheme();
     const { switchWindow, switchBack } = useFocusActions();
     const view = useSyncExternalStore(tempCleanupBridge.subscribe, tempCleanupBridge.get);
-    const open = view !== null;
+    // The start-up reminder must not land in the middle of the welcome intro: it waits for the intro to close.
+    const introOpen = useSyncExternalStore(introState.subscribe, introState.isOpen);
+    const open = view !== null && !introOpen;
 
     useEffect(() => {
         tempCleanupBridge.setMounted(true);
@@ -111,7 +114,7 @@ export const TempCleanupModal: React.FC<TempCleanupModalProps> = ({ terminalHeig
         ],
     });
 
-    if (!view) return null;
+    if (!view || !open) return null;
 
     const modalWidth = Math.min(64, Math.max(40, terminalWidth - 10));
     const accent =
