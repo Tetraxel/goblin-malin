@@ -203,7 +203,10 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ terminalHeight, term
             if (!painter.ready || !clockReady.current) return;
             painter.paint(renderIntroCanvas(elapsed(), terminalWidth, sceneRows, FOOTER_ROWS, optionsRef.current));
         }, FRAME_MS);
-        return () => clearInterval(timer);
+        return () => {
+            clearInterval(timer);
+            painter.dispose();
+        };
     }, [painting, stdout, elapsed, terminalWidth, sceneRows]);
 
     const outro: IntroOutro | undefined = useMemo(
