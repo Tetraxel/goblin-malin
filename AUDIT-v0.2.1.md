@@ -1,63 +1,85 @@
-# Goblin Malin — pre-release audit for `v0.2.0`
+# Goblin Malin — pre-release audit for `v0.2.1`
 
-- [Goblin Malin — pre-release audit for `v0.2.0`](#goblin-malin--pre-release-audit-for-v020)
+- [Goblin Malin — pre-release audit for `v0.2.1`](#goblin-malin--pre-release-audit-for-v021)
     - [1. Read this first](#1-read-this-first)
         - [Counts](#counts)
         - [Already fixed](#already-fixed)
     - [2. Findings](#2-findings)
         - [A. Build, release \& packaging](#a-build-release--packaging)
             - [REL-02 — `package.json` says `0.1.15`, but nothing was ever released under that number (registry is at `0.1.14`)](#rel-02--packagejson-says-0115-but-nothing-was-ever-released-under-that-number-registry-is-at-0114)
+            - [REL-08 — A pre-release build is never told about the final release](#rel-08--a-pre-release-build-is-never-told-about-the-final-release)
         - [B. Dependencies \& supply chain](#b-dependencies--supply-chain)
             - [⏳ DEP-02 — `yarn audit`: 1 advisory left (`zod` via `ytmusic-api`), no fix available](#-dep-02--yarn-audit-1-advisory-left-zod-via-ytmusic-api-no-fix-available)
             - [⏳ DEP-03 — Outdated dependencies: two majors deferred](#-dep-03--outdated-dependencies-two-majors-deferred)
         - [C. Data safety, persistence \& state](#c-data-safety-persistence--state)
             - [❌ DATA-09 — About 460 MB of tool binaries live under `%APPDATA%` (Roaming)](#-data-09--about-460-mb-of-tool-binaries-live-under-appdata-roaming)
+        - [D. Download, save \& tagging](#d-download-save--tagging)
+            - [DL-02 — A failed FLAC tag write is reported as "Saved"](#dl-02--a-failed-flac-tag-write-is-reported-as-saved)
+            - [DL-03 — Two tasks can own the same saved file](#dl-03--two-tasks-can-own-the-same-saved-file)
+            - [DL-04 — Replacing an existing file is not safe if the copy or the tagging fails](#dl-04--replacing-an-existing-file-is-not-safe-if-the-copy-or-the-tagging-fails)
+            - [DL-05 — Two saves of the same track can run at once](#dl-05--two-saves-of-the-same-track-can-run-at-once)
+            - [DL-06 — FLAC re-tagging keeps stale tag values](#dl-06--flac-re-tagging-keeps-stale-tag-values)
+            - [DL-07 — The automatic file name is cleaned less than a typed one](#dl-07--the-automatic-file-name-is-cleaned-less-than-a-typed-one)
+            - [DL-08 — Parallel yt-dlp runs share one `cookies.txt`](#dl-08--parallel-yt-dlp-runs-share-one-cookiestxt)
         - [E. Metadata \& discovery](#e-metadata--discovery)
             - [MD-03 — MusicBrainz IDs can never be written to a saved file](#md-03--musicbrainz-ids-can-never-be-written-to-a-saved-file)
             - [MD-04 — Provider-key branching in core code contradicts the extensibility rule; hardcoded Spotify market](#md-04--provider-key-branching-in-core-code-contradicts-the-extensibility-rule-hardcoded-spotify-market)
+            - [MD-05 — The Claude provider can't start an npm-installed Claude CLI on Windows](#md-05--the-claude-provider-cant-start-an-npm-installed-claude-cli-on-windows)
+        - [F. UI \& terminal](#f-ui--terminal)
+            - [UI-08 — Every mpv restart adds one more `process` exit listener](#ui-08--every-mpv-restart-adds-one-more-process-exit-listener)
         - [G. Security](#g-security)
             - [❌ SEC-02 — A copy of the secrets file sits in the repository root (kept on purpose)](#-sec-02--a-copy-of-the-secrets-file-sits-in-the-repository-root-kept-on-purpose)
         - [I. Docs, instructions \& repository hygiene](#i-docs-instructions--repository-hygiene)
             - [❌ DOC-06 — Project rules in `.claude/CLAUDE.md` are git-ignored](#-doc-06--project-rules-in-claudeclaudemd-are-git-ignored)
         - [J. Product \& UX](#j-product--ux)
             - [PROD-04 — No cover art is ever embedded](#prod-04--no-cover-art-is-ever-embedded)
+            - [PROD-05 — An imported playlist fetches and runs its tracks without Run](#prod-05--an-imported-playlist-fetches-and-runs-its-tracks-without-run)
+            - [PROD-06 — A failing live playlist is retried every 5 s](#prod-06--a-failing-live-playlist-is-retried-every-5-s)
         - [K. Candidates to verify (found while reading, not confirmed)](#k-candidates-to-verify-found-while-reading-not-confirmed)
     - [3. Verified OK (checked, no problem)](#3-verified-ok-checked-no-problem)
     - [4. Coverage \& limits](#4-coverage--limits)
     - [5. Side effects of this audit](#5-side-effects-of-this-audit)
 
-|             |                                                                                                                                                                                                            |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Date**    | 2026-11-08                                                                                                                                                                                                 |
-| **Audited** | `main` @ `4db1d64` (package version `0.1.15`; npm `latest` is `0.1.14`)                                                                                                                                    |
-| **Method**  | Static review + dependency/registry checks + headless TUI scenarios + throw-away repro scripts. Everything marked _verified_ was reproduced or proven from the exact code path.                            |
-| **Auditor** | Claude (orchestrator) + 8 sub-agents (Sonnet 5.5, max effort). **The sub-agents were cut off by the account's 5-hour rate limit (resets 17:40 Paris time)**, see [Coverage & limits](#4-coverage--limits). |
-| **Status**  | Findings that have been fixed were removed from this file: what is left is open. (Side effects of the audit are listed at the very end.)                                                                   |
+|             |                                                                                                                                                                                                                                                                                                                                    |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Date**    | 2026-11-08                                                                                                                                                                                                                                                                                                                         |
+| **Audited** | `main` @ `4db1d64` (package version `0.1.15`; npm `latest` is `0.1.14`)                                                                                                                                                                                                                                                            |
+| **Pass 2**  | 2026-11-10, `main` @ `0cc2e2e` (package version `0.2.0`): static review of the areas section 4 listed as not covered (save/tagging, file names, collections and live refresh, the Claude CLI spawn, mpv, the updater, `deepMerge`, zip extraction). Added DL-02…DL-08, MD-05, UI-08, REL-08, PROD-05, PROD-06; nothing reproduced. |
+| **Method**  | Static review + dependency/registry checks + headless TUI scenarios + throw-away repro scripts. Everything marked _verified_ was reproduced or proven from the exact code path.                                                                                                                                                    |
+| **Auditor** | Claude (orchestrator) + 8 sub-agents (Sonnet 5.5, max effort). **The sub-agents were cut off by the account's 5-hour rate limit (resets 17:40 Paris time)**, see [Coverage & limits](#4-coverage--limits).                                                                                                                         |
+| **Status**  | Findings that have been fixed were removed from this file: what is left is open. (Side effects of the audit are listed at the very end.)                                                                                                                                                                                           |
 
 ---
 
 ## 1. Read this first
 
-The two blockers found here — `yarn build` failing, and a fresh install unable to bootstrap ffmpeg/ffprobe — are **fixed** and gone from this file, like every other finding that was fully fixed (see [Already fixed](#already-fixed)). What `v0.2.0` still needs, in the order I would fix it:
+The two blockers found here — `yarn build` failing, and a fresh install unable to bootstrap ffmpeg/ffprobe — are **fixed** and gone from this file, like every other finding that was fully fixed (see [Already fixed](#already-fixed)). `v0.2.0` has been cut; this file now tracks `v0.2.1`. What it still needs, in the order I would fix it:
 
-| #   | ID                | Sev. | One-liner                                                                     |
-| --- | ----------------- | ---- | ----------------------------------------------------------------------------- |
-| 1   | [DEP-02](#dep-02) | low  | 1 `yarn audit` advisory left (`zod` via `ytmusic-api`); it waits for upstream |
+| #   | ID                  | Sev.   | One-liner                                                                     |
+| --- | ------------------- | ------ | ----------------------------------------------------------------------------- |
+| 1   | [DL-02](#dl-02)     | high   | A failed FLAC tag write is reported as "Saved"                                |
+| 2   | [PROD-05](#prod-05) | medium | An imported playlist fetches and runs its tracks without Run                  |
+| 3   | [PROD-06](#prod-06) | medium | A failing live playlist is retried every 5 s                                  |
+| 4   | [DL-03](#dl-03)     | medium | Two tasks can own the same saved file                                         |
+| 5   | [DL-04](#dl-04)     | medium | Replacing an existing file is not safe if the copy or the tagging fails       |
+| 6   | [DEP-02](#dep-02)   | low    | 1 `yarn audit` advisory left (`zod` via `ytmusic-api`); it waits for upstream |
 
 ### Counts
 
 <!-- COUNTS-TABLE -->
 
-| Area                                       | blocker |  high | medium |   low | total |
-| ------------------------------------------ | ------: | ----: | -----: | ----: | ----: |
-| Build, release & packaging (`REL-`)        |         |       |        |     1 |     1 |
-| Dependencies & supply chain (`DEP-`)       |         |       |        |     2 |     2 |
-| Data safety, persistence & state (`DATA-`) |         |       |      1 |       |     1 |
-| Metadata & discovery (`MD-`)               |         |       |      1 |     1 |     2 |
-| Security (`SEC-`)                          |         |       |        |     1 |     1 |
-| Docs, instructions & hygiene (`DOC-`)      |         |       |        |     1 |     1 |
-| Product & UX (`PROD-`)                     |         |       |      1 |       |     1 |
-| **Total**                                  |   **0** | **0** |  **3** | **6** | **9** |
+| Area                                       | blocker |  high | medium |    low |  total |
+| ------------------------------------------ | ------: | ----: | -----: | -----: | -----: |
+| Build, release & packaging (`REL-`)        |         |       |        |      2 |      2 |
+| Dependencies & supply chain (`DEP-`)       |         |       |        |      2 |      2 |
+| Data safety, persistence & state (`DATA-`) |         |       |      1 |        |      1 |
+| Download, save & tagging (`DL-`)           |         |     1 |      2 |      4 |      7 |
+| Metadata & discovery (`MD-`)               |         |       |      1 |      2 |      3 |
+| UI & terminal (`UI-`)                      |         |       |        |      1 |      1 |
+| Security (`SEC-`)                          |         |       |        |      1 |      1 |
+| Docs, instructions & hygiene (`DOC-`)      |         |       |        |      1 |      1 |
+| Product & UX (`PROD-`)                     |         |       |      3 |        |      3 |
+| **Total**                                  |   **0** | **1** |  **7** | **13** | **21** |
 
 Plus 8 unconfirmed candidates in [section K](#k-candidates-to-verify-found-while-reading-not-confirmed) (not counted).
 
@@ -65,7 +87,7 @@ Plus 8 unconfirmed candidates in [section K](#k-candidates-to-verify-found-while
 
 ### Already fixed
 
-Removed from this file once fixed and committed (what was found, the fix and how it was checked are in the file's git history: `git log -p -- AUDIT-v0.2.0.md`): **REL-01** (`yarn build`), **REL-04** (`engines`), **REL-05** (`postinstall`), **DEP-01** (unused dependencies), **DATA-01** ("Clear temporary downloads"), **DATA-02** and **DATA-03** (`sessions.json` / `settings.json` validation, quarantine, `.bak`, versioning), **DATA-04** (the data folder is derived, never stored), **DATA-05** (visible write failures, bounded retry on close, unique temp names, one instance per data folder), **DATA-06** (self-update exits through `exitApp()`), **DATA-07** (crash/signal handlers restore the terminal and save; console patch moved to the entry points), **MD-01** (confidence normalisation keeps every script and strips only accents; empty names score 0; live/remix/karaoke/cover versions are penalised; `tests/unit/confidence.test.ts`), **MD-02** (scraped Spotify answers are never cached; "nothing found" discovery results are kept 1 day, not 90; concurrent identical calls share one request; `tests/unit/cache.test.ts` — caches written before the fix may still hold old entries until they expire or "Clear cache"), **REL-06** (no more `prepack`/`postpack`: the README carries absolute image URLs, `patch-readme.mjs` is gone), **SEC-01** (`openUrl` spawns the native opener with an argv array — no shell, http(s) only; the updater takes a program + args from `getUpdateArgv`, with the version validated as semver, and uses a shell only on Windows for the `.cmd` shims; `tests/unit/shellSafety.test.ts`), **UI-01** (a link pasted into a focused text field stays in the field; scheme-less links and `spotify:` URIs are understood), **UI-02** (`Ctrl+Q`, rebindable `global.quit`, asks first; a second press quits at once), **DOC-02** (`.env.example`), **DOC-05** (`TODO.md`), **DOC-07** (`CHANGELOG.md`, `.gitattributes` with `* text=auto eol=lf`, `.nvmrc`, `SECURITY.md`, `homepage`/`bugs` in `package.json`; the README already states the licence terms, and `"license": "SEE LICENSE IN LICENSE"` stays because Yarn rejects the PolyForm SPDX id; the Splice licence of the audio samples and the untracked root notes are the owner's to handle, not tracked), **DOC-01** (`docs/audit/*` is deleted; `docs/ARCHITECTURE.md` is a short, current map and `CLAUDE.md` points to it), **DOC-03** (the README has the feature list, install notes per OS, first run, the keyboard table, how to quit, data and log locations per OS, `GOBLIN_DATA_DIR`, privacy, troubleshooting and the licence; `yarn global add` is flagged as Yarn 1 only), **DOC-04** (`docs/projects/p20`, `p20b` and `p22` no longer link to removed files and carry a historical note; a link checker over all the markdown files finds no other dead link), **PROD-02** (dotenv banner), **PROD-03** (Settings → Download → "Convert every download to one audio format", on by default and set to FLAC so nothing changes for existing users; the format can be FLAC, MP3 320, Ogg, Opus or M4A, and turned off each track keeps the format it was downloaded in — yt-dlp then keeps YouTube's own codec instead of wrapping it in a FLAC. Conversion is one ffmpeg step at save time (`convertAudio.ts`, `planSave` in `outputFormat.ts`), so changing the setting applies to the next save without downloading again and an update replaces a file saved in another format; tags are written per format (`tagAudioFile.ts`); the saved row shows what was written (`FLAC*`, `MP3 320`). It also fixes a Soulseek MP3 being copied to a `.flac` name; `tests/unit/outputFormat.test.ts`, `convertAudio.test.ts` — the latter runs the real ffmpeg and is skipped without one in `data/bin`. A review of the change led to: the files a save replaces are deleted only after the new one is written and tagged; a re-save tags in place before it renames; a half-copied output and a crashed conversion's leftover are no longer kept or reused; and the saved file is now the task's own record (`savedFile`, with the provider, source metadata and file info it was made from) instead of a flag on a download row, so restarting, re-downloading or retrying a provider can no longer drop it, `tests/unit/savedSource.test.ts`. Left open, in `TODO.md`: saving can't be cancelled, an untagged format is reported as saved, and `saveTrack` has no unit test of its own), **DATA-08** (temporary downloads are cleaned by how recently a session used them — manual age picker, start-up reminder, opt-in 48 h auto-clean, size row in Settings, sources marked "File not found" after a clean-up; the dead `autoDeleteTempAfter24h`, `autoSaveToOutputDir` and `autoRelocateMissingFiles` settings are gone; moving the default folder out of the Music library and deleting unselected candidates after a save are in `TODO.md`), the ffmpeg/ffprobe bootstrap bug and then the rest of **DL-01** (yt-dlp and ffmpeg downloads are SHA-256-verified when the vendor publishes a checksum list and only warn when it can't be fetched; mpv, whose vendor publishes none, is not verified; `mpv-setup.ts` is on `#utils/http`; ffmpeg and ffprobe share one archive download), **DATA-10** (the log file gets a task id instead of the whole task, `Error`s are serialised, and the previous session's log is kept as `app.prev.log` instead of being truncated; 10 MB cap per file), and most of **DEP-02** / **DEP-03** (`yarn audit` 97 → 1: every minor/patch bump plus a refresh of the transitive dependencies clears the `axios`, `ws`, `vite`, `js-yaml`, babel chains without any `resolutions`; `adm-zip` 0.6.1, which ships its own types so `@types/adm-zip` is gone; `ink` 8 (no more `ws`; two type-only fixes for its generic `stdout`), `react` 19.3, `musicbrainz-api` 2 (checked live: ISRC search, name search, lookup), `vitest` 5 (with `vite` now declared, it is no longer bundled), `tsup` 9 (`esbuild` 0.28), `dotenv` 18, `strip-ansi` 7, `@types/node` 26, `slsk-client` 2 (a new promise-based API: `SoulseekService` ported, its own typings replace `src/types/slsk-client.d.ts`; downloads are now really cancelled, so the abandon-and-sweep-orphan-files workaround is gone, and rows show download progress); one dev-only `resolutions` entry moves `@typescript-eslint/typescript-estree`'s `minimatch` to 11), and **REL-07** (the hidden swc build path is gone: `emitDecoratorMetadata` is off — nothing read `design:*` metadata — so tsup no longer loads `@swc/core`, which is removed; `@typescript-eslint/consistent-type-imports` is an error in `yarn lint` (the ~360 existing violations were auto-fixed to `import type`), and `yarn check:utf8` (`scripts/check-utf8.mjs`) runs in CI before the build; and, before that, the Windows exe was dropped — `npm install -g goblin-malin` is the only install path: `build-sea.mjs`, `package:win`, `postject`, the `pkg`-era `patch-pkg-compat.mjs` and the release workflow's exe job are gone, the update modal lost its exe branch; the exe build had been broken since `a4266c0` anyway, top-level `await` in `src/cli.ts`). Also fixed: **UI-06** (below 66×16 the interface is replaced by one line, "Terminal too small — need at least 66×16 (now W×H)"; the hooks, shortcuts and modals stay mounted underneath, so quitting still works and the screen comes back on resize; the limits and the message are in `src/utils/terminalSize.ts`, `tests/unit/terminalSize.test.ts` — checked in the TUI harness at 60×20, 100×12 and 100×30; progressively hiding the SPOTIFY/YOUTUBE/MB columns was not done), **UI-03** (the import clipboard is read asynchronously through `clipboardy`, with a visible message when it is empty or unreadable), **UI-04** (the read-only settings row keeps its label and truncates only the value), **UI-05** (the empty-state hint shows the live `global.import` binding) and **UI-07** (the task cursor is clamped and stale multi-selected ids are pruned whenever the task list changes; `tests/unit/reconcileTaskSelection.test.ts`). **TEST-01** (`yarn type-check` also checks `tests/` and the TUI harness through `scripts/tui-test/tsconfig.json`; `yarn lint` and `yarn format:check` cover `tests/` and `scripts/`, and CI runs `format:check`; Prettier now keeps each file's line endings, so Windows checkouts are no longer all "wrong"; the harness type-check had been broken for aliases and `__APP_VERSION__`, and linting the tests found Windows paths such as `"C:	mp.flac"` written with single backslashes, i.e. with a tab and a bell in them). **TEST-02** (every TUI scenario, e2e tests included, runs on a throwaway copy of its fixture in a temp folder, with the music folders pointed inside the copy: the real data folder, the tracked fixtures and `~/Music` are never touched, and the e2e tests that failed on a clean `main` because of the "temporary downloads" dialog now pass; a scenario without `dataDir` starts from `fixtures/empty`; `GOBLIN_TUI_KEEP_DATA=1` keeps the copy), **TEST-03** (`navigate-settings.json` presses → three times and asserts on `Search settings`, text only the modal shows), **TEST-05** (new tests for the shortcut registry and `matchesShortcut`, the updater — `isNewer`, `checkForUpdate`, installer detection — `envFile`, `useFocusManager` and `useDebouncedValue`; a `mountHook` helper runs a hook in a headless Ink tree; `yarn test:coverage` prints a coverage summary and CI runs it with the unit tests; no threshold is enforced). **TEST-04** (the harness emulator loads `@xterm/addon-unicode11` and switches to Unicode 11 widths, so emoji take 2 cells as in the app: the toolbar row of a harness snapshot no longer ends in a spurious `││`; checked on `collection-import.json` before and after). **REL-03** (every action in `ci.yml` and `release.yml` is pinned to a full commit SHA with its version as a comment, within the major already in use — `checkout` and `setup-node` v4.4.0, `action-gh-release` v2.6.2; `.github/dependabot.yml` bumps them monthly through the `github-actions` ecosystem only, npm dependencies stay manual; the pinned release workflow still has to be rehearsed with a `dry_run`, see REL-02). Findings that were only partly fixed (**DEP-02**, **DEP-03**) keep just the part that is still open.
+Removed from this file once fixed and committed (what was found, the fix and how it was checked are in the file's git history: `git log --follow -p -- AUDIT-v0.2.1.md`; it was `AUDIT-v0.2.0.md` until v0.2.0 was cut): **REL-01** (`yarn build`), **REL-04** (`engines`), **REL-05** (`postinstall`), **DEP-01** (unused dependencies), **DATA-01** ("Clear temporary downloads"), **DATA-02** and **DATA-03** (`sessions.json` / `settings.json` validation, quarantine, `.bak`, versioning), **DATA-04** (the data folder is derived, never stored), **DATA-05** (visible write failures, bounded retry on close, unique temp names, one instance per data folder), **DATA-06** (self-update exits through `exitApp()`), **DATA-07** (crash/signal handlers restore the terminal and save; console patch moved to the entry points), **MD-01** (confidence normalisation keeps every script and strips only accents; empty names score 0; live/remix/karaoke/cover versions are penalised; `tests/unit/confidence.test.ts`), **MD-02** (scraped Spotify answers are never cached; "nothing found" discovery results are kept 1 day, not 90; concurrent identical calls share one request; `tests/unit/cache.test.ts` — caches written before the fix may still hold old entries until they expire or "Clear cache"), **REL-06** (no more `prepack`/`postpack`: the README carries absolute image URLs, `patch-readme.mjs` is gone), **SEC-01** (`openUrl` spawns the native opener with an argv array — no shell, http(s) only; the updater takes a program + args from `getUpdateArgv`, with the version validated as semver, and uses a shell only on Windows for the `.cmd` shims; `tests/unit/shellSafety.test.ts`), **UI-01** (a link pasted into a focused text field stays in the field; scheme-less links and `spotify:` URIs are understood), **UI-02** (`Ctrl+Q`, rebindable `global.quit`, asks first; a second press quits at once), **DOC-02** (`.env.example`), **DOC-05** (`TODO.md`), **DOC-07** (`CHANGELOG.md`, `.gitattributes` with `* text=auto eol=lf`, `.nvmrc`, `SECURITY.md`, `homepage`/`bugs` in `package.json`; the README already states the licence terms, and `"license": "SEE LICENSE IN LICENSE"` stays because Yarn rejects the PolyForm SPDX id; the Splice licence of the audio samples and the untracked root notes are the owner's to handle, not tracked), **DOC-01** (`docs/audit/*` is deleted; `docs/ARCHITECTURE.md` is a short, current map and `CLAUDE.md` points to it), **DOC-03** (the README has the feature list, install notes per OS, first run, the keyboard table, how to quit, data and log locations per OS, `GOBLIN_DATA_DIR`, privacy, troubleshooting and the licence; `yarn global add` is flagged as Yarn 1 only), **DOC-04** (`docs/projects/p20`, `p20b` and `p22` no longer link to removed files and carry a historical note; a link checker over all the markdown files finds no other dead link), **PROD-02** (dotenv banner), **PROD-03** (Settings → Download → "Convert every download to one audio format", on by default and set to FLAC so nothing changes for existing users; the format can be FLAC, MP3 320, Ogg, Opus or M4A, and turned off each track keeps the format it was downloaded in — yt-dlp then keeps YouTube's own codec instead of wrapping it in a FLAC. Conversion is one ffmpeg step at save time (`convertAudio.ts`, `planSave` in `outputFormat.ts`), so changing the setting applies to the next save without downloading again and an update replaces a file saved in another format; tags are written per format (`tagAudioFile.ts`); the saved row shows what was written (`FLAC*`, `MP3 320`). It also fixes a Soulseek MP3 being copied to a `.flac` name; `tests/unit/outputFormat.test.ts`, `convertAudio.test.ts` — the latter runs the real ffmpeg and is skipped without one in `data/bin`. A review of the change led to: the files a save replaces are deleted only after the new one is written and tagged; a re-save tags in place before it renames; a half-copied output and a crashed conversion's leftover are no longer kept or reused; and the saved file is now the task's own record (`savedFile`, with the provider, source metadata and file info it was made from) instead of a flag on a download row, so restarting, re-downloading or retrying a provider can no longer drop it, `tests/unit/savedSource.test.ts`. Left open, in `TODO.md`: saving can't be cancelled, an untagged format is reported as saved, and `saveTrack` has no unit test of its own), **DATA-08** (temporary downloads are cleaned by how recently a session used them — manual age picker, start-up reminder, opt-in 48 h auto-clean, size row in Settings, sources marked "File not found" after a clean-up; the dead `autoDeleteTempAfter24h`, `autoSaveToOutputDir` and `autoRelocateMissingFiles` settings are gone; moving the default folder out of the Music library and deleting unselected candidates after a save are in `TODO.md`), the ffmpeg/ffprobe bootstrap bug and then the rest of **DL-01** (yt-dlp and ffmpeg downloads are SHA-256-verified when the vendor publishes a checksum list and only warn when it can't be fetched; mpv, whose vendor publishes none, is not verified; `mpv-setup.ts` is on `#utils/http`; ffmpeg and ffprobe share one archive download), **DATA-10** (the log file gets a task id instead of the whole task, `Error`s are serialised, and the previous session's log is kept as `app.prev.log` instead of being truncated; 10 MB cap per file), and most of **DEP-02** / **DEP-03** (`yarn audit` 97 → 1: every minor/patch bump plus a refresh of the transitive dependencies clears the `axios`, `ws`, `vite`, `js-yaml`, babel chains without any `resolutions`; `adm-zip` 0.6.1, which ships its own types so `@types/adm-zip` is gone; `ink` 8 (no more `ws`; two type-only fixes for its generic `stdout`), `react` 19.3, `musicbrainz-api` 2 (checked live: ISRC search, name search, lookup), `vitest` 5 (with `vite` now declared, it is no longer bundled), `tsup` 9 (`esbuild` 0.28), `dotenv` 18, `strip-ansi` 7, `@types/node` 26, `slsk-client` 2 (a new promise-based API: `SoulseekService` ported, its own typings replace `src/types/slsk-client.d.ts`; downloads are now really cancelled, so the abandon-and-sweep-orphan-files workaround is gone, and rows show download progress); one dev-only `resolutions` entry moves `@typescript-eslint/typescript-estree`'s `minimatch` to 11), and **REL-07** (the hidden swc build path is gone: `emitDecoratorMetadata` is off — nothing read `design:*` metadata — so tsup no longer loads `@swc/core`, which is removed; `@typescript-eslint/consistent-type-imports` is an error in `yarn lint` (the ~360 existing violations were auto-fixed to `import type`), and `yarn check:utf8` (`scripts/check-utf8.mjs`) runs in CI before the build; and, before that, the Windows exe was dropped — `npm install -g goblin-malin` is the only install path: `build-sea.mjs`, `package:win`, `postject`, the `pkg`-era `patch-pkg-compat.mjs` and the release workflow's exe job are gone, the update modal lost its exe branch; the exe build had been broken since `a4266c0` anyway, top-level `await` in `src/cli.ts`). Also fixed: **UI-06** (below 66×16 the interface is replaced by one line, "Terminal too small — need at least 66×16 (now W×H)"; the hooks, shortcuts and modals stay mounted underneath, so quitting still works and the screen comes back on resize; the limits and the message are in `src/utils/terminalSize.ts`, `tests/unit/terminalSize.test.ts` — checked in the TUI harness at 60×20, 100×12 and 100×30; progressively hiding the SPOTIFY/YOUTUBE/MB columns was not done), **UI-03** (the import clipboard is read asynchronously through `clipboardy`, with a visible message when it is empty or unreadable), **UI-04** (the read-only settings row keeps its label and truncates only the value), **UI-05** (the empty-state hint shows the live `global.import` binding) and **UI-07** (the task cursor is clamped and stale multi-selected ids are pruned whenever the task list changes; `tests/unit/reconcileTaskSelection.test.ts`). **TEST-01** (`yarn type-check` also checks `tests/` and the TUI harness through `scripts/tui-test/tsconfig.json`; `yarn lint` and `yarn format:check` cover `tests/` and `scripts/`, and CI runs `format:check`; Prettier now keeps each file's line endings, so Windows checkouts are no longer all "wrong"; the harness type-check had been broken for aliases and `__APP_VERSION__`, and linting the tests found Windows paths such as `"C:	mp.flac"` written with single backslashes, i.e. with a tab and a bell in them). **TEST-02** (every TUI scenario, e2e tests included, runs on a throwaway copy of its fixture in a temp folder, with the music folders pointed inside the copy: the real data folder, the tracked fixtures and `~/Music` are never touched, and the e2e tests that failed on a clean `main` because of the "temporary downloads" dialog now pass; a scenario without `dataDir` starts from `fixtures/empty`; `GOBLIN_TUI_KEEP_DATA=1` keeps the copy), **TEST-03** (`navigate-settings.json` presses → three times and asserts on `Search settings`, text only the modal shows), **TEST-05** (new tests for the shortcut registry and `matchesShortcut`, the updater — `isNewer`, `checkForUpdate`, installer detection — `envFile`, `useFocusManager` and `useDebouncedValue`; a `mountHook` helper runs a hook in a headless Ink tree; `yarn test:coverage` prints a coverage summary and CI runs it with the unit tests; no threshold is enforced). **TEST-04** (the harness emulator loads `@xterm/addon-unicode11` and switches to Unicode 11 widths, so emoji take 2 cells as in the app: the toolbar row of a harness snapshot no longer ends in a spurious `││`; checked on `collection-import.json` before and after). **REL-03** (every action in `ci.yml` and `release.yml` is pinned to a full commit SHA with its version as a comment, within the major already in use — `checkout` and `setup-node` v4.4.0, `action-gh-release` v2.6.2; `.github/dependabot.yml` bumps them monthly through the `github-actions` ecosystem only, npm dependencies stay manual; the pinned release workflow still has to be rehearsed with a `dry_run`, see REL-02). Findings that were only partly fixed (**DEP-02**, **DEP-03**) keep just the part that is still open.
 
 ---
 
@@ -85,6 +107,16 @@ Legend — **Severity** (for a v0.2.0 release): `blocker` data loss / crash in a
 - **What:** npm `latest` is `0.1.14` (published 2026-06-18); GitHub releases stop at `v0.1.14`. The only Actions run for tag `v0.1.15` ended `failure` (annotation: `src/index.tsx … 'typeof globalThis' has no index signature`, a build break that is since fixed). _Update: the owner has since deleted the `v0.1.15` tag, which removes the "burnt tag" problem; the failed run stays in the Actions history, which is harmless._ 31 commits (≈ 233 files, +14k/−1.4k lines) have landed since `0.1.14`, so users on npm/the exe are ~4.5 months behind `main`.
 - **Impact:** only a version-number inconsistency now: a local checkout reports `0.1.15` (and `APP_VERSION`/the update check use it) while the registry is at `0.1.14`.
 - **Fix:** bump to `0.2.0` in the release commit and tag `v0.2.0` only after a green dry-run. Also check what the in-app updater does for users whose installed version is higher than the latest release.
+
+<a id="rel-08"></a>
+
+#### REL-08 — A pre-release build is never told about the final release
+
+**low · updater · verified by reading**
+
+- **Where:** `src/updater/updateChecker.ts:9-16` (`isNewer`).
+- **What:** each part of the version goes through `Number()`, so the patch of `0.2.1-beta.1` (`"1-beta"`) becomes `NaN`. Every comparison with `NaN` is false: someone running `0.2.1-beta.1` is never offered `0.2.1`. Only matters if pre-releases are ever published.
+- **Fix:** compare with a semver parser (or strip the pre-release part and treat "same core, local has a pre-release tag" as older).
 
 ### B. Dependencies & supply chain
 
@@ -123,6 +155,78 @@ Everything else is on its latest version. Left, each tried and backed out:
 - **What:** `data/bin` on the dev machine: `ffmpeg` 163 MB + `ffprobe` 163 MB (the full GPL build ships both at full size) + `mpv` 113 MB + `yt-dlp` 23 MB, with date-stamped file names. On roaming-profile / OneDrive-redirected setups ~0.5 GB of executables gets synced; `%LOCALAPPDATA%` is the right place for binaries and caches. (The real installed-app folder `%APPDATA%/goblin-malin/bin` already holds 270 MB.)
 - **Fix:** `%LOCALAPPDATA%` / `~/Library/Caches` / `$XDG_CACHE_HOME` for `bin/` and `cache/`; consider an audio-only ffmpeg build or the system ffmpeg; document the footprint.
 
+### D. Download, save & tagging
+
+<a id="dl-02"></a>
+
+#### DL-02 — A failed FLAC tag write is reported as "Saved"
+
+**high · data · verified by reading**
+
+- **Where:** `src/utils/metadata.ts:24-79` (`cleanAndTagFlac`), called by `src/flows/musicDownloadFlow/utils/tagAudioFile.ts:117`.
+- **What:** `tagAudioFile` says "a failure here is thrown, so the save is reported as failed instead of leaving an untagged file that looks saved". That is true for MP3, Ogg, Opus and M4A, but FLAC — the default format — goes through `cleanAndTagFlac`, which catches every error of both its steps and only logs it. When step 1 (`NodeId3.removeTags`) throws, it returns before writing any tag. `saveTrack` then sets "Saved" and records `savedFile.tags` as if they had been written. No test covers this path.
+- **Fix:** rethrow from both `catch` blocks (or have `tagAudioFile` call a throwing FLAC writer); add a test with a file that is not a valid FLAC.
+
+<a id="dl-03"></a>
+
+#### DL-03 — Two tasks can own the same saved file
+
+**medium · data · verified by reading**
+
+- **Where:** `src/flows/musicDownloadFlow/utils/downloadTask.ts:1014` (the overwrite confirm), `:1038` (re-tag in place), `:1063` (delete the replaced file).
+- **What:** task A saves `X - Y.flac`. Task B has the same artist and title; the user agrees to replace the file and B overwrites it. A's `savedFile.path` still points at it. From then on A treats B's file as its own: re-saving A in place (`reuse`) writes A's tags into it, saving A under a new name deletes it (`existingSavedPath`), and saving A from another download overwrites it without asking (`isOutputPathTaken` ignores the task's own path).
+- **Fix:** when a replace is confirmed, clear `savedFile` on any other task whose saved path is the same (`samePath`), or refuse to save over a file another task owns.
+
+<a id="dl-04"></a>
+
+#### DL-04 — Replacing an existing file is not safe if the copy or the tagging fails
+
+**medium · data · verified by reading**
+
+- **Where:** `src/flows/musicDownloadFlow/utils/downloadTask.ts:1029-1059`, `:1098-1100`.
+- **What:** without conversion the download is copied straight over the file the user agreed to replace (`fs.copyFile(downloadPath, outputPath)`). If the copy stops half-way, the truncated file is kept on purpose (`outputExisted`). If the copy succeeds and the tagging then fails, `outputCreated` is true and the `catch` deletes `outputPath` — by then the user's file is gone either way. The conversion path does not have this problem: it encodes into a temp file and moves the finished file into place.
+- **Fix:** copy to a temporary name next to the destination, tag it there, then rename it over the destination.
+
+<a id="dl-05"></a>
+
+#### DL-05 — Two saves of the same track can run at once
+
+**low · data · likely (race, not reproduced)**
+
+- **Where:** `src/components/SecondaryPanel/DownloadPanel/DownloadPanel.tsx:282-317` (`isSaving`), `src/flows/musicDownloadFlow/utils/downloadTask.ts:1007-1022`, `src/flows/musicDownloadFlow/utils/convertAudio.ts:31`.
+- **What:** the save shortcut is blocked by `isSaving`, which is read from the task status. `saveTrack` only sets `Processing` after `await fs.mkdir(...)` and the overwrite dialog, so a held-down `S` (key repeat) can start a second save in that gap. With conversion on, both encode into the same `<stem>.converting.<ext>`; the first to finish removes it in its `finally` while the other is still using it, so one save fails (or moves a half-written file).
+- **Fix:** an in-flight guard inside `DownloadTask.saveTrack` (return or reject while a save is running), not only in the UI.
+
+<a id="dl-06"></a>
+
+#### DL-06 — FLAC re-tagging keeps stale tag values
+
+**low · data · verified by reading**
+
+- **Where:** `src/utils/metadata.ts:44-63`.
+- **What:** the FLAC writer starts from the file's current tags (`...currentTags.tagMap`) and only sets the fields that have a value. A field the user cleared (album, year, track number…) keeps its old value, and the uploader's own tags in a Soulseek file stay next to the app's (`COMMENT`, `ALBUM_ARTIST` next to `ALBUMARTIST`, a different `DATE`…). Ogg, Opus and M4A start from no tags (`-map_metadata -1` in `tagAudioFile.ts`), so the same track ends up with different tags depending on the format.
+- **Fix:** decide one rule for every format. If "the app's tags replace the file's" (as for the ffmpeg formats), start FLAC from an empty map; if some tags are worth keeping, keep an explicit list.
+
+<a id="dl-07"></a>
+
+#### DL-07 — The automatic file name is cleaned less than a typed one
+
+**low · data · verified by reading**
+
+- **Where:** `src/flows/musicDownloadFlow/utils/computeOutputPath.ts:19`, `src/flows/musicDownloadFlow/utils/tempFile.ts:19`.
+- **What:** `computeOutputFilename` (`"<artist> - <title>.<ext>"`) only replaces the characters Windows forbids. Unlike `cleanOutputFilename` (used for a typed name) it does not remove control characters, and neither has a length cap (one name part is limited to 255 characters on NTFS and most Linux file systems), so a very long title fails at save time. The temp-file name used when a track has no `uri` puts the raw title in the name, so a `/` in it (`AC/DC`) makes a sub-folder or an invalid path.
+- **Fix:** one sanitising function shared by the three (control characters, forbidden characters, trailing dots/spaces, a length cap that keeps the extension).
+
+<a id="dl-08"></a>
+
+#### DL-08 — Parallel yt-dlp runs share one `cookies.txt`
+
+**low · data · likely (yt-dlp behaviour, not reproduced)**
+
+- **Where:** `src/flows/musicDownloadFlow/services/download-providers/ytdlp/YtDlpService.ts:186-204`.
+- **What:** every yt-dlp run gets `--cookies <bin>/cookies.txt`. yt-dlp writes its cookie jar back to that file when it exits, so with `maxParallelDownloads > 1` several processes rewrite the same file at the same time; the last one wins and a write can be interleaved. The user's exported cookies can be replaced or broken, which brings back the "Sign in to confirm you're not a bot" failures they were meant to fix.
+- **Fix:** give each run its own copy of the file (in the temp folder, deleted afterwards).
+
 ### E. Metadata & discovery
 
 <a id="md-03"></a>
@@ -144,6 +248,28 @@ Everything else is on its latest version. Left, each tried and backed out:
 - **Where:** `src/flows/musicDownloadFlow/contextualActions.ts:398,405` (`serviceKey === "musicBrainz"`), `…/utils/downloadTask.ts:690` (`platform === "youtubeMusic"`), `…/claude/convertClaudeToTrack.ts:20-22`, `…/spotify/SpotifyService.ts:465` (`"FR"` market, with a `TODO`), stale TODO in `…/musicbrainz/MusicBrainzService.ts:9` ("once MusicBrainz is activated").
 - **What:** `CLAUDE.md` says "never branch on a provider key"; these places do. The hardcoded market affects availability/relinking of tracks for non-French users.
 - **Fix:** move the Picard special-case into a static capability of the service class; make the market a setting (default: the account's country).
+
+<a id="md-05"></a>
+
+#### MD-05 — The Claude provider can't start an npm-installed Claude CLI on Windows
+
+**low · product · verified by reading**
+
+- **Where:** `src/flows/musicDownloadFlow/services/apis/claude-client.ts:197-235`.
+- **What:** the CLI is started with `spawn(command, args)` and no shell. An npm install of Claude Code on Windows gives `claude.cmd`: spawning `claude` gives `ENOENT` (Windows only looks for `.exe`/`.com`), and spawning the full `.cmd` path gives `EINVAL`. Both are reported as "not installed … or set its full path in Settings", which does not help. Only the native `claude.exe` works.
+- **Fix:** at least say in the message (and the setting's description) that the native installer's `claude.exe` is needed on Windows. Running a `.cmd` needs a shell, and the system prompt and JSON schema are passed as arguments, so that needs careful quoting (or resolving the `.cmd` to `node <cli.js>`).
+
+### F. UI & terminal
+
+<a id="ui-08"></a>
+
+#### UI-08 — Every mpv restart adds one more `process` exit listener
+
+**low · ui · verified by reading**
+
+- **Where:** `src/utils/mpvPlayer.ts:94`.
+- **What:** each start of the preview player registers `process.once("exit", () => mpvProcess.kill())` and never removes it. After about ten restarts (mpv crashed or was closed) Node prints `MaxListenersExceededWarning` to stderr, which lands inside the TUI. The listeners also keep the dead processes referenced.
+- **Fix:** one exit hook for the player instance that kills whatever process is current, or remove the listener in the process's own `exit` handler.
 
 ### G. Security
 
@@ -184,6 +310,26 @@ Everything else is on its latest version. Left, each tried and backed out:
 - **What:** the saved FLAC has `TITLE`, `ARTIST`, `album_artist` and `ENCODER` tags and only one audio stream — no picture. A grep of `src/` for cover/artwork/picture/APIC finds no code that downloads or embeds artwork (Spotify/YouTube Music both provide thumbnails). For a "download and tag" tool, missing artwork is one of the first things users notice in a player; the former `README-TARGET` didn't promise it either, so decide whether it is in scope for 0.2.0.
 - **Fix:** download the best thumbnail/album image and embed it (`flac-tagger` supports pictures; `node-id3` supports `image`), with a size cap and a setting to disable.
 
+<a id="prod-05"></a>
+
+#### PROD-05 — An imported playlist fetches and runs its tracks without Run
+
+**medium · product · verified by reading**
+
+- **Where:** `src/flows/musicDownloadFlow/taskFactory.ts:35`, `src/flows/musicDownloadFlow/utils/liveRefreshScheduler.ts:38-51`, `src/flows/musicDownloadFlow/utils/collectionTask.ts:218-225`.
+- **What:** import never starts a task, and the factory says a collection's "track list is only fetched once the task is started". But every new playlist gets `live: { enabled: true }`, and the scheduler's tick does not look at `state`: a `pending` playlist has no `lastFetchedAt` (counted as 0), so within 5 s it is `refetch()`ed, which adds its tracks and runs them (`orchestrator.processTasks(newChildIds)`), downloading too if the import asked for it. Albums and single tracks wait for Run. The same tick also restarts a playlist the user stopped.
+- **Fix:** skip playlists whose `state` is `pending` or `stopped` (live refresh is for playlists that already ran), and test it.
+
+<a id="prod-06"></a>
+
+#### PROD-06 — A failing live playlist is retried every 5 s
+
+**medium · product · verified by reading**
+
+- **Where:** `src/flows/musicDownloadFlow/utils/collectionTask.ts:121-133` (`refetch`), `:233-240`; `src/flows/musicDownloadFlow/utils/liveRefreshScheduler.ts:48-49`.
+- **What:** `lastFetchedAt` is only written when a fetch succeeds. A playlist that fails — private (Spotify answers 404), deleted, offline, or rate-limited (429) — is therefore due again at the next tick, every 5 s instead of every `defaultLiveRefreshIntervalSeconds` (120 s), for as long as the app runs: a Spotify request, a warning in `app.log` and a status flip every 5 s, which also makes a 429 last longer.
+- **Fix:** record the last attempt as well as the last success, and back off after consecutive failures (e.g. double the wait up to an hour, reset on success).
+
 ### K. Candidates to verify (found while reading, not confirmed)
 
 These come from the UI agent's running notes before it was cut off. Treat them as leads, not findings.
@@ -214,6 +360,8 @@ These come from the UI agent's running notes before it was cut off. Treat them a
 ## 4. Coverage & limits
 
 Eight sub-agents were launched in parallel for: download pipeline, metadata/discovery, core/persistence, UI static review, dynamic TUI exploration, build/release/security, docs/tests, and a live end-to-end pipeline run. **All eight were terminated by an API rate limit (5-hour window, resets 17:40 Paris time) before producing their final reports.** Their saved partial output was used above (`REL-02`, `MD-01/02` experiments, the link check, the UI notes, TUI finding `UI-04`); everything else was done by the orchestrator.
+
+**Pass 2 (2026-11-10)** read the save/tag path, file naming, temp files, collections and live refresh, the Claude CLI spawn, mpv, the updater, `http.ts`, the zip extraction and `deepMerge`; its findings are DL-02…DL-08, MD-05, UI-08, REL-08, PROD-05 and PROD-06. Checked and fine: `deepMerge` with a `__proto__` key only changes the merged object's own prototype, not `Object.prototype`; zip entries are extracted flat by base name (no path escape); `http.ts` refuses an https → http redirect; the yt-dlp URL is passed after `--`; ffmpeg runs without a shell; Songlink handles its hourly quota; temp clean-up only touches the app's own UUID-named files; `release.yml` publishes to npm before the GitHub release, so the updater can't offer a version npm doesn't have. Still not read: Soulseek ranking and login, sessions/archive beyond DATA-02/03, the UI components, runtime resize.
 
 **Not covered or only partially covered** (so the absence of findings there means nothing):
 

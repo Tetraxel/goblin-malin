@@ -1,7 +1,7 @@
 # TODO
 
 > State of 2026-11-10 (`main`, working towards **v0.2.0**).
-> IDs like `DL-01` or `DATA-04` point to [AUDIT-v0.2.0.md](AUDIT-v0.2.0.md), which has the evidence and the suggested fix for each.
+> IDs like `DL-01` or `DATA-04` point to [AUDIT-v0.2.1.md](AUDIT-v0.2.1.md), which has the evidence and the suggested fix for each.
 > Per-project roadmap: [docs/projects/](docs/projects/README.md) (`P24`, `P25`… below).
 
 ## 🔴 Release blockers (v0.2.0)
