@@ -21,6 +21,28 @@ export type Metadata = {
     musicBrainzReleaseGroupId?: string;
 };
 
+/** The Vorbis comments of a FLAC file for `metadata`: only the fields that have a value. */
+export function buildFlacTagMap(metadata: Metadata): FlacTagMap {
+    return {
+        TITLE: metadata.trackTitle,
+        ARTIST: metadata.artists,
+        ALBUMARTIST: metadata.albumArtists ?? metadata.artists,
+        ...(metadata.albumName ? { ALBUM: metadata.albumName } : {}),
+        ...(metadata.year ? { YEAR: metadata.year, DATE: metadata.year } : {}),
+        ...(metadata.trackNumber ? { TRACKNUMBER: metadata.trackNumber } : {}),
+        ...(metadata.isrc ? { ISRC: metadata.isrc } : {}),
+        ...(metadata.genres?.length ? { GENRE: metadata.genres } : {}),
+        ...(metadata.bpm != null ? { BPM: String(metadata.bpm) } : {}),
+        ...(metadata.key ? { KEY: metadata.key } : {}),
+        ...(metadata.musicBrainzTrackId ? { MUSICBRAINZ_TRACKID: metadata.musicBrainzTrackId } : {}),
+        ...(metadata.musicBrainzAlbumId ? { MUSICBRAINZ_ALBUMID: metadata.musicBrainzAlbumId } : {}),
+        ...(metadata.musicBrainzArtistId ? { MUSICBRAINZ_ARTISTID: metadata.musicBrainzArtistId } : {}),
+        ...(metadata.musicBrainzReleaseGroupId
+            ? { MUSICBRAINZ_RELEASEGROUPID: metadata.musicBrainzReleaseGroupId }
+            : {}),
+    };
+}
+
 /**
  * Strips stray ID3 tags from a FLAC file, then writes `metadata` as Vorbis comments. Any failure is logged and
  * rethrown: the caller must not report a save whose tags were never written.
@@ -45,29 +67,11 @@ export async function cleanAndTagFlac(filePath: string, metadata: Metadata): Pro
     try {
         const currentTags = await readFlacTags(filePath);
 
-        const newTags: FlacTagMap = {
-            ...currentTags.tagMap,
-            TITLE: metadata.trackTitle,
-            ARTIST: metadata.artists,
-            ALBUMARTIST: metadata.albumArtists ?? metadata.artists,
-            ...(metadata.albumName ? { ALBUM: metadata.albumName } : {}),
-            ...(metadata.year ? { YEAR: metadata.year, DATE: metadata.year } : {}),
-            ...(metadata.trackNumber ? { TRACKNUMBER: metadata.trackNumber } : {}),
-            ...(metadata.isrc ? { ISRC: metadata.isrc } : {}),
-            ...(metadata.genres?.length ? { GENRE: metadata.genres } : {}),
-            ...(metadata.bpm != null ? { BPM: String(metadata.bpm) } : {}),
-            ...(metadata.key ? { KEY: metadata.key } : {}),
-            ...(metadata.musicBrainzTrackId ? { MUSICBRAINZ_TRACKID: metadata.musicBrainzTrackId } : {}),
-            ...(metadata.musicBrainzAlbumId ? { MUSICBRAINZ_ALBUMID: metadata.musicBrainzAlbumId } : {}),
-            ...(metadata.musicBrainzArtistId ? { MUSICBRAINZ_ARTISTID: metadata.musicBrainzArtistId } : {}),
-            ...(metadata.musicBrainzReleaseGroupId
-                ? { MUSICBRAINZ_RELEASEGROUPID: metadata.musicBrainzReleaseGroupId }
-                : {}),
-        };
-
+        // The app's tags replace the file's own (the uploader's COMMENT, a different DATE, a field the user cleared…),
+        // the same as for the ffmpeg formats. What is not a tag, the embedded picture, is kept.
         const tagsToWrite: FlacTags = {
             ...currentTags,
-            tagMap: newTags,
+            tagMap: buildFlacTagMap(metadata),
         };
 
         await writeFlacTags(tagsToWrite, filePath);
