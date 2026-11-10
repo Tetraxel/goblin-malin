@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented here.
 
+## [0.2.1] — 2026-11-11
+
+### Added
+
+- Spotify search market is now a setting (empty = the country of the OS locale).
+- One click on a TAG?/DL? checkbox toggles it.
+
+### Changed
+
+- Providers declare `platformAliases`, `trackUrl` and `openLabel`; core code no longer branches on provider keys.
+- Live refresh only refreshes a playlist that already ran, and backs off (doubling up to an hour) after consecutive failures instead of retrying every 5 s.
+
+### Fixed
+
+- Saving: a failed FLAC tag write is reported as a failed save; a file is built beside its destination and renamed into place, so an interrupted save no longer leaves a truncated file or deletes the one being replaced; one save at a time per task; FLAC re-tagging replaces the file's old tags; a save that replaces another task's file takes ownership of it.
+- File names (automatic, typed and temp) are cleaned the same way, and capped in bytes.
+- Each yt-dlp run works on its own copy of `cookies.txt`, so parallel runs can't break the exported cookies.
+- A single mpv exit hook instead of one per restart (no more `MaxListenersExceededWarning`).
+- The Claude CLI now starts when installed with npm on Windows.
+- Welcome intro: dialogs raised by background work wait until it has closed, and it repaints at once when Ink wipes the screen.
+
 ## [0.2.0] — 2026-11-10
 
 ### Added
