@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import os from "os";
 import { globalLogger } from "#base/logger/logger";
 import { Semaphore } from "#utils/semaphore";
+import { isShellScript, resolveCliCommand } from "./resolveCliCommand";
 
 /**
  * Thin wrapper around the Claude Code CLI in headless mode (`claude -p`), so the app can use the
@@ -183,7 +184,9 @@ export class ClaudeClient {
         const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
         return new Promise<string>((resolve, reject) => {
-            const child = spawn(command, buildClaudeArgs(opts), {
+            // On Windows an npm install is a `.cmd` shim Node cannot start: run what the shim runs.
+            const { file, prefixArgs } = resolveCliCommand(command);
+            const child = spawn(file, [...prefixArgs, ...buildClaudeArgs(opts)], {
                 cwd: os.tmpdir(),
                 windowsHide: true,
                 stdio: ["pipe", "pipe", "pipe"],
@@ -217,18 +220,16 @@ export class ClaudeClient {
             child.stderr.setEncoding("utf-8").on("data", (chunk: string) => (stderr += chunk));
 
             child.on("error", (error: NodeJS.ErrnoException) => {
-                // ENOENT: not on PATH. EINVAL: Windows refuses to spawn .cmd/.bat shims directly.
+                // ENOENT: not on PATH. EINVAL: Windows refuses to spawn .cmd/.bat shims directly — only
+                // reached for a shim `resolveCliCommand` could not read, so say that instead of "not found".
+                const unrunnableShim = error.code === "EINVAL" && isShellScript(file);
                 const missing = error.code === "ENOENT" || error.code === "EINVAL";
-                finish(() =>
-                    reject(
-                        new ClaudeCliError(
-                            missing ? "not-installed" : "failed",
-                            missing
-                                ? `Claude Code CLI not found ("${command}"). Install it and log in, or set its full path in Settings.`
-                                : `Could not start Claude: ${error.message}`
-                        )
-                    )
-                );
+                const message = unrunnableShim
+                    ? `Claude Code CLI ("${file}") is a Windows .cmd script that cannot be started directly. In Settings, set the full path of claude.exe (native install) or of the cli.js it runs.`
+                    : missing
+                      ? `Claude Code CLI not found ("${command}"). Install it and log in, or set its full path in Settings.`
+                      : `Could not start Claude: ${error.message}`;
+                finish(() => reject(new ClaudeCliError(missing ? "not-installed" : "failed", message)));
             });
 
             child.on("close", (code) => {
