@@ -6,6 +6,7 @@ import { globalLogger, type Logger } from "#base/logger/logger";
 import { type ServiceRegistry } from "#base/service-registry";
 import { type ServiceScope } from "#base/service-scope";
 import { providerDisplayRegistry } from "#base/providerDisplay";
+import { platformRegistry } from "#base/platformRegistry";
 import { type StatusAttributes, StatusType } from "#base/task/task-status";
 import { throwIfAborted } from "#utils/errors";
 import {
@@ -693,10 +694,10 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
     // Find registry key whose service handles the given platform
     private findServiceKeyForPlatform(platform: string): string | undefined {
+        // A service can declare alias platforms (`platformAliases`), e.g. youtubeMusic → youtube.
+        const canonical = platformRegistry.canonical(platform);
         for (const [key] of this.metadataServiceRegistry.getAllConstructors()) {
-            if (key === platform) return key;
-            // youtubeMusic → youtube service
-            if (platform === "youtubeMusic" && key === "youtube") return key;
+            if (key === canonical) return key;
         }
         return undefined;
     }

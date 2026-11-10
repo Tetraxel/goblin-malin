@@ -1,3 +1,4 @@
+import { platformRegistry } from "#base/platformRegistry";
 import { type TrackMetadata, type TrackUri, type Platform, type APIProvider } from "#flows/musicDownloadFlow/types";
 import type { SonglinkResponse, Entity, PlatformLink } from "../../apis/songlink-client";
 
@@ -32,7 +33,7 @@ export function convertSonglinkEntityToTrackMetadata(
     const platform = platformKey as Platform;
     const apiProvider = entity.apiProvider as APIProvider;
     // Normalize youtubeMusic → youtube so URIs match what YoutubeService produces
-    const uriPrefix = platformKey === "youtubeMusic" ? "youtube" : platformKey;
+    const uriPrefix = platformRegistry.canonical(platformKey);
     const uri = `${uriPrefix.toUpperCase()}::TRACK::${entity.id}` as TrackUri;
 
     return {

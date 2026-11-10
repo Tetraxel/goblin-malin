@@ -251,6 +251,8 @@ export type DiscoveryAnchor = {
     url?: string;
     id?: string;
     openUri?: string;
+    /** Name of the app `openUri` opens (e.g. "MusicBrainz Picard"); defaults to the provider's label. */
+    openLabel?: string;
     count?: number;
 };
 

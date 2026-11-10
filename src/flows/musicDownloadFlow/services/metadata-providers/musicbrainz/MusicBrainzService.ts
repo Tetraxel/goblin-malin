@@ -6,11 +6,6 @@
 // import { Cached } from '#utils/cache';
 // import { MetadataService } from '../../../metadataService';
 
-// // TODO: add static cellComponent = MusicBrainzCell once MusicBrainz is activated.
-// // Importing MusicBrainzCell here would create a circular dep since MusicBrainzCell
-// // imports MusicBrainzRecording/MusicBrainzRelease from this file. Extract those
-// // types to a shared types.ts in this folder to resolve it.
-
 // export class MusicBrainzService extends MetadataService {
 //     private static client: MusicBrainzApi;
 

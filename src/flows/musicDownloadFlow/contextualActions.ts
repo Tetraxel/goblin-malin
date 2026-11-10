@@ -395,17 +395,18 @@ function buildDiscoveryServiceColumnActions(serviceKey: string, task: DownloadTa
     if (anchor?.openUri) {
         actions.push({
             shortcuts: [{ key: "return" }],
-            label: serviceKey === "musicBrainz" ? `Open in MusicBrainz Picard` : `Open in ${display.label}`,
+            label: `Open in ${anchor.openLabel ?? display.label}`,
             onClick: () => {
                 open(anchor.openUri!).catch(() => {});
             },
         });
     }
 
-    if (serviceKey === "musicBrainz" && anchor?.url) {
+    // The app link (`openUri`) differs from the web page: offer the web page as a second action.
+    if (anchor?.url && anchor.openUri && anchor.url !== anchor.openUri) {
         actions.push({
             shortcuts: [{ input: "o" }],
-            label: "Open in MusicBrainz",
+            label: `Open in ${display.label}`,
             onClick: () => {
                 open(anchor.url!).catch(() => {});
             },

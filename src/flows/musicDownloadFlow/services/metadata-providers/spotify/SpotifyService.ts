@@ -20,6 +20,7 @@ import { MetadataService } from "../../../metadataService";
 import { getSpotifyEmbedDetails } from "../../apis/spotify-url-info-client";
 import { convertSpotifyUrlInfoToTrack } from "./convertSpotifyUrlInfoToTrack";
 import { getMetadataProviderSettings } from "../../../saveSettings";
+import { resolveSpotifyMarket } from "./spotifyMarket";
 
 export type SpotifyTokenResponse = {
     access_token: string;
@@ -93,7 +94,13 @@ export class SpotifyService extends MetadataService {
             defaultValue: true,
             kind: "checkbox",
         },
+        market: {
+            label: "Market for searches (2-letter country code, e.g. FR; empty = your system's country)",
+            defaultValue: "",
+            kind: "textInput",
+        },
     };
+    static readonly trackUrl = (id: string): string => `https://open.spotify.com/track/${id}`;
     static readonly setupWizard: SetupWizardConfig = {
         title: "⚙  Spotify Setup Wizard",
         providerKey: "spotify",
@@ -479,7 +486,7 @@ export class SpotifyService extends MetadataService {
             const searchResults = await client.search(
                 query,
                 ["track"],
-                "FR", // TODO: make country code configurable
+                resolveSpotifyMarket(getMetadataProviderSettings("spotify").market),
                 1
             );
 

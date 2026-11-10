@@ -1,6 +1,7 @@
 import { type Logger } from "./logger/logger";
 import { ServiceBase } from "./service-base";
 import { ServiceScope } from "./service-scope";
+import { platformRegistry } from "./platformRegistry";
 import { type Task } from "./task/task";
 import { type ProviderDisplay, providerDisplayRegistry } from "./providerDisplay";
 import { type ParsedUrl, type CollectionExpansion, urlParserRegistry } from "./urlParser";
@@ -26,6 +27,10 @@ type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> =
     consent?: ProviderConsent;
     // Slow/expensive last resort: only run when the regular services left a gap.
     lastResort?: boolean;
+    // Other platform keys this service also handles (e.g. YouTube Music links are YouTube videos).
+    platformAliases?: readonly string[];
+    // Canonical URL of one of this service's tracks, given its platform id.
+    trackUrl?: (id: string) => string;
 };
 
 // Central registry for services, allowing dynamic registration and scoped instantiation
@@ -61,6 +66,8 @@ export class ServiceRegistry<TTask extends Task<any> = Task, TService extends Se
             this.factories.set(name, (task, logger) => new ctor(task, logger));
             this.constructors.set(name, ctor);
             if (ctor.display) providerDisplayRegistry.register(name, ctor.display);
+            if (ctor.platformAliases) platformRegistry.registerAliases(name, ctor.platformAliases);
+            if (ctor.trackUrl) platformRegistry.registerTrackUrl(name, ctor.trackUrl);
             if (ctor.parseUrl) urlParserRegistry.register(ctor.parseUrl);
             if (ctor.findLinks) urlParserRegistry.registerNormalizer(ctor.findLinks);
         } else {

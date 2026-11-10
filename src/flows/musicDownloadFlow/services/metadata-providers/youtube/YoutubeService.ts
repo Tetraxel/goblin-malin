@@ -28,6 +28,9 @@ export class YoutubeService extends MetadataService {
         enabled: { label: "Enable", defaultValue: true, kind: "checkbox" },
     };
     static readonly cellComponent = YoutubeCell;
+    // YouTube Music links are plain YouTube videos and share this service's URIs.
+    static readonly platformAliases = ["youtubeMusic"] as const;
+    static readonly trackUrl = (id: string): string => `https://www.youtube.com/watch?v=${id}`;
 
     private static client: YTMusic;
 

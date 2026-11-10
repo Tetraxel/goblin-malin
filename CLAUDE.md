@@ -25,7 +25,10 @@ Optional static capabilities a service class can declare (all read generically �
 
 - `static consent: { title, message }` — the provider sends data to a third party or spends the user's quota, so it is **off until the user allows it, once** (a confirm dialog shown on first use; `utils/discoveryConsent.ts`). Its `enabled` default must be `false`. Used by Songlink and Claude.
 - `static lastResort = true` (discovery services) — slow/costly; only runs when a platform is still missing after all regular discovery, and its results must pass the platform's own metadata fetch + a confidence check. Used by Claude.
+- `static platformAliases = ["youtubeMusic"]` (metadata services) — other platform keys whose tracks the service handles; read through `platformRegistry.canonical()` (`src/base/platformRegistry.ts`). Never compare a platform to `"youtubeMusic"` in core code.
+- `static trackUrl = (id) => url` (metadata services) — canonical URL of one of the service's tracks; read through `platformRegistry.trackUrl()`.
 - `defaultSettings` entries can be `kind: "checkbox" | "textInput" | "select"`.
+- A discovery anchor can set `openLabel` to name the app its `openUri` opens (e.g. "MusicBrainz Picard"); when `url` differs from `openUri`, the web page gets its own "Open in …" action. Both are generic — no provider branching in `contextualActions.ts`.
 
 Display metadata (label, color, acronym, color variants) must **not** be hardcoded in components. Each service class declares `static readonly display: ProviderDisplay`. `ServiceRegistry.register()` reads it automatically and calls `providerDisplayRegistry.register()`. Components call `providerDisplayRegistry.get(key)` for display info.
 

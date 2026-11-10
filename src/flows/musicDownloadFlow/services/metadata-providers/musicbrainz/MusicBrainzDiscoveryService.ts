@@ -86,6 +86,7 @@ export class MusicBrainzDiscoveryService extends DiscoveryMetadataService {
                     url: recordingUrl,
                     id: recordingId,
                     openUri: picardUri,
+                    openLabel: "MusicBrainz Picard",
                     count: tracks.length,
                 },
             };

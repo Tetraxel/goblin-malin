@@ -6,6 +6,7 @@ import {
     type StandardArtist,
 } from "#flows/musicDownloadFlow/types";
 import type { IRecording } from "musicbrainz-api";
+import { platformRegistry } from "#base/platformRegistry";
 
 // Maps a streaming-platform URL to the Platform key we use internally, extracting the
 // platform-native track id so the produced URI matches what each metadata service emits.
@@ -102,7 +103,7 @@ export function extractTracksFromMusicBrainzRecording(recording: IRecording): Tr
         seen.add(match.platform);
 
         // Normalize youtubeMusic → youtube so URIs match what YoutubeService produces.
-        const uriPrefix = match.platform === "youtubeMusic" ? "youtube" : match.platform;
+        const uriPrefix = platformRegistry.canonical(match.platform);
         const uri = `${uriPrefix.toUpperCase()}::TRACK::${match.id}` as TrackUri;
 
         results.push({

@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeAll } from "vitest";
+import { platformRegistry } from "#base/platformRegistry";
 import { urlParserRegistry } from "#base/urlParser";
 import {
     claudeLinksToTracks,
@@ -15,7 +16,11 @@ import {
 } from "#flows/musicDownloadFlow/services/apis/claude-client";
 
 // The real parsers live on the (heavy) metadata services; these stand-ins have the same contract.
+// ...and the platform capabilities the real services declare (`platformAliases` / `trackUrl`).
 beforeAll(() => {
+    platformRegistry.registerAliases("youtube", ["youtubeMusic"]);
+    platformRegistry.registerTrackUrl("youtube", (id) => `https://www.youtube.com/watch?v=${id}`);
+    platformRegistry.registerTrackUrl("spotify", (id) => `https://open.spotify.com/track/${id}`);
     urlParserRegistry.register((url) => {
         const m = /^https:\/\/open\.spotify\.com\/track\/(\w+)/.exec(url);
         return m ? { platform: "spotify", type: "track", id: m[1] } : null;

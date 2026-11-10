@@ -1,3 +1,4 @@
+import { platformRegistry } from "#base/platformRegistry";
 import { urlParserRegistry } from "#base/urlParser";
 import type { APIProvider, Platform, TrackMetadata, TrackUri } from "#flows/musicDownloadFlow/types";
 
@@ -12,18 +13,12 @@ export type ClaudeLink = {
 // Below this the model is telling us it is guessing; a wrong link costs the user more than a gap.
 export const MIN_LINK_CONFIDENCE = 0.5;
 
-// "youtubeMusic" URLs are handled by the youtube service and share its URIs.
-const normalizePlatform = (platform: string): string => (platform === "youtubeMusic" ? "youtube" : platform);
+// A service's alias platforms (e.g. "youtubeMusic") share its URIs; each service also declares how to
+// build its canonical track URL. Platforms that declare none keep the URL as Claude gave it.
+const normalizePlatform = (platform: string): string => platformRegistry.canonical(platform);
 
 function canonicalUrl(platform: string, id: string, original: string): string {
-    switch (platform) {
-        case "spotify":
-            return `https://open.spotify.com/track/${id}`;
-        case "youtube":
-            return `https://www.youtube.com/watch?v=${id}`;
-        default:
-            return original;
-    }
+    return platformRegistry.trackUrl(platform, id) ?? original;
 }
 
 /**
