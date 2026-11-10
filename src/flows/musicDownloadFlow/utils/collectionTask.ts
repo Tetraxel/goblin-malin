@@ -119,7 +119,12 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
             this.status.set({ type: StatusType.Success, message: this.summaryMessage() });
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            this.updateAttributes({ error: message });
+            const live = this.getAttributes()?.live;
+            // Record the failed attempt so the live-refresh scheduler backs off instead of retrying every tick.
+            this.updateAttributes({
+                error: message,
+                live: live ? { ...live, lastAttemptAt: new Date(), failures: (live.failures ?? 0) + 1 } : live,
+            });
             this.status.set({ type: StatusType.Error, message: "Refetch failed" });
             this.showAccessHint(error);
             throw error;
@@ -234,7 +239,7 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
                 childTaskIds: [...attrs.childTaskIds, ...newChildIds],
                 live:
                     attrs.collectionKind === "playlist"
-                        ? { enabled: attrs.live?.enabled ?? true, lastFetchedAt: new Date() }
+                        ? { enabled: attrs.live?.enabled ?? true, lastFetchedAt: new Date() } // a success clears the backoff
                         : attrs.live,
             });
         } finally {

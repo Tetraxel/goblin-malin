@@ -2,6 +2,7 @@ import { TaskOrchestrator } from "#base/task/orchestrator";
 import { globalLogger } from "#base/logger/logger";
 import { type CollectionTask } from "./collectionTask";
 import { getMusicSettings } from "../settings";
+import { isDueForLiveRefresh, type LiveRefreshCandidate } from "./liveRefreshDue";
 
 // How often the scheduler checks for due playlists — independent of the user's
 // configurable refresh interval (in seconds), but small enough not to bottleneck it
@@ -36,17 +37,12 @@ class LiveRefreshScheduler {
         const now = Date.now();
 
         for (const task of TaskOrchestrator.getInstance().getTasks()) {
-            const attrs = task.getAttributes() as
-                | { kind?: string; collectionKind?: string; live?: { enabled: boolean; lastFetchedAt?: Date } }
-                | undefined;
-            if (attrs?.kind !== "collection" || attrs.collectionKind !== "playlist" || !attrs.live?.enabled) continue;
+            const attrs = task.getAttributes() as LiveRefreshCandidate | undefined;
+            if (!isDueForLiveRefresh(attrs, now, intervalMs)) continue;
             if (task.running) continue;
 
             const collectionTask = task as unknown as CollectionTask;
             if (collectionTask.isFetching()) continue;
-
-            const lastFetchedAt = attrs.live.lastFetchedAt?.getTime() ?? 0;
-            if (now - lastFetchedAt < intervalMs) continue;
 
             collectionTask.refetch().catch((error) => {
                 logger.warn(

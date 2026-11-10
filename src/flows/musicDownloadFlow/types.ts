@@ -495,7 +495,12 @@ export type TrackDownloadTask = {
 
 export type CollectionLiveRefresh = {
     enabled: boolean;
+    /** Last successful fetch. */
     lastFetchedAt?: Date;
+    /** Last failed fetch (the next live refresh waits from here, not from `lastFetchedAt`). */
+    lastAttemptAt?: Date;
+    /** Consecutive failed live refreshes since the last success; each one doubles the wait. */
+    failures?: number;
 };
 
 // A parent task for an album/playlist URL. Doesn't fetch track metadata itself —

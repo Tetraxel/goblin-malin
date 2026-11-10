@@ -37,6 +37,7 @@ function reviveCollectionDates(attrs: CollectionDownloadTask): CollectionDownloa
             ? {
                   ...attrs.live,
                   lastFetchedAt: attrs.live.lastFetchedAt ? new Date(attrs.live.lastFetchedAt) : undefined,
+                  lastAttemptAt: attrs.live.lastAttemptAt ? new Date(attrs.live.lastAttemptAt) : undefined,
               }
             : undefined,
     };
