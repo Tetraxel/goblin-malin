@@ -37,6 +37,7 @@ export class MpvPlayer extends EventEmitter {
     private _isPaused = false;
     private _started = false;
     private _starting: Promise<void> | null = null;
+    private exitHookInstalled = false;
 
     constructor() {
         super();
@@ -87,13 +88,7 @@ export class MpvPlayer extends EventEmitter {
             { stdio: "ignore", windowsHide: true }
         );
 
-        // The app exits through process.exit(), which leaves child processes running — and
-        // since playback now outlives the panel that started it, an orphaned mpv would keep
-        // playing after the app is gone.
-        const mpvProcess = this.mpvProcess;
-        process.once("exit", () => {
-            mpvProcess.kill();
-        });
+        this.installExitHook();
 
         this.mpvProcess.on("exit", (code) => {
             this._started = false;
@@ -109,6 +104,20 @@ export class MpvPlayer extends EventEmitter {
         await this.waitForSocket();
         await this.connectWithRetry();
         await this.observeProperties();
+    }
+
+    /**
+     * The app exits through process.exit(), which leaves child processes running — and
+     * since playback now outlives the panel that started it, an orphaned mpv would keep
+     * playing after the app is gone. One hook per player (mpv can be restarted many
+     * times), killing whichever process is current when the app exits.
+     */
+    private installExitHook() {
+        if (this.exitHookInstalled) return;
+        this.exitHookInstalled = true;
+        process.once("exit", () => {
+            this.mpvProcess?.kill();
+        });
     }
 
     private waitForSocket(timeoutMs = 8000): Promise<void> {
