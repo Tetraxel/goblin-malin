@@ -129,6 +129,26 @@ export function buildContextualActionBar(
     return buildTrackContextualActionBar(task as DownloadTask, attributes);
 }
 
+/**
+ * A plain click on a cell: runs the column's `runOnCellClick` action (a checkbox column's
+ * toggle) on that one task, whatever else is multi-selected. Other columns have no such
+ * action, so a click there only selects.
+ */
+export function runCellClickAction(
+    task: DownloadTask | CollectionTask,
+    columns: ColumnDefinition<MusicDownloadTaskAttributes>[],
+    columnIndex: number
+): void {
+    const bar = buildContextualActionBar(task, { columns, columnIndex });
+    const action = bar.rows[0]?.actions.find((a) => a.runOnCellClick);
+    if (!action) return;
+    try {
+        action.onClick();
+    } catch (err) {
+        globalLogger.error(err instanceof Error ? err.message : String(err));
+    }
+}
+
 function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttributes): ContextualActionBar {
     const orchestrator = TaskOrchestrator.getInstance();
     const column = attributes.columns[attributes.columnIndex];
@@ -264,6 +284,7 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
             shortcuts: [{ key: "return" }],
             label: "Toggle tagging",
             multiSelectAllowed: true,
+            runOnCellClick: true,
             onClick: () => task.updateAttributes({ toTag: !attrs?.toTag }),
             onClickBatch: (tasks) => {
                 const newValue = !attrs?.toTag;
@@ -277,6 +298,7 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
             shortcuts: [{ key: "return" }],
             label: "Toggle downloading",
             multiSelectAllowed: true,
+            runOnCellClick: true,
             onClick: () => task.updateAttributes({ toDownload: !attrs?.toDownload }),
             onClickBatch: (tasks) => {
                 const newValue = !attrs?.toDownload;
@@ -543,6 +565,7 @@ function buildCollectionContextualActionBar(task: CollectionTask, attributes: Ba
             shortcuts: [{ key: "return" }],
             label: "Toggle tagging (+ existing tracks)",
             multiSelectAllowed: true,
+            runOnCellClick: true,
             onClick: () => toggleCollectionFlag(task, "toTag"),
             onClickBatch: (tasks) => tasks.forEach((t) => toggleCollectionFlag(asCollection(t), "toTag")),
         });
@@ -553,6 +576,7 @@ function buildCollectionContextualActionBar(task: CollectionTask, attributes: Ba
             shortcuts: [{ key: "return" }],
             label: "Toggle downloading (+ existing tracks)",
             multiSelectAllowed: true,
+            runOnCellClick: true,
             onClick: () => toggleCollectionFlag(task, "toDownload"),
             onClickBatch: (tasks) => tasks.forEach((t) => toggleCollectionFlag(asCollection(t), "toDownload")),
         });

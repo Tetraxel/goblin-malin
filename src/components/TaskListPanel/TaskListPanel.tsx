@@ -14,6 +14,8 @@ import { findPlayingTaskId } from "#flows/musicDownloadFlow/utils/playingTask";
 import { useTaskHeaderShortcuts } from "#hooks/useKeyHandlers";
 import { saveColumnRatios } from "#flows/musicDownloadFlow/taskColumns";
 import { CollectionTask } from "#flows/musicDownloadFlow/utils/collectionTask";
+import type { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { runCellClickAction } from "#flows/musicDownloadFlow/contextualActions";
 
 export type { Shortcut, ContextualActions, ContextualActionBar };
 
@@ -318,6 +320,8 @@ export const TaskListPanel: React.FC<{
         visibleRows: height,
         tasks,
         onCellClick: (task, column, xInCell) => {
+            // A checkbox cell toggles on one click (same action as Enter on it).
+            runCellClickAction(task as unknown as DownloadTask | CollectionTask, columns, column);
             // Clicking a collection's "▾ [PLAYLIST]" tag (cell padding 1 + arrow + gap + tag) folds/unfolds it.
             if (columns[column]?.id !== "url" || !(task instanceof CollectionTask)) return;
             const kind = task.getAttributes()?.collectionKind;

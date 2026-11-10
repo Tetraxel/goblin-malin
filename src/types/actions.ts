@@ -42,6 +42,8 @@ export type ContextualActions = {
     color?: React.ComponentProps<typeof Text>["color"];
     multiSelectAllowed?: boolean;
     multiSelectOnly?: boolean;
+    /** Also runs (on that one task) when the pointer clicks the cell of the column the action belongs to. */
+    runOnCellClick?: boolean;
     onClick: () => void;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onClickBatch?: (tasks: Task<any>[]) => void;
