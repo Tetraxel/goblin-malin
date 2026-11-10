@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { type CompiledMetadata } from "./compiledMetadata";
 import { DEFAULT_OUTPUT_EXTENSION, withOutputExtension } from "./cleanOutputDir";
+import { sanitizeFileNamePart } from "./fileName";
 
 /**
  * The file name a track is saved under, with `extension` (the format it is saved in, no dot). `override` is a
@@ -16,7 +17,7 @@ export function computeOutputFilename(
     if (override) return withOutputExtension(override, extension);
     const artist = compiled.artists[0]?.name ?? "Unknown Artist";
     const title = compiled.trackName || "Unknown Title";
-    return `${artist} - ${title}.${extension}`.replace(/[/\\:*?"<>|]/g, "_");
+    return `${sanitizeFileNamePart(`${artist} - ${title}`) || "Unknown Track"}.${extension}`;
 }
 
 export function samePath(a: string, b: string): boolean {

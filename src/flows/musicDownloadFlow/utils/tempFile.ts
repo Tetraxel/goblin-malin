@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import { type TrackMetadata } from "#flows/musicDownloadFlow/types";
+import { sanitizeFileNamePart } from "./fileName";
 
 function formatDurationMs(ms: number): string {
     const totalSeconds = Math.floor(ms / 1000);
@@ -10,14 +11,20 @@ function formatDurationMs(ms: number): string {
     return `${minutes}-${String(seconds).padStart(2, "0")}`;
 }
 
+/** Room for each of the two name parts of a temp file, which also holds the provider label and a uuid. */
+const TEMP_NAME_PART_BYTES = 60;
+
 function getTempFilePrefix(providerLabel: string, metadata: TrackMetadata): string {
     if (metadata.uri) {
         const uriSlug = metadata.uri.replace(/::/g, "-");
         return `${providerLabel} ${uriSlug}`;
     }
-    const artist = metadata.artists?.[0]?.name ?? "Unknown Artist";
+    // The names are the provider's own text: a `/` in "AC/DC" must not become a folder. They are capped so that the
+    // uuid, the extension and yt-dlp's `.f251.webm` suffixes still fit in a file name.
+    const artist = sanitizeFileNamePart(metadata.artists?.[0]?.name ?? "Unknown Artist", TEMP_NAME_PART_BYTES);
+    const title = sanitizeFileNamePart(metadata.trackName ?? "", TEMP_NAME_PART_BYTES);
     const duration = metadata.duration != null ? ` ${formatDurationMs(metadata.duration)}` : "";
-    return `${providerLabel} ${metadata.trackName} - ${artist}${duration}`;
+    return `${providerLabel} ${title} - ${artist}${duration}`;
 }
 
 export function generateTempFilename(providerLabel: string, metadata: TrackMetadata, format: string): string {

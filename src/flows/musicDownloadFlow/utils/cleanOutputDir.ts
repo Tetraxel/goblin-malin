@@ -2,6 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+import { sanitizeFileNamePart } from "./fileName";
 
 // Extensions that mean "this pasted path ends in a file, not a folder" even when that file
 // doesn't exist (yet) — so it can be dropped without touching a folder that merely has a dot.
@@ -104,10 +105,7 @@ export function cleanOutputFilename(raw: string, extension: string = DEFAULT_OUT
     // ".flac" alone is a dotfile to `extname`, but it is an extension with no name in front of it.
     else if (AUDIO_EXTENSIONS.has(stem.toLowerCase())) stem = "";
 
-    // eslint-disable-next-line no-control-regex -- control characters are exactly what is being removed
-    stem = stem.replace(/[\u0000-\u001f]/g, "").replace(/[/\\:*?"<>|]/g, "_");
-    // Windows silently drops trailing dots and spaces, which would make the saved name differ from this one.
-    stem = stem.trim().replace(/[. ]+$/, "");
+    stem = sanitizeFileNamePart(stem);
     return stem ? `${stem}.${extension}` : null;
 }
 
