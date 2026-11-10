@@ -26,14 +26,14 @@
 > **This project is in early, early, early development.**<br>
 > Be aware that the data model can change drastically, making previous versions incompatible with the current one. Use at your own risk 😉
 
-A keyboard-driven terminal UI for downloading and tagging music tracks with metadata. Import links from Spotify and YouTube, the app cross-references metadata across providers, finds the best download source, and saves it to disk as a tagged FLAC.
+A keyboard-driven terminal UI for downloading and tagging music tracks with metadata. Import links from Spotify and YouTube, the app cross-references metadata across providers, finds the best download source, and saves it to disk as a tagged audio file (a FLAC by default).
 
 ## What it does
 
 - **Import** Spotify and YouTube (Music) links: tracks, **albums and playlists** from Spotify, tracks and playlists from YouTube (a playlist can keep refreshing itself). Plain links, links without `https://` and `spotify:track:…` URIs are understood.
 - **Cross-reference** the same track on other platforms to compare and merge metadata: **MusicBrainz**, plus **Songlink** and **Claude** if you opt in (see [Privacy](#privacy)). Every field can be edited or copied.
 - **Find download sources** from **yt-dlp** (YouTube) and **Soulseek**, preview them in the app (through `mpv`), compare them, and pick the best one.
-- **Save** the chosen source to your output folder as a **FLAC** with clean tags, replacing a previously saved file if you want to.
+- **Save** the chosen source to your output folder with clean tags, replacing a previously saved file if you want to. Every track is converted to one format, **FLAC** by default; Settings → Download → _Convert every download to one audio format_ lets you pick **MP3**, **Ogg**, **Opus** or **M4A** instead (handy for software that cannot swap a file for another format, like rekordbox), or turn the conversion off to keep each download as it came (Opus or M4A from YouTube, MP3 or FLAC from Soulseek). Converting a lossy source to FLAC does not add quality: the app marks those files `FLAC*`.
 - **Sessions and archive**: your task list is saved and re-opened on the next start; you can keep several sessions and archive finished tasks.
 - **Everything is configurable**: providers, folders, concurrency, themes and every keyboard shortcut (Settings). The mouse works too.
 

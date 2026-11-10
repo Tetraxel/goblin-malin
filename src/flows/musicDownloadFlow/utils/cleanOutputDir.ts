@@ -19,8 +19,11 @@ const AUDIO_EXTENSIONS = new Set([
     ".alac",
 ]);
 
-/** Every saved track is a FLAC; its extension is not up to the user. */
-export const OUTPUT_EXTENSION = ".flac";
+/**
+ * The extension a file name gets when nothing says otherwise. The real one is set by the "Convert every download"
+ * setting (or the download itself): it is never typed by the user, and the file name is edited without it.
+ */
+export const DEFAULT_OUTPUT_EXTENSION = "flac";
 
 const QUOTE_PAIRS: Record<string, string> = { '"': '"', "'": "'", "“": "”", "‘": "’", "`": "`" };
 
@@ -85,12 +88,12 @@ export function cleanOutputDir(raw: string): string | null {
 }
 
 /**
- * Turns what the user typed or pasted into the name of the output file (always `.flac`, like every
- * saved track), or null when nothing usable is left. A pasted full path keeps only its last part,
+ * Turns what the user typed or pasted into the name of the output file (with `extension`, the one every saved
+ * track gets), or null when nothing usable is left. A pasted full path keeps only its last part,
  * quotes are removed, characters Windows forbids become `_`, and a trailing audio extension is
  * replaced rather than doubled.
  */
-export function cleanOutputFilename(raw: string): string | null {
+export function cleanOutputFilename(raw: string, extension: string = DEFAULT_OUTPUT_EXTENSION): string | null {
     const firstLine = raw.split(/\r?\n/).find((line) => line.trim() !== "");
     if (!firstLine) return null;
 
@@ -105,12 +108,23 @@ export function cleanOutputFilename(raw: string): string | null {
     stem = stem.replace(/[\u0000-\u001f]/g, "").replace(/[/\\:*?"<>|]/g, "_");
     // Windows silently drops trailing dots and spaces, which would make the saved name differ from this one.
     stem = stem.trim().replace(/[. ]+$/, "");
-    return stem ? `${stem}${OUTPUT_EXTENSION}` : null;
+    return stem ? `${stem}.${extension}` : null;
 }
 
-/** A saved track's file name without the extension every saved track has, i.e. the part a user may change. */
-export function stripOutputExtension(filename: string): string {
-    return filename.toLowerCase().endsWith(OUTPUT_EXTENSION) ? filename.slice(0, -OUTPUT_EXTENSION.length) : filename;
+/** A saved track's file name without its `extension`, i.e. the part a user may change. */
+export function stripOutputExtension(filename: string, extension: string = DEFAULT_OUTPUT_EXTENSION): string {
+    const suffix = `.${extension}`;
+    return filename.toLowerCase().endsWith(suffix) ? filename.slice(0, -suffix.length) : filename;
+}
+
+/**
+ * `filename` with the audio extension it ends with (if any) replaced by `extension`. A name the user chose is stored
+ * with the extension of the day it was typed; the format a track is saved in can change after that.
+ */
+export function withOutputExtension(filename: string, extension: string): string {
+    const ext = path.extname(filename).toLowerCase();
+    const stem = AUDIO_EXTENSIONS.has(ext) ? filename.slice(0, -ext.length) : filename;
+    return `${stem}.${extension}`;
 }
 
 /** Same folder, regardless of case on Windows or a trailing separator. */

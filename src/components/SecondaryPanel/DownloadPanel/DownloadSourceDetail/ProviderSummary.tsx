@@ -33,8 +33,6 @@ export function ProviderSummary({ provider, sources, canRetry, width, height }: 
         },
     ].filter((stat) => stat.value > 0);
 
-    const hasSaved = sources.some((s) => s.savedFile);
-
     return (
         <Box flexDirection="column" width={width} height={height} overflow="hidden">
             <PanelFrame title={display.label.toUpperCase()} color={display.color} width={width} grow>
@@ -54,9 +52,7 @@ export function ProviderSummary({ provider, sources, canRetry, width, height }: 
                             <Hint shortcutId="downloadSourceTree.retryProvider" label="Search and download again" />
                         ) : (
                             <Text color={theme.text.hint} wrap="wrap">
-                                {hasSaved
-                                    ? "One of these files is saved, so this can't be searched again."
-                                    : "Can't search again while another download is running."}
+                                {"Can't search again while another download is running."}
                             </Text>
                         )}
                     </Box>

@@ -17,6 +17,13 @@ export type MusicDownloadFlowSettings = {
         autoChooseBestSource: boolean;
         /** When auto-selecting among multiple downloaded sources, prefer lossless over lossy/transcoded. */
         preferLossless: boolean;
+        /**
+         * Save every track in one audio format (`convertFormat`), converting it when the download is in another.
+         * Off: a track is saved in the format it was downloaded in (FLAC, MP3, Opus…).
+         */
+        convertAudio: boolean;
+        /** An `OutputFormatKey` ("flac", "mp3", "ogg", "opus", "m4a"); unknown values count as FLAC. */
+        convertFormat: string;
         outputDir: string;
         outputTemporaryDir: string;
         /** Suggest cleaning temporary downloads that no recent session uses (at most once a day, at start-up). */
@@ -79,6 +86,8 @@ export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSetting
     download: {
         autoChooseBestSource: false,
         preferLossless: true,
+        convertAudio: true,
+        convertFormat: "flac",
         outputDir: MEDIA_OUTPUT_DIR,
         outputTemporaryDir: path.join(MEDIA_OUTPUT_DIR, "tmp"),
         tempCleanupReminder: true,

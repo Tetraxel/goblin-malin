@@ -3,10 +3,14 @@ import {
     type TrackDownloadTask,
     type CollectionDownloadTask,
 } from "#flows/musicDownloadFlow/types";
+import { savedFileFromLegacyRows } from "./savedSource";
 
 function reviveTrackDates(attrs: TrackDownloadTask): TrackDownloadTask {
+    // Older sessions kept the saved file on the download row it was made from.
+    const savedFile = attrs.savedFile ?? savedFileFromLegacyRows(attrs.downloadSources);
     return {
         ...attrs,
+        savedFile: savedFile ? { ...savedFile, savedAt: new Date(savedFile.savedAt) } : undefined,
         metadataGroups: attrs.metadataGroups.map((group) => ({
             ...group,
             results: group.results.map((result) => ({
@@ -20,9 +24,7 @@ function reviveTrackDates(attrs: TrackDownloadTask): TrackDownloadTask {
         downloadSources: attrs.downloadSources.map((source) => ({
             ...source,
             downloadedAt: new Date(source.downloadedAt),
-            savedFile: source.savedFile
-                ? { ...source.savedFile, savedAt: new Date(source.savedFile.savedAt) }
-                : undefined,
+            savedFile: undefined,
             localFile: source.localFile ? { ...source.localFile } : undefined,
         })),
     };

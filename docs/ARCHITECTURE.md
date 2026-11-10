@@ -8,7 +8,7 @@ A keyboard-driven terminal UI (Ink / React) that turns streaming-platform links 
 
 ```
 import URL ──► primary metadata ──► discovery on other platforms ──► download sources ──► pick one ──► tag + save
-(Spotify,      (Spotify /           (Songlink*, MusicBrainz,        (yt-dlp, Soulseek)                (FLAC in the
+(Spotify,      (Spotify /           (Songlink*, MusicBrainz,        (yt-dlp, Soulseek)                (tagged file in
  YouTube,       YouTube)             Claude*, last resort)                                             output folder)
  albums,                                                          * opt-in, asks once
  playlists)

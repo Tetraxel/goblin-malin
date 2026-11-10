@@ -4,7 +4,7 @@ import * as os from "os";
 import * as path from "path";
 import type { DownloadTask as DownloadTaskType } from "#flows/musicDownloadFlow/utils/downloadTask";
 import type { DownloadUpdateCallback } from "#flows/musicDownloadFlow/downloadService";
-import type { TrackDownloadSource, TrackMetadata } from "#flows/musicDownloadFlow/types";
+import type { TrackDownloadSource, TrackDownloadTask, TrackMetadata } from "#flows/musicDownloadFlow/types";
 
 // Anything that touches app data (settings, sessions, logs) must point at a temp dir first,
 // hence the dynamic imports below.
@@ -44,7 +44,10 @@ let soulseekOutcome: "failed" | "downloaded";
 
 let m: {
     DownloadTask: typeof DownloadTaskType;
-    makeTask: (sources: TrackDownloadSource[], extra?: { downloadsFetched?: boolean }) => DownloadTaskType;
+    makeTask: (
+        sources: TrackDownloadSource[],
+        extra?: Partial<Pick<TrackDownloadTask, "downloadsFetched" | "savedFile">>
+    ) => DownloadTaskType;
 };
 
 beforeAll(async () => {
@@ -116,6 +119,7 @@ beforeAll(async () => {
                     metadataOverride: {},
                     downloadSources: sources,
                     downloadsFetched: extra.downloadsFetched ?? true,
+                    savedFile: extra.savedFile,
                     toTag: true,
                     toDownload: true,
                 },
@@ -222,15 +226,53 @@ describe("canRetryDownloadProvider", () => {
         expect(task.canRetryDownloadProvider("soulseek")).toBe(true);
     });
 
-    test("is false when one of the provider's files is already saved", () => {
-        const savedFile = { path: "C:/music/Jersey.flac", savedAt: new Date() };
-        const task = m.makeTask([row("ytdlp", "downloaded", { savedFile }), row("soulseek", "failed")]);
-        expect(task.canRetryDownloadProvider("ytdlp")).toBe(false);
+    test("is true for a provider whose file is saved: the saved file is the task's own, not one of the rows", () => {
+        const savedFile = {
+            path: "C:/music/Jersey.flac",
+            savedAt: new Date(),
+            provider: "ytdlp" as const,
+            track: row("ytdlp", "downloaded").track,
+        };
+        const task = m.makeTask([row("ytdlp", "downloaded"), row("soulseek", "failed")], { savedFile });
+        expect(task.canRetryDownloadProvider("ytdlp")).toBe(true);
         expect(task.canRetryDownloadProvider("soulseek")).toBe(true);
     });
 
     test("is false for a provider with no rows", () => {
         const task = m.makeTask([row("soulseek", "failed")]);
         expect(task.canRetryDownloadProvider("ytdlp")).toBe(false);
+    });
+});
+
+describe("startDownloads and the saved file", () => {
+    const savedFile = {
+        path: "C:/music/Jersey.flac",
+        savedAt: new Date(),
+        provider: "soulseek" as const,
+        track,
+        providerDetail: "LostianGirl",
+    };
+
+    test("downloading again replaces every row but keeps the saved file", async () => {
+        soulseekOutcome = "failed";
+        soulseekRuns = 0;
+        // The saved file came from a Soulseek row that is no longer in the list at all.
+        const task = m.makeTask([row("ytdlp", "failed", { selected: true })], { savedFile });
+
+        await task.startDownloads();
+
+        expect(task.getAttributes()?.savedFile).toEqual(savedFile);
+        expect(summary(task)).toEqual(["ytdlp:downloaded", "soulseek:failed", "soulseek:failed", "soulseek:failed"]);
+    });
+
+    test("the saved provider is downloaded again like any other (no duplicate, no skip)", async () => {
+        soulseekOutcome = "failed";
+        soulseekRuns = 0;
+        const task = m.makeTask([], { savedFile });
+
+        await task.startDownloads();
+
+        expect(soulseekRuns).toBe(1);
+        expect(sourcesOf(task).filter((s) => s.provider === "soulseek")).toHaveLength(3);
     });
 });

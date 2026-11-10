@@ -1,6 +1,10 @@
 import { type Task } from "#base/task/task";
 import { computeCompiledMetadata, type CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
-import { type MusicDownloadTaskAttributes, type TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import {
+    type MusicDownloadTaskAttributes,
+    type SavedFile,
+    type TrackDownloadSource,
+} from "#flows/musicDownloadFlow/types";
 import { type ArchivedTaskSnapshot, type SessionTaskSnapshot, type StoredSession } from "./types";
 
 /** Display-ready view of one archived task, derived from its stored snapshot. */
@@ -33,10 +37,16 @@ type Derived = Omit<ArchivedEntry, "sessionId" | "sessionName" | "archivedAt" | 
 const derivedCache = new WeakMap<ArchivedTaskSnapshot, Derived>();
 
 function bestSource(sources: TrackDownloadSource[]): TrackDownloadSource | undefined {
-    return (
-        sources.find((s) => !s.isRejected && s.savedFile) ??
-        sources.find((s) => !s.isRejected && s.localFile?.state === "found")
-    );
+    return sources.find((s) => !s.isRejected && s.localFile?.state === "found");
+}
+
+/**
+ * The file a track was saved as. Archived snapshots are stored as they were, so one from an older version still has
+ * it on a download row.
+ */
+function savedFileOf(attrs: MusicDownloadTaskAttributes | undefined): SavedFile | undefined {
+    if (attrs?.kind !== "track") return undefined;
+    return attrs.savedFile ?? attrs.downloadSources?.find((s) => !s.isRejected && s.savedFile)?.savedFile;
 }
 
 function derive(entry: ArchivedTaskSnapshot): Derived {
@@ -68,6 +78,7 @@ function derive(entry: ArchivedTaskSnapshot): Derived {
             compiled = undefined; // malformed legacy snapshot — still list it by URL
         }
         const source = bestSource(attrs?.downloadSources ?? []);
+        const saved = savedFileOf(attrs);
         derived = {
             task,
             taskId: task.id,
@@ -75,12 +86,12 @@ function derive(entry: ArchivedTaskSnapshot): Derived {
             artist: compiled?.artists.map((a) => a.name).join(", ") ?? "",
             title: compiled?.trackName || url,
             compiled,
-            filePath: source?.savedFile?.path ?? source?.localFile?.path,
-            savedAt: source?.savedFile?.savedAt ? new Date(source.savedFile.savedAt).toISOString() : undefined,
+            filePath: saved?.path ?? source?.localFile?.path,
+            savedAt: saved?.savedAt ? new Date(saved.savedAt).toISOString() : undefined,
             metadataServiceKeys: (attrs?.metadataGroups ?? [])
                 .filter((g) => g.results.length > 0)
                 .map((g) => g.serviceKey),
-            downloadProvider: source?.provider,
+            downloadProvider: saved?.provider ?? source?.provider,
             url,
         };
     }
@@ -159,7 +170,7 @@ export function findSavedTaskIds(tasks: Task[]): string[] {
     const isSaved = (t: QueuedTask): boolean => {
         const attrs = t.getAttributes();
         if (t.running || !attrs) return false;
-        if (attrs.kind === "track") return attrs.downloadSources.some((s) => !s.isRejected && !!s.savedFile);
+        if (attrs.kind === "track") return savedFileOf(attrs) !== undefined;
         const children = attrs.childTaskIds.map((id) => byId.get(id)).filter((c): c is QueuedTask => !!c);
         return children.length > 0 && children.every(isSaved);
     };

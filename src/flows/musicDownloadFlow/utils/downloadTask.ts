@@ -16,10 +16,10 @@ import {
     type DiscoverySource,
     type DiscoveryResult,
     type Platform,
+    type LocalFile,
 } from "#flows/musicDownloadFlow/types";
 import { runWithoutCache } from "#utils/cache";
 import { overwriteConfirmBridge } from "#base/bridges/overwriteConfirmBridge";
-import { cleanAndTagFlac } from "#utils/metadata";
 import { SafeAction } from "#utils/decorators";
 import { metadataLimiter, downloadLimiter } from "./stageLimiters";
 import { computeConfidenceScore } from "./confidence";
@@ -27,7 +27,11 @@ import { ensureDiscoveryConsent, getUnansweredConsentKeys } from "./discoveryCon
 import { computeCompiledMetadata } from "./compiledMetadata";
 import { compiledFieldValues } from "./metadataFields";
 import { compiledMetadataToTags } from "./compiledMetadataToTags";
-import { computeOutputPath, isOutputPathTaken } from "./computeOutputPath";
+import { computeOutputPath, isOutputPathTaken, samePath } from "./computeOutputPath";
+import { convertAudioInto } from "./convertAudio";
+import { extensionOf, parseOutputFormat, planSave } from "./outputFormat";
+import { isSavedFrom } from "./savedSource";
+import { tagAudioFile } from "./tagAudioFile";
 import { pickAutoSelectedIndex } from "./sourceSelection";
 import { type MetadataService } from "../metadataService";
 import { type DiscoveryMetadataService } from "../discoveryMetadataService";
@@ -944,6 +948,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 localFile: {
                     ...s.localFile!,
                     path: newPath,
+                    extension: (extensionOf(newPath) || s.localFile?.extension) as LocalFile["extension"],
                     state: "found" as const,
                     name:
                         newPath
@@ -963,7 +968,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.updateAttributes({ outputDirOverride: dir });
     }
 
-    /** Sets the name this track is saved as (already cleaned); `undefined` goes back to "Artist - Title.flac". */
+    /** Sets the name this track is saved as (already cleaned); `undefined` goes back to "Artist - Title". */
     setOutputFilename(filename: string | undefined): void {
         this.updateAttributes({ outputFilenameOverride: filename });
     }
@@ -973,17 +978,23 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.updateAttributes({ overwriteTags: overwrite });
     }
 
-    async saveTrack(): Promise<void> {
+    /**
+     * Saves the track into the output folder, from the selected download source — or, with `fromSaved`, from the
+     * file it is already saved as (re-tag, rename, move: no download is needed, and the format stays).
+     */
+    async saveTrack(options: { fromSaved?: boolean } = {}): Promise<void> {
         const attrs = this.getAttributes();
         const sources = attrs?.downloadSources ?? [];
-        const selectedSource = sources.find((s) => s.selected);
+        const saved = attrs?.savedFile;
 
-        if (!selectedSource) throw new Error("No download source selected");
-        // A track that is already saved can be re-tagged / renamed / moved without its temporary copy, which
-        // may have been cleaned up since (only a *new* save copies from it).
-        if (!selectedSource.savedFile && selectedSource.localFile?.state !== "found") {
-            throw new Error("Local file not found");
-        }
+        // Where the new saved file comes from: a download row, or the saved file itself.
+        const origin = options.fromSaved ? saved : sources.find((s) => s.selected);
+        if (!origin) throw new Error(options.fromSaved ? "No saved file" : "No download source selected");
+        const selectedSource = options.fromSaved ? undefined : (origin as TrackDownloadSource);
+        if (selectedSource && selectedSource.localFile?.state !== "found") throw new Error("Local file not found");
+        // Made from the download the track is saved from already (or from the saved file itself): the file is
+        // updated in place when its format stays. From any other download it is replaced.
+        const sameOrigin = !!saved && (!selectedSource || isSavedFrom(saved, selectedSource));
 
         const settings = getSaveSettings();
         globalLogger.info("Saving track with settings:", { settings });
@@ -994,70 +1005,92 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         });
         const outputDir = attrs!.outputDirOverride ?? settings.outputDir;
         await fs.mkdir(outputDir, { recursive: true });
-        const outputPath = computeOutputPath(compiled, outputDir, attrs!.outputFilenameOverride);
-        // Another file with this name is replaced only if the user agrees. The track's own saved files don't
-        // count: this one replaces them anyway (the saved files of the other sources are deleted below).
-        if (
-            isOutputPathTaken(
-                outputPath,
-                sources.map((s) => s.savedFile?.path)
-            ) &&
-            !(await overwriteConfirmBridge.confirm(outputPath))
-        ) {
+        // What the file is saved as: the format from Settings (or the download's own), see `planSave`.
+        const downloadPath = selectedSource?.localFile?.path;
+        const plan = planSave(settings, downloadPath, sameOrigin ? saved?.path : undefined);
+        const outputPath = computeOutputPath(compiled, outputDir, attrs!.outputFilenameOverride, plan.extension);
+        // Another file with this name is replaced only if the user agrees. The track's own saved file doesn't
+        // count: this one replaces it anyway.
+        if (isOutputPathTaken(outputPath, [saved?.path]) && !(await overwriteConfirmBridge.confirm(outputPath))) {
             globalLogger.info("Save cancelled: the file name is taken and the user kept the existing file");
             return;
         }
 
-        this.status.update({ type: StatusType.Processing, message: "Saving…" });
+        this.status.update({
+            type: StatusType.Processing,
+            message: plan.convert ? `Converting to ${plan.extension.toUpperCase()}…` : "Saving…",
+        });
 
-        const existingSavedPath = selectedSource.savedFile?.path ?? null;
+        const existingSavedPath = saved?.path ?? null;
+        // Only a file made here is deleted when saving fails: a saved file that was merely renamed is the user's.
         let outputCreated = false;
 
-        try {
-            // Delete saved files from other sources (they're being replaced)
-            for (const src of sources) {
-                if (src !== selectedSource && src.savedFile) {
-                    try {
-                        await fs.unlink(src.savedFile.path);
-                    } catch (e: unknown) {
-                        if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-                    }
-                }
-            }
+        // A file already at the target (the user agreed to replace it): a failed write must not delete it as a "partial".
+        const outputExisted = await fs.access(outputPath).then(
+            () => true,
+            () => false
+        );
 
-            if (existingSavedPath) {
-                // Re-saving same source: rename to new path if it changed, otherwise just re-tag
+        try {
+            if (plan.mode === "reuse") {
+                // Re-saving same source: re-tag the file where it is, then rename it to its new path if that changed.
+                // Tagging first means a failure leaves the file where the task still points at it.
+                if (attrs!.overwriteTags !== false) await tagAudioFile(existingSavedPath!, tags);
                 if (existingSavedPath !== outputPath) {
                     const { moveFile } = await import("../../../utils/metadata");
-                    await moveFile(existingSavedPath, outputPath);
+                    await moveFile(existingSavedPath!, outputPath);
+                }
+            } else {
+                // New file from the temporary download: a plain copy, or a re-encode into the chosen format.
+                try {
+                    if (plan.convert) {
+                        await convertAudioInto(downloadPath!, outputPath, parseOutputFormat(plan.extension));
+                    } else {
+                        await fs.copyFile(downloadPath!, outputPath);
+                    }
+                } catch (err) {
+                    // A copy that stopped half-way leaves a partial file under the final name.
+                    if (!outputExisted) await fs.unlink(outputPath).catch(() => {});
+                    throw err;
                 }
                 outputCreated = true;
-            } else {
-                // New source: copy temp file to output dir
-                await fs.copyFile(selectedSource.localFile!.path, outputPath);
-                outputCreated = true;
+                // Off: the file keeps the tags it came with (it is still copied/renamed/moved as usual).
+                if (attrs!.overwriteTags !== false) await tagAudioFile(outputPath, tags);
             }
 
-            // Off: the file keeps the tags it came with (it is still copied/renamed/moved as usual).
-            if (attrs!.overwriteTags !== false) await cleanAndTagFlac(outputPath, tags);
+            // Only now that the new file is in place is the one it replaces deleted (a file that was updated in
+            // place, or kept its name, is the new file itself).
+            if (existingSavedPath && plan.mode === "fromDownload" && !samePath(existingSavedPath, outputPath)) {
+                await fs.unlink(existingSavedPath).catch((e: NodeJS.ErrnoException) => {
+                    if (e.code !== "ENOENT") throw e;
+                });
+            }
 
+            // The temporary download no longer describes a re-encoded file: remember what was really written.
+            const reencoded = plan.mode === "fromDownload" ? plan.convert : !!saved?.converted;
+            const converted = reencoded
+                ? { format: plan.extension, sizeBytes: (await fs.stat(outputPath)).size }
+                : undefined;
+
+            // What the file was made from is kept with it: the download rows may all be replaced later.
             this.updateAttributes({
-                downloadSources: sources.map((s) =>
-                    s === selectedSource
-                        ? {
-                              ...s,
-                              savedFile: {
-                                  path: outputPath,
-                                  savedAt: new Date(),
-                                  // What was just written; when the file kept its own tags, what was known before.
-                                  tags:
-                                      attrs!.overwriteTags !== false
-                                          ? compiledFieldValues(compiled)
-                                          : selectedSource.savedFile?.tags,
-                              },
-                          }
-                        : { ...s, savedFile: undefined }
-                ),
+                savedFile: {
+                    path: outputPath,
+                    savedAt: new Date(),
+                    provider: origin.provider,
+                    track: origin.track,
+                    providerDetail: origin.providerDetail,
+                    fileInfo: origin.fileInfo,
+                    downloadPath: selectedSource ? selectedSource.localFile?.path : saved?.downloadPath,
+                    converted,
+                    // What was just written; when the file kept its own tags, what was known before.
+                    tags:
+                        attrs!.overwriteTags !== false
+                            ? compiledFieldValues(compiled)
+                            : sameOrigin
+                              ? saved?.tags
+                              : undefined,
+                },
             });
 
             this.status.set({ type: StatusType.Success, message: "Saved" });
@@ -1205,8 +1238,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
     /**
      * Whether `provider`'s whole search + download can be re-run now. Not while the first pass is still going,
-     * while another provider's rows are being worked on (replacing this provider's rows shifts their positions),
-     * or when one of its files has been saved (re-running would drop the record of that saved copy).
+     * or while another provider's rows are being worked on (replacing this provider's rows shifts their positions).
+     * A saved file doesn't get in the way: it is the task's own record, not one of the rows that are replaced.
      */
     canRetryDownloadProvider(provider: string): boolean {
         const attrs = this.getAttributes();
@@ -1215,8 +1248,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         const sources = attrs.downloadSources;
         if (!sources.some((s) => s.provider === provider)) return false;
         if (this.retryingProviders.has(provider)) return false;
-        if (sources.some((s) => s.provider !== provider && DownloadTask.isInFlight(s))) return false;
-        return !sources.some((s) => s.provider === provider && s.savedFile);
+        return !sources.some((s) => s.provider !== provider && DownloadTask.isInFlight(s));
     }
 
     /**
@@ -1280,6 +1312,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         }
 
         this.logger.info(`Starting downloads with ${metadataGroups.length} metadata groups`);
+        // Only the download rows are redone: the saved file is the task's own record (`savedFile`) and stays.
         this.updateAttributes({ downloadSources: [], downloadsFetched: false });
 
         for (const downloadService of this.downloadServices.getAllServices()) {

@@ -20,10 +20,11 @@ import {
     cleanOutputDir,
     cleanOutputFilename,
     isSameDir,
-    OUTPUT_EXTENSION,
     stripOutputExtension,
 } from "#flows/musicDownloadFlow/utils/cleanOutputDir";
-import { getProvenanceDisplay } from "#flows/musicDownloadFlow/utils/provenance";
+import { getProvenanceDisplay, getSavedFileDisplay } from "#flows/musicDownloadFlow/utils/provenance";
+import { extensionOf, previewOutputExtension } from "#flows/musicDownloadFlow/utils/outputFormat";
+import { getSaveSettings } from "#flows/musicDownloadFlow/saveSettings";
 import { getInstance } from "#utils/mpvPlayer";
 import { playableFilePath } from "#flows/musicDownloadFlow/utils/playableFile";
 import { togglePlayback as toggleFilePlayback, seekFileToFraction } from "#utils/togglePlayback";
@@ -56,7 +57,7 @@ interface DownloadSourceDetailProps {
     /** Folder from Settings, used when the track has no override of its own. */
     defaultOutputDir: string;
     isOutputOverridden: boolean;
-    /** Name chosen for this track instead of "Artist - Title.flac"; undefined when it has none. */
+    /** Name chosen for this track instead of "Artist - Title"; undefined when it has none. */
     filenameOverride: string | undefined;
     /** Whether saving writes the compiled metadata into the file's tags. */
     overwriteTags: boolean;
@@ -78,7 +79,7 @@ interface DownloadSourceDetailProps {
     onSave: () => void;
     /** `undefined` goes back to the default folder. */
     onChangeOutputDir: (dir: string | undefined) => void;
-    /** `undefined` goes back to the "Artist - Title.flac" name. */
+    /** `undefined` goes back to the "Artist - Title" name. */
     onChangeFilename: (filename: string | undefined) => void;
     onChangeOverwriteTags: (overwrite: boolean) => void;
     onOverridesChange: (overrides: MetadataOverrides) => void;
@@ -334,8 +335,13 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
 
     // ── Editing ───────────────────────────────────────────────────────────────
 
-    const defaultFilename = compiled ? computeOutputFilename(compiled) : "";
-    const currentFilename = compiled ? computeOutputFilename(compiled, filenameOverride) : "";
+    // The extension is not typed by the user: it is the format the track will be saved in (Settings → Download),
+    // or, when only the saved file is left (its download was cleaned up), the one it has. A saved file in another
+    // format than the setting wants is made again from its download, so the name shows the new extension.
+    const downloadPath = source?.localFile?.state === "found" ? source.localFile.path : undefined;
+    const outputExt = previewOutputExtension(getSaveSettings(), downloadPath, source?.savedFile?.path);
+    const defaultFilename = compiled ? computeOutputFilename(compiled, undefined, outputExt) : "";
+    const currentFilename = compiled ? computeOutputFilename(compiled, filenameOverride, outputExt) : "";
 
     function isOverridden(target: string): boolean {
         if (target === "output") return isOutputOverridden;
@@ -370,7 +376,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                 onChangeFilename(undefined);
                 return null;
             }
-            const cleaned = cleanOutputFilename(value);
+            const cleaned = cleanOutputFilename(value, outputExt);
             if (!cleaned) return "Not a valid file name";
             onChangeFilename(cleaned === defaultFilename ? undefined : cleaned);
             return null;
@@ -420,7 +426,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
 
     function startEditing(target: string) {
         // The extension is fixed, so the file name is edited without it.
-        const draft = target === "filename" ? stripOutputExtension(currentFilename) : textOf(target);
+        const draft = target === "filename" ? stripOutputExtension(currentFilename, outputExt) : textOf(target);
         setEdit({ target, draft, error: null, inputKey: 0 });
         setIsEditingField(true);
     }
@@ -434,8 +440,10 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
         if (!edit) return;
         const chunk = insertedText(edit.draft, next);
         if (replacesDraft(edit.target, chunk)) {
-            const cleanedPath = edit.target === "output" ? cleanOutputDir(chunk) : cleanOutputFilename(chunk);
-            const cleaned = cleanedPath && edit.target === "filename" ? stripOutputExtension(cleanedPath) : cleanedPath;
+            const cleanedPath =
+                edit.target === "output" ? cleanOutputDir(chunk) : cleanOutputFilename(chunk, outputExt);
+            const cleaned =
+                cleanedPath && edit.target === "filename" ? stripOutputExtension(cleanedPath, outputExt) : cleanedPath;
             if (cleaned) {
                 // Remounting the input puts its cursor at the end of the rewritten draft.
                 setEdit({ ...edit, draft: cleaned, error: null, inputKey: edit.inputKey + 1 });
@@ -731,7 +739,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     // (or the one this source replaces) is not "another file".
     const replacesExisting =
         compiled != null &&
-        isOutputPathTaken(computeOutputPath(compiled, outputDir, filenameOverride), [
+        isOutputPathTaken(computeOutputPath(compiled, outputDir, filenameOverride, outputExt), [
             source.savedFile?.path,
             savedSource?.savedFile?.path,
         ]);
@@ -740,8 +748,22 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     const fileNotFound = source.localFile?.state === "not_found" && !source.savedFile;
     const sourceDurationMs = source.fileInfo?.durationMs ?? source.track.duration ?? 0;
     const displayDurationMs = newPlayback.durationMs > 0 ? newPlayback.durationMs : sourceDurationMs;
-    const sizeText = source.fileInfo ? formatBytes(source.fileInfo.sizeBytes) : "—";
-    const provenance = getProvenanceDisplay(source.fileInfo);
+    // What the panel describes is the file the track will be (or is) saved as. When saving re-encodes the download,
+    // that is not the download itself: the format and quality are worked out for the converted file, and its size
+    // is unknown until it is written.
+    const willConvert = !isSaved && !!downloadPath && extensionOf(downloadPath) !== outputExt;
+    const savedConversion = isSaved ? source.savedFile?.converted : undefined;
+    const provenance =
+        isSaved || willConvert
+            ? getSavedFileDisplay(source.fileInfo, isSaved ? savedConversion : { format: outputExt, sizeBytes: 0 })
+            : getProvenanceDisplay(source.fileInfo);
+    const sizeText = willConvert
+        ? "—"
+        : savedConversion
+          ? formatBytes(savedConversion.sizeBytes)
+          : source.fileInfo
+            ? formatBytes(source.fileInfo.sizeBytes)
+            : "—";
     const formatLabel = provenance.badge || (source.fileInfo?.format ?? "flac").toUpperCase();
     const provenanceColor = provenance.tone === "warning" ? theme.status.warning : theme.status.success;
     const embeddedTags = source.fileInfo?.embeddedTags ?? {};
@@ -761,7 +783,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                   inputKey: edit.inputKey,
                   onChange: handleDraftChange,
                   onSubmit: handleDraftSubmit,
-                  suffix: target === "filename" ? OUTPUT_EXTENSION : undefined,
+                  suffix: target === "filename" ? `.${outputExt}` : undefined,
               }
             : undefined;
 
@@ -785,7 +807,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
         // Panel width minus its border, the row's padding, the gutter, the label column and the gap after it.
         const valueWidth = panelWidth - 2 - 2 - 2 - COMPACT_LABEL_W - 1;
         const lines = editRowLines(
-            { ...edit, suffix: target === "filename" ? OUTPUT_EXTENSION : undefined },
+            { ...edit, suffix: target === "filename" ? `.${outputExt}` : undefined },
             valueWidth
         );
         return lines > 1 ? lines : undefined;
@@ -798,9 +820,10 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
         (diskTags?.path === oldPath ? diskTags?.values : undefined) ??
         oldSource?.savedFile?.tags ??
         (baseCompiled ? compiledFieldValues(baseCompiled) : {});
-    const oldProvenance = getProvenanceDisplay(oldSource?.fileInfo);
+    const oldProvenance = getSavedFileDisplay(oldSource?.fileInfo, oldSource?.savedFile?.converted);
     const oldFormatLabel = oldProvenance.badge || (oldSource?.fileInfo?.format ?? "flac").toUpperCase();
-    const oldSize = oldSource?.fileInfo ? formatBytes(oldSource.fileInfo.sizeBytes) : "—";
+    const oldBytes = oldSource?.savedFile?.converted?.sizeBytes ?? oldSource?.fileInfo?.sizeBytes;
+    const oldSize = oldBytes !== undefined ? formatBytes(oldBytes) : "—";
     const oldDuration = formatDuration(oldSource?.fileInfo?.durationMs ?? oldSource?.track.duration ?? 0);
     const oldFilename = oldPath ? path.basename(oldPath) : "";
     const oldDir = oldPath ? path.dirname(oldPath) : "";

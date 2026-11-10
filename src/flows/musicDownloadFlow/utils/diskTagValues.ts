@@ -1,7 +1,8 @@
 import { readTags } from "./readFileInfo";
 import { FIELDS } from "./metadataFields";
+import { extensionOf } from "./outputFormat";
 
-/** The tag each compiled field is written to (see `cleanAndTagFlac`) and how to read it back as the field's text. */
+/** The tag each compiled field is written to (see `tagAudioFile`) and how to read it back as the field's text. */
 const FIELD_TAGS: Record<string, (tags: Record<string, string | string[]>) => string | undefined> = {
     trackName: (t) => join(t.TITLE),
     artists: (t) => join(t.ARTIST),
@@ -24,7 +25,6 @@ function join(value: string | string[] | undefined): string | undefined {
  * compiled metadata is shown in. It is the truth about a saved file, whatever was recorded when it was saved.
  */
 export async function readDiskFieldValues(filePath: string): Promise<Record<string, string>> {
-    const format = filePath.toLowerCase().endsWith(".mp3") ? "mp3" : "flac";
-    const tags = await readTags(filePath, format);
+    const tags = await readTags(filePath, extensionOf(filePath));
     return Object.fromEntries(FIELDS.map((f) => [f.key, FIELD_TAGS[f.key]?.(tags) ?? "—"]));
 }

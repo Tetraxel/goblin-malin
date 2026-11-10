@@ -7,10 +7,12 @@ import {
     type TrackDownloadSource,
     type DownloadProvider,
     type DownloadQueryField,
+    type SavedFile,
 } from "#flows/musicDownloadFlow/types";
 import type { Updater } from "#hooks/useFocusManager";
 import { togglePlayback } from "#utils/togglePlayback";
 import { playableFilePath } from "#flows/musicDownloadFlow/utils/playableFile";
+import { isSavedFrom } from "#flows/musicDownloadFlow/utils/savedSource";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useNowPlaying, type NowPlaying } from "#hooks/useNowPlaying";
 import { ProviderHeader } from "./ProviderHeader";
@@ -21,14 +23,19 @@ import { MoreRow } from "./MoreRow";
 import { SavedFileRow, SAVED_ROW_HEIGHT } from "./SavedFileRow";
 import { computeWindow } from "./treeWindow";
 
+/** What `onRequestSave` gets for the pinned saved file, which is not one of `sources`. */
+export const SAVED_SOURCE_INDEX = -1;
+
 interface DownloadSourceTreeProps {
     sources: TrackDownloadSource[];
+    /** The track's saved file as a stand-in row (see `savedFileAsSource`); null while nothing is saved. */
+    savedSource: TrackDownloadSource | null;
     /** Show, under each group of rows, what the provider was actually asked for. */
     showQuery: boolean;
     selectedSourceIndex: number;
     /** The provider whose header holds the cursor (instead of one of its rows); null when a row does. */
     focusedProvider: DownloadProvider | null;
-    /** The cursor is on the pinned "saved file" row (instead of the saved source's own row in the list). */
+    /** The cursor is on the pinned "saved file" row. */
     savedFocused: boolean;
     isActive: boolean;
     width: number;
@@ -53,7 +60,7 @@ interface DownloadSourceTreeProps {
     onRequestSelect: (index: number) => void;
     onRejectSource: (index: number) => void;
     onRetrySource: (index: number) => void;
-    /** Save (or update) the file of that source to the output folder. */
+    /** Save (or update) the file of that source to the output folder; `SAVED_SOURCE_INDEX` updates the saved file itself. */
     onRequestSave: (index: number) => void;
     onInnerFocusSwitch: () => void;
 }
@@ -162,15 +169,23 @@ function isRowContext(item: TreeItem): boolean {
 }
 
 /** Whether the player is on this source's file (the downloaded one, or the copy saved from it). */
-function playbackOf(source: TrackDownloadSource, nowPlaying: NowPlaying): "playing" | "paused" | undefined {
+function playbackOf(
+    source: TrackDownloadSource,
+    nowPlaying: NowPlaying,
+    saved?: SavedFile
+): "playing" | "paused" | undefined {
     if (!nowPlaying) return undefined;
-    const isThis = nowPlaying.filePath === source.localFile?.path || nowPlaying.filePath === source.savedFile?.path;
+    const isThis =
+        nowPlaying.filePath === source.localFile?.path ||
+        nowPlaying.filePath === source.savedFile?.path ||
+        (saved !== undefined && isSavedFrom(saved, source) && nowPlaying.filePath === saved.path);
     if (!isThis) return undefined;
     return nowPlaying.isPaused ? "paused" : "playing";
 }
 
 export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     sources,
+    savedSource,
     showQuery,
     selectedSourceIndex,
     focusedProvider,
@@ -197,8 +212,8 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     // Re-renders only when the track or its paused state changes, not on playback progress.
     const nowPlaying = useNowPlaying();
     // The saved file is pinned above the scrolling list, so the list gets what is left.
-    const savedIndex = sources.findIndex((s) => s.savedFile != null);
-    const hasSaved = savedIndex >= 0;
+    const hasSaved = savedSource != null;
+    const savedFile = savedSource?.savedFile;
     const onSaved = hasSaved && savedFocused && focusedProvider === null;
     const height = hasSaved ? Math.max(1, fullHeight - SAVED_ROW_HEIGHT) : fullHeight;
     const treeItems = buildTreeItems(sources, showQuery, canShowMore);
@@ -271,16 +286,21 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
 
     // While a header holds the cursor there is no row to select, play, save…
     const onHeader = focusedProvider !== null;
-    const selectedSource = onHeader ? undefined : sources[selectedSourceIndex];
+    // What the keys act on: the saved file while the cursor is on its pinned row, else the focused download row.
+    const selectedSource = onHeader ? undefined : onSaved ? (savedSource ?? undefined) : sources[selectedSourceIndex];
     const canRetryHeader = onHeader && canRetryProvider(focusedProvider);
     // Previewing and saving need a file: the temporary copy, or the saved file once that copy is cleaned up.
     const playPath = selectedSource ? playableFilePath(selectedSource) : null;
     const canPlay = playPath !== null;
-    const saveLabel = selectedSource?.savedFile ? "Update" : "Save";
+    const saveLabel =
+        selectedSource?.savedFile || (savedFile && selectedSource && isSavedFrom(savedFile, selectedSource))
+            ? "Update"
+            : "Save";
     // A source only carries retryPayload if its provider supports re-attempting it
     // on demand (e.g. a Soulseek candidate that was "skipped" or "failed") — gate on
     // the data being present rather than hardcoding which providers/states qualify.
     const canRetry =
+        !onSaved &&
         selectedSource?.retryPayload != null &&
         (selectedSource.state === "skipped" || selectedSource.state === "failed");
     // The "more" row of the search the cursor is in, if it has one.
@@ -330,7 +350,7 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                 defaultShortcut: { key: "return" },
                 label: "Select",
                 handler: () => {
-                    if (!onHeader && selectedSourceIndex >= 0) onRequestSelect(selectedSourceIndex);
+                    if (!onHeader && !onSaved && selectedSourceIndex >= 0) onRequestSelect(selectedSourceIndex);
                 },
             },
             {
@@ -347,7 +367,7 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                 defaultShortcut: { input: "s" },
                 label: saveLabel,
                 handler: () => {
-                    if (canPlay) onRequestSave(selectedSourceIndex);
+                    if (canPlay) onRequestSave(onSaved ? SAVED_SOURCE_INDEX : selectedSourceIndex);
                 },
             },
             {
@@ -409,36 +429,35 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
         ],
     });
 
+    // The saved file is the task's own record: it is there even while there are no download rows (before they are
+    // fetched, or while they are being redone).
+    const savedRow = savedSource && (
+        <SavedFileRow
+            source={savedSource}
+            isFocused={onSaved}
+            isActive={isActive}
+            width={width}
+            playback={playbackOf(savedSource, nowPlaying)}
+            onSelect={onFocusSaved}
+        />
+    );
+
     if (sources.length === 0) {
         return (
-            <Box
-                ref={treeRef}
-                flexDirection="column"
-                width={width}
-                height={height}
-                overflow="hidden"
-                paddingX={1}
-                paddingY={1}
-            >
-                <Text color={theme.text.secondary} dimColor>
-                    No download sources yet
-                </Text>
+            <Box ref={treeRef} flexDirection="column" width={width} height={fullHeight} overflow="hidden">
+                {savedRow}
+                <Box flexDirection="column" paddingX={1} paddingY={1} flexShrink={0}>
+                    <Text color={theme.text.secondary} dimColor>
+                        No download sources yet
+                    </Text>
+                </Box>
             </Box>
         );
     }
 
     return (
         <Box ref={treeRef} flexDirection="column" width={width} height={fullHeight} overflow="hidden">
-            {hasSaved && (
-                <SavedFileRow
-                    source={sources[savedIndex]}
-                    isFocused={onSaved}
-                    isActive={isActive}
-                    width={width}
-                    playback={playbackOf(sources[savedIndex], nowPlaying)}
-                    onSelect={onFocusSaved}
-                />
-            )}
+            {savedRow}
             {treeItems.slice(windowStart, windowEnd).map((item, offset) => {
                 const i = windowStart + offset;
                 if (item.type === "provider-header") {
@@ -491,7 +510,8 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                         isSelected={!onHeader && !onSaved && item.sourceIndex === selectedSourceIndex}
                         isActive={isActive}
                         width={width}
-                        playback={playbackOf(item.source, nowPlaying)}
+                        playback={playbackOf(item.source, nowPlaying, savedFile)}
+                        isSaved={savedFile !== undefined && isSavedFrom(savedFile, item.source)}
                         onSelect={onClickSource}
                     />
                 );

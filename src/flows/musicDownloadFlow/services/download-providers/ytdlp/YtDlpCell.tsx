@@ -9,7 +9,8 @@ export const YtDlpCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ task, 
     const attrs = task.attributes;
     const downloadSource =
         attrs?.kind === "track" ? attrs.downloadSources.find((d) => d.provider === "ytdlp") : undefined;
-    const saved = downloadSource?.savedFile;
+    // The saved file is the task's own; it is shown here when this provider is where it came from.
+    const saved = attrs?.kind === "track" && attrs.savedFile?.provider === "ytdlp" ? attrs.savedFile : undefined;
     const display = saved
         ? path.basename(saved.path)
         : downloadSource?.localFile

@@ -3,7 +3,7 @@
 ## Quick orientation
 
 - **What this is:** A keyboard-driven terminal UI (Ink/React) for downloading and tagging music tracks from streaming platforms.
-- **Current state:** Working pipeline, heading to v0.2.0 — Spotify / YouTube links, albums and playlists → cross-platform discovery → yt-dlp / Soulseek download → tagged FLAC. See [README.md](README.md) for what a user gets and [TODO.md](TODO.md) for what is left.
+- **Current state:** Working pipeline, heading to v0.2.0 — Spotify / YouTube links, albums and playlists → cross-platform discovery → yt-dlp / Soulseek download → tagged audio file (FLAC by default, other formats or none via Settings → Download). See [README.md](README.md) for what a user gets and [TODO.md](TODO.md) for what is left.
     - Run the local script [scripts/TREE.ps1](scripts/TREE.ps1) to get the full project tree
 - **Target state:** [docs/designs/](docs/designs/) (screenshots contain the most detail) and the "Promised … but not built yet" list in [TODO.md](TODO.md).
 

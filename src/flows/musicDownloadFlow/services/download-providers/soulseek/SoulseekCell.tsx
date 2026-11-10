@@ -26,7 +26,8 @@ export const SoulseekCell: ColumnComponent<MusicDownloadTaskAttributes> = ({ tas
         attrs?.kind === "track" ? attrs.downloadSources.filter((d) => d.provider === "soulseek") : [];
     const downloadSource = pickPrimarySource(soulseekSources);
 
-    const saved = downloadSource?.savedFile;
+    // The saved file is the task's own; it is shown here when this provider is where it came from.
+    const saved = attrs?.kind === "track" && attrs.savedFile?.provider === "soulseek" ? attrs.savedFile : undefined;
     const display = saved
         ? path.basename(saved.path)
         : downloadSource?.localFile

@@ -3,12 +3,14 @@ import * as path from "path";
 import { readFlacTags } from "flac-tagger";
 import NodeID3 from "node-id3";
 import { type FileInfo, type Provenance } from "#flows/musicDownloadFlow/types";
-import { probeAudio } from "#utils/probeAudio";
+import { probeAudio, probeTags } from "#utils/probeAudio";
 
 const ID3_TAG_MAP: Record<string, string | undefined> = {
     title: "TITLE",
     artist: "ARTIST",
+    performerInfo: "ALBUMARTIST",
     album: "ALBUM",
+    genre: "GENRE",
     year: "DATE",
     trackNumber: "TRACKNUMBER",
     ISRC: "ISRC",
@@ -30,13 +32,18 @@ function normalizeId3Tags(tags: NodeID3.Tags): Record<string, string | string[]>
     return embeddedTags;
 }
 
-export async function readTags(filePath: string, format: "flac" | "mp3"): Promise<Record<string, string | string[]>> {
+/** The tags in a file, in the FLAC / Vorbis-comment spelling the UI uses, whatever the file's format. */
+export async function readTags(filePath: string, format: string): Promise<Record<string, string | string[]>> {
     if (format === "flac") {
         const flacData = await readFlacTags(filePath);
         return flacData.tagMap ?? {};
     }
-    const tags = await NodeID3.Promise.read(filePath);
-    return normalizeId3Tags(tags);
+    if (format === "mp3") {
+        const tags = await NodeID3.Promise.read(filePath);
+        return normalizeId3Tags(tags);
+    }
+    // Ogg, Opus, M4A…: no dedicated reader, so ask ffprobe.
+    return probeTags(filePath);
 }
 
 /**
@@ -52,7 +59,7 @@ export async function readFileInfo(
     provenance: Provenance,
     sourceCodec?: string
 ): Promise<FileInfo> {
-    const format = path.extname(filePath).slice(1).toLowerCase() as "flac" | "mp3";
+    const format = path.extname(filePath).slice(1).toLowerCase() as FileInfo["format"];
 
     const [stats, embeddedTags, probeResult] = await Promise.all([
         stat(filePath),

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect, useMemo } from "react";
 import { Box } from "ink";
 import fs from "fs";
 import path from "path";
@@ -15,8 +15,10 @@ import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { computeCompiledMetadata, type CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { getSaveSettings } from "#flows/musicDownloadFlow/saveSettings";
 import { computeOutputPath, samePath } from "#flows/musicDownloadFlow/utils/computeOutputPath";
+import { previewOutputExtension } from "#flows/musicDownloadFlow/utils/outputFormat";
 import { isSameDir } from "#flows/musicDownloadFlow/utils/cleanOutputDir";
-import { DownloadSourceTree } from "./DownloadSourceTree/DownloadSourceTree";
+import { savedFileAsSource, isSavedFrom } from "#flows/musicDownloadFlow/utils/savedSource";
+import { DownloadSourceTree, SAVED_SOURCE_INDEX } from "./DownloadSourceTree/DownloadSourceTree";
 import { DownloadSourceDetail } from "./DownloadSourceDetail/DownloadSourceDetail";
 import { ProviderSummary } from "./DownloadSourceDetail/ProviderSummary";
 import { DynamicHintBar } from "#components/DynamicHintBar/DynamicHintBar";
@@ -85,7 +87,10 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     const downloadSources: TrackDownloadSource[] =
         snapshot?.attributes?.kind === "track" ? snapshot.attributes.downloadSources : [];
 
-    const savedSource: TrackDownloadSource | null = downloadSources.find((s) => s.savedFile != null) ?? null;
+    // The saved file is the task's own record, not one of the download rows: it stays through restarts and
+    // re-downloads. The UI shows it as a stand-in row.
+    const savedFile = snapshot?.attributes?.kind === "track" ? snapshot.attributes.savedFile : undefined;
+    const savedSource = useMemo(() => (savedFile ? savedFileAsSource(savedFile) : null), [savedFile]);
 
     const compiled: CompiledMetadata | null =
         snapshot?.attributes?.kind === "track"
@@ -113,38 +118,56 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     const rightWidth = width - leftWidth - 4;
     const listHeight = height - HINT_BAR_HEIGHT;
 
-    const savedIndex = downloadSources.findIndex((s) => s.savedFile != null);
     // The pinned saved row is only there while a file is saved.
     const onSaved = savedFocused && savedSource != null && focusedProvider === null;
-    const cursorSource = focusedProvider ? null : (downloadSources[downloadNavIndex] ?? null);
+    const cursorSource = focusedProvider || onSaved ? null : (downloadSources[downloadNavIndex] ?? null);
+    // The row under the cursor holds the download the saved file was made from.
+    const cursorIsSavedOrigin = cursorSource != null && savedFile != null && isSavedFrom(savedFile, cursorSource);
 
     // The diff follows the cursor. On any other source that has a file, the saved file (OLD) is shown next to
     // that source (NEW): what Enter would replace it with.
     const isSourceSwitch =
         savedSource != null &&
         cursorSource != null &&
-        cursorSource !== savedSource &&
+        !cursorIsSavedOrigin &&
         cursorSource.localFile?.state === "found";
 
-    // On the saved file itself: does saving now rename or move it? The name it would get is worked out like
-    // saving does.
+    // On the saved file itself (or the download it was made from): does saving now rename or move it? The name it
+    // would get is worked out like saving does.
     // Only an explicit per-track folder counts: changing the default folder in Settings applies to new saves,
     // it doesn't drag every saved file along.
-    const savedPath = savedSource?.savedFile?.path ?? null;
+    const savedPath = savedFile?.path ?? null;
     const hasFolderChange =
         outputDirOverride != null && savedPath != null && !isSameDir(path.dirname(savedPath), outputDirOverride);
     const hasMetadataChange =
         compiled != null &&
         savedPath != null &&
         !samePath(
-            computeOutputPath(compiled, outputDirOverride ?? path.dirname(savedPath), filenameOverride),
+            computeOutputPath(
+                compiled,
+                outputDirOverride ?? path.dirname(savedPath),
+                filenameOverride,
+                // The format saving would make it (a changed setting re-encodes it from its download, which only
+                // the row it was made from still has).
+                previewOutputExtension(
+                    getSaveSettings(),
+                    cursorIsSavedOrigin && cursorSource?.localFile?.state === "found"
+                        ? cursorSource.localFile.path
+                        : undefined,
+                    savedPath
+                )
+            ),
             savedPath
         );
-    const isMetadataChange =
-        !isSourceSwitch && cursorSource != null && cursorSource === savedSource && hasMetadataChange;
+    const isMetadataChange = !isSourceSwitch && (onSaved || cursorIsSavedOrigin) && hasMetadataChange;
 
     const showDiff = isSourceSwitch || isMetadataChange;
-    const effectivePendingSource = isSourceSwitch ? cursorSource : isMetadataChange ? savedSource : null;
+    // On the saved file the comparison is with itself; on its origin row, with that row.
+    const effectivePendingSource = isSourceSwitch
+        ? cursorSource
+        : isMetadataChange
+          ? (cursorSource ?? savedSource)
+          : null;
 
     useShortcuts({
         id: "downloadPanel",
@@ -207,11 +230,10 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
 
     /** Moves the cursor onto the pinned saved file (a click on it also focuses the list). */
     function handleFocusSaved() {
-        if (savedIndex < 0) return;
+        if (!savedSource) return;
         focusSourcesPane("list");
         setFocusedProvider(null);
         setSavedFocused(true);
-        setSelectedSourceIndex(savedIndex);
     }
 
     /** Lists the next results of one search (a click on its "show more" row, or the shortcut). */
@@ -255,9 +277,13 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
 
     /** Saves the file of the focused source: the selected one directly, another one after selecting it. */
     function handleRequestSave(idx: number) {
+        // The saved file can be saved again (re-tag, rename, move) without any download.
+        if (idx === SAVED_SOURCE_INDEX) {
+            if (!isSaving && savedSource) handleSave(true);
+            return;
+        }
         const source = downloadSources[idx];
-        // A saved source can be saved again (re-tag, rename, move) without its temporary copy.
-        if (isSaving || !source || (source.localFile?.state !== "found" && !source.savedFile)) return;
+        if (isSaving || !source || source.localFile?.state !== "found") return;
         if (isSourceSwitch) {
             // The comparison with the saved file is already on screen: this source takes its place.
             (typedTask as unknown as DownloadTask)?.selectDownloadSource(idx);
@@ -278,7 +304,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
             handleSave();
         } else if (isMetadataChange) {
             // Metadata-only diff: save directly (re-tag + rename the existing file)
-            handleSave();
+            handleSave(onSaved);
         }
     }
 
@@ -290,10 +316,11 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
 
     const isSaving = snapshot?.status?.type === StatusType.Processing;
 
-    async function handleSave() {
+    /** `fromSaved`: update the saved file itself, instead of saving the selected download. */
+    async function handleSave(fromSaved = false) {
         if (!typedTask) return;
         try {
-            await (typedTask as unknown as DownloadTask).saveTrack();
+            await (typedTask as unknown as DownloadTask).saveTrack({ fromSaved });
         } catch {
             // status already set to Error inside saveTrack()
         }
@@ -302,7 +329,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     async function handleRelocateFile() {
         if (!typedTask) return;
         const attrs = typedTask.getAttributes();
-        if (attrs?.kind !== "track") return;
+        if (attrs?.kind !== "track" || onSaved) return;
         const sourceIdx = downloadNavIndex >= 0 ? downloadNavIndex : 0;
         const source = attrs.downloadSources[sourceIdx];
         if (!source) return;
@@ -313,7 +340,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                 status: "Relocating file",
                 title: "Relocate File",
                 message: `Enter new file path for: ${filename}`,
-                hint: "Absolute path to the FLAC file",
+                hint: "Absolute path to the audio file",
             });
             if (!newPath.trim()) return;
             if (!fs.existsSync(newPath)) return;
@@ -323,7 +350,12 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
         }
     }
 
-    const selectedSource = downloadNavIndex >= 0 ? (downloadSources[downloadNavIndex] ?? null) : null;
+    // What the detail pane shows: the saved file while the cursor is on its pinned row, else the focused download.
+    const selectedSource = onSaved
+        ? savedSource
+        : downloadNavIndex >= 0
+          ? (downloadSources[downloadNavIndex] ?? null)
+          : null;
 
     return (
         <Box
@@ -340,6 +372,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
             <Box flexDirection="row" flexGrow={1} overflow="hidden">
                 <DownloadSourceTree
                     sources={downloadSources}
+                    savedSource={savedSource}
                     showQuery={showQuery}
                     selectedSourceIndex={downloadNavIndex}
                     focusedProvider={focusedProvider}
@@ -395,7 +428,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                     onConfirmDiff={handleConfirmDiff}
                     onCancelDiff={handleCancelDiff}
                     onRelocateFile={handleRelocateFile}
-                    onSave={handleSave}
+                    onSave={() => handleSave(onSaved)}
                     onChangeOutputDir={(dir) => (typedTask as unknown as DownloadTask)?.setOutputDir(dir)}
                     onChangeFilename={(name) => (typedTask as unknown as DownloadTask)?.setOutputFilename(name)}
                     onChangeOverwriteTags={(overwrite) =>

@@ -3,6 +3,10 @@
 export interface SaveSettings {
     outputDir: string;
     includeMusicBrainzTags: boolean;
+    /** See `MusicDownloadFlowSettings.download.convertAudio`. */
+    convertAudio: boolean;
+    /** See `MusicDownloadFlowSettings.download.convertFormat`. */
+    convertFormat: string;
 }
 
 export function getDownloadDir(): string {
@@ -28,5 +32,7 @@ export function getSaveSettings(): SaveSettings {
     return {
         outputDir: s.download.outputDir,
         includeMusicBrainzTags: false,
+        convertAudio: s.download.convertAudio,
+        convertFormat: s.download.convertFormat,
     };
 }

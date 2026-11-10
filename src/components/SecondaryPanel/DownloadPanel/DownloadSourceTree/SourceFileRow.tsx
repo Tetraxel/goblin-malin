@@ -16,6 +16,8 @@ interface SourceFileRowProps {
     width: number;
     /** Set when the player is on this source's file. */
     playback?: "playing" | "paused";
+    /** The track's saved file was made from this row's download. */
+    isSaved?: boolean;
     onSelect: (sourceIndex: number) => void;
 }
 
@@ -26,6 +28,7 @@ export function SourceFileRow({
     isActive,
     width,
     playback,
+    isSaved,
     onSelect,
 }: SourceFileRowProps) {
     const theme = useTheme();
@@ -150,7 +153,7 @@ export function SourceFileRow({
                 </Box>
             )}
             <Box paddingLeft={1} paddingRight={1} flexShrink={0}>
-                <StateBadge source={source} />
+                <StateBadge source={source} isSaved={isSaved} />
             </Box>
         </Box>
     );

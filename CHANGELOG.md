@@ -19,6 +19,7 @@ All notable changes to this project are documented here.
 - Ctrl+Q to quit.
 - CI: type-check, lint, build and unit tests on every push; release depends on CI and is gated on tag == version; workflow actions pinned by commit SHA; Dependabot for GitHub Actions.
 - Test coverage, and lint/format/type-check extended to `tests/` and `scripts/`.
+- Output format: Settings → Download → _Convert every download to one audio format_ (on by default, to FLAC) with a choice of FLAC, MP3, Ogg, Opus or M4A. Turned off, each track keeps the format it was downloaded in; yt-dlp then keeps YouTube's own codec instead of re-encoding it to FLAC.
 
 ### Changed
 
@@ -41,6 +42,8 @@ All notable changes to this project are documented here.
 - Clipboard read is asynchronous; read-only settings row layout; live import hint; stale task selection.
 - The YouTube fetch status clears once the call succeeds; the elapsed timer keeps ticking in status cells; the playback bar highlights when the download detail is focused.
 - A download in flight is cancelled when its source is rejected.
+- The file a track was saved as is kept on the task, apart from the download sources: downloading again, retrying a provider or restarting the task no longer makes it disappear, and it still shows what it was made from. Older sessions are converted when loaded.
+- An MP3 downloaded from Soulseek is no longer saved as a `.flac` file that is really an MP3: saving converts it to the chosen format, or keeps it as an MP3.
 
 ### Removed
 

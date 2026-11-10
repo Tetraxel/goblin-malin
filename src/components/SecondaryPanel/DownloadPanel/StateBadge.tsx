@@ -3,10 +3,11 @@ import { Text } from "ink";
 import { useTheme } from "#base/themeContext";
 import { type TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 
-export function StateBadge({ source }: { source: TrackDownloadSource }) {
+/** `isSaved`: the track's saved file was made from this row's download. */
+export function StateBadge({ source, isSaved = false }: { source: TrackDownloadSource; isSaved?: boolean }) {
     const theme = useTheme();
     const strikethrough = source.isRejected;
-    if (source.savedFile) {
+    if (isSaved) {
         return (
             <Text color={theme.status.locked} strikethrough={strikethrough}>
                 ● SAVED

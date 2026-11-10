@@ -1,6 +1,6 @@
 # TODO
 
-> State of 2026-11-09 (`main`, working towards **v0.2.0**).
+> State of 2026-11-10 (`main`, working towards **v0.2.0**).
 > IDs like `DL-01` or `DATA-04` point to [AUDIT-v0.2.0.md](AUDIT-v0.2.0.md), which has the evidence and the suggested fix for each.
 > Per-project roadmap: [docs/projects/](docs/projects/README.md) (`P24`, `P25`… below).
 
@@ -17,10 +17,13 @@
 **Bugs / safety**
 
 - [ ] "Terminal too small" message below ~66 columns — `UI-06`
+- [ ] Saving can't be cancelled: an ffmpeg conversion or tagging step keeps running when the task is stopped or the app quits (thread an `AbortSignal` through `saveTrack`; `runFfmpeg` already takes one)
+- [ ] A download whose format has no tag writer (wav, wma… with conversion off) is copied untagged and still reported as "Saved" — `tagAudioFile`
+- [ ] No unit tests for `saveTrack` itself (delete-after-write order, tag failure after a rename, partial output): it needs a mocked harness, like the one `retryDownloadProvider.test.ts` has for the other task actions
+- [ ] On the pinned saved file, `Ctrl+F` (relocate) does nothing, and a changed format setting can only be applied from a download row (updating the saved file keeps its format)
 
 **Product**
 
-- [ ] Output format choice (keep the original codec / MP3 / FLAC) — every save is a `.flac` today, even from Opus — `PROD-03`
 - [ ] Embed cover art — `PROD-04`
 - [ ] Temp downloads: move the default out of the Music library (with a one-time migration of the old folder), clean unselected candidates after a save
 - [ ] Handling of **SoundCloud** links
@@ -56,6 +59,9 @@ Decide per release whether each is wanted.
 - [ ] Claude as an assistant (pick the best source, fix metadata) — `P29`
 
 ## ✅ Done (removed from the lists above)
+
+- [x] **Output format** — Settings → Download → "Convert every download to one audio format" (on by default, FLAC; MP3 / Ogg / Opus / M4A, or off to keep each download as it came); one ffmpeg step at save time, per-format tags; a Soulseek MP3 is no longer saved as a fake `.flac` — `PROD-03`
+- [x] **The saved file is the task's own record** — kept on the task (`savedFile`, with what it was made from) instead of on a download row, so Restart / Re-download / provider retry no longer make it disappear; shown pinned under a "SAVED FILE" title; older sessions are converted on load
 
 - [x] **Data safety and quitting** — the data folder is derived and never stored (`DATA-04`); `Ctrl+Q` (rebindable `global.quit`) quits, asking first (`UI-02`); a link pasted into a focused text field stays there (`UI-01`); self-update exits through `exitApp()`, crash/signal handlers restore the terminal and save (`DATA-06`, `DATA-07`); write failures are surfaced, retried on close, and a second instance is locked out (`DATA-05`)
 - [x] **Docs** — README rewritten for v0.2.0 (`DOC-03`), `docs/audit/*` replaced by `docs/ARCHITECTURE.md` (`DOC-01`), dead links in `docs/projects/` fixed (`DOC-04`)

@@ -24,7 +24,7 @@ function binExt(): string {
 export function ensureFfmpeg(autoDownloadBinary = true): Promise<string> {
     return withBinaryAlert(
         "ffmpeg",
-        "ffmpeg converts the downloaded audio to FLAC, so downloads with yt-dlp fail until it is available.",
+        "ffmpeg converts the downloaded audio and extracts it from YouTube's streams, so downloads with yt-dlp fail until it is available.",
         () => setUpFfmpeg(autoDownloadBinary)
     );
 }

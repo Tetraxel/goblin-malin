@@ -1,4 +1,5 @@
-import { type FileInfo } from "#flows/musicDownloadFlow/types";
+import { type FileInfo, type SavedFile } from "#flows/musicDownloadFlow/types";
+import { OUTPUT_FORMATS, parseOutputFormat } from "./outputFormat";
 
 export type ProvenanceTone = "success" | "warning" | "neutral";
 
@@ -10,6 +11,40 @@ export type ProvenanceDisplay = {
     /** Longer explanation for the detail panel, only set when honesty matters (transcodes). */
     detail?: string;
 };
+
+/**
+ * The badge of a track's saved file. Usually that is the download's own (`getProvenanceDisplay`); when saving
+ * re-encoded it (`converted`), the download no longer describes the file, so the badge is worked out from the
+ * format it was converted to: a lossless target holding a lossy source is a transcode, a lossy target is
+ * labelled with its nominal bitrate.
+ */
+export function getSavedFileDisplay(
+    fileInfo: FileInfo | undefined,
+    converted?: SavedFile["converted"]
+): ProvenanceDisplay {
+    const target = converted ? OUTPUT_FORMATS[parseOutputFormat(converted.format)] : undefined;
+    if (!converted || !target || target.ext !== converted.format) return getProvenanceDisplay(fileInfo);
+
+    const label = converted.format.toUpperCase();
+    // What the file was before: the codec the service knows it came from, else its format (with the real bitrate).
+    const from = fileInfo
+        ? (fileInfo.sourceCodec ??
+          (fileInfo.bitrateKbps && fileInfo.provenance === "lossy"
+              ? `${fileInfo.format.toUpperCase()} ${fileInfo.bitrateKbps}`
+              : fileInfo.format.toUpperCase()))
+        : undefined;
+    if (!target.lossless) {
+        return {
+            badge: `${label} ${target.kbps}`,
+            tone: "neutral",
+            ...(from ? { detail: `${label} (converted from ${from})` } : {}),
+        };
+    }
+    if (fileInfo && fileInfo.provenance !== "lossless") {
+        return { badge: `${label}*`, tone: "warning", detail: `${label} (transcoded from ${from})` };
+    }
+    return { badge: label, tone: "success" };
+}
 
 /**
  * Turn a probed FileInfo into an honest quality badge. Provenance (not just

@@ -285,7 +285,8 @@ export type LocalFile = {
     state: "found" | "not_found";
     path: string;
     name: string;
-    extension: "flac" | "mp3";
+    /** The downloaded file's real extension (no dot): "flac" / "mp3" from Soulseek, any audio format from yt-dlp. */
+    extension: "flac" | "mp3" | "ogg" | "opus" | "m4a";
     sourceUrl?: string;
 };
 
@@ -296,7 +297,7 @@ export type LocalFile = {
 export type Provenance = "lossless" | "lossy-transcode" | "lossy";
 
 export type FileInfo = {
-    format: "flac" | "mp3" | "ogg";
+    format: "flac" | "mp3" | "ogg" | "opus" | "m4a";
     sizeBytes: number;
     durationMs: number;
     embeddedTags: Record<string, string | string[]>;
@@ -314,9 +315,30 @@ export type FileInfo = {
     sourceCodec?: string;
 };
 
+/**
+ * The file a track was saved as: a record of a file in the user's library, kept on the task
+ * (`TrackDownloadTask.savedFile`), not in `downloadSources`. The download rows are the candidates and are rebuilt
+ * whenever the downloads are redone; this record is not, so it also says where the file came from.
+ */
 export type SavedFile = {
     path: string;
     savedAt: Date;
+    /** The download provider the file was made from. */
+    provider: DownloadProvider;
+    /** The metadata of the source it was made from (what its row showed). */
+    track: TrackMetadata;
+    /** Provider-specific origin detail of that source (e.g. the Soulseek peer). */
+    providerDetail?: string;
+    /** What the source's file was probed as when it was saved (the temporary download, before any conversion). */
+    fileInfo?: FileInfo;
+    /** The temporary download it was made from: how a download row is recognized as "the one that was saved". */
+    downloadPath?: string;
+    /**
+     * Set when saving re-encoded the download into another format: the saved file's own extension and size,
+     * since the source's `fileInfo` (the temporary download) no longer describes it. Absent when the file is
+     * a plain copy, and on files saved before this was recorded.
+     */
+    converted?: { format: string; sizeBytes: number };
     /**
      * The metadata that was written into the file's tags when it was saved, as the strings the UI shows
      * ("—" for a missing one), keyed by compiled field. Absent when the file kept its own tags, and on
@@ -387,6 +409,11 @@ export type TrackDownloadSource = {
     selected: boolean;
     isRejected?: boolean;
     fileInfo?: FileInfo;
+    /**
+     * Never set on a row of `downloadSources`. Only the stand-in row the UI builds from the task's `savedFile`
+     * (see `savedFileAsSource`) carries it, so the saved file is shown with the same components as a download.
+     * Sessions saved by older versions kept it on the row; loading them moves it to `TrackDownloadTask.savedFile`.
+     */
     savedFile?: SavedFile;
     /** Download progress 0–100 while `state` is "downloading". */
     progress?: number;
@@ -445,9 +472,14 @@ export type TrackDownloadTask = {
     metadataGroups: MetadataGroupState[];
     metadataOverride: MetadataOverrides;
     downloadSources: TrackDownloadSource[];
+    /**
+     * The file this track was saved as. Separate from `downloadSources` on purpose: restarting the task or
+     * downloading again replaces every row there, but the file in the library — and what it was made from — stays.
+     */
+    savedFile?: SavedFile;
     /** Folder this track is saved to instead of the one from Settings. Unset = use the setting. */
     outputDirOverride?: string;
-    /** File name (with `.flac`) this track is saved as instead of "Artist - Title.flac". */
+    /** File name this track is saved as instead of "Artist - Title"; its extension is replaced by the saved format's. */
     outputFilenameOverride?: string;
     /**
      * Whether saving writes the compiled metadata into the file's tags (adding the ones it lacks and

@@ -23,8 +23,21 @@ import { type DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { readFileInfo } from "#flows/musicDownloadFlow/utils/readFileInfo";
 import { ensureYtDlpSetup } from "./ytdlp-setup";
 import { YtDlpCell } from "./YtDlpCell";
-import { getTempDownloadDir, getDownloadProviderSettings } from "../../../saveSettings";
-import { generateTempFilename, findExistingTempFile } from "#flows/musicDownloadFlow/utils/tempFile";
+import { getTempDownloadDir, getDownloadProviderSettings, getSaveSettings } from "../../../saveSettings";
+import { generateTempStem, findExistingTempFile, listTempFilesWithStem } from "#flows/musicDownloadFlow/utils/tempFile";
+import { extensionOf, parseOutputFormat } from "#flows/musicDownloadFlow/utils/outputFormat";
+
+/**
+ * The audio files a yt-dlp download can end up as: its own FLAC, or the codec YouTube serves, which yt-dlp
+ * extracts as-is (Opus → .opus, Vorbis → .ogg, AAC → .m4a, MP3 → .mp3). Never an intermediate `.webm` / `.part`.
+ */
+const YTDLP_AUDIO_EXTENSIONS = ["flac", "opus", "m4a", "ogg", "mp3"] as const;
+
+/** Whether `file` is the finished download named `<stem>.<audio extension>` (and not a leftover like `<stem>.f251.webm`). */
+function isFinishedAudioFile(file: string, stem: string): boolean {
+    const rest = path.basename(file).slice(stem.length + 1);
+    return (YTDLP_AUDIO_EXTENSIONS as readonly string[]).includes(rest);
+}
 
 export class YtDlpService extends DownloadService {
     static readonly display: ProviderDisplay = {
@@ -130,22 +143,28 @@ export class YtDlpService extends DownloadService {
                 progress: 0,
             });
 
-            const format = "flac";
+            // yt-dlp converts to FLAC itself only when that is what every download is converted to anyway (the
+            // default). Otherwise it keeps YouTube's own codec (Opus / AAC) and saving converts it - once, and
+            // only if the settings ask for it - so the temporary file is the honest source, not a lossy FLAC.
+            const saveSettings = getSaveSettings();
+            const nativeFlac = saveSettings.convertAudio && parseOutputFormat(saveSettings.convertFormat) === "flac";
+            const format = nativeFlac ? "flac" : "best";
             const artistName = trackMetadata.artists?.[0]?.name ?? "Unknown Artist";
             const outputName = `${artistName} - ${trackMetadata.trackName}`;
 
+            // A finished download in any audio format is reused: saving converts it to the wanted one.
             const existingPath = findExistingTempFile(
                 YtDlpService.display.label,
                 trackMetadata,
-                format,
+                YTDLP_AUDIO_EXTENSIONS,
                 getTempDownloadDir()
             );
-            const fullPath =
-                existingPath ??
-                path.join(
-                    getTempDownloadDir(),
-                    generateTempFilename(YtDlpService.display.label, trackMetadata, format)
-                );
+            // `<provider> <id> <uuid>`; the extension is added by yt-dlp when the format is not forced.
+            const tempStem = existingPath
+                ? path.basename(existingPath, path.extname(existingPath))
+                : generateTempStem(YtDlpService.display.label, trackMetadata);
+            // Where the finished file is. Known up front only when the format is forced; otherwise found after the run.
+            let fullPath = existingPath ?? path.join(getTempDownloadDir(), `${tempStem}.flac`);
 
             // Check if file already exists
             let localFile: LocalFile;
@@ -155,7 +174,7 @@ export class YtDlpService extends DownloadService {
                     state: "found",
                     path: fullPath,
                     name: outputName,
-                    extension: "flac",
+                    extension: extensionOf(fullPath) as LocalFile["extension"],
                     sourceUrl: trackUrl,
                 };
             } else {
@@ -168,7 +187,9 @@ export class YtDlpService extends DownloadService {
                 const cookiesPath = path.join(getBinDir(), "cookies.txt");
                 const downloadOptions: FormatOptions<keyof QualityOptions> = {
                     paths: getTempDownloadDir(),
-                    output: path.basename(fullPath),
+                    // `%` is yt-dlp's template escape: a literal one in a track name must be doubled. With "best"
+                    // the extension is left to yt-dlp (`%(ext)s`), which names the file after the codec it kept.
+                    output: `${tempStem.replace(/%/g, "%%")}.${nativeFlac ? "flac" : "%(ext)s"}`,
                     audioFormat: format,
                     extractAudio: true,
                     restrictFilenames: true,
@@ -253,8 +274,19 @@ export class YtDlpService extends DownloadService {
                 // to avoid it being treated as a complete cached download on the next
                 // run, then re-raise as AbortError.
                 if (rowAbortController.signal.aborted) {
-                    await fs.promises.unlink(fullPath).catch(() => {});
+                    // Whatever name yt-dlp had got to: the finished file and any `.part` / intermediate leftovers.
+                    for (const leftover of listTempFilesWithStem(getTempDownloadDir(), tempStem)) {
+                        await fs.promises.unlink(leftover).catch(() => {});
+                    }
                     throw makeAbortError();
+                }
+
+                if (!nativeFlac) {
+                    const produced = listTempFilesWithStem(getTempDownloadDir(), tempStem).find((file) =>
+                        isFinishedAudioFile(file, tempStem)
+                    );
+                    if (!produced) throw new Error("yt-dlp finished but no audio file was found");
+                    fullPath = produced;
                 }
 
                 note(`Successfully downloaded: ${path.basename(fullPath)}`);
@@ -262,7 +294,7 @@ export class YtDlpService extends DownloadService {
                     state: "found",
                     path: fullPath,
                     name: outputName,
-                    extension: "flac",
+                    extension: extensionOf(fullPath) as LocalFile["extension"],
                     sourceUrl: trackUrl,
                 };
             }
@@ -271,7 +303,15 @@ export class YtDlpService extends DownloadService {
 
             let fileInfo: FileInfo | undefined;
             try {
-                fileInfo = await readFileInfo(fullPath, trackMetadata.duration ?? 0, "lossy-transcode", "Opus");
+                // yt-dlp's own FLAC is a lossless wrapper around YouTube's lossy stream; any other file it made
+                // is that stream itself (or a cached download of either kind), honestly lossy at its real bitrate.
+                const isFlacWrapper = extensionOf(fullPath) === "flac";
+                fileInfo = await readFileInfo(
+                    fullPath,
+                    trackMetadata.duration ?? 0,
+                    isFlacWrapper ? "lossy-transcode" : "lossy",
+                    isFlacWrapper ? "Opus" : undefined
+                );
             } catch (err) {
                 this.logger.warn(`Failed to read file info for ${path.basename(fullPath)}`, { error: err });
             }

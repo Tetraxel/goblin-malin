@@ -7,6 +7,7 @@ import { type SettingsItem } from "#settings/buildSettingsItems";
 import { type MusicDownloadFlowSettings } from "./settings";
 import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
 import { runTempCleanup } from "./tempCleanupFlow";
+import { OUTPUT_FORMATS, OUTPUT_FORMAT_KEYS, parseOutputFormat } from "./utils/outputFormat";
 
 export type ProviderEntry = {
     key: string;
@@ -213,6 +214,38 @@ export function buildFlowSettingsItems(
         get: () => flowSettings.download.outputDir,
         set: (v) => onChange({ download: { outputDir: v } }),
     });
+    items.push({
+        kind: "checkbox",
+        indent: 0,
+        label: "Convert every download to one audio format",
+        get: () => flowSettings.download.convertAudio,
+        set: (v) => onChange({ download: { convertAudio: v } }),
+    });
+    if (flowSettings.download.convertAudio) {
+        const format = parseOutputFormat(flowSettings.download.convertFormat);
+        items.push({
+            kind: "select",
+            // Cursor (2) + icon (1) + gap (2) = 5 columns before the checkbox label; the select's cursor takes 2 of them.
+            indent: 3,
+            label: "Convert to",
+            options: OUTPUT_FORMAT_KEYS,
+            get: () => format,
+            set: (v) => onChange({ download: { convertFormat: v } }),
+        });
+        items.push({
+            kind: "note",
+            indent: 0,
+            text: OUTPUT_FORMATS[format].lossless
+                ? "A lossy source (YouTube, MP3…) keeps its quality: FLAC adds none."
+                : `Encoded at about ${OUTPUT_FORMATS[format].kbps} kbps; a lossless source loses quality.`,
+        });
+    } else {
+        items.push({
+            kind: "note",
+            indent: 0,
+            text: "Each track keeps the format it was downloaded in.",
+        });
+    }
     items.push({
         kind: "textInput",
         indent: 0,

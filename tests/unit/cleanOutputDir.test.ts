@@ -6,6 +6,7 @@ import {
     cleanOutputFilename,
     isSameDir,
     stripOutputExtension,
+    withOutputExtension,
 } from "#flows/musicDownloadFlow/utils/cleanOutputDir";
 
 const isWin = process.platform === "win32";
@@ -101,6 +102,12 @@ describe("cleanOutputFilename", () => {
         expect(cleanOutputFilename("Track...")).toBe("Track.flac");
     });
 
+    test("uses the extension of the format the track is saved in", () => {
+        expect(cleanOutputFilename("My Track", "mp3")).toBe("My Track.mp3");
+        expect(cleanOutputFilename("My Track.flac", "opus")).toBe("My Track.opus");
+        expect(cleanOutputFilename("Mix v2.0", "m4a")).toBe("Mix v2.0.m4a");
+    });
+
     test("rejects what leaves no name", () => {
         expect(cleanOutputFilename("")).toBeNull();
         expect(cleanOutputFilename('  ""  ')).toBeNull();
@@ -123,5 +130,24 @@ describe("stripOutputExtension", () => {
     test("round-trips with cleanOutputFilename", () => {
         const name = cleanOutputFilename("My Mix v2.0")!;
         expect(stripOutputExtension(name)).toBe("My Mix v2.0");
+    });
+
+    test("removes the extension it is told, and only that one", () => {
+        expect(stripOutputExtension("Track.mp3", "mp3")).toBe("Track");
+        expect(stripOutputExtension("Track.flac", "mp3")).toBe("Track.flac");
+        const name = cleanOutputFilename("My Mix v2.0", "opus")!;
+        expect(stripOutputExtension(name, "opus")).toBe("My Mix v2.0");
+    });
+});
+
+describe("withOutputExtension", () => {
+    test("swaps the audio extension a name ends with", () => {
+        expect(withOutputExtension("Track.flac", "mp3")).toBe("Track.mp3");
+        expect(withOutputExtension("Track.OPUS", "flac")).toBe("Track.flac");
+    });
+
+    test("keeps a dot that is not an audio extension", () => {
+        expect(withOutputExtension("Mix v2.0", "flac")).toBe("Mix v2.0.flac");
+        expect(withOutputExtension("Track", "ogg")).toBe("Track.ogg");
     });
 });

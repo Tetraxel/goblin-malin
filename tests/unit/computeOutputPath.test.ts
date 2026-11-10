@@ -16,6 +16,19 @@ describe("computeOutputPath", () => {
         expect(computeOutputPath(compiled, "out", "Mine.flac")).toBe(path.join("out", "Mine.flac"));
     });
 
+    it("takes the extension of the format the track is saved in", () => {
+        expect(computeOutputPath(compiled, "out", undefined, "mp3")).toBe(
+            path.join("out", "Aki Oke - don't you miss me.mp3")
+        );
+    });
+
+    it("keeps the name the user chose but follows the saved format for its extension", () => {
+        expect(computeOutputPath(compiled, "out", "Mine.flac", "mp3")).toBe(path.join("out", "Mine.mp3"));
+        expect(computeOutputPath(compiled, "out", "Mix v2.0.flac", "opus")).toBe(path.join("out", "Mix v2.0.opus"));
+        // A stored name without any audio extension still gets one.
+        expect(computeOutputPath(compiled, "out", "Mine", "ogg")).toBe(path.join("out", "Mine.ogg"));
+    });
+
     it("never adds a (2) suffix, even when the name is taken", () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "goblin-out-"));
         try {

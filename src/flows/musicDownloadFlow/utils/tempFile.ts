@@ -25,16 +25,46 @@ export function generateTempFilename(providerLabel: string, metadata: TrackMetad
     return `${prefix} ${randomUUID()}.${format}`;
 }
 
+/** The name (without extension) a temp file for this download is given: `<provider> <track id or title> <uuid>`. */
+export function generateTempStem(providerLabel: string, metadata: TrackMetadata): string {
+    return `${getTempFilePrefix(providerLabel, metadata)} ${randomUUID()}`;
+}
+
+/**
+ * The finished temp file already downloaded for this track, if any. `formats` is the extension(s) to accept:
+ * a download whose format is only known once it is done (yt-dlp keeping the original codec) can be any of several.
+ * A `.part` / `.ytdl` leftover or an intermediate `….f251.webm` never matches, since none of them ends in a format.
+ */
 export function findExistingTempFile(
     providerLabel: string,
     metadata: TrackMetadata,
-    format: string,
+    formats: string | readonly string[],
     dir: string
 ): string | undefined {
     if (!metadata.uri || !fs.existsSync(dir)) return undefined;
     const prefix = getTempFilePrefix(providerLabel, metadata);
-    const match = fs.readdirSync(dir).find((f) => f.startsWith(prefix) && f.endsWith(`.${format}`));
+    const suffixes = (typeof formats === "string" ? [formats] : formats).map((format) => `.${format}`);
+    // After the prefix a finished file is exactly ` <uuid>.<format>`: that rules out the intermediate `….f251.webm`
+    // and a `.converting.mp3` left behind by a crashed conversion.
+    const finished = /^ [0-9a-f-]{36}\.[^.]+$/i;
+    const match = fs
+        .readdirSync(dir)
+        .find(
+            (f) => f.startsWith(prefix) && finished.test(f.slice(prefix.length)) && suffixes.some((s) => f.endsWith(s))
+        );
     return match ? path.join(dir, match) : undefined;
+}
+
+/**
+ * Every file in `dir` that belongs to the download whose stem is `stem` (the file itself and any leftovers
+ * sharing it), so an aborted yt-dlp run whose final name was never known can be cleaned up completely.
+ */
+export function listTempFilesWithStem(dir: string, stem: string): string[] {
+    if (!fs.existsSync(dir)) return [];
+    return fs
+        .readdirSync(dir)
+        .filter((f) => f.startsWith(`${stem}.`))
+        .map((f) => path.join(dir, f));
 }
 
 /**

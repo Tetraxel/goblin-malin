@@ -5,13 +5,17 @@ import { useClickTarget, useHoverTarget } from "#base/mouse/useMouseTarget";
 import { useTheme } from "#base/themeContext";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { type TrackDownloadSource } from "#flows/musicDownloadFlow/types";
-import { getProvenanceDisplay } from "#flows/musicDownloadFlow/utils/provenance";
+import { getSavedFileDisplay } from "#flows/musicDownloadFlow/utils/provenance";
 import { formatBytes } from "#components/SecondaryPanel/DownloadPanel/utils";
 import { PlaybackIndicator } from "#components/PlaybackIndicator";
 import { revealInFileExplorer } from "#utils/revealInFileExplorer";
 
-/** Lines the pinned row takes: the file, the folder it is in, and a blank line before the providers. */
-export const SAVED_ROW_HEIGHT = 3;
+/** Lines the pinned block takes: its title, the file, the folder it is in, and a rule before the providers. */
+export const SAVED_ROW_HEIGHT = 4;
+
+const TITLE = " SAVED FILE ";
+/** Columns before the title: the lead-in dashes. */
+const TITLE_LEAD = "── ";
 
 interface SavedFileRowProps {
     /** The source whose file was saved. */
@@ -50,12 +54,27 @@ export function SavedFileRow({ source, isFocused, isActive, width, playback, onS
     if (!saved) return null;
 
     const display = providerDisplayRegistry.get(source.provider);
-    const provenance = getProvenanceDisplay(source.fileInfo);
+    // A re-encoded file is not what `source.fileInfo` (the temporary download) describes: use what was written.
+    const provenance = getSavedFileDisplay(source.fileInfo, saved.converted);
     const provenanceColor = provenance.tone === "warning" ? theme.status.warning : theme.status.success;
-    const sizeText = source.fileInfo ? formatBytes(source.fileInfo.sizeBytes) : "";
+    const savedBytes = saved.converted?.sizeBytes ?? source.fileInfo?.sizeBytes;
+    const sizeText = savedBytes !== undefined ? formatBytes(savedBytes) : "";
+
+    const lineColor = theme.status.locked;
+    const titleDashes = Math.max(0, width - 1 - TITLE_LEAD.length - TITLE.length - 1);
 
     return (
         <Box flexDirection="column" width={width} height={SAVED_ROW_HEIGHT} flexShrink={0} overflow="hidden">
+            {/* The title sets this block apart from the download providers below it: it is a file in the library, not a candidate. */}
+            <Box width={width} height={1} paddingLeft={1} flexShrink={0} overflow="hidden">
+                <Text wrap="truncate-end">
+                    <Text color={lineColor}>{TITLE_LEAD}</Text>
+                    <Text color={lineColor} bold inverse>
+                        {TITLE}
+                    </Text>
+                    <Text color={lineColor}>{" " + "─".repeat(titleDashes)}</Text>
+                </Text>
+            </Box>
             <Box
                 ref={rowRef}
                 flexDirection="row"
@@ -70,8 +89,8 @@ export function SavedFileRow({ source, isFocused, isActive, width, playback, onS
                     <Text color={theme.ui.focusIndicator}>{isFocused && isActive ? "☛ " : "  "}</Text>
                 </Box>
                 <Box flexShrink={0} paddingRight={1}>
-                    <Text color={theme.status.locked} bold>
-                        ● SAVED
+                    <Text color={lineColor} bold>
+                        ●
                     </Text>
                 </Box>
                 {playback && (
@@ -80,7 +99,7 @@ export function SavedFileRow({ source, isFocused, isActive, width, playback, onS
                     </Box>
                 )}
                 <Box flexGrow={1} overflow="hidden">
-                    <Text color={theme.text.primary} wrap="truncate-end">
+                    <Text color={theme.text.primary} bold wrap="truncate-end">
                         {path.basename(saved.path)}
                     </Text>
                 </Box>
@@ -114,6 +133,12 @@ export function SavedFileRow({ source, isFocused, isActive, width, playback, onS
                         {saved.path}
                     </Text>
                 </Box>
+            </Box>
+            {/* Closes the block, so the providers below start under a line of their own. */}
+            <Box width={width} height={1} paddingLeft={1} flexShrink={0} overflow="hidden">
+                <Text color={lineColor} dimColor wrap="truncate-end">
+                    {"─".repeat(Math.max(0, width - 1))}
+                </Text>
             </Box>
         </Box>
     );

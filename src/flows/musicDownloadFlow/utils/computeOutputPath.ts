@@ -1,16 +1,22 @@
 import * as fs from "fs";
 import * as path from "path";
 import { type CompiledMetadata } from "./compiledMetadata";
+import { DEFAULT_OUTPUT_EXTENSION, withOutputExtension } from "./cleanOutputDir";
 
 /**
- * The file name a track is saved under. `override` is a name the user chose for this track; it is
- * stored already cleaned (see `cleanOutputFilename`), so it is used as is.
+ * The file name a track is saved under, with `extension` (the format it is saved in, no dot). `override` is a
+ * name the user chose for this track; it is stored already cleaned (see `cleanOutputFilename`) and only its
+ * extension follows `extension`, since the format can change after the name was typed.
  */
-export function computeOutputFilename(compiled: CompiledMetadata, override?: string): string {
-    if (override) return override;
+export function computeOutputFilename(
+    compiled: CompiledMetadata,
+    override?: string,
+    extension: string = DEFAULT_OUTPUT_EXTENSION
+): string {
+    if (override) return withOutputExtension(override, extension);
     const artist = compiled.artists[0]?.name ?? "Unknown Artist";
     const title = compiled.trackName || "Unknown Title";
-    return `${artist} - ${title}.flac`.replace(/[/\\:*?"<>|]/g, "_");
+    return `${artist} - ${title}.${extension}`.replace(/[/\\:*?"<>|]/g, "_");
 }
 
 export function samePath(a: string, b: string): boolean {
@@ -20,8 +26,13 @@ export function samePath(a: string, b: string): boolean {
 }
 
 /** Where a track is written inside `outputDir`: its file name, whether or not that name is already in use. */
-export function computeOutputPath(compiled: CompiledMetadata, outputDir: string, filenameOverride?: string): string {
-    return path.join(outputDir, computeOutputFilename(compiled, filenameOverride));
+export function computeOutputPath(
+    compiled: CompiledMetadata,
+    outputDir: string,
+    filenameOverride?: string,
+    extension: string = DEFAULT_OUTPUT_EXTENSION
+): string {
+    return path.join(outputDir, computeOutputFilename(compiled, filenameOverride, extension));
 }
 
 /**
