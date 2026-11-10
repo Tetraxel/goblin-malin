@@ -22,6 +22,7 @@ import {
 import { type DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { readFileInfo } from "#flows/musicDownloadFlow/utils/readFileInfo";
 import { ensureYtDlpSetup } from "./ytdlp-setup";
+import { copyCookiesForRun, type CookiesCopy } from "./cookiesCopy";
 import { YtDlpCell } from "./YtDlpCell";
 import { getTempDownloadDir, getDownloadProviderSettings, getSaveSettings } from "../../../saveSettings";
 import { generateTempStem, findExistingTempFile, listTempFilesWithStem } from "#flows/musicDownloadFlow/utils/tempFile";
@@ -134,6 +135,8 @@ export class YtDlpService extends DownloadService {
             publish();
         };
 
+        // This run's private copy of cookies.txt, if there is one; removed whatever way the run ends.
+        let cookiesCopy: CookiesCopy | undefined;
         try {
             note(`Downloading track from ${trackMetadata.apiProvider}: ${trackMetadata.trackName}`);
             this.status.set({
@@ -195,10 +198,12 @@ export class YtDlpService extends DownloadService {
                     restrictFilenames: true,
                 };
 
-                // Add cookies if the file exists
+                // Add cookies if the file exists. yt-dlp rewrites the file it is given when it exits, so every run
+                // works on its own copy (see `copyCookiesForRun`); the user's file is only read.
                 if (fs.existsSync(cookiesPath)) {
                     note(`Using cookies from ${cookiesPath}`, "debug");
-                    downloadOptions.cookies = cookiesPath;
+                    cookiesCopy = await copyCookiesForRun(cookiesPath);
+                    downloadOptions.cookies = cookiesCopy.path;
                 } else {
                     note("No cookies file found, proceeding without cookies", "warn");
                 }
@@ -338,6 +343,8 @@ export class YtDlpService extends DownloadService {
             log.push(`Failed: ${error instanceof Error ? error.message : String(error)}`);
             publish("failed");
             throw error;
+        } finally {
+            await cookiesCopy?.cleanup().catch(() => {});
         }
     }
 }
