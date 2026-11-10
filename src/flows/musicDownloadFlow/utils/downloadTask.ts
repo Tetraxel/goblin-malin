@@ -33,6 +33,7 @@ import { convertAudioInto } from "./convertAudio";
 import { extensionOf, parseOutputFormat, planSave } from "./outputFormat";
 import { isSavedFrom, releaseSavedFile } from "./savedSource";
 import { tagAudioFile } from "./tagAudioFile";
+import { createSingleFlight } from "./singleFlight";
 import { writeViaStaging } from "./writeViaStaging";
 import { pickAutoSelectedIndex } from "./sourceSelection";
 import { type MetadataService } from "../metadataService";
@@ -77,6 +78,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
     // (see DownloadUpdateOptions) and consumed by rejectDownloadSource() so rejecting
     // an actively-downloading row actually stops it instead of just hiding it.
     private activeAbortBySourceIndex = new Map<number, () => void>();
+    // Held for the whole of `saveTrack`, from before its first await.
+    private saveGuard = createSingleFlight();
 
     constructor({
         id,
@@ -983,8 +986,16 @@ export class DownloadTask extends Task<TrackDownloadTask> {
     /**
      * Saves the track into the output folder, from the selected download source — or, with `fromSaved`, from the
      * file it is already saved as (re-tag, rename, move: no download is needed, and the format stays).
+     *
+     * One save at a time per task: a call made while another is running (a held-down key, a second press while the
+     * overwrite dialog is open) is ignored. The UI blocks that too, but it only knows once the status says so.
      */
     async saveTrack(options: { fromSaved?: boolean } = {}): Promise<void> {
+        const started = await this.saveGuard.run(() => this.runSave(options));
+        if (!started) globalLogger.info("Save ignored: this track is already being saved");
+    }
+
+    private async runSave(options: { fromSaved?: boolean }): Promise<void> {
         const attrs = this.getAttributes();
         const sources = attrs?.downloadSources ?? [];
         const saved = attrs?.savedFile;
