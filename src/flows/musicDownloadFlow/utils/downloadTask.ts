@@ -1,5 +1,6 @@
 import fs from "fs/promises";
 import { Task } from "#base/task/task";
+import { TaskOrchestrator } from "#base/task/orchestrator";
 import { TaskScoped } from "#base/task/taskContext";
 import { globalLogger, type Logger } from "#base/logger/logger";
 import { type ServiceRegistry } from "#base/service-registry";
@@ -30,7 +31,7 @@ import { compiledMetadataToTags } from "./compiledMetadataToTags";
 import { computeOutputPath, isOutputPathTaken, samePath } from "./computeOutputPath";
 import { convertAudioInto } from "./convertAudio";
 import { extensionOf, parseOutputFormat, planSave } from "./outputFormat";
-import { isSavedFrom } from "./savedSource";
+import { isSavedFrom, releaseSavedFile } from "./savedSource";
 import { tagAudioFile } from "./tagAudioFile";
 import { pickAutoSelectedIndex } from "./sourceSelection";
 import { type MetadataService } from "../metadataService";
@@ -1092,6 +1093,13 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                               : undefined,
                 },
             });
+
+            // The file now belongs to this task: another one that saved a file under this path (and was replaced
+            // by the confirm above) must not keep treating it as its own.
+            const released = releaseSavedFile(TaskOrchestrator.getInstance().getTasks(), outputPath, this.getId());
+            if (released.length > 0) {
+                globalLogger.info(`${outputPath} replaced the saved file of ${released.length} other task(s)`);
+            }
 
             this.status.set({ type: StatusType.Success, message: "Saved" });
         } catch (err) {

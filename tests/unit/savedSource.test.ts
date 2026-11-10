@@ -1,6 +1,12 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import type { SavedFile, TrackDownloadSource, TrackMetadata } from "#flows/musicDownloadFlow/types";
-import { isSavedFrom, savedFileAsSource, savedFileFromLegacyRows } from "#flows/musicDownloadFlow/utils/savedSource";
+import {
+    isSavedFrom,
+    releaseSavedFile,
+    savedFileAsSource,
+    savedFileFromLegacyRows,
+    type SavedFileHolder,
+} from "#flows/musicDownloadFlow/utils/savedSource";
 import { reviveTaskDates } from "#flows/musicDownloadFlow/utils/reviveTaskDates";
 
 const track = { id: "1", trackName: "Mode avion", fetchedAt: new Date().toISOString() } as unknown as TrackMetadata;
@@ -40,6 +46,39 @@ describe("isSavedFrom", () => {
         expect(isSavedFrom(saved, row())).toBe(false);
         expect(isSavedFrom(undefined, row())).toBe(false);
         expect(isSavedFrom({ ...saved, downloadPath: undefined }, row())).toBe(false);
+    });
+});
+
+describe("releaseSavedFile", () => {
+    const holder = (id: string, attrs: { kind?: string; savedFile?: SavedFile } | undefined): SavedFileHolder => ({
+        getId: () => id,
+        getAttributes: () => attrs,
+        updateAttributes: vi.fn((patch: { savedFile: undefined }) => Object.assign(attrs ?? {}, patch)),
+    });
+
+    test("another task that recorded the same file as its own lets go of it", () => {
+        const a = holder("a", { kind: "track", savedFile: saved });
+        const b = holder("b", { kind: "track", savedFile: { ...saved, path: "C:/Music/other.flac" } });
+        const c = holder("c", { kind: "track" });
+        const owner = holder("owner", { kind: "track", savedFile: saved });
+
+        expect(releaseSavedFile([a, b, c, owner], "C:/Music/Mode avion.flac", "owner")).toEqual(["a"]);
+        expect(a.getAttributes()?.savedFile).toBeUndefined();
+        expect(b.getAttributes()?.savedFile).toBeDefined();
+        expect(owner.getAttributes()?.savedFile).toBe(saved);
+    });
+
+    test("paths are compared the way the file system does (separators; case on Windows)", () => {
+        const a = holder("a", { kind: "track", savedFile: { ...saved, path: "C:\\Music\\Mode avion.flac" } });
+        const sameName = process.platform === "win32" ? "c:/music/mode avion.flac" : "C:/Music/Mode avion.flac";
+        expect(releaseSavedFile([a], sameName, "owner")).toEqual(["a"]);
+    });
+
+    test("collections and tasks without attributes are left alone", () => {
+        const collection = holder("c", { kind: "collection" });
+        const empty = holder("e", undefined);
+        expect(releaseSavedFile([collection, empty], saved.path, "owner")).toEqual([]);
+        expect(collection.updateAttributes).not.toHaveBeenCalled();
     });
 });
 

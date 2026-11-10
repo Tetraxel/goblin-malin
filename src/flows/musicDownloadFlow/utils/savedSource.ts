@@ -25,6 +25,31 @@ export function isSavedFrom(saved: SavedFile | undefined, source: TrackDownloadS
     return !!saved?.downloadPath && !!downloadPath && samePath(saved.downloadPath, downloadPath);
 }
 
+/** What `releaseSavedFile` needs from a task (any `Task` of the music flow fits). */
+export interface SavedFileHolder {
+    getId(): string;
+    getAttributes(): { kind?: string; savedFile?: SavedFile } | undefined;
+    updateAttributes(attributes: { savedFile: undefined }): void;
+}
+
+/**
+ * A file belongs to one task. When `ownerId` has just written `filePath` (replacing a file the user agreed to
+ * replace), every other task that still recorded it as its own saved file lets go of it: that file is no longer
+ * what it saved, and re-tagging, renaming or deleting it from there would hit the new owner's file.
+ * Returns the ids of the tasks that were released.
+ */
+export function releaseSavedFile(tasks: readonly SavedFileHolder[], filePath: string, ownerId: string): string[] {
+    const released: string[] = [];
+    for (const task of tasks) {
+        if (task.getId() === ownerId) continue;
+        const attrs = task.getAttributes();
+        if (attrs?.kind !== "track" || !attrs.savedFile || !samePath(attrs.savedFile.path, filePath)) continue;
+        task.updateAttributes({ savedFile: undefined });
+        released.push(task.getId());
+    }
+    return released;
+}
+
 /**
  * The saved file of a track loaded from a session written by an older version, which kept it on the download row
  * it was made from. `undefined` when no row has one.
