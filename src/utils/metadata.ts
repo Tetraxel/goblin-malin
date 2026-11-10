@@ -21,7 +21,11 @@ export type Metadata = {
     musicBrainzReleaseGroupId?: string;
 };
 
-export async function cleanAndTagFlac(filePath: string, metadata: Metadata) {
+/**
+ * Strips stray ID3 tags from a FLAC file, then writes `metadata` as Vorbis comments. Any failure is logged and
+ * rethrown: the caller must not report a save whose tags were never written.
+ */
+export async function cleanAndTagFlac(filePath: string, metadata: Metadata): Promise<void> {
     // --- STEP 1: CLEAN THE FILE ---
     globalLogger.info(`--- Step 1: Cleaning invalid ID3 tags from ${filePath} ---`);
     try {
@@ -33,7 +37,7 @@ export async function cleanAndTagFlac(filePath: string, metadata: Metadata) {
         }
     } catch (err) {
         globalLogger.error(`Error cleaning file: ${(err as Error).message}. Stopping.`);
-        return;
+        throw err;
     }
 
     // --- STEP 2: WRITE FLAC METADATA ---
@@ -74,6 +78,7 @@ export async function cleanAndTagFlac(filePath: string, metadata: Metadata) {
         if (err.message === "Invalid stream header") {
             globalLogger.error("This is unexpected, the file should be clean.");
         }
+        throw error;
     }
 }
 

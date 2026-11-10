@@ -113,8 +113,8 @@ async function tagWithFfmpeg(filePath: string, metadata: Metadata): Promise<void
 
 /**
  * Writes `metadata` into a saved file, in the tag system its format uses: Vorbis comments for FLAC, Ogg and
- * Opus, ID3 for MP3, MP4 atoms for M4A. Unlike `cleanAndTagFlac`, a failure here is thrown, so the save is
- * reported as failed instead of leaving an untagged file that looks saved.
+ * Opus, ID3 for MP3, MP4 atoms for M4A. A failure is thrown (for every format), so the save is reported as
+ * failed instead of leaving an untagged file that looks saved.
  */
 export async function tagAudioFile(filePath: string, metadata: Metadata): Promise<void> {
     switch (extensionOf(filePath)) {
