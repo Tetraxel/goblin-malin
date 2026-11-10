@@ -16,7 +16,6 @@
 
 **Bugs / safety**
 
-- [ ] "Terminal too small" message below ~66 columns — `UI-06`
 - [ ] Saving can't be cancelled: an ffmpeg conversion or tagging step keeps running when the task is stopped or the app quits (thread an `AbortSignal` through `saveTrack`; `runFfmpeg` already takes one)
 - [ ] A download whose format has no tag writer (wav, wma… with conversion off) is copied untagged and still reported as "Saved" — `tagAudioFile`
 - [ ] No unit tests for `saveTrack` itself (delete-after-write order, tag failure after a rename, partial output): it needs a mocked harness, like the one `retryDownloadProvider.test.ts` has for the other task actions

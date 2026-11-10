@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect } from "react";
 import { Box } from "ink";
 import { Footer } from "./Footer";
+import { TerminalTooSmall } from "./TerminalTooSmall";
+import { isTerminalTooSmall } from "#utils/terminalSize";
 import { Separator } from "./Separator";
 import { PromptModal } from "./PromptModal/PromptModal";
 import { ImportModal } from "./ImportModal/ImportModal";
@@ -46,7 +48,8 @@ export const AppInner: React.FC<{
     const theme = useTheme();
     const { pendingConfig, openConfirmModal, openConfirmModalWhenFree, handleConfirm, handleCancel } =
         useConfirmModal();
-    useQuitShortcut(openConfirmModal, pendingConfig);
+    const tooSmall = isTerminalTooSmall(terminalWidth, terminalHeight);
+    useQuitShortcut(openConfirmModal, pendingConfig, !tooSmall);
     const { pendingImport, openImportFlow, handleImportConfirm, handleImportCancel } = useImportFlow(openConfirmModal);
     const { pendingStart, openStartFlow, handleStartConfirm, handleStartCancel } = useStartFlow();
 
@@ -207,77 +210,82 @@ Check your internet connection, then try again.`,
             {/* InputRouter: registers global + window-specific shortcuts */}
             <InputRouter tasks={tasks} columns={columns} />
 
-            <Box flexDirection="column" height={terminalHeight} backgroundColor={theme.ui.background}>
-                <Toolbar width={terminalWidth} updateInfo={updateInfo} />
-                <TaskListPanel columns={columns} tasks={tasks} width={terminalWidth} />
-                <SecondaryPanel tasks={tasks} width={terminalWidth} />
-                <Separator width={terminalWidth} />
-                <Footer />
+            {/* The dispatcher, router and every hook above stay mounted, so state and shortcuts (quit) survive a resize. */}
+            {tooSmall ? (
+                <TerminalTooSmall width={terminalWidth} height={terminalHeight} />
+            ) : (
+                <Box flexDirection="column" height={terminalHeight} backgroundColor={theme.ui.background}>
+                    <Toolbar width={terminalWidth} updateInfo={updateInfo} />
+                    <TaskListPanel columns={columns} tasks={tasks} width={terminalWidth} />
+                    <SecondaryPanel tasks={tasks} width={terminalWidth} />
+                    <Separator width={terminalWidth} />
+                    <Footer />
 
-                {/* Modals rendered above everything else */}
+                    {/* Modals rendered above everything else */}
 
-                <PromptModal tasks={tasks} terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
+                    <PromptModal tasks={tasks} terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
 
-                <ImportModal
-                    pendingImport={pendingImport}
-                    terminalHeight={terminalHeight}
-                    terminalWidth={terminalWidth}
-                    onConfirm={handleImportConfirm}
-                    onCancel={handleImportCancel}
-                />
-
-                <StartModal
-                    pendingStart={pendingStart}
-                    terminalHeight={terminalHeight}
-                    terminalWidth={terminalWidth}
-                    onConfirm={handleStartConfirm}
-                    onCancel={handleStartCancel}
-                />
-
-                <SessionsModal
-                    terminalHeight={terminalHeight}
-                    terminalWidth={terminalWidth}
-                    openConfirmModal={openConfirmModal}
-                />
-
-                <ArchiveModal
-                    tasks={tasks}
-                    terminalHeight={terminalHeight}
-                    terminalWidth={terminalWidth}
-                    openConfirmModal={openConfirmModal}
-                />
-
-                <SettingsModal
-                    terminalHeight={terminalHeight}
-                    terminalWidth={terminalWidth}
-                    openConfirmModal={openConfirmModal}
-                />
-
-                <SetupWizardModal tasks={tasks} terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
-
-                <WelcomeModal terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
-
-                <ConfirmModal
-                    pendingConfig={pendingConfig}
-                    terminalHeight={terminalHeight}
-                    terminalWidth={terminalWidth}
-                    onConfirm={handleConfirm}
-                    onCancel={handleCancel}
-                />
-
-                <TempCleanupModal terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
-
-                <ClosingModal terminalHeight={terminalHeight} />
-
-                {updateInfo && (
-                    <UpdateModal
-                        latestVersion={updateInfo.latestVersion}
-                        releaseUrl={updateInfo.releaseUrl}
+                    <ImportModal
+                        pendingImport={pendingImport}
                         terminalHeight={terminalHeight}
                         terminalWidth={terminalWidth}
+                        onConfirm={handleImportConfirm}
+                        onCancel={handleImportCancel}
                     />
-                )}
-            </Box>
+
+                    <StartModal
+                        pendingStart={pendingStart}
+                        terminalHeight={terminalHeight}
+                        terminalWidth={terminalWidth}
+                        onConfirm={handleStartConfirm}
+                        onCancel={handleStartCancel}
+                    />
+
+                    <SessionsModal
+                        terminalHeight={terminalHeight}
+                        terminalWidth={terminalWidth}
+                        openConfirmModal={openConfirmModal}
+                    />
+
+                    <ArchiveModal
+                        tasks={tasks}
+                        terminalHeight={terminalHeight}
+                        terminalWidth={terminalWidth}
+                        openConfirmModal={openConfirmModal}
+                    />
+
+                    <SettingsModal
+                        terminalHeight={terminalHeight}
+                        terminalWidth={terminalWidth}
+                        openConfirmModal={openConfirmModal}
+                    />
+
+                    <SetupWizardModal tasks={tasks} terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
+
+                    <WelcomeModal terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
+
+                    <ConfirmModal
+                        pendingConfig={pendingConfig}
+                        terminalHeight={terminalHeight}
+                        terminalWidth={terminalWidth}
+                        onConfirm={handleConfirm}
+                        onCancel={handleCancel}
+                    />
+
+                    <TempCleanupModal terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
+
+                    <ClosingModal terminalHeight={terminalHeight} />
+
+                    {updateInfo && (
+                        <UpdateModal
+                            latestVersion={updateInfo.latestVersion}
+                            releaseUrl={updateInfo.releaseUrl}
+                            terminalHeight={terminalHeight}
+                            terminalWidth={terminalWidth}
+                        />
+                    )}
+                </Box>
+            )}
         </ImportActionsProvider>
     );
 };

@@ -15,7 +15,9 @@ import { exitApp } from "#utils/exitApp";
  */
 export function useQuitShortcut(
     openConfirmModal: (config: ConfirmModalConfig) => void,
-    pendingConfig: ConfirmModalConfig | null
+    pendingConfig: ConfirmModalConfig | null,
+    // False while the interface is hidden (terminal too small): a question nobody can see is skipped.
+    canAsk = true
 ): void {
     const theme = useTheme();
     const literal = useShortcutLiteral("global.quit");
@@ -32,7 +34,7 @@ export function useQuitShortcut(
                 defaultShortcut: { input: "q", ctrl: true },
                 label: "Quit",
                 handler: () => {
-                    if (pendingConfig !== null && pendingConfig === quitQuestion.current) {
+                    if (!canAsk || (pendingConfig !== null && pendingConfig === quitQuestion.current)) {
                         exitApp();
                         return;
                     }
