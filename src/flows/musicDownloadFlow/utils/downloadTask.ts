@@ -33,6 +33,7 @@ import { convertAudioInto } from "./convertAudio";
 import { extensionOf, parseOutputFormat, planSave } from "./outputFormat";
 import { isSavedFrom, releaseSavedFile } from "./savedSource";
 import { tagAudioFile } from "./tagAudioFile";
+import { writeViaStaging } from "./writeViaStaging";
 import { pickAutoSelectedIndex } from "./sourceSelection";
 import { type MetadataService } from "../metadataService";
 import { type DiscoveryMetadataService } from "../discoveryMetadataService";
@@ -1026,7 +1027,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         // Only a file made here is deleted when saving fails: a saved file that was merely renamed is the user's.
         let outputCreated = false;
 
-        // A file already at the target (the user agreed to replace it): a failed write must not delete it as a "partial".
+        // A file already at the target (the user agreed to replace it): a failure after it was replaced must not
+        // delete it as a file this save created.
         const outputExisted = await fs.access(outputPath).then(
             () => true,
             () => false
@@ -1042,21 +1044,21 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                     await moveFile(existingSavedPath!, outputPath);
                 }
             } else {
-                // New file from the temporary download: a plain copy, or a re-encode into the chosen format.
-                try {
+                // New file from the temporary download: a plain copy, or a re-encode into the chosen format. It is
+                // built and tagged beside its destination and only then renamed over it, so a failure at any step
+                // leaves no partial file and keeps the file the user agreed to replace.
+                await writeViaStaging(outputPath, async (staging) => {
                     if (plan.convert) {
-                        await convertAudioInto(downloadPath!, outputPath, parseOutputFormat(plan.extension));
+                        await convertAudioInto(downloadPath!, staging, parseOutputFormat(plan.extension));
                     } else {
-                        await fs.copyFile(downloadPath!, outputPath);
+                        await fs.copyFile(downloadPath!, staging);
                     }
-                } catch (err) {
-                    // A copy that stopped half-way leaves a partial file under the final name.
-                    if (!outputExisted) await fs.unlink(outputPath).catch(() => {});
-                    throw err;
-                }
-                outputCreated = true;
-                // Off: the file keeps the tags it came with (it is still copied/renamed/moved as usual).
-                if (attrs!.overwriteTags !== false) await tagAudioFile(outputPath, tags);
+                    // Off: the file keeps the tags it came with (it is still copied/renamed/moved as usual).
+                    if (attrs!.overwriteTags !== false) await tagAudioFile(staging, tags);
+                });
+                // From here the file at `outputPath` is complete. If a later step fails, a file this save created
+                // is removed again; one that replaced the user's is kept (the old content is gone either way).
+                outputCreated = !outputExisted;
             }
 
             // Only now that the new file is in place is the one it replaces deleted (a file that was updated in
