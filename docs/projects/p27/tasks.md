@@ -56,6 +56,8 @@ _Depends on: T27.1; coordinates with P24 (doctor), P25 (status)_
 
 ### T27.4 — MusicBrainz release-ID completion (release blocker)
 
+> **Superseded by [P30](../p30/tasks.md).** The "earliest official release" heuristic below picks *a* release, not necessarily the user's edition; P30 matches the release by barcode / streaming link / ISRC and asks when unsure. The fingerprint (T27.3) can still feed P30 as one more piece of evidence.
+
 When a recording ID is known (from fingerprint T27.3, or from the existing MusicBrainz discovery/ISRC path) but release-level IDs are missing from compiled metadata:
 
 - Query the recording's releases via the existing [musicbrainz-client.ts](../../../src/flows/musicDownloadFlow/services/apis/musicbrainz-client.ts); pick by heuristic: release whose title matches the compiled album name → official over bootleg → earliest date. Fill `release`, `releaseGroup` (and `artist` when absent) into the MusicBrainz IDs consumed by `compiledMetadataToTags`, so `saveTrack()` embeds complete `MUSICBRAINZ_*` tags — closing the TODO blocker.

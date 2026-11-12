@@ -33,4 +33,15 @@ describe("windowRows", () => {
         expect(keys(windowRows(list, "a", 3))).toEqual(["a", "b"]);
         expect(keys(windowRows(list, "d", 3))).toEqual(["b", "c", "d"]);
     });
+
+    test("a row with a focus span keeps the rows of its block in view", () => {
+        const list = rows(20).map((r) => (r.key === "r10" ? { ...r, focusSpan: 4 } : r));
+        // The bar at r10 and the four rows under it, not just one row of context.
+        expect(keys(windowRows(list, "r10", 6))).toEqual(["r9", "r10", "r11", "r12", "r13", "r14"]);
+    });
+
+    test("a block taller than the view still shows the focused row first", () => {
+        const list = rows(20).map((r) => (r.key === "r10" ? { ...r, focusSpan: 9 } : r));
+        expect(keys(windowRows(list, "r10", 4))).toEqual(["r10", "r11", "r12", "r13"]);
+    });
 });

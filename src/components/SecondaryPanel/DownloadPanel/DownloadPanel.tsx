@@ -12,7 +12,12 @@ import {
     type TrackDownloadSource,
 } from "#flows/musicDownloadFlow/types";
 import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
-import { computeCompiledMetadata, type CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
+import {
+    computeCompiledMetadata,
+    musicBrainzIdsFromIdentity,
+    type CompiledMetadata,
+} from "#flows/musicDownloadFlow/utils/compiledMetadata";
+import { isMusicBrainzVerdictStale } from "#flows/musicDownloadFlow/musicbrainz/inputKey";
 import { getSaveSettings } from "#flows/musicDownloadFlow/saveSettings";
 import { computeOutputPath, samePath } from "#flows/musicDownloadFlow/utils/computeOutputPath";
 import { previewOutputExtension } from "#flows/musicDownloadFlow/utils/outputFormat";
@@ -23,6 +28,7 @@ import { DownloadSourceDetail } from "./DownloadSourceDetail/DownloadSourceDetai
 import { ProviderSummary } from "./DownloadSourceDetail/ProviderSummary";
 import { DynamicHintBar } from "#components/DynamicHintBar/DynamicHintBar";
 import { useShortcuts } from "#hooks/useShortcuts";
+import { useFileExists } from "#hooks/useFileExists";
 import type { Updater } from "#hooks/useFocusManager";
 
 const HINT_BAR_HEIGHT = 2;
@@ -91,6 +97,9 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     // re-downloads. The UI shows it as a stand-in row.
     const savedFile = snapshot?.attributes?.kind === "track" ? snapshot.attributes.savedFile : undefined;
     const savedSource = useMemo(() => (savedFile ? savedFileAsSource(savedFile) : null), [savedFile]);
+    // The file may have been deleted or moved since it was saved (even while the app was closed): that is looked for
+    // on disk, not recorded, so it also clears itself when the file is back.
+    const savedMissing = useFileExists(savedFile?.path) === false;
 
     const compiled: CompiledMetadata | null =
         snapshot?.attributes?.kind === "track"
@@ -107,6 +116,14 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     const trackAttrs = snapshot?.attributes?.kind === "track" ? snapshot.attributes : null;
     const filenameOverride = trackAttrs?.outputFilenameOverride;
     const overwriteTags = trackAttrs?.overwriteTags !== false;
+    // The MusicBrainz ids saving would write: those of the verdict, unless the sources moved on since it was made
+    // (`runSave` leaves a stale verdict out too). The track's own choice wins over the setting.
+    const musicBrainzIdentity = trackAttrs?.musicBrainzIdentity;
+    const musicBrainzIds =
+        musicBrainzIdentity && compiled && !isMusicBrainzVerdictStale(musicBrainzIdentity, compiled)
+            ? musicBrainzIdsFromIdentity(musicBrainzIdentity)
+            : undefined;
+    const includeMusicBrainzTags = trackAttrs?.includeMusicBrainzTags ?? getSaveSettings().includeMusicBrainzTags;
 
     const downloadNavIndex =
         downloadSources.length === 0
@@ -126,8 +143,10 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
 
     // The diff follows the cursor. On any other source that has a file, the saved file (OLD) is shown next to
     // that source (NEW): what Enter would replace it with.
+    // (Not when the saved file is gone: there is nothing to compare with, the download just takes its place.)
     const isSourceSwitch =
         savedSource != null &&
+        !savedMissing &&
         cursorSource != null &&
         !cursorIsSavedOrigin &&
         cursorSource.localFile?.state === "found";
@@ -159,7 +178,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
             ),
             savedPath
         );
-    const isMetadataChange = !isSourceSwitch && (onSaved || cursorIsSavedOrigin) && hasMetadataChange;
+    const isMetadataChange = !isSourceSwitch && !savedMissing && (onSaved || cursorIsSavedOrigin) && hasMetadataChange;
 
     const showDiff = isSourceSwitch || isMetadataChange;
     // On the saved file the comparison is with itself; on its origin row, with that row.
@@ -279,7 +298,8 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     function handleRequestSave(idx: number) {
         // The saved file can be saved again (re-tag, rename, move) without any download.
         if (idx === SAVED_SOURCE_INDEX) {
-            if (!isSaving && savedSource) handleSave(true);
+            // A file that is not there cannot be re-tagged, renamed or moved: it has to be relocated first.
+            if (!isSaving && savedSource && !savedMissing) handleSave(true);
             return;
         }
         const source = downloadSources[idx];
@@ -329,22 +349,29 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     async function handleRelocateFile() {
         if (!typedTask) return;
         const attrs = typedTask.getAttributes();
-        if (attrs?.kind !== "track" || onSaved) return;
+        if (attrs?.kind !== "track") return;
+        // The pinned saved file, or the download row under the cursor.
         const sourceIdx = downloadNavIndex >= 0 ? downloadNavIndex : 0;
-        const source = attrs.downloadSources[sourceIdx];
-        if (!source) return;
+        const source = onSaved ? undefined : attrs.downloadSources[sourceIdx];
+        if (onSaved ? !attrs.savedFile : !source) return;
 
-        const filename = source.localFile?.name ?? "file";
+        const filename = onSaved ? path.basename(attrs.savedFile!.path) : (source?.localFile?.name ?? "file");
         try {
-            const newPath = await typedTask.getPrompt().askInput({
-                status: "Relocating file",
-                title: "Relocate File",
-                message: `Enter new file path for: ${filename}`,
-                hint: "Absolute path to the audio file",
-            });
-            if (!newPath.trim()) return;
+            const newPath = (
+                await typedTask.getPrompt().askInput({
+                    status: "Relocating file",
+                    title: "Relocate File",
+                    message: `Enter new file path for: ${filename}`,
+                    hint: "Absolute path to the audio file",
+                })
+            )
+                // A path pasted from a file manager often comes quoted.
+                .trim()
+                .replace(/^"(.*)"$/, "$1");
+            if (!newPath) return;
             if (!fs.existsSync(newPath)) return;
-            (typedTask as unknown as DownloadTask)?.updateLocalFile(sourceIdx, newPath);
+            if (onSaved) (typedTask as unknown as DownloadTask)?.relocateSavedFile(newPath);
+            else (typedTask as unknown as DownloadTask)?.updateLocalFile(sourceIdx, newPath);
         } catch {
             // user cancelled
         }
@@ -373,6 +400,8 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                 <DownloadSourceTree
                     sources={downloadSources}
                     savedSource={savedSource}
+                    savedMissing={savedMissing}
+                    onRelocateSaved={handleRelocateFile}
                     showQuery={showQuery}
                     selectedSourceIndex={downloadNavIndex}
                     focusedProvider={focusedProvider}
@@ -409,6 +438,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                         ) : undefined
                     }
                     savedSource={savedSource}
+                    savedFileMissing={savedMissing}
                     compiled={compiled}
                     baseCompiled={baseCompiled}
                     overrides={trackAttrs?.metadataOverride ?? {}}
@@ -417,6 +447,8 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                     isOutputOverridden={outputDirOverride != null}
                     filenameOverride={filenameOverride}
                     overwriteTags={overwriteTags}
+                    musicBrainzIds={musicBrainzIds}
+                    includeMusicBrainzTags={includeMusicBrainzTags}
                     isDiffMode={showDiff}
                     diffKind={isSourceSwitch ? "source-switch" : "metadata-change"}
                     pendingSource={effectivePendingSource}
@@ -433,6 +465,9 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                     onChangeFilename={(name) => (typedTask as unknown as DownloadTask)?.setOutputFilename(name)}
                     onChangeOverwriteTags={(overwrite) =>
                         (typedTask as unknown as DownloadTask)?.setOverwriteTags(overwrite)
+                    }
+                    onChangeIncludeMusicBrainzTags={(include) =>
+                        (typedTask as unknown as DownloadTask)?.setIncludeMusicBrainzTags(include)
                     }
                     onOverridesChange={(updated) => typedTask?.updateAttributes({ metadataOverride: updated })}
                     setIsEditingField={setIsEditingField}

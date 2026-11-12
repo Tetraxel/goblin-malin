@@ -22,7 +22,9 @@ export function compiledMetadataToTags(compiled: CompiledMetadata, options: TagO
                   musicBrainzTrackId: compiled.musicBrainzIds?.recording,
                   musicBrainzAlbumId: compiled.musicBrainzIds?.release,
                   musicBrainzArtistId: compiled.musicBrainzIds?.artist,
+                  musicBrainzAlbumArtistIds: compiled.musicBrainzIds?.albumArtists,
                   musicBrainzReleaseGroupId: compiled.musicBrainzIds?.releaseGroup,
+                  musicBrainzReleaseTrackId: compiled.musicBrainzIds?.releaseTrack,
               }
             : {}),
     };

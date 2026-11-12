@@ -47,6 +47,10 @@ The product wave: with the foundation in place, these projects target what users
 | P27 — Audio Verification & Auto-MB IDs        | Catch wrong downloads (live versions, DJ sets) via duration + optional acoustic fingerprint; auto-fill missing MusicBrainz release IDs (release blocker).               | [p27/tasks.md](p27/tasks.md) |
 | P28 — Provider Expansion: Deezer & SoundCloud | Deezer metadata/discovery (keyless API, fills the empty BPM column via ISRC lookup) and SoundCloud import + direct download.                                            | [p28/tasks.md](p28/tasks.md) |
 
+**P31 — Add a link by hand, and re-uploads** ([p31/tasks.md](p31/tasks.md)): paste a track link onto a track (`Ctrl+V` in the Metadata Sources list or on a platform's cell) when the automatic search can't find the source — kept through restart, re-discovery and a stopped task — and teach Claude (and the confidence gate) that an unofficial re-upload may be linked to its official release, never the reverse.
+
+**P30 — MusicBrainz Identity** ([p30/tasks.md](p30/tasks.md)): which MusicBrainz release each track is on — matched only on conclusive evidence, reviewed by the user otherwise — the IDs in the saved file, and a guarded way to add a missing release (the user always submits it themselves). Supersedes P27/T27.4 and P29/T29.3.
+
 **P29 — Claude as a Fallback & Assistant** ([p29/tasks.md](p29/tasks.md)): Claude (through the user's own `claude -p` CLI) as the last-resort discovery provider — shipped — and later as an agent that picks the best source, fixes metadata and finds MusicBrainz releases.
 
 ### Recommended order

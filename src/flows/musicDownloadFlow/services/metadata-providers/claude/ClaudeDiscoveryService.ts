@@ -14,7 +14,7 @@ import {
     DEFAULT_CLAUDE_COMMAND,
     DEFAULT_CLAUDE_MODEL,
 } from "../../apis/claude-client";
-import { type ClaudeLink, claudeLinksToTracks } from "./convertClaudeToTrack";
+import { type ClaudeLink, claudeLinksToResults } from "./convertClaudeToTrack";
 import {
     CLAUDE_DISCOVERY_SYSTEM_PROMPT,
     // `type` matters: it is used in the signature of the @Cached() method below, and the swc pass that
@@ -50,6 +50,11 @@ export class ClaudeDiscoveryService extends DiscoveryMetadataService {
         enabled: { label: "Enable (uses your Claude plan)", defaultValue: false, kind: "checkbox" },
         model: { label: "Model", defaultValue: DEFAULT_CLAUDE_MODEL, kind: "select", options: CLAUDE_MODELS },
         command: { label: "Claude CLI command", defaultValue: DEFAULT_CLAUDE_COMMAND, kind: "textInput" },
+        explain: {
+            label: "Explain why Claude chose each link (a little more output per lookup)",
+            defaultValue: true,
+            kind: "checkbox",
+        },
     };
     static readonly consent: ProviderConsent = {
         title: "Let Claude help find tracks?",
@@ -88,15 +93,18 @@ export class ClaudeDiscoveryService extends DiscoveryMetadataService {
             sourceUrl: sourceMetadata.url,
             wanted,
             model,
+            explain: settings.explain !== false,
         };
 
-        const links = await this.lookup(query);
-        const tracks = claudeLinksToTracks(links, wanted);
+        const answer = normalizeAnswer(await this.lookup(query));
+        const { tracks, explanations, summaries } = claudeLinksToResults(answer.links, wanted);
 
         const searchKeys: SearchKey[] = [query.isrc ? "trackName+artistName+isrc" : "trackName+artistName"];
         return {
             tracks,
             searchKeys,
+            ...(Object.keys(explanations).length > 0 ? { explanations } : {}),
+            ...(Object.keys(summaries).length > 0 ? { summaries } : {}),
             anchor: { state: tracks.length > 0 ? "found" : "notFound", count: tracks.length },
         };
     }
@@ -105,7 +113,7 @@ export class ClaudeDiscoveryService extends DiscoveryMetadataService {
     // object, whose fetch timestamp would make every refetch a cache miss — this call is expensive.
     // Short TTL (vs the 90-day default): a "nothing found" shouldn't stick for months.
     @Cached({ ttl: CACHE_TTL_MS })
-    private async lookup(query: ClaudeTrackQuery): Promise<ClaudeLink[]> {
+    private async lookup(query: ClaudeTrackQuery): Promise<ClaudeAnswer> {
         const settings = getMusicSettings().metadata.discoveryProviders[PROVIDER_KEY] ?? {};
         const command = typeof settings.command === "string" ? settings.command : DEFAULT_CLAUDE_COMMAND;
         const label = `"${query.trackName}" by ${query.artists.join(", ")}`;
@@ -119,11 +127,11 @@ export class ClaudeDiscoveryService extends DiscoveryMetadataService {
         });
 
         try {
-            const { data } = await this.client.run<{ links?: ClaudeLink[] }>({
+            const { data } = await this.client.run<{ links?: ClaudeLink[]; reasoning?: string }>({
                 prompt: buildClaudeDiscoveryPrompt(query),
                 systemPrompt: CLAUDE_DISCOVERY_SYSTEM_PROMPT,
                 model: query.model,
-                jsonSchema: buildClaudeDiscoverySchema(query.wanted),
+                jsonSchema: buildClaudeDiscoverySchema(query.wanted, query.explain === true),
                 tools: ["WebSearch", "WebFetch"],
                 command,
             });
@@ -134,14 +142,31 @@ export class ClaudeDiscoveryService extends DiscoveryMetadataService {
                         .map((l) => `${l.platform} ${l.url} (${l.confidence}${l.evidence ? `, ${l.evidence}` : ""})`)
                         .join(" | ")
             );
+            // The whole of what Claude said goes to the log; the metadata panel shows the one-line summary.
+            const reasoning = typeof data.reasoning === "string" ? data.reasoning.trim() : "";
+            if (reasoning) this.logger.info(`Claude left platforms out for ${label}:\n${reasoning}`);
+            for (const l of links) {
+                if (typeof l.explanation === "string" && l.explanation.trim()) {
+                    this.logger.info(`Why Claude chose ${l.platform} ${l.url}:\n${l.explanation.trim()}`);
+                }
+            }
             this.status.clear();
-            return links;
+            return { links, reasoning };
         } catch (error) {
             this.logger.error(`Error asking Claude about ${label}`, { error });
             this.status.set({ type: StatusType.Error, message: describeFailure(error) });
             throw error;
         }
     }
+}
+
+/** What a lookup returns. Cache entries from before explanations existed are a bare list of links. */
+type ClaudeAnswer = { links: ClaudeLink[]; reasoning?: string };
+
+function normalizeAnswer(raw: unknown): ClaudeAnswer {
+    if (Array.isArray(raw)) return { links: raw as ClaudeLink[] };
+    const answer = raw as Partial<ClaudeAnswer> | undefined;
+    return { links: Array.isArray(answer?.links) ? answer.links : [], reasoning: answer?.reasoning };
 }
 
 function describeFailure(error: unknown): string {

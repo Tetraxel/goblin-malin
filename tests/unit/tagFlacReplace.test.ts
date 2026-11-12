@@ -25,6 +25,28 @@ describe("buildFlacTagMap", () => {
             BPM: "0",
         });
     });
+
+    test("the MusicBrainz ids go in under Picard's names: the recording is TRACKID, the release's track RELEASETRACKID", () => {
+        expect(
+            buildFlacTagMap({
+                trackTitle: "T",
+                artists: ["A"],
+                musicBrainzTrackId: "rec",
+                musicBrainzAlbumId: "rel",
+                musicBrainzArtistId: "art",
+                musicBrainzAlbumArtistIds: ["alb-1", "alb-2"],
+                musicBrainzReleaseGroupId: "grp",
+                musicBrainzReleaseTrackId: "trk",
+            })
+        ).toMatchObject({
+            MUSICBRAINZ_TRACKID: "rec",
+            MUSICBRAINZ_ALBUMID: "rel",
+            MUSICBRAINZ_ARTISTID: "art",
+            MUSICBRAINZ_ALBUMARTISTID: ["alb-1", "alb-2"],
+            MUSICBRAINZ_RELEASEGROUPID: "grp",
+            MUSICBRAINZ_RELEASETRACKID: "trk",
+        });
+    });
 });
 
 describe("cleanAndTagFlac — the app's tags replace the file's", () => {

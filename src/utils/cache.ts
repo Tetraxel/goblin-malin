@@ -46,6 +46,11 @@ export function runWithoutCache<T>(fn: () => Promise<T>): Promise<T> {
     return withSkipCache(fn);
 }
 
+/** True inside `runWithoutCache`: the caller wants fresh answers, and in-memory caches must not answer for them either. */
+export function isCacheSkipped(): boolean {
+    return skipCacheStorage.getStore() === true;
+}
+
 /** How long a "nothing found" answer is kept: data may appear upstream tomorrow, errors can be transient. */
 export const NEGATIVE_RESULT_TTL_MS = 24 * 60 * 60 * 1000;
 

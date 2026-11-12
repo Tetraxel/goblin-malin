@@ -7,6 +7,7 @@ import {
     type StandardArtist,
     type StandardAlbum,
 } from "#flows/musicDownloadFlow/types";
+import { type MusicBrainzIdentity } from "#flows/musicDownloadFlow/musicbrainz/types";
 
 export type FieldAttribution = Platform | "manual" | "none";
 
@@ -17,7 +18,11 @@ export type MusicBrainzIds = {
     recording?: string;
     release?: string;
     artist?: string;
+    /** The artists the matched release is credited to (Picard's "Release Artist MBID"). */
+    albumArtists?: string[];
     releaseGroup?: string;
+    /** The track of the matched release that is the recording (Picard's "Track MBID"). */
+    releaseTrack?: string;
 };
 
 export type CompiledMetadata = {
@@ -65,7 +70,11 @@ function pickFirst<T>(
     return { value: undefined, platform: undefined };
 }
 
-export function computeCompiledMetadata(groups: MetadataGroupState[], overrides: MetadataOverrides): CompiledMetadata {
+export function computeCompiledMetadata(
+    groups: MetadataGroupState[],
+    overrides: MetadataOverrides,
+    identity?: MusicBrainzIdentity
+): CompiledMetadata {
     // Build a flat sorted list of representative results, one per group, sorted by group rank
     const sorted = [...groups]
         .sort((a, b) => a.rank - b.rank)
@@ -152,5 +161,31 @@ export function computeCompiledMetadata(groups: MetadataGroupState[], overrides:
         attribution.genres = "manual";
     }
 
+    const musicBrainzIds = musicBrainzIdsFromIdentity(identity);
+    if (musicBrainzIds) compiled.musicBrainzIds = musicBrainzIds;
+
     return compiled;
+}
+
+/**
+ * The MusicBrainz IDs a saved file may carry, from what the identity checks concluded.
+ *  - release / release group: only once a release is actually matched (never from a mere candidate);
+ *  - release artists / release track: the matched release's own credit and its track for the recording;
+ *  - recording: the one recording the track's ISRC names (on the matched release, when there is one);
+ *  - artist: the first credited artist that was linked on real evidence — a same-name search hit never counts.
+ */
+export function musicBrainzIdsFromIdentity(identity: MusicBrainzIdentity | undefined): MusicBrainzIds | undefined {
+    if (!identity) return undefined;
+    const matched = identity.verdict === "matched" && identity.release;
+    const albumArtists = matched ? identity.release!.artists.map((a) => a.id).filter(Boolean) : [];
+    const ids: MusicBrainzIds = {
+        ...(identity.recordingId ? { recording: identity.recordingId } : {}),
+        ...(matched ? { release: identity.release!.id } : {}),
+        ...(albumArtists.length > 0 ? { albumArtists } : {}),
+        ...(matched && identity.releaseGroupId ? { releaseGroup: identity.releaseGroupId } : {}),
+        ...(matched && identity.releaseTrackId ? { releaseTrack: identity.releaseTrackId } : {}),
+    };
+    const artist = identity.artists.find((a) => a.mbid)?.mbid;
+    if (artist) ids.artist = artist;
+    return Object.keys(ids).length > 0 ? ids : undefined;
 }

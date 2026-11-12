@@ -9,6 +9,7 @@ import { type DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { MusicBrainzClient } from "../../apis/musicbrainz-client";
 import { extractTracksFromMusicBrainzRecording } from "./convertMusicBrainzToTrack";
 import { MusicBrainzCell } from "./MusicBrainzCell";
+import { musicBrainzColumnActions } from "../../../musicbrainz/columnActions";
 import { discoveryResultTtl } from "#flows/musicDownloadFlow/utils/discoveryCache";
 
 export class MusicBrainzDiscoveryService extends DiscoveryMetadataService {
@@ -23,6 +24,7 @@ export class MusicBrainzDiscoveryService extends DiscoveryMetadataService {
         enabled: { label: "Enable", defaultValue: true, kind: "checkbox" },
     };
     static readonly cellComponent = MusicBrainzCell;
+    static readonly columnActions = musicBrainzColumnActions;
 
     private static client: MusicBrainzClient;
 
@@ -77,7 +79,6 @@ export class MusicBrainzDiscoveryService extends DiscoveryMetadataService {
             this.status.clear();
 
             const recordingUrl = `https://musicbrainz.org/recording/${recordingId}`;
-            const picardUri = `http://127.0.0.1:8000/opennat?id=${recordingId}`;
 
             return {
                 tracks,
@@ -85,8 +86,6 @@ export class MusicBrainzDiscoveryService extends DiscoveryMetadataService {
                     state: "found",
                     url: recordingUrl,
                     id: recordingId,
-                    openUri: picardUri,
-                    openLabel: "MusicBrainz Picard",
                     count: tracks.length,
                 },
             };

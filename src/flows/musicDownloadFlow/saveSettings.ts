@@ -31,7 +31,7 @@ export function getSaveSettings(): SaveSettings {
     const s = getMusicSettings();
     return {
         outputDir: s.download.outputDir,
-        includeMusicBrainzTags: false,
+        includeMusicBrainzTags: s.musicBrainz.includeTags,
         convertAudio: s.download.convertAudio,
         convertFormat: s.download.convertFormat,
     };

@@ -97,3 +97,40 @@ describe("computeConfidenceScore — versions", () => {
         expect(computeConfidenceScore(b, a)).toBe(100);
     });
 });
+
+describe("computeConfidenceScore — 'Artist - Title' uploads", () => {
+    // An unofficial YouTube re-upload: the artist is only in the title, the channel is "the artist".
+    const repost = track("Orelsan - Dans ma ville on traine (clip non officiel)", "Paul LATOUR", { duration: 242000 });
+    const official = track("Dans ma ville on traine", "Orelsan", { duration: 242000 });
+
+    test("the official track of a re-upload clears the last-resort bar (50) — it used to score 45", () => {
+        // title contained (25) + artist found in the upload's title (15) + same duration (20)
+        expect(computeConfidenceScore(official, repost)).toBe(60);
+    });
+
+    test("it works both ways: the official track as the primary and the upload as the candidate", () => {
+        expect(computeConfidenceScore(repost, official)).toBe(60);
+    });
+
+    test("another artist's cover of the same title does NOT get the boost", () => {
+        const cover = track("Dans ma ville on traine", "Jean Dupont", { duration: 242000 });
+        expect(computeConfidenceScore(cover, repost)).toBe(45);
+    });
+
+    test("the artist has to be a whole word of the title, not part of one", () => {
+        const upload = track("Orelsanfan - Dans ma ville on traine", "Some Channel", { duration: 242000 });
+        const other = track("Dans ma ville on traine", "Orelsan", { duration: 242000 });
+        expect(computeConfidenceScore(other, upload)).toBe(45);
+    });
+
+    test("an exact artist match still counts for the full 30", () => {
+        const a = track("Song", "Artist", { duration: 200000 });
+        expect(computeConfidenceScore(a, a)).toBe(90);
+    });
+
+    test("one-letter artist names never match inside a title", () => {
+        const upload = track("A - Some Song", "Xyz Ltd", { duration: 200000 });
+        const other = track("Some Song", "A", { duration: 200000 });
+        expect(computeConfidenceScore(other, upload)).toBe(45);
+    });
+});

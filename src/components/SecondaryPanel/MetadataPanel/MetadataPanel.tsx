@@ -10,6 +10,11 @@ import {
 } from "#flows/musicDownloadFlow/types";
 import { computeCompiledMetadata, pickGroupRepresentative } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { navigableFields } from "#flows/musicDownloadFlow/utils/metadataFields";
+import { pasteRouter } from "#base/pasteRouter";
+import { musicBrainzActionItems } from "#flows/musicDownloadFlow/musicbrainz/columnActions";
+import { type DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { addLinkFromClipboard } from "#flows/musicDownloadFlow/utils/addLinkFromClipboard";
+import { canCheckMusicBrainz, isMusicBrainzVerdictStale } from "#flows/musicDownloadFlow/musicbrainz/inputKey";
 import { MetadataSourceList } from "./MetadataSourceList";
 import { MetadataDetailPanel } from "./MetadataDetailPanel";
 import { DynamicHintBar } from "#components/DynamicHintBar/DynamicHintBar";
@@ -64,8 +69,11 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
         () => typedTask?.get() as TaskSnapshot<MusicDownloadTaskAttributes> | undefined
     );
     const [prevTypedTask, setPrevTypedTask] = useState(typedTask);
+    // A MusicBrainz check is running (shared by the re-check button next to the compiled row and the one in the compiled metadata).
+    const [checkingMusicBrainz, setCheckingMusicBrainz] = useState(false);
     if (prevTypedTask !== typedTask) {
         setPrevTypedTask(typedTask);
+        setCheckingMusicBrainz(false);
         setSnapshot(typedTask?.get() as TaskSnapshot<MusicDownloadTaskAttributes> | undefined);
     }
 
@@ -88,7 +96,29 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
         () => (snapshot?.attributes?.kind === "track" ? snapshot.attributes.metadataOverride : {}),
         [snapshot]
     );
-    const compiled = useMemo(() => computeCompiledMetadata(groups, overrides), [groups, overrides]);
+    const musicBrainz = useMemo(
+        () => (snapshot?.attributes?.kind === "track" ? snapshot.attributes.musicBrainzIdentity : undefined),
+        [snapshot]
+    );
+    const compiled = useMemo(
+        () => computeCompiledMetadata(groups, overrides, musicBrainz),
+        [groups, overrides, musicBrainz]
+    );
+    // Whether the MusicBrainz check is out of date with these sources, and whether there is enough to check.
+    const musicBrainzStale = isMusicBrainzVerdictStale(musicBrainz, compiled);
+    const musicBrainzCheckable = canCheckMusicBrainz(compiled);
+    // The re-check button: when the verdict is out of date with the sources, or there is none yet. Shown next to the
+    // compiled row (left) and in the compiled metadata (right); both share `checkingMusicBrainz`.
+    const showMusicBrainzRecheck = musicBrainzCheckable && (musicBrainzStale || !musicBrainz);
+    // What can be done about the verdict, as buttons next to it. The plain "re-check" is left out while the louder
+    // "sources changed" button is shown: it would be the same thing twice.
+    const musicBrainzActions = useMemo(() => {
+        if (!typedTask || snapshot?.attributes?.kind !== "track") return [];
+        return musicBrainzActionItems(typedTask as unknown as DownloadTask)
+            .filter((item) => !(item.id === "recheck" && showMusicBrainzRecheck))
+            .map((item) => ({ id: item.id, label: item.buttonLabel, run: item.run }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [typedTask, musicBrainz, showMusicBrainzRecheck]);
 
     const [splitRatio, setSplitRatio] = useState(0.6);
     const leftWidth = Math.floor(width * splitRatio) - 4;
@@ -183,6 +213,49 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
         [typedTask]
     );
 
+    const handleAddLink = useCallback(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const task = typedTask as any;
+        if (typeof task?.addUserSources === "function") void addLinkFromClipboard(task);
+    }, [typedTask]);
+
+    // Delete (not reject) a link the user added by hand: the row and its durable entry.
+    const handleDeleteUserResult = useCallback(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (uri: string) => (typedTask as any)?.removeUserSource?.(uri),
+        [typedTask]
+    );
+
+    // "Re-check on MusicBrainz": the sources changed since the last check. Resolves when the check is done.
+    const handleRecheckMusicBrainz = useCallback(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const task = typedTask as any;
+        if (typeof task?.checkMusicBrainz !== "function") return;
+        setCheckingMusicBrainz(true);
+        void (async () => {
+            try {
+                await task.checkMusicBrainz();
+            } catch {
+                /* already logged by the task */
+            } finally {
+                setCheckingMusicBrainz(false);
+            }
+        })();
+    }, [typedTask]);
+
+    // A link pasted while the sources list has focus (on any of its rows) is added to THIS track as a source — in
+    // most terminals Ctrl+V arrives as pasted text, not as a key, so the shortcut alone is not enough.
+    const claimsPaste =
+        isPanelActive && innerFocus === "list" && !isEditingField && typedTask?.getAttributes()?.kind === "track";
+    useEffect(() => {
+        if (!claimsPaste || !typedTask) return;
+        return pasteRouter.register((text) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            void addLinkFromClipboard(typedTask as any, text);
+            return true;
+        });
+    }, [claimsPaste, typedTask]);
+
     const handleSkipDiscovery = useCallback(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         () => (typedTask as any)?.skipDiscovery?.(),
@@ -265,6 +338,17 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
                     onGroupsChange={handleGroupsChange}
                     onToggleDiscoverySources={() => setShowDiscoverySources(!showDiscoverySources)}
                     onRefetchResult={handleRefetchResult}
+                    onAddLink={handleAddLink}
+                    onDeleteUserResult={handleDeleteUserResult}
+                    musicBrainzRecheckLabel={
+                        showMusicBrainzRecheck
+                            ? musicBrainz
+                                ? "↻ Sources changed: re-check on MusicBrainz"
+                                : "↻ Check on MusicBrainz"
+                            : undefined
+                    }
+                    checkingMusicBrainz={checkingMusicBrainz}
+                    onRecheckMusicBrainz={handleRecheckMusicBrainz}
                     onSkipDiscovery={handleSkipDiscovery}
                     isFetchingPrimarySource={
                         snapshot?.attributes?.kind === "track"
@@ -290,6 +374,12 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
                     onScrollField={handleScrollField}
                     onInnerFocusSwitch={() => setSourcesInnerFocus("list")}
                     setIsEditingField={setIsEditingField}
+                    musicBrainz={musicBrainz}
+                    musicBrainzStale={musicBrainzStale}
+                    showMusicBrainzRecheck={showMusicBrainzRecheck}
+                    checkingMusicBrainz={checkingMusicBrainz}
+                    onRecheckMusicBrainz={handleRecheckMusicBrainz}
+                    musicBrainzActions={musicBrainzActions}
                 />
             </Box>
             <DynamicHintBar width={width - 2} isActive={isPanelActive} />

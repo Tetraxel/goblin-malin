@@ -17,7 +17,7 @@ function formatDuration(ms: number | undefined): string {
 }
 
 function confidenceBadge(result: MetadataResultState, theme: Theme): { text: string; color: string } {
-    if (result.isPrimaryInput) return { text: "[USER]", color: theme.confidence.primary };
+    if (result.isPrimaryInput || result.addedByUser) return { text: "[USER]", color: theme.confidence.primary };
     const c = result.confidence;
     if (c === undefined) return { text: "[??%]", color: theme.text.secondary };
     const text = `[${c}%]`;
@@ -147,7 +147,7 @@ export const MetadataResultRow = React.memo(function MetadataResultRow({
             </Box>
             {/* Discovery source lines */}
             {sourceLines.map((src, i) => (
-                <DiscoverySourceLine key={i} source={src} dimmed={isDimmed} />
+                <DiscoverySourceLine key={i} source={src} dimmed={isDimmed} width={width} />
             ))}
         </Box>
     );

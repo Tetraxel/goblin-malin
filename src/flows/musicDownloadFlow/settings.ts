@@ -39,6 +39,23 @@ export type MusicDownloadFlowSettings = {
     ui: {
         columnRatios: Record<string, number>; // columnId → fraction of available width (0–1)
     };
+    /** MusicBrainz: which release a track belongs to, the IDs in the saved file, and adding a missing release (P30). */
+    musicBrainz: {
+        /** Work out the MusicBrainz release of each track while discovering (read-only lookups). */
+        matchTracks: boolean;
+        /** Write the MusicBrainz IDs (recording, release, artist, release group) into the saved file. */
+        includeTags: boolean;
+        /** "Add to MusicBrainz" is allowed. Off until the user says yes, once. */
+        contribute: boolean;
+        /** The user has been asked about `contribute` (so a "no" is not asked again). */
+        contributeAsked: boolean;
+        /** How the MusicBrainz editor gets its data: "harmony" (Harmony does the import) or "direct" (the app seeds it). */
+        contributeVia: string;
+        /** Address of the Harmony instance used by "harmony" (the public one, or the user's own). */
+        harmonyUrl: string;
+        /** The port of MusicBrainz Picard's browser integration (Picard: Options → Network → Browser integration). */
+        picardPort: string;
+    };
     collections: {
         /** How often a live-enabled playlist re-fetches its track list, in seconds. */
         defaultLiveRefreshIntervalSeconds: number;
@@ -98,6 +115,15 @@ export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSetting
     },
     ui: {
         columnRatios: {},
+    },
+    musicBrainz: {
+        matchTracks: true,
+        includeTags: true,
+        contribute: false,
+        contributeAsked: false,
+        contributeVia: "harmony",
+        harmonyUrl: "https://harmony.pulsewidth.org.uk",
+        picardPort: "8000",
     },
     collections: {
         defaultLiveRefreshIntervalSeconds: 120,

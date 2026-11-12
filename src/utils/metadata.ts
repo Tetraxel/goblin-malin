@@ -18,7 +18,11 @@ export type Metadata = {
     musicBrainzTrackId?: string;
     musicBrainzAlbumId?: string;
     musicBrainzArtistId?: string;
+    /** The release's credited artists (`MUSICBRAINZ_ALBUMARTISTID`). */
+    musicBrainzAlbumArtistIds?: string[];
     musicBrainzReleaseGroupId?: string;
+    /** The track of the release (`MUSICBRAINZ_RELEASETRACKID`); `musicBrainzTrackId` is the recording, as in Picard. */
+    musicBrainzReleaseTrackId?: string;
 };
 
 /** The Vorbis comments of a FLAC file for `metadata`: only the fields that have a value. */
@@ -37,8 +41,14 @@ export function buildFlacTagMap(metadata: Metadata): FlacTagMap {
         ...(metadata.musicBrainzTrackId ? { MUSICBRAINZ_TRACKID: metadata.musicBrainzTrackId } : {}),
         ...(metadata.musicBrainzAlbumId ? { MUSICBRAINZ_ALBUMID: metadata.musicBrainzAlbumId } : {}),
         ...(metadata.musicBrainzArtistId ? { MUSICBRAINZ_ARTISTID: metadata.musicBrainzArtistId } : {}),
+        ...(metadata.musicBrainzAlbumArtistIds?.length
+            ? { MUSICBRAINZ_ALBUMARTISTID: metadata.musicBrainzAlbumArtistIds }
+            : {}),
         ...(metadata.musicBrainzReleaseGroupId
             ? { MUSICBRAINZ_RELEASEGROUPID: metadata.musicBrainzReleaseGroupId }
+            : {}),
+        ...(metadata.musicBrainzReleaseTrackId
+            ? { MUSICBRAINZ_RELEASETRACKID: metadata.musicBrainzReleaseTrackId }
             : {}),
     };
 }

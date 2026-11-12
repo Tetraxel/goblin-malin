@@ -53,13 +53,31 @@ function extractYear(releaseDate: string | undefined): number | undefined {
     return isNaN(year) ? undefined : year;
 }
 
+/** True when `phrase` appears in `text` as whole words (both already normalised). */
+function containsPhrase(text: string, phrase: string): boolean {
+    return phrase.length >= 2 && ` ${text} `.includes(` ${phrase} `);
+}
+
+/**
+ * Uploads on YouTube are named "Artist - Title" and credited to the CHANNEL, so the artist of an upload is often only
+ * in its title ("Orelsan - Dans ma ville (clip non officiel)", channel "Paul LATOUR"). One side's artist found in the
+ * other side's track name is worth the same as a partial artist match.
+ */
+function artistInOtherTitle(source: TrackMetadata, primary: TrackMetadata): boolean {
+    const inTitle = (artists: TrackMetadata["artists"], title: string | undefined) => {
+        const t = normalize(title ?? "");
+        return !!t && artists.some((a) => containsPhrase(t, normalize(a.name)));
+    };
+    return inTitle(source.artists, primary.trackName) || inTitle(primary.artists, source.trackName);
+}
+
 /**
  * Scores how well `source` matches `primary` on a 0–100 scale.
  * Primary source always returns 100. ISRC match short-circuits to 100.
  *
  * Breakdown:
  *   Track name exact:  40 pts  (substring: 25 pts)
- *   Artist name exact: 30 pts  (substring: 15 pts)
+ *   Artist name exact: 30 pts  (substring: 15 pts; the artist inside the other side's title: 15 pts)
  *   Duration ≤2% diff: 20 pts  (≤5%: 10 pts)
  *   Year match:        10 pts
  *   Version markers (live/remix/karaoke/cover…) on one side only: −15 pts each (max −30)
@@ -90,6 +108,8 @@ export function computeConfidenceScore(source: TrackMetadata, primary: TrackMeta
         if (srcArtist === primArtist) {
             score += 30;
         } else if (srcArtist.includes(primArtist) || primArtist.includes(srcArtist)) {
+            score += 15;
+        } else if (artistInOtherTitle(source, primary)) {
             score += 15;
         }
     }

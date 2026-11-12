@@ -117,7 +117,7 @@ Linux is **not supported yet**: the app installs and starts, but its automatic `
 
     They are saved in the `.env` file of the data folder, in plain text. See [.env.example](.env.example) for the format.
 
-- **Songlink** and **Claude** are off until you allow them once (a dialog explains what is sent).
+- **Songlink** and **Claude** are off until you allow them once (a dialog explains what is sent). Claude can explain each link it chooses (Settings → Metadata → Claude): the full text is in the logs, a few lines show under the source when you toggle the search details with `E`.
 - Pick your **output folder** in Settings → Download → _Default output directory_.
 
 ## Steps
@@ -127,6 +127,7 @@ Linux is **not supported yet**: the app installs and starts, but its automatic `
     - `YouTube` / `YouTube Music` (tracks, playlists)
 - System fetches primary metadata from the corresponding URL platform
 - System discovers the same track on other platforms (cross-referencing via ISRC or track/artist name)
+- When it can't find a source (an unofficial re-upload, say), **paste the right link yourself** (`Ctrl+V` in the Metadata Sources list, or on a platform's cell). It is kept for good: a restart, a re-discovery or a stopped task never removes it.
 - Filters/orders metadata sources by relevance or leaves the default ranking chosen by the system (use `TAB` key to switch the focused window).
 - System searches matching tracks from the enabled download providers:
     - `yt-dlp`
@@ -138,27 +139,27 @@ Linux is **not supported yet**: the app installs and starts, but its automatic `
 
 Every shortcut can be rebound in Settings → _Shortcuts_, and the hints at the bottom of the screen always show the live binding. The defaults:
 
-| Key                        | What it does                                                                                                                                                                             |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Ctrl+V`                   | Import the links on the clipboard (a link pasted while a text field has focus stays in that field)                                                                                       |
-| `Ctrl+Q`                   | **Quit**, from anywhere. Asks first; press `Ctrl+Q` again (right away, or while the question is up) to quit at once. Closing waits for your session to be saved. `Ctrl+C` does not quit. |
-| `Tab`                      | Switch the focused panel                                                                                                                                                                 |
-| `Esc` `Esc`                | Focus the toolbar (`←` `→` to move, `Enter` to press a button, `↓` to go back to the tasks)                                                                                              |
-| `↑` `↓`                    | Move in the task list; `←` `→` change column                                                                                                                                             |
-| `Shift+↑` `Shift+↓`        | Shrink / grow the secondary panel                                                                                                                                                        |
-| `Ctrl+A`, `Ctrl+Shift+↑/↓` | Select all tasks, or extend the selection by a range (`Esc` clears it). Most actions work on the whole selection.                                                                        |
-| `R`                        | Start / restart the focused task                                                                                                                                                         |
-| `F` / `D`                  | Re-fetch primary metadata / re-discover on the other providers                                                                                                                           |
-| `W`                        | Search download sources                                                                                                                                                                  |
-| `Enter`                    | Run the cell's action (toggle tagging or downloading, open a link, …)                                                                                                                    |
-| `Del`                      | Archive or delete the task                                                                                                                                                               |
-| `Ctrl+C`                   | Copy the focused value                                                                                                                                                                   |
-| `1` `2`                    | Metadata mode / download mode                                                                                                                                                            |
-| `3` `4` `5`                | Metadata sources / download sources / logs tab                                                                                                                                           |
-| `Space`, `Ctrl+P`          | Play a source / pause or resume playback                                                                                                                                                 |
-| `S`                        | Save the selected source to the output folder (in the download panel)                                                                                                                    |
-| `Ctrl+F`                   | Relocate a saved file that moved                                                                                                                                                         |
-| `F3`                       | Toggle the stats overlay                                                                                                                                                                 |
+| Key                        | What it does                                                                                                                                                                                                |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Ctrl+V`                   | Import the links on the clipboard (a link pasted while a text field has focus stays in that field). In the **Metadata Sources** list, or on a **platform's cell**, it adds the link to _that track_ instead |
+| `Ctrl+Q`                   | **Quit**, from anywhere. Asks first; press `Ctrl+Q` again (right away, or while the question is up) to quit at once. Closing waits for your session to be saved. `Ctrl+C` does not quit.                    |
+| `Tab`                      | Switch the focused panel                                                                                                                                                                                    |
+| `Esc` `Esc`                | Focus the toolbar (`←` `→` to move, `Enter` to press a button, `↓` to go back to the tasks)                                                                                                                 |
+| `↑` `↓`                    | Move in the task list; `←` `→` change column                                                                                                                                                                |
+| `Shift+↑` `Shift+↓`        | Shrink / grow the secondary panel                                                                                                                                                                           |
+| `Ctrl+A`, `Ctrl+Shift+↑/↓` | Select all tasks, or extend the selection by a range (`Esc` clears it). Most actions work on the whole selection.                                                                                           |
+| `R`                        | Start / restart the focused task                                                                                                                                                                            |
+| `F` / `D`                  | Re-fetch primary metadata / re-discover on the other providers                                                                                                                                              |
+| `W`                        | Search download sources                                                                                                                                                                                     |
+| `Enter`                    | Run the cell's action (toggle tagging or downloading, open a link, …)                                                                                                                                       |
+| `Del`                      | Archive or delete the task                                                                                                                                                                                  |
+| `Ctrl+C`                   | Copy the focused value                                                                                                                                                                                      |
+| `1` `2`                    | Metadata mode / download mode                                                                                                                                                                               |
+| `3` `4` `5`                | Metadata sources / download sources / logs tab                                                                                                                                                              |
+| `Space`, `Ctrl+P`          | Play a source / pause or resume playback                                                                                                                                                                    |
+| `S`                        | Save the selected source to the output folder (in the download panel)                                                                                                                                       |
+| `Ctrl+F`                   | Relocate a saved file that moved                                                                                                                                                                            |
+| `F3`                       | Toggle the stats overlay                                                                                                                                                                                    |
 
 The mouse works as well: click to focus and select, scroll, click the toolbar buttons.
 

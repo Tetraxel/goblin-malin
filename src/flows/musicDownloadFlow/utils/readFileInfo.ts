@@ -18,6 +18,15 @@ const ID3_TAG_MAP: Record<string, string | undefined> = {
     initialKey: "KEY",
 };
 
+/** The picard-compatible `TXXX` descriptions (lower-cased) → the Vorbis comment each one stands for. */
+const ID3_MUSICBRAINZ_TEXT: Record<string, string | undefined> = {
+    "musicbrainz album id": "MUSICBRAINZ_ALBUMID",
+    "musicbrainz artist id": "MUSICBRAINZ_ARTISTID",
+    "musicbrainz album artist id": "MUSICBRAINZ_ALBUMARTISTID",
+    "musicbrainz release group id": "MUSICBRAINZ_RELEASEGROUPID",
+    "musicbrainz release track id": "MUSICBRAINZ_RELEASETRACKID",
+};
+
 // node-id3's Tags shape doesn't match flac-tagger's uppercase Vorbis-comment-style
 // tagMap — normalize the handful of fields the UI actually displays (PRIORITY_TAGS
 // in DownloadSourceDetail) into the same shape so both formats render identically.
@@ -29,6 +38,13 @@ function normalizeId3Tags(tags: NodeID3.Tags): Record<string, string | string[]>
             embeddedTags[mappedKey] = value;
         }
     }
+    // The MusicBrainz ids sit in frames of their own (see `tagMp3`): shown under the Vorbis names, like the rest.
+    for (const { description, value } of tags.userDefinedText ?? []) {
+        const mappedKey = ID3_MUSICBRAINZ_TEXT[description.toLowerCase()];
+        if (mappedKey && value) embeddedTags[mappedKey] = value;
+    }
+    const recording = tags.uniqueFileIdentifier?.find((u) => u.ownerIdentifier === "http://musicbrainz.org");
+    if (recording) embeddedTags.MUSICBRAINZ_TRACKID = recording.identifier.toString();
     return embeddedTags;
 }
 

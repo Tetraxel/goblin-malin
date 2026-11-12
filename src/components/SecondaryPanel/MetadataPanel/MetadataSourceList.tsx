@@ -10,6 +10,7 @@ import { stepCursor, useSourceListInput } from "./useSourceListInput";
 import { MetadataGroupHeader } from "./MetadataGroupHeader";
 import { MetadataResultRow } from "./MetadataResultRow";
 import { MetadataCompiledRow } from "./MetadataCompiledRow";
+import { MusicBrainzRecheckButton } from "./MusicBrainzRecheckButton";
 
 interface MetadataSourceListProps {
     groups: MetadataGroupState[];
@@ -29,6 +30,16 @@ interface MetadataSourceListProps {
     onGroupsChange: (groups: MetadataGroupState[]) => void;
     onToggleDiscoverySources: () => void;
     onRefetchResult: (groupIndex: number, resultIndex: number) => void;
+    /** Add the link in the clipboard to this track as a source. Must be referentially stable. */
+    onAddLink: () => void;
+    /** Delete a link the user added by hand (`uri` = the row's `metadata.uri`). Must be referentially stable. */
+    onDeleteUserResult: (uri: string) => void;
+    /** The label of the MusicBrainz re-check button under the compiled row; undefined = no button. */
+    musicBrainzRecheckLabel?: string;
+    /** A MusicBrainz check is running. */
+    checkingMusicBrainz?: boolean;
+    /** Run the MusicBrainz check again. Must be referentially stable. */
+    onRecheckMusicBrainz?: () => void;
     /** Stop discovering and keep the sources found so far. Must be referentially stable. */
     onSkipDiscovery: () => void;
     isFetchingPrimarySource?: boolean;
@@ -79,6 +90,11 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
     onGroupsChange,
     onToggleDiscoverySources,
     onRefetchResult,
+    onAddLink,
+    onDeleteUserResult,
+    musicBrainzRecheckLabel,
+    checkingMusicBrainz = false,
+    onRecheckMusicBrainz,
     onSkipDiscovery,
     isFetchingPrimarySource = false,
     isDiscovering = false,
@@ -99,6 +115,8 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
         onGroupsChange,
         onToggleDiscoverySources,
         onRefetchResult,
+        onAddLink,
+        onDeleteUserResult,
     });
 
     // Skipping only makes sense once there is something to keep.
@@ -116,15 +134,26 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
                 </Text>
             </Box>
             <Box flexDirection="column" flexGrow={1} gap={1} overflow="hidden">
-                {/* Compiled row */}
-                <MetadataCompiledRow
-                    compiled={compiled}
-                    overrideCount={overrideCount}
-                    onSelect={onSelectCursor}
-                    isSelected={cursor.type === "compiled"}
-                    isActive={isActive}
-                    width={width}
-                />
+                {/* Compiled row, and under it the MusicBrainz re-check button when the sources changed */}
+                <Box flexDirection="column" flexShrink={0}>
+                    <MetadataCompiledRow
+                        compiled={compiled}
+                        overrideCount={overrideCount}
+                        onSelect={onSelectCursor}
+                        isSelected={cursor.type === "compiled"}
+                        isActive={isActive}
+                        width={width}
+                    />
+                    {musicBrainzRecheckLabel && onRecheckMusicBrainz && (
+                        <Box paddingLeft={3} flexShrink={0}>
+                            <MusicBrainzRecheckButton
+                                label={musicBrainzRecheckLabel}
+                                busy={checkingMusicBrainz}
+                                onRecheck={onRecheckMusicBrainz}
+                            />
+                        </Box>
+                    )}
+                </Box>
                 {/* Groups */}
                 {sortedGroups.map((group, gIdx) => {
                     const sortedResults = [...group.results].sort((a, b) => a.rank - b.rank);

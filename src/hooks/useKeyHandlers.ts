@@ -1,3 +1,6 @@
+import { useEffect } from "react";
+import { pasteRouter } from "#base/pasteRouter";
+import { addLinkFromClipboard } from "#flows/musicDownloadFlow/utils/addLinkFromClipboard";
 import { useFocusActions, useFocusChrome, useFocusTaskList } from "#contexts/FocusContext";
 import { useToolbarActionsRef } from "#contexts/ToolbarActionsContext";
 import { type Task } from "#base/task/task";
@@ -65,6 +68,22 @@ export function useTaskListShortcuts(tasks: Task[], columns: ColumnDefinition<Mu
 
     const selectedTask = tasks[taskList.selectedTaskIndex];
     const multiCount = taskList.selectedTaskIds.size;
+
+    // On a platform's cell the action bar offers "Paste link": a pasted link is added to that track as a source (not
+    // imported as a new track). With several tracks selected it is ambiguous, so the import dialog keeps it.
+    const onPlatformCell = columns[taskList.selectedColumnIndex]?.id.startsWith("metadataService-") ?? false;
+    const claimsPaste =
+        isActive &&
+        onPlatformCell &&
+        multiCount <= 1 &&
+        (selectedTask?.getAttributes() as MusicDownloadTaskAttributes | undefined)?.kind === "track";
+    useEffect(() => {
+        if (!claimsPaste || !selectedTask) return;
+        return pasteRouter.register((text) => {
+            void addLinkFromClipboard(selectedTask as unknown as DownloadTask, text);
+            return true;
+        });
+    }, [claimsPaste, selectedTask]);
 
     // Derive contextual action shortcuts from the action bar for the current task/column.
     // Computed inline (no memo) so the action bar is always fresh — task internal state (status,

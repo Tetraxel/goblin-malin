@@ -34,6 +34,8 @@ Per task: send the compiled metadata + all source metadata; ask for a list of de
 
 ### T29.3 — Find or create a MusicBrainz release
 
+> **Built without Claude, as [P30](../p30/tasks.md):** the lookups, the verdict rules and the "add a missing release" flow are deterministic and guarded. Claude could later be one more *proposer* of candidates (verified by the same rules), never the judge.
+
 Given a track with no MusicBrainz match, have Claude search MusicBrainz (and the web) for the right release, or draft a new release's data for the user to submit. Output is a release MBID candidate verified against the MusicBrainz API, or a prefilled "add release" link. Overlaps P27's auto-MB-ID work — build the verification once.
 
 ### T29.4 — Agent UX

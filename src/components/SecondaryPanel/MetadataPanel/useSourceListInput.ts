@@ -6,6 +6,7 @@ import { type CursorPosition } from "#hooks/useFocusManager";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { Uri } from "#components/SecondaryPanel/MetadataPanel/Uri";
+import { toAppUri as toOpenableUri } from "#utils/appLinks";
 
 interface UseSourceListInputParams {
     groups: MetadataGroupState[];
@@ -17,12 +18,10 @@ interface UseSourceListInputParams {
     onGroupsChange: (groups: MetadataGroupState[]) => void;
     onToggleDiscoverySources: () => void;
     onRefetchResult: (groupIndex: number, resultIndex: number) => void;
-}
-
-function toOpenableUri(url: string): string {
-    const m = url.match(/open\.spotify\.com\/(track|album|artist|playlist)\/([A-Za-z0-9]+)/);
-    if (m) return `spotify:${m[1]}:${m[2]}`;
-    return url;
+    /** Add the link in the clipboard to this track as a source. */
+    onAddLink: () => void;
+    /** Delete a link the user added by hand (not just reject it); `uri` is the row's `metadata.uri`. */
+    onDeleteUserResult: (uri: string) => void;
 }
 
 type FlatItem =
@@ -81,6 +80,8 @@ export function useSourceListInput({
     onGroupsChange,
     onToggleDiscoverySources,
     onRefetchResult,
+    onAddLink,
+    onDeleteUserResult,
 }: UseSourceListInputParams) {
     // Focused result metadata (for hint line left content)
     const focusedResult =
@@ -93,6 +94,7 @@ export function useSourceListInput({
             : undefined;
 
     const focusedGroup = cursor.type === "group" ? sortedGroups[cursor.groupIndex] : undefined;
+    const deletesFocusedResult = !!focusedResult?.addedByUser && !focusedResult.isPrimaryInput;
 
     const uri = focusedResult?.metadata
         ? (focusedResult.metadata.uri ??
@@ -121,7 +123,7 @@ export function useSourceListInput({
                             }),
                         nodeKey: uri,
                     },
-                    shortcutIds: ["sourceList.enter", "sourceList.copy"],
+                    shortcutIds: ["sourceList.enter", "sourceList.copy", "sourceList.addLink"],
                 },
                 {
                     id: "sourceList.line.position",
@@ -150,7 +152,12 @@ export function useSourceListInput({
                         color: groupDisplay?.color,
                         bold: true,
                     },
-                    shortcutIds: ["sourceList.reject", "sourceList.moveUp", "sourceList.moveDown"],
+                    shortcutIds: [
+                        "sourceList.reject",
+                        "sourceList.moveUp",
+                        "sourceList.moveDown",
+                        "sourceList.addLink",
+                    ],
                 },
             ];
         }
@@ -158,7 +165,7 @@ export function useSourceListInput({
             {
                 id: "sourceList.line.compiled",
                 left: { type: "text" as const, value: "Compiled Metadata", bold: true },
-                shortcutIds: [],
+                shortcutIds: ["sourceList.addLink"],
             },
         ];
     })();
@@ -345,7 +352,8 @@ export function useSourceListInput({
             {
                 id: "sourceList.reject",
                 defaultShortcut: { key: "delete" },
-                label: "Reject",
+                // A link the user added by hand is deleted for real; everything else can only be rejected.
+                label: deletesFocusedResult ? "Delete" : "Reject",
                 handler: () => {
                     if (cursor.type === "result") {
                         const { groupIndex: gi, resultIndex: ri } = cursor;
@@ -353,6 +361,17 @@ export function useSourceListInput({
                         const sortedResults = [...group.results].sort((a, b) => a.rank - b.rank);
                         const result = sortedResults[ri];
                         if (!result) return;
+                        if (result.addedByUser && !result.isPrimaryInput && result.metadata.uri) {
+                            // Keep the cursor on a row that exists afterwards: the next one up, or — when this was the
+                            // group's last row and the group goes with it — the row above the group.
+                            onCursorChange(
+                                sortedResults.length > 1
+                                    ? { ...cursor, resultIndex: Math.min(ri, sortedResults.length - 2) }
+                                    : stepCursor(cursor, sortedGroups, -2)
+                            );
+                            onDeleteUserResult(result.metadata.uri);
+                            return;
+                        }
                         const origGroup = groups.find((g) => g.serviceKey === group.serviceKey);
                         if (!origGroup) return;
                         const newRejected = !result.isRejected;
@@ -401,6 +420,13 @@ export function useSourceListInput({
                 defaultShortcut: { input: "e" },
                 label: "Toggle details",
                 handler: () => onToggleDiscoverySources(),
+            },
+            {
+                id: "sourceList.addLink",
+                defaultShortcut: { input: "v", ctrl: true },
+                label: "Add link",
+                // Wins over the global Ctrl+V (import) while this list has focus: here a pasted link belongs to THIS track.
+                handler: () => onAddLink(),
             },
             {
                 id: "sourceList.refetch",

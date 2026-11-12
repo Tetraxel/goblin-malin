@@ -32,7 +32,10 @@ import { collectionHintBridge, type CollectionHintRequest } from "#base/bridges/
 import { overwriteConfirmBridge, type OverwriteConfirmRequest } from "#base/bridges/overwriteConfirmBridge";
 import { binaryAlertBridge, type BinaryAlertRequest } from "#base/bridges/binaryAlertBridge";
 import { dataFileNoticeBridge, type DataFileNotice } from "#base/bridges/dataFileNoticeBridge";
+import { dialogBridge, type ConfirmDialog, type DialogTone } from "#base/bridges/dialogBridge";
 import { ConfirmModal } from "./ConfirmModal/ConfirmModal";
+import { ListDialogModal } from "./ListDialogModal/ListDialogModal";
+import { useListDialog } from "./ListDialogModal/useListDialog";
 import { ClosingModal } from "./ClosingModal/ClosingModal";
 import { TempCleanupModal } from "./TempCleanupModal/TempCleanupModal";
 import { useConfirmModal } from "./ConfirmModal/useConfirmModal";
@@ -169,6 +172,40 @@ Check your internet connection, then try again.`,
         [openConfirmModalWhenFree, theme]
     );
 
+    // Bridge: let plain-TS flows ask a question and wait for the answer (dialogBridge.confirm / .choose). These
+    // are answers to something the user just asked for, but a flow may still be waiting on a dialog the user is
+    // answering, so a confirm waits for a free slot rather than replacing it.
+    const { pending: pendingList, open: openListDialog, answer: answerListDialog } = useListDialog();
+    const handleDialogConfirm = useCallback(
+        (dialog: ConfirmDialog, resolve: (index: number | null) => void) => {
+            const colors: Record<DialogTone, string> = {
+                primary: theme.action.primary,
+                danger: theme.status.error,
+                muted: theme.text.muted,
+                success: theme.status.success,
+            };
+            openConfirmModalWhenFree({
+                title: dialog.title,
+                message: dialog.message,
+                choices: dialog.choices.map((c) => ({ label: c.label, color: colors[c.tone] })),
+                accentColor: dialog.accent ?? theme.action.primary,
+                onConfirm: (i) => resolve(i),
+                onCancel: () => resolve(null),
+            });
+        },
+        [openConfirmModalWhenFree, theme]
+    );
+
+    useEffect(() => {
+        dialogBridge.setConfirmOpener(handleDialogConfirm);
+        return () => dialogBridge.setConfirmOpener(null);
+    }, [handleDialogConfirm]);
+
+    useEffect(() => {
+        dialogBridge.setListOpener(openListDialog);
+        return () => dialogBridge.setListOpener(null);
+    }, [openListDialog]);
+
     // Bridge: let plain-TS task actions open the start-options modal.
     useEffect(() => {
         startOptionsBridge.setOpener(openStartFlow);
@@ -273,6 +310,13 @@ Check your internet connection, then try again.`,
                         terminalWidth={terminalWidth}
                         onConfirm={handleConfirm}
                         onCancel={handleCancel}
+                    />
+
+                    <ListDialogModal
+                        pending={pendingList}
+                        terminalHeight={terminalHeight}
+                        terminalWidth={terminalWidth}
+                        onAnswer={answerListDialog}
                     />
 
                     <TempCleanupModal terminalHeight={terminalHeight} terminalWidth={terminalWidth} />

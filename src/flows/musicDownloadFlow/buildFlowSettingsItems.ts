@@ -4,7 +4,7 @@ import { type ServiceRegistry } from "#base/service-registry";
 import { type SetupWizardConfig, isSetupComplete } from "#base/setupWizard";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { type SettingsItem } from "#settings/buildSettingsItems";
-import { type MusicDownloadFlowSettings } from "./settings";
+import { BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS, type MusicDownloadFlowSettings } from "./settings";
 import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
 import { runTempCleanup } from "./tempCleanupFlow";
 import { OUTPUT_FORMATS, OUTPUT_FORMAT_KEYS, parseOutputFormat } from "./utils/outputFormat";
@@ -167,6 +167,68 @@ export function buildFlowSettingsItems(
             );
         }
     }
+
+    // ── MusicBrainz ───────────────────────────────────────────────
+    // Over the defaults, so a caller holding settings from before this section existed still gets working rows.
+    const mb = { ...BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS.musicBrainz, ...flowSettings.musicBrainz };
+    items.push({ kind: "sectionHeader", label: "MusicBrainz" });
+    items.push({
+        kind: "checkbox",
+        indent: 0,
+        label: "Find each track's MusicBrainz release (read-only lookups)",
+        get: () => mb.matchTracks,
+        set: (v) => onChange({ musicBrainz: { matchTracks: v } }),
+    });
+    items.push({
+        kind: "checkbox",
+        indent: 0,
+        label: "Write MusicBrainz IDs into saved files",
+        get: () => mb.includeTags,
+        set: (v) => onChange({ musicBrainz: { includeTags: v } }),
+    });
+    items.push({
+        kind: "checkbox",
+        indent: 0,
+        label: "Allow adding missing releases to MusicBrainz",
+        // Flipping the switch is an explicit answer: never ask again.
+        get: () => mb.contribute,
+        set: (v) => onChange({ musicBrainz: { contribute: v, contributeAsked: true } }),
+    });
+    items.push({
+        kind: "note",
+        indent: 0,
+        text: "Nothing is submitted by the app: MusicBrainz opens in your browser and you press “Enter edit” yourself.",
+    });
+    items.push({
+        kind: "select",
+        indent: 0,
+        label: "Add releases via",
+        options: ["harmony", "direct"],
+        get: () => (mb.contributeVia === "direct" ? "direct" : "harmony"),
+        set: (v) => onChange({ musicBrainz: { contributeVia: v } }),
+    });
+    items.push({
+        kind: "note",
+        indent: 0,
+        text:
+            mb.contributeVia === "direct"
+                ? "direct: the app fills MusicBrainz' editor itself and learns the new release when you are done."
+                : "harmony: Harmony (a public import tool) checks for duplicates and fills the editor; press Re-check afterwards.",
+    });
+    items.push({
+        kind: "textInput",
+        indent: 0,
+        label: "Harmony address",
+        get: () => mb.harmonyUrl,
+        set: (v) => onChange({ musicBrainz: { harmonyUrl: v } }),
+    });
+    items.push({
+        kind: "textInput",
+        indent: 0,
+        label: "MusicBrainz Picard port (its browser integration)",
+        get: () => mb.picardPort,
+        set: (v) => onChange({ musicBrainz: { picardPort: v } }),
+    });
 
     // ── Collections (albums/playlists) ─────────────────────────────
     items.push({ kind: "sectionHeader", label: "Collections" });

@@ -30,6 +30,10 @@ interface DownloadSourceTreeProps {
     sources: TrackDownloadSource[];
     /** The track's saved file as a stand-in row (see `savedFileAsSource`); null while nothing is saved. */
     savedSource: TrackDownloadSource | null;
+    /** The saved file is not on disk any more: it cannot be played or updated, only relocated. */
+    savedMissing: boolean;
+    /** Ask where the saved file went (the user then gives its new path). */
+    onRelocateSaved: () => void;
     /** Show, under each group of rows, what the provider was actually asked for. */
     showQuery: boolean;
     selectedSourceIndex: number;
@@ -186,6 +190,8 @@ function playbackOf(
 export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     sources,
     savedSource,
+    savedMissing,
+    onRelocateSaved,
     showQuery,
     selectedSourceIndex,
     focusedProvider,
@@ -290,7 +296,8 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
     const selectedSource = onHeader ? undefined : onSaved ? (savedSource ?? undefined) : sources[selectedSourceIndex];
     const canRetryHeader = onHeader && canRetryProvider(focusedProvider);
     // Previewing and saving need a file: the temporary copy, or the saved file once that copy is cleaned up.
-    const playPath = selectedSource ? playableFilePath(selectedSource) : null;
+    const savedGone = onSaved && savedMissing;
+    const playPath = selectedSource && !savedGone ? playableFilePath(selectedSource) : null;
     const canPlay = playPath !== null;
     const saveLabel =
         selectedSource?.savedFile || (savedFile && selectedSource && isSavedFrom(savedFile, selectedSource))
@@ -395,6 +402,14 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                 },
             },
             {
+                id: "downloadSourceTree.relocate",
+                defaultShortcut: { input: "f", ctrl: true },
+                label: "Relocate",
+                handler: () => {
+                    if (savedGone) onRelocateSaved();
+                },
+            },
+            {
                 id: "downloadSourceTree.playPause",
                 defaultShortcut: { input: " " },
                 label: "Play/Pause",
@@ -423,6 +438,7 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
                     ...(canRetryHeader ? ["downloadSourceTree.retryProvider"] : []),
                     ...(canRetry ? ["downloadSourceTree.retry"] : []),
                     ...(moreItem ? ["downloadSourceTree.showMore"] : []),
+                    ...(savedGone ? ["downloadSourceTree.relocate"] : []),
                     ...(canPlay ? ["downloadSourceTree.playPause", "downloadSourceTree.save"] : []),
                 ],
             },
@@ -437,7 +453,8 @@ export const DownloadSourceTree: React.FC<DownloadSourceTreeProps> = ({
             isFocused={onSaved}
             isActive={isActive}
             width={width}
-            playback={playbackOf(savedSource, nowPlaying)}
+            missing={savedMissing}
+            playback={savedMissing ? undefined : playbackOf(savedSource, nowPlaying)}
             onSelect={onFocusSaved}
         />
     );

@@ -1,4 +1,5 @@
 import { type IRecordingMatch, type IReleaseGroupMatch, type IRelease } from "musicbrainz-api";
+import { type MusicBrainzIdentity } from "./musicbrainz/types";
 
 //----------------------//
 //     MUSICBRAINZ      //
@@ -47,6 +48,8 @@ export interface StandardAlbum {
     url: string;
     uri: string;
     artists?: StandardArtist[];
+    /** UPC / EAN, when the provider gave it with the track (most only give it on the full album: see `getAlbumDetails`). */
+    barcode?: string;
 }
 
 //----------------------//
@@ -217,6 +220,10 @@ export type DiscoverySource = {
     discoveredBy: string; // service key: "spotify", "songlink", "youtube"
     fromUri: string; // source URI used as input: "SPOTIFY::TRACK::abcd"
     searchKeys: SearchKey[]; // which fields drove this search
+    /** Why the discoverer chose this result, in its own words (Claude, when its explanations are on). */
+    explanation?: string;
+    /** The same, as one short line written for the Metadata Sources panel (`explanation` is for the log). */
+    summary?: string;
 };
 
 // One result within a platform group
@@ -226,6 +233,11 @@ export type MetadataResultState = {
     isFavorited: boolean; // max 1 per group
     isRejected: boolean;
     rank: number; // within-group ordering (lower = higher priority)
+    /**
+     * The user pasted this link onto the track by hand (see `TrackDownloadTask.userSources`). Kept across
+     * re-discovery, like the primary input, and shown as "[USER]".
+     */
+    addedByUser?: boolean;
     confidence?: number; // 0–100 vs primary input metadata
     discoverySources: DiscoverySource[]; // empty for the primary input result
     fetchState?: "loading" | "error";
@@ -262,6 +274,10 @@ export type DiscoveryResult = {
     // Which fields of the source metadata drove the lookup. Defaults to ["url"] (a lookup by the
     // source URL, like Songlink); a text-based lookup reports the fields it actually searched on.
     searchKeys?: SearchKey[];
+    /** Why each result was chosen, by the result's uri — shown under the result's "found by" line. */
+    explanations?: Record<string, string>;
+    /** One short line per result (by uri) for the Metadata Sources panel. */
+    summaries?: Record<string, string>;
 };
 
 export type MetadataOverrides = Partial<{
@@ -450,6 +466,16 @@ export type TrackDownloadSource = {
 //         TASK         //
 //----------------------//
 
+/** A track link the user added to a track by hand. */
+export type UserSource = {
+    /** The link as pasted (trimmed). */
+    url: string;
+    /** Its canonical "PLATFORM::TRACK::ID" — how it is told apart from the results it becomes. */
+    uri: string;
+    /** ISO date-time. */
+    addedAt: string;
+};
+
 export type TrackDownloadTask = {
     kind: "track";
     state: "pending" | "running" | "finished" | "failed" | "stopped";
@@ -488,7 +514,24 @@ export type TrackDownloadTask = {
      * replacing the ones it has). `false` keeps the file's own tags. Unset means on.
      */
     overwriteTags?: boolean;
+    /**
+     * Whether the MusicBrainz ids go into the saved file's tags, for this track. Unset = what Settings → MusicBrainz
+     * says (`SaveSettings.includeMusicBrainzTags`). Only matters while `overwriteTags` is on: with it off the file
+     * keeps the tags it came with.
+     */
+    includeMusicBrainzTags?: boolean;
     discoveryAnchors?: Record<string, DiscoveryAnchor>;
+    /**
+     * Track links the user added by hand (the source the automatic search could not find). This is the durable copy:
+     * no pipeline step ever clears it, and every rebuild of `metadataGroups` (restart, a stopped task started again,
+     * re-discovery) puts each entry back. Like `userInput`, it is the user's data, not the pipeline's.
+     */
+    userSources?: UserSource[];
+    /**
+     * Which MusicBrainz release this track belongs to (P30): the verdict of the identity checks, the evidence,
+     * and the user's decisions. Absent until the checks have run (or when they are switched off).
+     */
+    musicBrainzIdentity?: MusicBrainzIdentity;
 };
 
 //----------------------//

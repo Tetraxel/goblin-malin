@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
 import type { TrackDownloadSource } from "#flows/musicDownloadFlow/types";
+import { type AttributesTint } from "./FocusRow";
 
 /** Label column of the side-by-side view: narrower than the full pane's, as two panels share the width. */
 export const COMPACT_LABEL_W = 9;
@@ -20,16 +21,21 @@ export function DiffCell({
     value,
     tone = "same",
     variant = "plain",
+    tint,
+    dim,
 }: {
     label: string;
     value: string;
     tone?: DiffTone;
     variant?: "plain" | "attribute";
+    /** The colours of an "attribute" row that is not the yellow "File attributes" block. */
+    tint?: AttributesTint;
+    dim?: boolean;
 }) {
     const theme = useTheme();
     const attribute = variant === "attribute";
-    const valueColor =
-        tone === "removed" ? theme.status.error : attribute ? theme.fileAttributes.value : theme.text.primary;
+    const colors = tint ?? theme.fileAttributes;
+    const valueColor = tone === "removed" ? theme.status.error : attribute ? colors.value : theme.text.primary;
     return (
         <Box
             flexDirection="row"
@@ -37,18 +43,18 @@ export function DiffCell({
             height={1}
             flexShrink={0}
             overflow="hidden"
-            backgroundColor={attribute ? theme.fileAttributes.background : undefined}
+            backgroundColor={attribute ? colors.background : undefined}
         >
             <Box width={2} minWidth={2} flexShrink={0} />
             <Box width={COMPACT_LABEL_W} minWidth={COMPACT_LABEL_W} flexShrink={0} marginRight={1}>
-                <Text color={attribute ? theme.fileAttributes.label : theme.ui.border} bold wrap="truncate-end">
+                <Text color={attribute ? colors.label : theme.ui.border} bold wrap="truncate-end">
                     {attribute
                         ? label.toUpperCase().padStart(COMPACT_LABEL_W)
                         : label.toUpperCase().padEnd(COMPACT_LABEL_W)}
                 </Text>
             </Box>
             <Box flexGrow={1} flexShrink={1} overflow="hidden">
-                <Text color={valueColor} bold={attribute} dimColor={value === "—"} wrap="truncate-middle">
+                <Text color={valueColor} bold={attribute} dimColor={dim || value === "—"} wrap="truncate-middle">
                     {value}
                 </Text>
             </Box>

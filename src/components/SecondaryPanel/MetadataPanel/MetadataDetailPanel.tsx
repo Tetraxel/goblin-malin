@@ -8,6 +8,8 @@ import { type CompiledMetadata, type CompiledMetadataField } from "#flows/musicD
 import { FIELDS, navigableFields } from "#flows/musicDownloadFlow/utils/metadataFields";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { FieldRow } from "./FieldRow";
+import { MusicBrainzSection, type MusicBrainzButtonSpec } from "./MusicBrainzSection";
+import { type MusicBrainzIdentity } from "#flows/musicDownloadFlow/musicbrainz/types";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
 
@@ -26,6 +28,18 @@ interface MetadataSourceDetailProps {
     onScrollField: (index: Updater<number>) => void;
     onInnerFocusSwitch: () => void;
     setIsEditingField: (editing: boolean) => void;
+    /** Which MusicBrainz release the track is on (shown in the compiled view). */
+    musicBrainz?: MusicBrainzIdentity;
+    /** The sources changed since the MusicBrainz check was made. */
+    musicBrainzStale?: boolean;
+    /** Show the MusicBrainz re-check button. */
+    showMusicBrainzRecheck?: boolean;
+    /** A MusicBrainz check is running. */
+    checkingMusicBrainz?: boolean;
+    /** Run the MusicBrainz check again. */
+    onRecheckMusicBrainz?: () => void;
+    /** What can be done about the MusicBrainz verdict (buttons). */
+    musicBrainzActions?: MusicBrainzButtonSpec[];
 }
 
 function getPlatformBrightColor(apiProvider: string): string {
@@ -44,6 +58,12 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
     onScrollField,
     onInnerFocusSwitch,
     setIsEditingField,
+    musicBrainz,
+    musicBrainzStale = false,
+    showMusicBrainzRecheck = false,
+    checkingMusicBrainz = false,
+    onRecheckMusicBrainz,
+    musicBrainzActions,
 }) => {
     const theme = useTheme();
     const panelRef = useRef<DOMElement>(null);
@@ -241,6 +261,17 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
                             );
                         })}
                     </Box>
+                    {isCompiled && (
+                        <MusicBrainzSection
+                            identity={musicBrainz}
+                            ids={compiled.musicBrainzIds}
+                            stale={musicBrainzStale}
+                            showRecheck={showMusicBrainzRecheck}
+                            checking={checkingMusicBrainz}
+                            onRecheck={onRecheckMusicBrainz}
+                            actions={musicBrainzActions}
+                        />
+                    )}
                 </Box>
             </Box>
         </Box>

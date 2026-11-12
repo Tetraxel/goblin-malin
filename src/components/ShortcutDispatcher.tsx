@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { useInput } from "ink";
 import { shortcutRegistry } from "#base/shortcuts/ShortcutRegistry";
 import { textInputFocus } from "#base/textInputFocus";
+import { pasteRouter } from "#base/pasteRouter";
 import { useImportActions } from "#contexts/ImportActionsContext";
 import { useFocusChrome } from "#contexts/FocusContext";
 import type { FocusableWindow } from "#hooks/useFocusManager";
@@ -24,6 +25,7 @@ const NO_IMPORT_PASTE_WINDOWS: ReadonlySet<FocusableWindow> = new Set([
     "welcomeModal",
     "updateModal",
     "confirmModal",
+    "listDialog",
     "tempCleanupModal",
 ]);
 
@@ -62,6 +64,8 @@ export const ShortcutDispatcher: React.FC = () => {
                 pasteTimerRef.current = null;
                 // Another window (Archive, Settings…) may be on top by now: the paste is dropped, not stacked under it.
                 if (NO_IMPORT_PASTE_WINDOWS.has(activeWindowRef.current)) return;
+                // A focused panel may have its own use for a pasted link ("add it to this track"): it goes first.
+                if (pasteRouter.route(text)) return;
                 openImportFlow(text);
             }, PASTE_DEBOUNCE_MS);
             return;

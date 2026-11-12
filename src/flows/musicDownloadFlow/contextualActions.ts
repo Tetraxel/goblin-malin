@@ -10,6 +10,9 @@ import { deleteConfirmBridge } from "#base/bridges/deleteConfirmBridge";
 import { type DownloadTask } from "./utils/downloadTask";
 import { type CollectionTask } from "./utils/collectionTask";
 import { runSelected } from "./runController";
+import { toAppUri as toOpenableUri } from "#utils/appLinks";
+import { addLinkFromClipboard } from "./utils/addLinkFromClipboard";
+import { discoveryServiceRegistry } from "./registries";
 import { metadataLimiter, downloadLimiter } from "./utils/stageLimiters";
 import type { Task } from "#base/task/task";
 import type { Semaphore } from "#utils/semaphore";
@@ -104,12 +107,6 @@ function sourceUrlFor(t: DownloadTask, serviceKey: string | undefined): string {
 function archive(ids: string[]): void {
     const count = SessionManager.getInstance().archiveTasks(ids);
     if (count > 0) globalLogger.info(`Archived ${count} task${count === 1 ? "" : "s"}`);
-}
-
-function toOpenableUri(url: string): string {
-    const m = url.match(/open\.spotify\.com\/(track|album|artist|playlist)\/([A-Za-z0-9]+)/);
-    if (m) return `spotify:${m[1]}:${m[2]}`;
-    return url;
 }
 
 /**
@@ -333,6 +330,13 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
         columnLabel = display.label;
         columnColor = display.color;
         columnActions.push(...buildMetadataServiceColumnActions(serviceKey, task));
+        // Spreadsheet-style: paste a link onto a platform's cell to tell the app which track this is there.
+        columnActions.push({
+            shortcuts: [{ input: "v", ctrl: true }],
+            label: "Paste link",
+            description: "Add the link in the clipboard to this track as a source (any platform)",
+            onClick: () => fire(addLinkFromClipboard(task)),
+        });
     }
 
     if (column && column.id.startsWith("discoveryService-")) {
@@ -402,7 +406,11 @@ function buildMetadataServiceColumnActions(
 function buildDiscoveryServiceColumnActions(serviceKey: string, task: DownloadTask): ContextualActions[] {
     const display = providerDisplayRegistry.get(serviceKey);
     const anchor = task.getAttributes()?.discoveryAnchors?.[serviceKey];
-    const actions: ContextualActions[] = [];
+    // What the service itself offers for its column (e.g. MusicBrainz: review a match, add a missing release) comes
+    // first: it is what the user most likely came for, and the one-line bar cuts off whatever does not fit.
+    const actions: ContextualActions[] = [
+        ...(discoveryServiceRegistry.getConstructor(serviceKey)?.columnActions?.(task) ?? []),
+    ];
 
     if (anchor?.url) {
         actions.push(
@@ -414,14 +422,32 @@ function buildDiscoveryServiceColumnActions(serviceKey: string, task: DownloadTa
         );
     }
 
-    if (anchor?.openUri) {
+    // (A service that offers the same action itself — MusicBrainz opens Picard from its verdict — wins: the same label
+    // would be the same shortcut id twice.)
+    const openLabel = `Open in ${anchor?.openLabel ?? display.label}`;
+    if (anchor?.openUri && !actions.some((a) => a.label === openLabel)) {
         actions.push({
             shortcuts: [{ key: "return" }],
-            label: `Open in ${anchor.openLabel ?? display.label}`,
+            label: openLabel,
             onClick: () => {
                 open(anchor.openUri!).catch(() => {});
             },
         });
+    }
+
+    // A web page and no app link (MusicBrainz, once it no longer hands the browser a Picard address): open the page.
+    if (anchor?.url && !anchor.openUri) {
+        const label = `Open in ${display.label}`;
+        if (!actions.some((a) => a.label === label)) {
+            const enterTaken = actions.some((a) => a.shortcuts.some((s) => s.key === "return"));
+            actions.push({
+                shortcuts: [enterTaken ? { input: "o" } : { key: "return" }],
+                label,
+                onClick: () => {
+                    open(anchor.url!).catch(() => {});
+                },
+            });
+        }
     }
 
     // The app link (`openUri`) differs from the web page: offer the web page as a second action.

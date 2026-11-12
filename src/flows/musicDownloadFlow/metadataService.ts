@@ -3,6 +3,7 @@ import { type Task } from "#base/task/task";
 import { type Logger } from "#base/logger/logger";
 import { type ParsedUrl, type CollectionExpansion } from "#base/urlParser";
 import { type TrackMetadata, type SearchTrackResult } from "./types";
+import { type ProviderAlbum } from "./musicbrainz/types";
 import { type DownloadTask } from "./utils/downloadTask";
 
 /**
@@ -36,4 +37,15 @@ export abstract class MetadataService extends ServiceBase {
 
     abstract getTrackMetadata(url: string): Promise<TrackMetadata>;
     abstract searchTrack(sourceTrackMetadata: TrackMetadata): Promise<SearchTrackResult[]>;
+
+    /**
+     * Optional capability: the whole album a track belongs to — its barcode (UPC/EAN), the track list and the
+     * artists' pages. A track's own metadata usually lacks the barcode, and it is the strongest key for recognising
+     * the release in MusicBrainz. `withIsrcs` also fetches each track's ISRC (costs more requests; only a seed needs it).
+     * Resolves null when the service cannot tell (e.g. it only reads public web pages).
+     */
+    getAlbumDetails?(
+        album: { id: string; url: string },
+        options?: { withIsrcs?: boolean }
+    ): Promise<ProviderAlbum | null>;
 }

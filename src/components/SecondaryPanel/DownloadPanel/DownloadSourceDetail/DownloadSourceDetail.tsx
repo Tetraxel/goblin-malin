@@ -8,9 +8,11 @@ import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useWheelTarget } from "#base/mouse/useMouseTarget";
 import { useTheme } from "#base/themeContext";
 import { type MetadataOverrides, type TrackDownloadSource } from "#flows/musicDownloadFlow/types";
-import { type CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
+import { type CompiledMetadata, type MusicBrainzIds } from "#flows/musicDownloadFlow/utils/compiledMetadata";
 import { FIELDS, type FieldDef, compiledFieldValues } from "#flows/musicDownloadFlow/utils/metadataFields";
-import { readDiskFieldValues } from "#flows/musicDownloadFlow/utils/diskTagValues";
+import { diskFieldValues } from "#flows/musicDownloadFlow/utils/diskTagValues";
+import { readTags } from "#flows/musicDownloadFlow/utils/readFileInfo";
+import { MUSICBRAINZ_TAG_FIELDS, hasMusicBrainzTags } from "#flows/musicDownloadFlow/utils/musicBrainzTagFields";
 import {
     computeOutputFilename,
     computeOutputPath,
@@ -39,6 +41,8 @@ import { DownloadInProgress } from "./DownloadInProgress";
 import { DetailRow } from "./DetailRow";
 import { DiffCell, SourceCell, COMPACT_LABEL_W } from "./DiffCell";
 import { AttributesHeader, ClickableBox, FocusRow, type FocusRowEdit, editRowLines } from "./FocusRow";
+import { ActionButton } from "./ActionButton";
+import { musicBrainzTint } from "./musicBrainzTint";
 import { OutputFolderBlock } from "./OutputFolderBlock";
 import { PanelFrame } from "./PanelFrame";
 import { windowRows, type WindowRow } from "./windowRows";
@@ -47,6 +51,8 @@ import { formatDuration } from "../../utils";
 interface DownloadSourceDetailProps {
     source: TrackDownloadSource | null;
     savedSource: TrackDownloadSource | null;
+    /** The saved file is no longer on disk (see `useFileExists`). */
+    savedFileMissing: boolean;
     compiled: CompiledMetadata | null;
     /** `compiled` without the track's own edits. */
     baseCompiled: CompiledMetadata | null;
@@ -61,6 +67,10 @@ interface DownloadSourceDetailProps {
     filenameOverride: string | undefined;
     /** Whether saving writes the compiled metadata into the file's tags. */
     overwriteTags: boolean;
+    /** The MusicBrainz ids saving would write (undefined: nothing was matched, or the verdict is out of date). */
+    musicBrainzIds: MusicBrainzIds | undefined;
+    /** Whether saving writes `musicBrainzIds` into the tags: the track's own choice, else Settings → MusicBrainz. */
+    includeMusicBrainzTags: boolean;
     /**
      * A change is pending on a track that is already saved: show the saved file (OLD, play only) next to
      * `pendingSource` (NEW, the same interactive pane as ever) instead of `source`.
@@ -82,6 +92,7 @@ interface DownloadSourceDetailProps {
     /** `undefined` goes back to the "Artist - Title" name. */
     onChangeFilename: (filename: string | undefined) => void;
     onChangeOverwriteTags: (overwrite: boolean) => void;
+    onChangeIncludeMusicBrainzTags: (include: boolean) => void;
     onOverridesChange: (overrides: MetadataOverrides) => void;
     setIsEditingField: (editing: boolean) => void;
     /** A click landed in this pane: give it keyboard focus. */
@@ -94,6 +105,10 @@ const PRIORITY_TAGS = ["TITLE", "ARTIST", "ALBUM", "DATE", "TRACKNUMBER", "ISRC"
 
 // The file's own duration is its own row; the compiled duration is not written to the tags.
 const META_FIELDS = FIELDS.filter((f) => f.key !== "duration");
+// The label column of the MusicBrainz ids: wide enough for "ALB. ARTIST".
+const MUSICBRAINZ_LABEL_W = 11;
+// The rows that are a switch: one click or Enter flips them, there is nothing to type.
+const isSwitchTarget = (target: string) => target === "overwrite" || target === "mbtags";
 const fieldTarget = (f: FieldDef) => `field:${f.key}`;
 const findField = (target: string) => META_FIELDS.find((f) => fieldTarget(f) === target);
 
@@ -160,6 +175,7 @@ interface EditState {
 export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     source: listSource,
     savedSource,
+    savedFileMissing,
     compiled,
     baseCompiled,
     overrides,
@@ -168,6 +184,8 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     isOutputOverridden,
     filenameOverride,
     overwriteTags,
+    musicBrainzIds,
+    includeMusicBrainzTags,
     isDiffMode,
     diffKind,
     pendingSource,
@@ -183,6 +201,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     onChangeOutputDir,
     onChangeFilename,
     onChangeOverwriteTags,
+    onChangeIncludeMusicBrainzTags,
     onOverridesChange,
     setIsEditingField,
     onFocusPane,
@@ -198,14 +217,18 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
 
     // What the OLD file really holds. Read from the disk: what was recorded when it was saved can be missing
     // (older saves, or tags that were left alone) and the file may have been changed since.
-    const [diskTags, setDiskTags] = useState<{ path: string; values: Record<string, string> } | null>(null);
+    const [diskTags, setDiskTags] = useState<{
+        path: string;
+        values: Record<string, string>;
+        tags: Record<string, string | string[]>;
+    } | null>(null);
     const savedAt = oldSource?.savedFile?.savedAt?.toString();
     useEffect(() => {
         if (!oldPath) return;
         let current = true;
-        readDiskFieldValues(oldPath)
-            .then((values) => {
-                if (current) setDiskTags({ path: oldPath, values });
+        readTags(oldPath, extensionOf(oldPath))
+            .then((tags) => {
+                if (current) setDiskTags({ path: oldPath, values: diskFieldValues(tags), tags });
             })
             .catch(() => {
                 // Unreadable or gone: the recorded values stand in.
@@ -216,7 +239,30 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     }, [oldPath, savedAt]);
     const source = compare ? pendingSource : listSource;
 
-    // Where the cursor is: "player", "overwrite", a `field:<key>`, "filename" or "output".
+    // The tags the saved file holds right now. The saved row's `fileInfo` is the one of the download it was made
+    // from, so it cannot tell what was really written (the MusicBrainz ids, above all): the file is read.
+    const savedPath = !compare ? (listSource?.savedFile?.path ?? null) : null;
+    const savedFileAt = listSource?.savedFile?.savedAt?.toString();
+    const [savedDiskTags, setSavedDiskTags] = useState<{
+        path: string;
+        tags: Record<string, string | string[]>;
+    } | null>(null);
+    useEffect(() => {
+        if (!savedPath) return;
+        let current = true;
+        readTags(savedPath, extensionOf(savedPath))
+            .then((tags) => {
+                if (current) setSavedDiskTags({ path: savedPath, tags });
+            })
+            .catch(() => {
+                // Unreadable or gone: the section just stays empty.
+            });
+        return () => {
+            current = false;
+        };
+    }, [savedPath, savedFileAt]);
+
+    // Where the cursor is: "player", "overwrite", "mbtags", a `field:<key>`, "filename" or "output".
     const [cursor, setCursor] = useState("player");
     // The draft of whatever is being typed; null when nothing is.
     const [edit, setEdit] = useState<EditState | null>(null);
@@ -270,7 +316,9 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     const newPlayback = useFilePlayback(currentFilePath);
     const oldPlayback = useFilePlayback(oldPath);
 
-    const canPlay = currentFilePath !== null;
+    // The saved file (the pinned row) is gone from the disk: nothing to play, edit or update, only to relocate.
+    const savedGone = !!source?.savedFile && savedFileMissing;
+    const canPlay = currentFilePath !== null && !savedGone;
     // Shared by the Space shortcut and a click on the playback bar. Only a file that is already
     // loaded can be paused; starting one needs it to be on disk.
     const togglePlayback = () => {
@@ -284,7 +332,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
         seekFileToFraction(currentFilePath, fraction, source?.fileInfo?.durationMs ?? source?.track.duration ?? 0);
     };
     // A saved source whose temporary copy is gone (cleaned up) is not lost: its saved file is what is edited.
-    const fileNotFoundNow = source?.localFile?.state === "not_found" && !source.savedFile;
+    const fileNotFoundNow = (source?.localFile?.state === "not_found" && !source.savedFile) || savedGone;
 
     /** Seeks by `deltaMs` in whichever of the two files is loaded in the player. */
     function seekBy(deltaMs: number) {
@@ -300,6 +348,8 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
 
     // Everything the cursor can land on, in the order it appears on screen. The OLD side is never one of them.
     const hasEditableRows = !!source && (!!source.localFile || !!source.savedFile) && !fileNotFoundNow && !!compiled;
+    // The MusicBrainz block: the switch and the ids (side by side, those of the old file next to the new ones).
+    const showMusicBrainz = hasEditableRows && !!musicBrainzIds;
     const targets: string[] = [];
     // Side by side, the OLD file's playback bar is reached with ← and → (it is on the same row as the NEW one).
     if (compare && oldPath) targets.push("oldPlayer");
@@ -307,6 +357,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     if (hasEditableRows) {
         targets.push("filename", "overwrite");
         for (const f of META_FIELDS) if (f.editable) targets.push(fieldTarget(f));
+        if (showMusicBrainz) targets.push("mbtags");
     }
     if (compiled) targets.push("output");
     const current = targets.includes(cursor) ? cursor : (targets[0] ?? "");
@@ -411,6 +462,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     /** What Enter (or a second click) does on a row: flip the switch, or start typing in it. */
     function activate(target: string) {
         if (target === "overwrite") onChangeOverwriteTags(!overwriteTags);
+        else if (target === "mbtags") onChangeIncludeMusicBrainzTags(!includeMusicBrainzTags);
         else startEditing(target);
     }
 
@@ -421,7 +473,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
         focusPane();
         setCursor(target);
         // A switch has nothing to select first: one click flips it. Text rows need a second click to edit.
-        if (target === "overwrite" || (isActive && current === target)) activate(target);
+        if (isSwitchTarget(target) || (isActive && current === target)) activate(target);
     }
 
     function startEditing(target: string) {
@@ -509,9 +561,11 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                 ? "File name"
                 : current === "overwrite"
                   ? "Tags"
-                  : current.startsWith("field:")
-                    ? (findField(current)?.label ?? "Metadata")
-                    : "Download";
+                  : current === "mbtags"
+                    ? "MusicBrainz tags"
+                    : current.startsWith("field:")
+                      ? (findField(current)?.label ?? "Metadata")
+                      : "Download";
 
     const canSave = canPlay && !isSaving;
     const saveLabel = source?.savedFile ? "Update" : "Save";
@@ -528,7 +582,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                 defaultShortcut: { key: "return" },
                 label: isEditing
                     ? "Apply"
-                    : current === "overwrite"
+                    : isSwitchTarget(current)
                       ? "Toggle"
                       : current === "filename"
                         ? "Rename"
@@ -542,7 +596,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                 handler: () => {
                     // While typing, Enter belongs to the text input (it applies the draft).
                     if (isEditing) return;
-                    if (current === "overwrite" || isTextTarget) activate(current);
+                    if (isSwitchTarget(current) || isTextTarget) activate(current);
                     else if (compare) onConfirmDiff();
                     else if (canSave) onSave();
                 },
@@ -696,9 +750,8 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                                     oldPlayback.isPaused
                                         ? ["downloadSourceDetail.seekBack", "downloadSourceDetail.seekFwd"]
                                         : []),
-                                    ...(fileNotFoundNow ? ["downloadSourceDetail.relocate"] : []),
                                 ]
-                              : current === "overwrite"
+                              : isSwitchTarget(current)
                                 ? ["downloadSourceDetail.confirm"]
                                 : [
                                       "downloadSourceDetail.confirm",
@@ -706,6 +759,8 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                                       "downloadSourceDetail.copy",
                                       ...(isOverridden(current) ? ["downloadSourceDetail.reset"] : []),
                                   ]),
+                          // Whatever row the cursor is on (a lost file leaves only the output folder to land on).
+                          ...(fileNotFoundNow ? ["downloadSourceDetail.relocate"] : []),
                           ...(compare && current !== "oldPlayer" ? ["downloadSourceDetail.playOld"] : []),
                           ...(compare || canSave ? ["downloadSourceDetail.save"] : []),
                           ...(compare ? ["downloadSourceDetail.cancel"] : []),
@@ -745,7 +800,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
         ]);
     const outputEdit = edit?.target === "output" ? edit : null;
 
-    const fileNotFound = source.localFile?.state === "not_found" && !source.savedFile;
+    const fileNotFound = fileNotFoundNow;
     const sourceDurationMs = source.fileInfo?.durationMs ?? source.track.duration ?? 0;
     const displayDurationMs = newPlayback.durationMs > 0 ? newPlayback.durationMs : sourceDurationMs;
     // What the panel describes is the file the track will be (or is) saved as. When saving re-encodes the download,
@@ -766,12 +821,35 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
             : "—";
     const formatLabel = provenance.badge || (source.fileInfo?.format ?? "flac").toUpperCase();
     const provenanceColor = provenance.tone === "warning" ? theme.status.warning : theme.status.success;
-    const embeddedTags = source.fileInfo?.embeddedTags ?? {};
+    // A saved file shows what it holds now (nothing until it is read); a download, the tags it came with.
+    const embeddedTags: Record<string, string | string[]> = isSaved
+        ? savedDiskTags?.path === savedPath
+            ? savedDiskTags.tags
+            : {}
+        : (source.fileInfo?.embeddedTags ?? {});
+    const musicBrainzTagNames = MUSICBRAINZ_TAG_FIELDS.map((f) => f.tag);
     const otherTagKeys = Object.keys(embeddedTags)
         .map((k) => k.toUpperCase())
-        .filter((k) => !PRIORITY_TAGS.includes(k));
+        .filter((k) => !PRIORITY_TAGS.includes(k) && !musicBrainzTagNames.includes(k));
+    // The MusicBrainz ids have their own section. For a saved file it is always there: "—" says they were not written.
+    const showEmbeddedMusicBrainz = isSaved || hasMusicBrainzTags(embeddedTags);
+    // For a saved file, what its MusicBrainz tags say about the ids above, once the file has been read: the ids are
+    // all in it ("in file"), it holds others or only some of them ("differs"), or none ("not in file").
+    const musicBrainzFileState = (() => {
+        if (!isSaved || !musicBrainzIds || savedDiskTags?.path !== savedPath) return undefined;
+        const wanted = MUSICBRAINZ_TAG_FIELDS.map((f) => [
+            f.idOf(musicBrainzIds),
+            tagValue(embeddedTags, f.tag),
+        ]).filter((pair): pair is [string, string] => !!pair[0]);
+        if (wanted.every(([id, written]) => id === written)) return "in file" as const;
+        return hasMusicBrainzTags(embeddedTags) ? ("differs" as const) : ("not in file" as const);
+    })();
 
     const dlProvider = providerDisplayRegistry.get(source.provider);
+    // The MusicBrainz rows' labels take its own (bright, so it reads on a dark background) colour.
+    const musicBrainzColor = providerDisplayRegistry.get("musicBrainz").colorBright;
+    // The colours of the MusicBrainz block, the way the "File attributes" block has its yellow ones.
+    const musicBrainzColors = musicBrainzTint(theme);
     const sourceUri = source.track.uri ?? `${source.track.platform.toUpperCase()}::TRACK::${source.track.id}`;
 
     /** The in-place text input for `target`, when it is the one being edited. */
@@ -955,7 +1033,9 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                 key: "missing",
                 node: (
                     <Box paddingX={1} flexShrink={0}>
-                        <Text color={theme.status.warning}>△ File not found</Text>
+                        <Text color={theme.status.warning}>
+                            {source.savedFile ? "△ Saved file not found on disk" : "△ File not found"}
+                        </Text>
                     </Box>
                 ),
             },
@@ -964,7 +1044,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                 node: (
                     <Box paddingX={1} flexShrink={0}>
                         <Text color={theme.text.secondary} dimColor wrap="truncate-end">
-                            Last known: {source.localFile?.path ?? "—"}
+                            Last known: {source.savedFile?.path ?? source.localFile?.path ?? "—"}
                         </Text>
                     </Box>
                 ),
@@ -973,8 +1053,15 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
             {
                 key: "missing-hint",
                 node: (
-                    <Box paddingX={1} flexShrink={0}>
-                        <Hint shortcutId="downloadSourceDetail.relocate" label="Relocate file" />
+                    <Box paddingX={1} flexShrink={0} flexDirection="row" columnGap={1}>
+                        <ActionButton
+                            label="Relocate"
+                            onClick={() => {
+                                focusPane();
+                                onRelocateFile();
+                            }}
+                        />
+                        <Hint shortcutId="downloadSourceDetail.relocate" label="" />
                     </Box>
                 ),
             }
@@ -1101,6 +1188,77 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                 });
             }
             rows.push({ key: "gap-fields", node: blankRow() });
+
+            // What saving writes of MusicBrainz: a switch, and the ids it would put in the file.
+            if (showMusicBrainz && musicBrainzIds) {
+                // Written only when both switches are on. Side by side the NEW column says what the file will hold
+                // (nothing, when they are off: the old ids are then dropped); alone, the ids are shown dimmed.
+                const writes = includeMusicBrainzTags && overwriteTags;
+                const oldMusicBrainzTags = compare && diskTags?.path === oldPath ? diskTags.tags : undefined;
+                rows.push({
+                    key: "mbtags",
+                    // The ids under the bar are part of the block: the cursor on the bar keeps all of them in view.
+                    focusSpan: MUSICBRAINZ_TAG_FIELDS.length + 1,
+                    node: clickable(
+                        "mbtags",
+                        <AttributesHeader
+                            label={`${includeMusicBrainzTags ? "☒" : "☐"} Include MusicBrainz tags`}
+                            tint={musicBrainzColors}
+                            inset={inset}
+                            focusable
+                            isFocused={isActive && current === "mbtags"}
+                            badge={
+                                musicBrainzFileState
+                                    ? {
+                                          text: musicBrainzFileState.toUpperCase(),
+                                          color:
+                                              musicBrainzFileState === "in file"
+                                                  ? theme.status.success
+                                                  : musicBrainzFileState === "differs"
+                                                    ? theme.status.warning
+                                                    : musicBrainzColors.headerText,
+                                      }
+                                    : undefined
+                            }
+                        />
+                    ),
+                    old: <AttributesHeader label="MusicBrainz tags" tint={musicBrainzColors} inset={false} />,
+                });
+                for (const { label, shortLabel, tag, idOf } of MUSICBRAINZ_TAG_FIELDS) {
+                    const id = idOf(musicBrainzIds) ?? "—";
+                    const newValue = compare && !writes ? "—" : id;
+                    // Not read yet: no claim that anything differs.
+                    const oldValue = oldMusicBrainzTags ? tagValue(oldMusicBrainzTags, tag) : newValue;
+                    const changed = compare && newValue !== oldValue;
+                    rows.push({
+                        key: `mbid:${tag}`,
+                        changed,
+                        node: (
+                            <FocusRow
+                                variant="attribute"
+                                tint={musicBrainzColors}
+                                label={compare ? shortLabel : label}
+                                value={newValue}
+                                valueColor={changed ? theme.status.success : undefined}
+                                dim={!compare && !writes}
+                                labelWidth={compare ? COMPACT_LABEL_W : MUSICBRAINZ_LABEL_W}
+                                inset={inset}
+                                truncate="truncate-middle"
+                            />
+                        ),
+                        old: (
+                            <DiffCell
+                                variant="attribute"
+                                tint={musicBrainzColors}
+                                label={shortLabel}
+                                value={oldValue}
+                                tone={changed ? "removed" : "same"}
+                            />
+                        ),
+                    });
+                }
+                rows.push({ key: "gap-mbtags", node: blankRow() });
+            }
         }
 
         // The tags the file came with matter for the new file only; the old one is judged by what was saved.
@@ -1108,6 +1266,24 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
             rows.push({ key: "divider-tags", node: <SectionDivider label="Embedded Tags" width={innerW} /> });
             for (const tag of [...PRIORITY_TAGS, ...otherTagKeys]) {
                 rows.push({ key: `tag:${tag}`, node: <DetailRow label={tag} value={tagValue(embeddedTags, tag)} /> });
+            }
+            if (showEmbeddedMusicBrainz) {
+                rows.push(
+                    { key: "gap-embedded-mb", node: blankRow() },
+                    { key: "divider-embedded-mb", node: <SectionDivider label="MusicBrainz in file" width={innerW} /> }
+                );
+                for (const { label, tag } of MUSICBRAINZ_TAG_FIELDS) {
+                    rows.push({
+                        key: `mbtag:${tag}`,
+                        node: (
+                            <DetailRow
+                                label={label}
+                                value={tagValue(embeddedTags, tag)}
+                                labelColor={musicBrainzColor}
+                            />
+                        ),
+                    });
+                }
             }
         }
     }

@@ -25,6 +25,10 @@ function join(value: string | string[] | undefined): string | undefined {
  * compiled metadata is shown in. It is the truth about a saved file, whatever was recorded when it was saved.
  */
 export async function readDiskFieldValues(filePath: string): Promise<Record<string, string>> {
-    const tags = await readTags(filePath, extensionOf(filePath));
+    return diskFieldValues(await readTags(filePath, extensionOf(filePath)));
+}
+
+/** `readDiskFieldValues` for tags that were read already. */
+export function diskFieldValues(tags: Record<string, string | string[]>): Record<string, string> {
     return Object.fromEntries(FIELDS.map((f) => [f.key, FIELD_TAGS[f.key]?.(tags) ?? "—"]));
 }

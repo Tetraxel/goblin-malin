@@ -27,6 +27,22 @@ Optional static capabilities a service class can declare (all read generically �
 - `static lastResort = true` (discovery services) — slow/costly; only runs when a platform is still missing after all regular discovery, and its results must pass the platform's own metadata fetch + a confidence check. Used by Claude.
 - `static platformAliases = ["youtubeMusic"]` (metadata services) — other platform keys whose tracks the service handles; read through `platformRegistry.canonical()` (`src/base/platformRegistry.ts`). Never compare a platform to `"youtubeMusic"` in core code.
 - `static trackUrl = (id) => url` (metadata services) — canonical URL of one of the service's tracks; read through `platformRegistry.trackUrl()`.
+- `static openUri = (parsed) => uri | undefined` (metadata services) — the address that opens one of the service's links in its desktop app (`spotify:track:<id>`). A link a registered service reads takes its name, colors and app address from that service (`src/utils/appLinks.ts` asks `urlParserRegistry` first); the regex/site table there is only the fallback for sites no service reads.
+- `static columnActions = (task) => ContextualActions[]` (any service) — extra actions for the service's column in the task list (MusicBrainz: review a match, add a missing release); read by `contextualActions.ts` through the registry, shown before the generic copy/open actions. Never branch on a provider key.
+- `getAlbumDetails?(album, { withIsrcs })` (metadata services, instance method) — the whole album the track belongs to (barcode, track list, artist pages). A track's own `album` is usually the "simplified" one; the MusicBrainz checks ask the service that owns the album's link (`DownloadTask.fetchAlbumDetails`).
+
+### User data is never rebuilt away
+
+Whatever the user typed or pasted by hand must live **outside** anything the pipeline rebuilds. `metadataGroups`, `downloadSources` and the discovery results are rebuilt by restart, re-discovery and "stopped → start" — so a link the user added is stored in `TrackDownloadTask.userSources` (written _before_ anything is fetched, never cleared by any pipeline step; only the user's own **Delete** on the row, `DownloadTask.removeUserSource()`, removes an entry — **Reject** keeps it) and `DownloadTask.applyUserSources()` puts each entry back among the sources every time the groups are rebuilt. A link that cannot be read right now (network, a platform switched off) stays as a row to retry, never dropped. If you add a new kind of hand-entered data, give it the same treatment and a test that restarts the task (`tests/unit/userSources.test.ts`).
+
+### Pasted text
+
+Most terminals catch `Ctrl+V` and type the clipboard into the app as plain input, so a "Ctrl+V" shortcut alone never fires for a paste: `ShortcutDispatcher` sees a chunk of text with links in it and opens the import dialog. A part of the screen with its own use for a pasted link (e.g. "add it to this track") registers a handler with `pasteRouter.register()` (`src/base/pasteRouter.ts`) while it is focused and returns true to claim the text; the import dialog only opens when nobody does. Keep the `Ctrl+V` shortcut as well, for terminals that deliver the key.
+
+### Asking the user from plain TypeScript
+
+`dialogBridge.confirm({ title, message, choices })` and `dialogBridge.choose({ title, items, noneLabel })` (`src/base/bridges/dialogBridge.ts`) let a flow ask and `await` the answer; both resolve `null` when dismissed **or when no UI is mounted**, so "nobody answered" is never read as consent. When a list needs a lookup first (a network request), pass `body: Promise<{ items, intro?, noneLabel? } | null>` to `choose`: the dialog opens **at once** with a loader and shows the body when it arrives (`null` or a failure closes it, answered `null`) — never make the user wait on a blank screen before it opens. Dialogs are shown one at a time, in the order asked. Anything that ends in a public or irreversible action (e.g. adding a release to MusicBrainz) goes through it, with the safe button first.
+
 - `defaultSettings` entries can be `kind: "checkbox" | "textInput" | "select"`.
 - A discovery anchor can set `openLabel` to name the app its `openUri` opens (e.g. "MusicBrainz Picard"); when `url` differs from `openUri`, the web page gets its own "Open in …" action. Both are generic — no provider branching in `contextualActions.ts`.
 

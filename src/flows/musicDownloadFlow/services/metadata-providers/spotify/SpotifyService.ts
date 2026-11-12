@@ -15,6 +15,7 @@ import {
     type SearchTrackResult,
 } from "#flows/musicDownloadFlow/types";
 import { type DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { type ProviderAlbum } from "#flows/musicDownloadFlow/musicbrainz/types";
 import { SpotifyCell } from "./SpotifyCell";
 import { MetadataService } from "../../../metadataService";
 import { getSpotifyEmbedDetails } from "../../apis/spotify-url-info-client";
@@ -101,6 +102,9 @@ export class SpotifyService extends MetadataService {
         },
     };
     static readonly trackUrl = (id: string): string => `https://open.spotify.com/track/${id}`;
+    /** The desktop app opens a track, album or playlist from its own address instead of a browser tab. */
+    static readonly openUri = (parsed: ParsedUrl): string | undefined =>
+        parsed.id && parsed.type !== "unknown" ? `spotify:${parsed.type}:${parsed.id}` : undefined;
     static readonly setupWizard: SetupWizardConfig = {
         title: "⚙  Spotify Setup Wizard",
         providerKey: "spotify",
@@ -372,6 +376,68 @@ export class SpotifyService extends MetadataService {
             ownerName: album.artists[0]?.name,
             trackUrls,
             totalCount: trackUrls.length,
+        };
+    }
+
+    /**
+     * The full album: barcode (`external_ids.upc`), track list, the artists' pages — and, on request, every
+     * track's ISRC. A track's own `album` object is the "simplified" one without the barcode, so the MusicBrainz
+     * checks come here. Only the official API can answer; scrape mode has nothing and returns null.
+     */
+    @Cached({ shouldCache: (result) => result !== null })
+    async getAlbumDetails(
+        album: { id: string; url: string },
+        options: { withIsrcs?: boolean } = {}
+    ): Promise<ProviderAlbum | null> {
+        await this.resolveAuth();
+        if (SpotifyService.authMode === "scrape") return null;
+        const client = await this.getClient();
+
+        this.logger.info(`Get album info: "${album.id}"…`);
+        const full = await client.albums.get(album.id);
+
+        const simplified = [...full.tracks.items];
+        for (let offset = simplified.length; offset < full.total_tracks; offset += 50) {
+            const page = await client.albums.tracks(album.id, undefined, 50, offset);
+            if (page.items.length === 0) break;
+            simplified.push(...page.items);
+        }
+
+        const isrcs = new Map<string, string>();
+        if (options.withIsrcs) {
+            const ids = simplified.filter((t) => !t.is_local).map((t) => t.id);
+            for (let i = 0; i < ids.length; i += 50) {
+                for (const track of await client.tracks.get(ids.slice(i, i + 50))) {
+                    const isrc = track?.external_ids?.isrc;
+                    if (track && isrc) isrcs.set(track.id, isrc);
+                }
+            }
+        }
+
+        const artistOf = (a: { name: string; external_urls?: { spotify?: string } }) => ({
+            name: a.name,
+            url: a.external_urls?.spotify,
+        });
+        return {
+            id: full.id,
+            name: full.name,
+            url: full.external_urls?.spotify || album.url,
+            albumType: full.album_type,
+            releaseDate: full.release_date,
+            barcode: full.external_ids?.upc || full.external_ids?.ean || undefined,
+            trackCount: full.total_tracks,
+            artists: full.artists.map(artistOf),
+            tracks: simplified
+                .filter((t) => !t.is_local)
+                .map((t) => ({
+                    id: t.id,
+                    name: t.name,
+                    number: t.track_number,
+                    discNumber: t.disc_number,
+                    durationMs: t.duration_ms,
+                    isrc: isrcs.get(t.id),
+                    artists: t.artists.map(artistOf),
+                })),
         };
     }
 

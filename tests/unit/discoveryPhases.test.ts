@@ -189,6 +189,34 @@ describe("last-resort discovery (Phase C)", () => {
         ]);
     });
 
+    test("the explanation Claude gave travels to the source the result becomes", async () => {
+        const url = "https://youtube.test/yt1";
+        catalog[url] = meta("youtube", "yt1", "Get Lucky", "Daft Punk");
+        lastResortResult = {
+            tracks: [claudeFound(url)],
+            explanations: { "YOUTUBE::TRACK::yt1": "The official audio. Same title and duration." },
+        };
+
+        const task = await makeTask();
+        await task.startMetadataDiscovering();
+
+        expect(youtubeResults(task)[0].discoverySources[0]).toMatchObject({
+            discoveredBy: "claude",
+            explanation: "The official audio. Same title and duration.",
+        });
+    });
+
+    test("a result without an explanation has no explanation field", async () => {
+        const url = "https://youtube.test/yt1";
+        catalog[url] = meta("youtube", "yt1", "Get Lucky", "Daft Punk");
+        lastResortResult = { tracks: [claudeFound(url)] };
+
+        const task = await makeTask();
+        await task.startMetadataDiscovering();
+
+        expect(youtubeResults(task)[0].discoverySources[0]).not.toHaveProperty("explanation");
+    });
+
     test("is skipped when nothing is missing", async () => {
         youtubeSearch = [{ metadata: meta("youtube", "found", "Get Lucky", "Daft Punk"), searchKeys: ["trackName"] }];
 

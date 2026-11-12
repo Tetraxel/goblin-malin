@@ -7,6 +7,7 @@ import { type ServiceRegistry } from "#base/service-registry";
 import { type ServiceScope } from "#base/service-scope";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { platformRegistry } from "#base/platformRegistry";
+import { urlParserRegistry } from "#base/urlParser";
 import { type StatusAttributes, StatusType } from "#base/task/task-status";
 import { throwIfAborted } from "#utils/errors";
 import {
@@ -16,15 +17,19 @@ import {
     type MetadataGroupState,
     type MetadataResultState,
     type DiscoverySource,
+    type UserSource,
+    type TrackUriParts,
     type DiscoveryResult,
     type Platform,
     type LocalFile,
 } from "#flows/musicDownloadFlow/types";
-import { runWithoutCache } from "#utils/cache";
+import { runWithoutCache, isCacheSkipped } from "#utils/cache";
 import { overwriteConfirmBridge } from "#base/bridges/overwriteConfirmBridge";
 import { SafeAction } from "#utils/decorators";
 import { metadataLimiter, downloadLimiter } from "./stageLimiters";
 import { computeConfidenceScore } from "./confidence";
+import { resolveTrackRecognition } from "./resolveTrackRecognition";
+import { formatTrackUri, parseTrackUri } from "./trackUri";
 import { ensureDiscoveryConsent, getUnansweredConsentKeys } from "./discoveryConsent";
 import { computeCompiledMetadata } from "./compiledMetadata";
 import { compiledFieldValues } from "./metadataFields";
@@ -42,6 +47,11 @@ import { type DiscoveryMetadataService } from "../discoveryMetadataService";
 import { type DownloadService, type DownloadUpdateOptions } from "../downloadService";
 import { getSaveSettings } from "../saveSettings";
 import { getMusicSettings } from "../settings";
+import { MusicBrainzClient } from "../services/apis/musicbrainz-client";
+import { checkMusicBrainzIdentity, unknownIdentity, type IdentityCheckOptions } from "../musicbrainz/identityCheck";
+import { type MbUserChoice, type MusicBrainzIdentity, type ProviderAlbum } from "../musicbrainz/types";
+import { isMusicBrainzVerdictStale, musicBrainzInputKey } from "../musicbrainz/inputKey";
+import { normalizeUrl } from "../musicbrainz/normalize";
 
 // The @Cached() decorator persists results to a 90-day disk cache. Old cache entries
 // may still contain a plain TrackMetadata[] (the previous return format). Normalizing
@@ -62,8 +72,22 @@ interface DiscoveryRun {
     skip: () => void;
 }
 
+/** `DownloadTask.checkMusicBrainz` options: the lookups' own, plus a way to change the user's decisions safely. */
+export type MusicBrainzCheckOptions = IdentityCheckOptions & {
+    /** Receives the user's decisions as they are when this check runs (never an older copy) and returns the new ones. */
+    decide?: (current: MbUserChoice) => MbUserChoice;
+};
+
+/** What `DownloadTask.addUserSources` did with the links it was given. */
+export type AddUserSourcesResult = {
+    added: UserSource[];
+    skipped: { url: string; reason: string }[];
+};
+
 export class DownloadTask extends Task<TrackDownloadTask> {
     private discoveryRun?: DiscoveryRun;
+    /** The MusicBrainz checks of this track, one after the other (see `checkMusicBrainz`). */
+    private musicBrainzQueue: Promise<unknown> = Promise.resolve();
     private metadataServices: ServiceScope<DownloadTask, MetadataService>;
     private discoveryServices: ServiceScope<DownloadTask, DiscoveryMetadataService>;
     private downloadServices: ServiceScope<DownloadTask, DownloadService>;
@@ -416,7 +440,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             // Keep all groups and their order, only remove previously discovered (non-primary) results
             metadataGroups: (this.getAttributes()?.metadataGroups ?? []).map((g) => ({
                 ...g,
-                results: g.results.filter((r) => r.isPrimaryInput),
+                // The primary input and the links the user added by hand are theirs: only what the search found goes.
+                results: g.results.filter((r) => r.isPrimaryInput || r.addedByUser),
             })),
             metadataDiscoveringInProgress: true,
             metadataDiscovered: false,
@@ -435,6 +460,11 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.discoveryRun = run;
 
         const discoverEverywhere = async () => {
+            // The user's own links first: they are the most reliable thing this track has, and a platform they
+            // cover is no longer "missing" for the last-resort services (no Claude call spent on it).
+            await this.applyUserSources();
+            if (run.skipped) return;
+
             // Phase A — MetadataService.searchTrack (like Spotify, Youtube, etc.)
             const services = this.metadataServices.getAllServices();
             for (const service of services) {
@@ -507,6 +537,17 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                     run
                 );
             }
+
+            // Phase D — which MusicBrainz release is this track on? (P30) Read-only lookups; the verdict is
+            // stored on the task and never fails it.
+            if (run.skipped) return;
+            if (getMusicSettings().musicBrainz.matchTracks) {
+                try {
+                    await this.checkMusicBrainz({ force: isCacheSkipped() });
+                } catch (error) {
+                    this.logger.warn("MusicBrainz identity check failed", { error });
+                }
+            }
         };
 
         try {
@@ -541,6 +582,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 tracks: allDiscovered,
                 anchor,
                 searchKeys,
+                explanations,
+                summaries,
             } = normalizeDiscoveryResult(await (bypassCache ? runWithoutCache(discover) : discover()));
             if (run?.skipped) return;
 
@@ -583,6 +626,10 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                     discoveredBy: rudimentary.fetchedBy,
                     fromUri: primaryUri,
                     searchKeys: searchKeys ?? ["url"],
+                    ...(rudimentary.uri && explanations?.[rudimentary.uri]
+                        ? { explanation: explanations[rudimentary.uri] }
+                        : {}),
+                    ...(rudimentary.uri && summaries?.[rudimentary.uri] ? { summary: summaries[rudimentary.uri] } : {}),
                 };
 
                 if (existingResult) {
@@ -629,7 +676,11 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                             this.logger.info(
                                 `Dropping ${discoveryService.id} result ${rudimentary.url}: ` +
                                     (enriched
-                                        ? `only ${confidence}% match with the primary track`
+                                        ? `only ${confidence}% match with the primary track${
+                                              discoverySource.explanation
+                                                  ? ` (it said: ${discoverySource.explanation})`
+                                                  : ""
+                                          }`
                                         : "could not verify it")
                             );
                             continue;
@@ -649,6 +700,110 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         } catch (error) {
             this.logger.warn(`Phase B discovery failed for ${discoveryService.id}`, { error });
         }
+    }
+
+    // ── MusicBrainz identity (P30) ────────────────────────────────────────────
+
+    /**
+     * The whole album, from the metadata service that owns the album's link (Spotify for a Spotify album).
+     * Null when no enabled service can tell: the checks then go on with what the track itself carried.
+     */
+    async fetchAlbumDetails(
+        album: { id: string; url: string },
+        options?: { withIsrcs?: boolean }
+    ): Promise<ProviderAlbum | null> {
+        for (const [key, ctor] of this.metadataServiceRegistry.getAllConstructors()) {
+            if (!this.isMetadataServiceEnabled(key)) continue;
+            let type: string | undefined;
+            try {
+                type = ctor.parseUrl?.(album.url)?.type;
+            } catch {
+                continue; // a service that does not parse URLs at all
+            }
+            if (type !== "album") continue;
+            const service = this.metadataServices.get(key);
+            if (typeof service.getAlbumDetails !== "function") continue;
+            try {
+                return await service.getAlbumDetails(album, options);
+            } catch (error) {
+                this.logger.warn(`Could not read the album from ${key}`, { error });
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Works out which MusicBrainz release this track is on and stores the verdict (`musicBrainzIdentity`).
+     * `force` asks MusicBrainz again instead of reusing answers; `knownReleaseId` is a release the user just added
+     * in the editor; `decide` turns the user's stored decisions into the new ones (it sees the latest, see below);
+     * `user` replaces them outright. Returns the new identity.
+     *
+     * Checks of one track run one after the other. Each takes minutes of rate-limited requests, and each writes the
+     * whole verdict: run side by side, the older one finishing last would overwrite what the user decided meanwhile.
+     */
+    @TaskScoped()
+    @SafeAction("Check MusicBrainz")
+    checkMusicBrainz(options: MusicBrainzCheckOptions = {}): Promise<MusicBrainzIdentity | undefined> {
+        const run = this.musicBrainzQueue.then(() => this.runMusicBrainzCheck(options));
+        this.musicBrainzQueue = run.catch(() => undefined);
+        return run;
+    }
+
+    private async runMusicBrainzCheck(options: MusicBrainzCheckOptions): Promise<MusicBrainzIdentity | undefined> {
+        const attrs = this.getAttributes();
+        if (!attrs) return undefined;
+        const previous = attrs.musicBrainzIdentity;
+        // The user's decisions as they are NOW (this run waited its turn), changed by this run's decision if it has one.
+        const stored = options.decide
+            ? options.decide(previous?.userChoice ?? { rejectedReleaseIds: [], artistChoices: {} })
+            : (options.user ?? previous?.userChoice);
+        const compiled = computeCompiledMetadata(attrs.metadataGroups, attrs.metadataOverride);
+        const album = compiled.album;
+
+        let identity: MusicBrainzIdentity;
+        if (!album || !compiled.trackName) {
+            identity = unknownIdentity("No album information from the metadata sources yet", previous);
+            if (stored) identity.userChoice = stored;
+        } else {
+            // A release the user picked or turned down was about ANOTHER album if the sources have changed since:
+            // it is kept, but not applied here.
+            const albumKey = normalizeUrl(album.url);
+            const appliesHere = !stored?.albumKey || stored.albumKey === albumKey;
+            const effective =
+                stored && !appliesHere ? { ...stored, chosenRelease: undefined, rejectedReleaseIds: [] } : stored;
+            const details = await this.fetchAlbumDetails({ id: album.id, url: album.url });
+            const providerAlbum: ProviderAlbum = details ?? {
+                id: album.id,
+                name: album.albumName,
+                url: album.url,
+                albumType: album.albumType,
+                releaseDate: album.releaseDate,
+                barcode: album.barcode,
+                trackCount: album.totalTracks,
+                artists: (album.artists ?? []).map((a) => ({ name: a.name, url: a.url })),
+                tracks: [],
+            };
+            identity = await checkMusicBrainzIdentity(
+                new MusicBrainzClient(),
+                providerAlbum,
+                {
+                    name: compiled.trackName,
+                    isrc: compiled.isrc,
+                    artists: compiled.artists.map((a) => ({ name: a.name, url: a.url })),
+                },
+                { force: options.force, knownReleaseId: options.knownReleaseId, user: effective }
+            );
+            if (stored) identity.userChoice = stored;
+        }
+
+        // What this verdict was made from, so the UI can say when the sources have changed since.
+        identity.inputKey = musicBrainzInputKey(compiled);
+        // The hand-off to MusicBrainz is a fact about the user's session, not about the verdict.
+        if (previous?.handedOffAt && identity.verdict !== "matched") identity.handedOffAt = previous.handedOffAt;
+        this.updateAttributes({ musicBrainzIdentity: identity });
+        this.logger.info(`MusicBrainz: ${identity.verdict}${identity.release ? ` (${identity.release.id})` : ""}`);
+        return identity;
     }
 
     private isLastResortService(service: DiscoveryMetadataService): boolean {
@@ -802,15 +957,240 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         }
     }
 
+    // ── Links the user added by hand ─────────────────────────────────────────
+    //
+    // A link the user pastes onto a track is data nobody can regenerate, so it is stored twice: as a result in the
+    // metadata groups (what the UI shows) and in `userSources`, which no pipeline step ever clears. Whenever the
+    // groups are rebuilt — restart, a stopped task started again, re-discovery — `applyUserSources()` puts every
+    // entry back. The entry is written BEFORE anything is fetched, so a crash or a failed fetch loses nothing.
+
+    /**
+     * Adds track links to this track as sources: each is recognized by the metadata service that reads that platform,
+     * stored, fetched, and shown as a favorited "[USER]" result of that platform. Links no service can read are
+     * reported back, not stored.
+     */
+    async addUserSources(urls: string[]): Promise<AddUserSourcesResult> {
+        const added: UserSource[] = [];
+        const skipped: { url: string; reason: string }[] = [];
+        const attrs = this.getAttributes();
+        const own = attrs?.uri ? this.userSourceUri(attrs.uri) : "";
+
+        for (const raw of urls) {
+            const url = raw.trim();
+            // Whatever was pasted, a service's URL parser must not be able to throw it out of here.
+            let recognition: ReturnType<typeof resolveTrackRecognition> = null;
+            try {
+                recognition = resolveTrackRecognition(url, this.metadataServiceRegistry);
+            } catch {
+                /* not a link */
+            }
+            if (!recognition) {
+                let kind: string | undefined;
+                try {
+                    kind = urlParserRegistry.parse(url)?.type;
+                } catch {
+                    /* not a link */
+                }
+                skipped.push({
+                    url,
+                    reason:
+                        kind === "album" || kind === "playlist"
+                            ? `an ${kind} link: paste the link of the track itself`
+                            : "not a track link Goblin Malin can read",
+                });
+                continue;
+            }
+            const uri = this.userSourceUri(recognition.uri);
+            if (uri === own) {
+                skipped.push({ url, reason: "that is this track's own link" });
+                continue;
+            }
+            const current = this.getAttributes()?.userSources ?? [];
+            let entry = current.find((s) => s.uri === uri);
+            if (!entry) {
+                entry = { url, uri, addedAt: new Date().toISOString() };
+                this.updateAttributes({ userSources: [...current, entry] });
+            }
+            added.push(entry);
+        }
+        for (const entry of added) await this.applyUserSource(entry);
+        return { added, skipped };
+    }
+
+    /**
+     * Deletes a link the user added by hand, for real: its row among the sources AND its durable entry in
+     * `userSources` (without that, the next rebuild would put it back). This is the user's own explicit "delete", the
+     * only thing that ever removes such an entry; "reject" keeps it. A group the link created, left empty, goes with it.
+     * `uri` is the row's `metadata.uri`. Returns false when no such row (the search's own results are never deleted).
+     */
+    removeUserSource(uri: string): boolean {
+        const attrs = this.getAttributes();
+        if (!attrs) return false;
+        const canonical = (u: string | undefined): string | undefined => {
+            const parts = u ? parseTrackUri(u) : null;
+            return parts ? this.userSourceUri(parts) : u;
+        };
+        const target = canonical(uri);
+        const isTarget = (r: MetadataResultState) =>
+            !!r.addedByUser && !r.isPrimaryInput && canonical(r.metadata.uri) === target;
+        if (!attrs.metadataGroups.some((g) => g.results.some(isTarget))) return false;
+
+        const metadataGroups = attrs.metadataGroups
+            .map((g) => ({ ...g, results: g.results.filter((r) => !isTarget(r)) }))
+            .filter((g, i) => g.results.length > 0 || attrs.metadataGroups[i].results.length === 0);
+        const userSources = (attrs.userSources ?? []).filter((s) => canonical(s.uri) !== target);
+        this.updateAttributes({ metadataGroups, userSources });
+        return true;
+    }
+
+    /** The canonical "PLATFORM::TRACK::ID" of a track link (YouTube Music and YouTube are one platform). */
+    private userSourceUri(uri: TrackUriParts): string {
+        return formatTrackUri({ ...uri, platform: platformRegistry.canonical(uri.platform) as Platform });
+    }
+
+    /** Puts every link the user added back among the sources (fetching the ones that are missing or failed). */
+    private async applyUserSources(): Promise<void> {
+        for (const entry of this.getAttributes()?.userSources ?? []) {
+            try {
+                await this.applyUserSource(entry);
+            } catch (error) {
+                this.logger.warn(`Could not restore the link you added: ${entry.url}`, { error });
+            }
+        }
+    }
+
+    private async applyUserSource(entry: UserSource): Promise<void> {
+        const recognition = resolveTrackRecognition(entry.url, this.metadataServiceRegistry);
+        if (!recognition) {
+            // No registered service reads it any more. The entry stays: it comes back when one does.
+            this.logger.warn(`No service reads the link you added (kept): ${entry.url}`);
+            return;
+        }
+        const serviceKey = recognition.serviceKey;
+        const group = this.getAttributes()?.metadataGroups.find((g) => g.serviceKey === serviceKey);
+        const existing = group?.results.find((r) => r.metadata.uri === entry.uri);
+        if (existing && !existing.fetchState) {
+            if (!existing.addedByUser) this.upsertUserResult(existing.metadata, serviceKey);
+            return;
+        }
+
+        let metadata: TrackMetadata;
+        let fetchState: "error" | undefined;
+        let fetchError: string | undefined;
+        const label = providerDisplayRegistry.get(serviceKey).label;
+        try {
+            if (!this.isMetadataServiceEnabled(serviceKey)) throw new Error(`${label} is switched off in Settings`);
+            metadata = await this.metadataServices.get(serviceKey).getTrackMetadata(entry.url);
+        } catch (error) {
+            // Keep the link as a row to retry ([R] Refetch): what the user pasted is never dropped for a failed fetch.
+            fetchState = "error";
+            fetchError = error instanceof Error ? error.message : "Could not read this link";
+            metadata = {
+                id: recognition.uri.id,
+                trackName: "",
+                artists: [],
+                url: entry.url,
+                uri: entry.uri,
+                platform: recognition.uri.platform,
+                apiProvider: recognition.uri.platform,
+                fetchedAt: new Date(),
+                type: "track",
+            } as unknown as TrackMetadata;
+            this.logger.warn(`Could not read the link you added (${entry.url}): ${fetchError}`);
+        }
+        this.upsertUserResult(metadata, serviceKey, fetchState, fetchError);
+    }
+
+    /** Adds the result of a link the user added, or marks the one that is already there as theirs. */
+    private upsertUserResult(
+        metadata: TrackMetadata,
+        serviceKey: string,
+        fetchState?: "error",
+        fetchError?: string
+    ): void {
+        const primary = this.getPrimaryMetadata()?.metadata;
+        const source: DiscoverySource = {
+            discoveredBy: "user",
+            fromUri: primary?.uri ?? primary?.url ?? "",
+            searchKeys: ["url"],
+        };
+        const groups = [...(this.getAttributes()?.metadataGroups ?? [])];
+        let groupIdx = groups.findIndex((g) => g.serviceKey === serviceKey);
+        if (groupIdx === -1) {
+            groups.push({ platform: metadata.platform, serviceKey, rank: groups.length, results: [] });
+            groupIdx = groups.length - 1;
+        }
+        const group: MetadataGroupState = { ...groups[groupIdx], results: [...groups[groupIdx].results] };
+
+        const idx = group.results.findIndex((r) => r.metadata.uri === metadata.uri);
+        if (idx !== -1) {
+            const current = group.results[idx];
+            // The group's favorite becomes this one when it failed before and now reads fine (as if it had worked at
+            // once), or when the search had already found it and the user now confirms it by pasting it themselves.
+            const becomesFavorite =
+                !fetchState &&
+                !current.isRejected &&
+                (current.fetchState === "error" || (!current.addedByUser && !current.isPrimaryInput));
+            group.results = group.results.map((r, i) => {
+                if (i !== idx) return becomesFavorite ? { ...r, isFavorited: false } : r;
+                return {
+                    ...r,
+                    addedByUser: true,
+                    metadata: fetchState ? r.metadata : metadata,
+                    fetchState,
+                    fetchError,
+                    isFavorited: r.isFavorited || becomesFavorite,
+                    discoverySources: r.discoverySources.some((s) => s.discoveredBy === "user")
+                        ? r.discoverySources
+                        : [...r.discoverySources, source],
+                };
+            });
+        } else {
+            // First in its group. Favorited when it reads fine: the user chose it over whatever the search found. A
+            // link that failed to load is NOT favorited: an empty favorite would hide the group's real metadata.
+            const others = group.results.map((r) => ({
+                ...r,
+                rank: r.rank + 1,
+                isFavorited: fetchState ? r.isFavorited : false,
+            }));
+            group.results = [
+                {
+                    metadata,
+                    isPrimaryInput: false,
+                    isFavorited: !fetchState,
+                    isRejected: false,
+                    rank: 0,
+                    confidence: !fetchState && primary ? computeConfidenceScore(metadata, primary) : undefined,
+                    discoverySources: [source],
+                    addedByUser: true,
+                    fetchState,
+                    fetchError,
+                },
+                ...others,
+            ];
+        }
+        groups[groupIdx] = group;
+        this.updateAttributes({ metadataGroups: groups });
+    }
+
     // ── Misc mutations ────────────────────────────────────────────────────────
 
     @TaskScoped()
     @SafeAction("Restart task")
     async restart(): Promise<void> {
+        // The verdict is rebuilt, but what the user decided about it (the release they picked or turned down, the
+        // artists they chose) is theirs and stays: the next check applies it again.
+        const kept = this.getAttributes()?.musicBrainzIdentity;
         this.updateAttributes({
             state: "pending",
             metadataGroups: [],
             metadataOverride: {},
+            musicBrainzIdentity: kept?.userChoice
+                ? {
+                      ...unknownIdentity("Checking again after the restart", kept),
+                      ...(kept.handedOffAt ? { handedOffAt: kept.handedOffAt } : {}),
+                  }
+                : undefined,
             downloadSources: [],
             primaryMetadataFetched: false,
             metadataDiscovered: false,
@@ -969,6 +1349,16 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.updateAttributes({ downloadSources: updated });
     }
 
+    /**
+     * Points the track's saved file at another place (the user moved it, or restored it): what the app recorded stays
+     * as it was, only where to find the file changes.
+     */
+    relocateSavedFile(newPath: string): void {
+        const saved = this.getAttributes()?.savedFile;
+        if (!saved) return;
+        this.updateAttributes({ savedFile: { ...saved, path: newPath } });
+    }
+
     /** Sets the folder this track is saved to; `undefined` goes back to the folder from Settings. */
     setOutputDir(dir: string | undefined): void {
         this.updateAttributes({ outputDirOverride: dir });
@@ -984,6 +1374,11 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.updateAttributes({ overwriteTags: overwrite });
     }
 
+    /** Whether saving writes the MusicBrainz ids into the tags (see `TrackDownloadTask.includeMusicBrainzTags`). */
+    setIncludeMusicBrainzTags(include: boolean): void {
+        this.updateAttributes({ includeMusicBrainzTags: include });
+    }
+
     /**
      * Saves the track into the output folder, from the selected download source — or, with `fromSaved`, from the
      * file it is already saved as (re-tag, rename, move: no download is needed, and the format stays).
@@ -994,6 +1389,28 @@ export class DownloadTask extends Task<TrackDownloadTask> {
     async saveTrack(options: { fromSaved?: boolean } = {}): Promise<void> {
         const started = await this.saveGuard.run(() => this.runSave(options));
         if (!started) globalLogger.info("Save ignored: this track is already being saved");
+    }
+
+    /**
+     * The verdict whose IDs may go into the file. One made from other sources than the ones the file is built from
+     * (the album was swapped, a field edited) says nothing about this file: it is checked again first, and left out
+     * if that cannot be done. Never a wrong release ID in a file because the sources moved on.
+     */
+    private async musicBrainzIdentityForSave(attrs: TrackDownloadTask): Promise<MusicBrainzIdentity | undefined> {
+        const identity = attrs.musicBrainzIdentity;
+        if (!identity) return undefined;
+        const current = computeCompiledMetadata(attrs.metadataGroups, attrs.metadataOverride);
+        if (!isMusicBrainzVerdictStale(identity, current)) return identity;
+        if (getMusicSettings().musicBrainz.matchTracks) {
+            try {
+                const fresh = await this.checkMusicBrainz();
+                if (fresh && !isMusicBrainzVerdictStale(fresh, current)) return fresh;
+            } catch {
+                /* already logged: saving goes on without the IDs */
+            }
+        }
+        this.logger.warn("The MusicBrainz verdict is out of date with the sources: its IDs are not written");
+        return undefined;
     }
 
     private async runSave(options: { fromSaved?: boolean }): Promise<void> {
@@ -1013,10 +1430,15 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         const settings = getSaveSettings();
         globalLogger.info("Saving track with settings:", { settings });
 
-        const compiled = computeCompiledMetadata(attrs!.metadataGroups, attrs!.metadataOverride);
-        const tags = compiledMetadataToTags(compiled, {
-            includeMusicBrainzTags: settings.includeMusicBrainzTags,
-        });
+        // The track's own choice wins over the setting. Left out, the IDs are not even looked up (a re-check is a
+        // network round trip nobody asked for).
+        const includeMusicBrainzTags = attrs!.includeMusicBrainzTags ?? settings.includeMusicBrainzTags;
+        const compiled = computeCompiledMetadata(
+            attrs!.metadataGroups,
+            attrs!.metadataOverride,
+            includeMusicBrainzTags ? await this.musicBrainzIdentityForSave(attrs!) : undefined
+        );
+        const tags = compiledMetadataToTags(compiled, { includeMusicBrainzTags });
         const outputDir = attrs!.outputDirOverride ?? settings.outputDir;
         await fs.mkdir(outputDir, { recursive: true });
         // What the file is saved as: the format from Settings (or the download's own), see `planSave`.

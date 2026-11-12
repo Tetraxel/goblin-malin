@@ -166,6 +166,15 @@ describe("discovery prompt", () => {
         expect(prompt).toContain("- youtube: https://www.youtube.com/watch?v=<id>");
     });
 
+    test("tells the model a re-upload may be linked to its official release — never the reverse, official first", () => {
+        const prompt = buildClaudeDiscoveryPrompt(query);
+        expect(prompt).toContain("unofficial re-upload");
+        expect(prompt).toContain("the official Spotify track, then the official YouTube upload");
+        expect(prompt).toContain("Never the other way round");
+        // The rule that keeps real covers/remixes out is still there.
+        expect(prompt).toContain("Not a cover, remix, live version, karaoke");
+    });
+
     test("the schema only allows the wanted platforms", () => {
         const schema = buildClaudeDiscoverySchema(["youtube", "soundcloud"]) as {
             properties: { links: { items: { properties: { platform: { enum: string[] } } } } };

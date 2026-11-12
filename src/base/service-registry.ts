@@ -6,6 +6,7 @@ import { type Task } from "./task/task";
 import { type ProviderDisplay, providerDisplayRegistry } from "./providerDisplay";
 import { type ParsedUrl, type CollectionExpansion, urlParserRegistry } from "./urlParser";
 import { type ProviderConsent, type ProviderSettingsSchema } from "./providerSettings";
+import { type ContextualActions } from "#types/actions";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ServiceFactory<TTask extends Task<any>, TService extends ServiceBase> = (
@@ -31,6 +32,12 @@ type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> =
     platformAliases?: readonly string[];
     // Canonical URL of one of this service's tracks, given its platform id.
     trackUrl?: (id: string) => string;
+    // The address that opens one of this service's links (as `parseUrl` read it) in its desktop app, when it has one
+    // (`spotify:track:<id>`). Read through `platformRegistry.openUri()`.
+    openUri?: (parsed: ParsedUrl) => string | undefined;
+    // Extra actions for the service's column in the task list (read generically, e.g. "Review match…"), given the
+    // selected task. Called whenever the action bar is built: keep it cheap and free of side effects.
+    columnActions?: (task: TTask) => ContextualActions[];
 };
 
 // Central registry for services, allowing dynamic registration and scoped instantiation
@@ -68,6 +75,7 @@ export class ServiceRegistry<TTask extends Task<any> = Task, TService extends Se
             if (ctor.display) providerDisplayRegistry.register(name, ctor.display);
             if (ctor.platformAliases) platformRegistry.registerAliases(name, ctor.platformAliases);
             if (ctor.trackUrl) platformRegistry.registerTrackUrl(name, ctor.trackUrl);
+            if (ctor.openUri) platformRegistry.registerOpenUri(name, ctor.openUri);
             if (ctor.parseUrl) urlParserRegistry.register(ctor.parseUrl);
             if (ctor.findLinks) urlParserRegistry.registerNormalizer(ctor.findLinks);
         } else {

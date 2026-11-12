@@ -24,7 +24,7 @@ import URL ──► primary metadata ──► discovery on other platforms ─
 
 ## Layers
 
-- **`src/base/`** — generic infrastructure that knows nothing about music: the task engine (`task/`: `Task`, `TaskOrchestrator`, statuses, prompts), the service registry and `ServiceBase`, provider display metadata, the shortcut registry, mouse handling, the logger, theme, and the _bridges_ (small singletons that let non-React code open a React modal: consent, overwrite confirm, binary-not-found alert, …).
+- **`src/base/`** — generic infrastructure that knows nothing about music: the task engine (`task/`: `Task`, `TaskOrchestrator`, statuses, prompts), the service registry and `ServiceBase`, provider display metadata, the shortcut registry, mouse handling, the logger, theme, and the _bridges_ (small singletons that let non-React code open a React modal: consent, overwrite confirm, binary-not-found alert, a generic confirm / pick-from-list dialog, …).
 - **`src/flows/musicDownloadFlow/`** — everything music-specific. Despite the folder name there is no "flow" abstraction any more (it was removed, see [P20b](projects/p20b/tasks.md)); this folder is simply the product.
     - `types.ts` — the data model (`TrackMetadata`, `TrackDownloadTask`, `TrackDownloadSource`, …).
     - `utils/downloadTask.ts` — `DownloadTask`, the heart of the pipeline for one track (see below). `utils/collectionTask.ts` — `CollectionTask`, an album/playlist parent that expands into child `DownloadTask`s.
@@ -44,6 +44,10 @@ import URL ──► primary metadata ──► discovery on other platforms ─
 1. **Primary metadata** — the service whose `parseUrl()` recognised the URL fetches the track.
 2. **Discovery** — look for the same track on the other platforms (ISRC or name match). Services marked `lastResort` only run if a platform is still missing, and their results must pass the platform's own metadata fetch plus a confidence check ([utils/confidence.ts](../src/flows/musicDownloadFlow/utils/confidence.ts)). The compiled metadata merges all sources and the user's overrides.
 3. **Download sources** — every enabled download service searches or resolves candidates; the best one is auto-selected ([utils/sourceSelection.ts](../src/flows/musicDownloadFlow/utils/sourceSelection.ts)) and the user can preview and change it. Saving tags the file and moves it to the output folder.
+
+Links the user pastes onto a track (the source the search could not find) are kept in `userSources` and re-applied whenever the sources are rebuilt (P31); the track's own link (`userInput`) and those are the user's data, not the pipeline's.
+
+Discovery ends with a fourth step (P30): **which MusicBrainz release is this track on?** `DownloadTask.checkMusicBrainz()` asks MusicBrainz by album barcode, streaming link, ISRC and title + artist, and a pure resolver ([musicbrainz/resolveIdentity.ts](../src/flows/musicDownloadFlow/musicbrainz/resolveIdentity.ts)) turns the answers into a verdict stored on the task (`musicBrainzIdentity`): matched only on conclusive evidence, otherwise a review for the user. The matched IDs go into the saved file's tags; a release that is truly missing can be added through the user's own browser. See [P30](projects/p30/tasks.md).
 
 A task is a plain serialisable attribute object (`TrackDownloadTask`) plus a status; the whole task list is saved as a session after changes and revived by `createTasksFromSnapshots()`.
 

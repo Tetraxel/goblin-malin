@@ -13,12 +13,24 @@ const ID3_MUSICBRAINZ_TEXT = {
     musicBrainzAlbumId: "MusicBrainz Album Id",
     musicBrainzArtistId: "MusicBrainz Artist Id",
     musicBrainzReleaseGroupId: "MusicBrainz Release Group Id",
+    musicBrainzReleaseTrackId: "MusicBrainz Release Track Id",
 } as const;
 
+/**
+ * The formats whose writers take one text per tag get the first release artist only: a list of ids glued into one
+ * value would be an id nothing recognises.
+ */
+const firstAlbumArtistId = (metadata: Metadata) => metadata.musicBrainzAlbumArtistIds?.[0];
+
 async function tagMp3(filePath: string, metadata: Metadata): Promise<void> {
-    const userDefinedText = (Object.keys(ID3_MUSICBRAINZ_TEXT) as (keyof typeof ID3_MUSICBRAINZ_TEXT)[])
-        .filter((key) => metadata[key])
-        .map((key) => ({ description: ID3_MUSICBRAINZ_TEXT[key], value: metadata[key] as string }));
+    const userDefinedText = [
+        ...(Object.keys(ID3_MUSICBRAINZ_TEXT) as (keyof typeof ID3_MUSICBRAINZ_TEXT)[])
+            .filter((key) => metadata[key])
+            .map((key) => ({ description: ID3_MUSICBRAINZ_TEXT[key], value: metadata[key] as string })),
+        ...(firstAlbumArtistId(metadata)
+            ? [{ description: "MusicBrainz Album Artist Id", value: firstAlbumArtistId(metadata)! }]
+            : []),
+    ];
 
     const tags: NodeId3.Tags = {
         title: metadata.trackTitle,
@@ -66,7 +78,9 @@ function ffmpegTagEntries(ext: string, metadata: Metadata): [string, string][] {
         ["MUSICBRAINZ_TRACKID", metadata.musicBrainzTrackId],
         ["MUSICBRAINZ_ALBUMID", metadata.musicBrainzAlbumId],
         ["MUSICBRAINZ_ARTISTID", metadata.musicBrainzArtistId],
+        ["MUSICBRAINZ_ALBUMARTISTID", firstAlbumArtistId(metadata)],
         ["MUSICBRAINZ_RELEASEGROUPID", metadata.musicBrainzReleaseGroupId],
+        ["MUSICBRAINZ_RELEASETRACKID", metadata.musicBrainzReleaseTrackId],
     ];
     return entries.filter((e): e is [string, string] => e[1] !== undefined && e[1] !== "");
 }

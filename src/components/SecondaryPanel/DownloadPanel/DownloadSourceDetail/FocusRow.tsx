@@ -5,6 +5,7 @@ import stringWidth from "string-width";
 import wrapAnsi from "wrap-ansi";
 import { useClickTarget } from "#base/mouse/useMouseTarget";
 import { useTheme } from "#base/themeContext";
+import { type Theme } from "#base/theme";
 
 export const LABEL_W = 11;
 
@@ -63,7 +64,16 @@ export interface FocusRowProps {
     inset?: boolean;
     /** Terminal rows the value takes (it contains line breaks when above 1). Defaults to a single, truncated row. */
     lines?: number;
+    /** Overrides the label's colour (a provider's own, for the rows that are about it). */
+    labelColor?: string;
+    /** The colours of an "attribute" row, when it is not the yellow "File attributes" block (e.g. MusicBrainz'). */
+    tint?: AttributesTint;
+    /** Where a value too long for its column is cut. Ids keep their ends readable with "truncate-middle". */
+    truncate?: "truncate-end" | "truncate-middle";
 }
+
+/** The colours of a tinted block of attribute rows: the title bar, the rows' background, labels and values. */
+export type AttributesTint = Theme["fileAttributes"];
 
 /**
  * A `LABEL  value` row of the file detail. Every row keeps the same 2-column gutter, so rows the
@@ -81,11 +91,17 @@ export function FocusRow({
     labelWidth = LABEL_W,
     inset = true,
     lines = 1,
+    labelColor: labelColorOverride,
+    tint,
+    truncate = "truncate-end",
 }: FocusRowProps) {
     const theme = useTheme();
     const attribute = variant === "attribute";
+    const colors = tint ?? theme.fileAttributes;
     const labelText = attribute ? label.toUpperCase().padStart(labelWidth) : label.toUpperCase().padEnd(labelWidth);
-    const labelColor = isFocused ? theme.field.selected : attribute ? theme.fileAttributes.label : theme.ui.border;
+    const labelColor = isFocused
+        ? theme.field.selected
+        : (labelColorOverride ?? (attribute ? colors.label : theme.ui.border));
     return (
         <Box
             flexDirection="row"
@@ -93,7 +109,7 @@ export function FocusRow({
             marginX={attribute && inset ? 1 : 0}
             height={edit ? undefined : lines}
             flexShrink={0}
-            backgroundColor={attribute ? theme.fileAttributes.background : undefined}
+            backgroundColor={attribute ? colors.background : undefined}
         >
             <Box width={2} minWidth={2} flexShrink={0}>
                 {isFocused && <Text color={theme.text.active}>{"☛"}</Text>}
@@ -117,11 +133,11 @@ export function FocusRow({
             ) : (
                 <Box flexGrow={1} flexShrink={1}>
                     <Text
-                        color={valueColor ?? (attribute ? theme.fileAttributes.value : theme.text.primary)}
+                        color={valueColor ?? (attribute ? colors.value : theme.text.primary)}
                         bold={attribute}
                         dimColor={dim || value === "—"}
                         underline={isFocused}
-                        wrap={lines > 1 ? "wrap" : "truncate-end"}
+                        wrap={lines > 1 ? "wrap" : truncate}
                     >
                         {value}
                     </Text>
@@ -138,20 +154,56 @@ export function FocusRow({
     );
 }
 
-/** The yellow title bar of the "File attributes" block. */
-export function AttributesHeader({ label, inset = true }: { label: string; inset?: boolean }) {
+/**
+ * The title bar of a block of attribute rows: yellow for "File attributes", `tint` for another block. With
+ * `focusable` it is a row the cursor can reach (a switch): the pointer shows at the end of the bar.
+ */
+export function AttributesHeader({
+    label,
+    inset = true,
+    tint,
+    focusable = false,
+    isFocused = false,
+    badge,
+}: {
+    label: string;
+    inset?: boolean;
+    tint?: AttributesTint;
+    focusable?: boolean;
+    isFocused?: boolean;
+    /** Small bold note at the right end of the bar. */
+    badge?: { text: string; color: string };
+}) {
     const theme = useTheme();
+    const colors = tint ?? theme.fileAttributes;
     return (
         <Box
+            flexDirection="row"
             paddingX={1}
             marginX={inset ? 1 : 0}
             height={1}
             flexShrink={0}
-            backgroundColor={theme.fileAttributes.header}
+            overflow="hidden"
+            backgroundColor={colors.header}
         >
-            <Text color={theme.fileAttributes.headerText} bold wrap="truncate-end">
-                {label}
-            </Text>
+            <Box flexGrow={1} flexShrink={1}>
+                <Text color={colors.headerText} bold underline={isFocused} wrap="truncate-end">
+                    {label}
+                </Text>
+            </Box>
+            {/* The text stays where the other blocks' titles are: the pointer goes at the end of the bar. */}
+            {focusable && isFocused && (
+                <Box flexShrink={0} paddingLeft={1}>
+                    <Text color={colors.headerText}>{"☚"}</Text>
+                </Box>
+            )}
+            {badge && (
+                <Box flexShrink={0} paddingLeft={1}>
+                    <Text color={badge.color} bold>
+                        {badge.text}
+                    </Text>
+                </Box>
+            )}
         </Box>
     );
 }

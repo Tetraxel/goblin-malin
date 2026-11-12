@@ -7,7 +7,7 @@
 ## 🔴 Release blockers (v0.2.0)
 
 - [ ] **Release 0.2.0** — bump `package.json` to `0.2.0`, rehearse with a `dry_run` of `release.yml`, then tag `v0.2.0` — `REL-02` (the pipeline itself is fixed and its actions are pinned by SHA, `REL-03`)
-- [ ] **MusicBrainz IDs never reach the saved file** — "Include MusicBrainz tags" setting (the option is hard-coded `false`), show the MB ID rows, set `MusicBrainzReleaseId` — `MD-03`, `P27/T27.4`
+- [x] **MusicBrainz IDs never reach the saved file** — done in `P30`: "Write MusicBrainz IDs into saved files" setting (on by default), the IDs shown in the compiled metadata, release/recording/artist/release-group written to the tags — `MD-03`
 - [ ] Status per service (Spotify, Ytdlp, etc...) instead of per task — `P25`
 - [ ] Easier `cookies.txt` extraction for yt-dlp (drag and drop? step by step instructions?) — `P24/T24.3`
 - [ ] Better way to select the app path / folders in settings (a path picker; the temp folder defaults to a sub-folder of the Music library) — `P24/T24.4`
