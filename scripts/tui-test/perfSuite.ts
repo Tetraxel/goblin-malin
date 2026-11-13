@@ -8,7 +8,8 @@
  *   yarn tsx scripts/tui-test/perfCompare.ts before after
  *
  * Options: --runs N (default 3; the median is kept), --only a,b (scenario names), --no-bench, --no-scenarios,
- * --no-latency (the end-to-end key latency of the built bundle, see bench/latency.ts; needs `yarn build`).
+ * --no-latency (the end-to-end key latency of the built bundle, see bench/latency.ts; needs `yarn build`),
+ * --latency-cmd "node /other/checkout/dist/cli.js" (time another build, e.g. the one before a change).
  * Results go to `scripts/tui-test/profiling/results/<label>.json` (git-ignored).
  *
  * What is comparable between runs and machines: the **counts** (commits, ink frames, renders per component).
@@ -236,10 +237,14 @@ function runBench(): BenchResult[] {
     }
 }
 
-function runLatency(args: string[]): LatencySummary | undefined {
+function runLatency(args: string[], cmd?: string): LatencySummary | undefined {
     const out = spawnSync(
         "yarn",
-        ["-s", "tsx", "scripts/tui-test/bench/latency.ts", "--tasks", "2000", ...args, "--json"],
+        [
+            ...["-s", "tsx", "scripts/tui-test/bench/latency.ts", "--tasks", "2000", ...args],
+            ...(cmd ? ["--cmd", JSON.stringify(cmd)] : []),
+            "--json",
+        ],
         { cwd: ROOT, encoding: "utf-8", shell: true, maxBuffer: 64 * 1024 * 1024 }
     );
     try {
@@ -307,7 +312,8 @@ async function main(): Promise<void> {
     }
 
     if (!process.argv.includes("--no-latency")) {
-        if (!fs.existsSync(path.join(ROOT, "dist", "cli.js"))) {
+        const latencyCmd = arg("latency-cmd");
+        if (!latencyCmd && !fs.existsSync(path.join(ROOT, "dist", "cli.js"))) {
             process.stderr.write("[perf] latency: dist/cli.js not found (run `yarn build`), skipped\n");
         } else {
             result.latency = {};
@@ -315,7 +321,7 @@ async function main(): Promise<void> {
                 const samples: LatencySummary[] = [];
                 for (let i = 0; i < runs; i++) {
                     process.stderr.write(`[perf] latency ${name} run ${i + 1}/${runs}\n`);
-                    const sample = runLatency(args);
+                    const sample = runLatency(args, latencyCmd);
                     if (sample) samples.push(sample);
                 }
                 if (samples.length === 0) continue;
