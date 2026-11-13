@@ -24,6 +24,8 @@ export type MusicDownloadFlowSettings = {
         convertAudio: boolean;
         /** An `OutputFormatKey` ("flac", "mp3", "ogg", "opus", "m4a"); unknown values count as FLAC. */
         convertFormat: string;
+        /** A `DownloadStrategyKey` ("best", "each", "all"): how many files a track downloads; unknown values count as "each". */
+        downloadStrategy: string;
         outputDir: string;
         outputTemporaryDir: string;
         /** Suggest cleaning temporary downloads that no recent session uses (at most once a day, at start-up). */
@@ -105,6 +107,7 @@ export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSetting
         preferLossless: true,
         convertAudio: true,
         convertFormat: "flac",
+        downloadStrategy: "each",
         outputDir: MEDIA_OUTPUT_DIR,
         outputTemporaryDir: path.join(MEDIA_OUTPUT_DIR, "tmp"),
         tempCleanupReminder: true,

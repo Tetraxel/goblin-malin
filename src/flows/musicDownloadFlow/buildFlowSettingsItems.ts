@@ -8,6 +8,7 @@ import { BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS, type MusicDownloadFlowSettin
 import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
 import { runTempCleanup } from "./tempCleanupFlow";
 import { OUTPUT_FORMATS, OUTPUT_FORMAT_KEYS, parseOutputFormat } from "./utils/outputFormat";
+import { DOWNLOAD_STRATEGY_KEYS, DOWNLOAD_STRATEGY_NOTES, parseDownloadStrategy } from "./utils/downloadStrategy";
 
 export type ProviderEntry = {
     key: string;
@@ -262,13 +263,16 @@ export function buildFlowSettingsItems(
 
     // ── Download ──────────────────────────────────────────────────
     items.push({ kind: "sectionHeader", label: "Download" });
-    // items.push({
-    //     kind: "checkbox",
-    //     indent: 0,
-    //     label: "Choose the best download source automatically",
-    //     get: () => flowSettings.download.autoChooseBestSource,
-    //     set: (v) => onChange({ download: { autoChooseBestSource: v } }),
-    // });
+    const strategy = parseDownloadStrategy(flowSettings.download.downloadStrategy);
+    items.push({
+        kind: "select",
+        indent: 0,
+        label: "Download strategy",
+        options: DOWNLOAD_STRATEGY_KEYS,
+        get: () => strategy,
+        set: (v) => onChange({ download: { downloadStrategy: v } }),
+    });
+    items.push({ kind: "note", indent: 0, text: DOWNLOAD_STRATEGY_NOTES[strategy] });
     items.push({
         kind: "textInput",
         indent: 0,

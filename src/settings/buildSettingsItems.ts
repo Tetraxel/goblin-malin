@@ -1,3 +1,6 @@
+import stringWidth from "string-width";
+import wrapAnsi from "wrap-ansi";
+
 export type SettingsItem =
     | { kind: "sectionHeader"; label: string }
     | { kind: "subHeader"; label: string }
@@ -21,10 +24,38 @@ export function isInteractive(item: SettingsItem): boolean {
     return item.kind === "checkbox" || item.kind === "textInput" || item.kind === "select" || item.kind === "action";
 }
 
-// sectionHeader uses marginTop={1} and subHeader uses paddingTop={1}, both adding 1 extra visual row
-export function itemRowHeight(item: SettingsItem): number {
+/** Number of terminal lines `text` takes in `width` columns, wrapped the way Ink wraps a `<Text>`. */
+function wrappedLines(text: string, width: number): number {
+    if (width <= 0) return 1;
+    return Math.max(1, wrapAnsi(text, width, { trim: false, hard: true }).split("\n").length);
+}
+
+/**
+ * How many terminal lines a row takes. A section header and a sub-header add one blank line above their text
+ * (`marginTop` / `paddingTop`). A row whose label is longer than the modal is wide wraps onto more lines, so
+ * pass `width` (the list's width) or the scroll logic counts it as one line and clips the last rows.
+ * Notes and provider headers are cut to one line, never wrapped.
+ *
+ * The text counted here mirrors what `SettingsItemRow` renders: cursor (2) + icon/label + value.
+ */
+export function itemRowHeight(item: SettingsItem, width?: number): number {
     if (item.kind === "sectionHeader" || item.kind === "subHeader") return 2;
-    return 1;
+    if (width === undefined) return 1;
+
+    const available = width - ("indent" in item ? item.indent : 0);
+    switch (item.kind) {
+        case "checkbox":
+            return wrappedLines(`${"  "}✔${"  "}${item.label}`, available);
+        case "action":
+            return wrappedLines(`${"  "}${item.label}`, available);
+        // The label and the value are two `<Text>`s in a row: the value keeps its width, the label wraps in the rest.
+        case "textInput":
+            return wrappedLines(`${"  "}${item.label}: `, available - stringWidth(`[${item.get()}]`));
+        case "select":
+            return wrappedLines(`${"  "}${item.label}: `, available - stringWidth(`[${item.get()} ◀ ▶]`));
+        default:
+            return 1;
+    }
 }
 
 /**

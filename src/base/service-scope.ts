@@ -31,12 +31,17 @@ export class ServiceScope<TTask extends Task<any>, TService extends ServiceBase>
 
     // Re-evaluates isEnabled on every call so settings changes take effect on next task run
     getAllServices(): TService[] {
-        const services: TService[] = [];
+        return this.getAllEntries().map(([, service]) => service);
+    }
+
+    /** Like `getAllServices()`, with each service's registry key. */
+    getAllEntries(): [string, TService][] {
+        const entries: [string, TService][] = [];
         for (const name of this.factories.keys()) {
             if (!this.isEnabled || this.isEnabled(name)) {
-                services.push(this.get(name));
+                entries.push([name, this.get(name)]);
             }
         }
-        return services;
+        return entries;
     }
 }

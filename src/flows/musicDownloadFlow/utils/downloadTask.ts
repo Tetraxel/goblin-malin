@@ -42,6 +42,7 @@ import { tagAudioFile } from "./tagAudioFile";
 import { createSingleFlight } from "./singleFlight";
 import { writeViaStaging } from "./writeViaStaging";
 import { pickAutoSelectedIndex } from "./sourceSelection";
+import { maxDownloadsPerProvider, parseDownloadStrategy, stopsAtFirstDownload } from "./downloadStrategy";
 import { type MetadataService } from "../metadataService";
 import { type DiscoveryMetadataService } from "../discoveryMetadataService";
 import { type DownloadService, type DownloadUpdateOptions } from "../downloadService";
@@ -1558,7 +1559,13 @@ export class DownloadTask extends Task<TrackDownloadTask> {
     private async runDownloadService(
         downloadService: DownloadService,
         signal?: AbortSignal,
-        insertAt?: number
+        insertAt?: number,
+        options: {
+            /** Files this service may download (the strategy's limit); left out, the service's own default of one. */
+            maxDownloads?: number;
+            /** The service is not used this time: only a "skipped" row is left under this provider key. */
+            skipAs?: string;
+        } = {}
     ): Promise<void> {
         const metadataGroups = this.getAttributes()?.metadataGroups ?? [];
         let createdRows = 0;
@@ -1633,6 +1640,19 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 };
             }
 
+            // Not needed (an earlier provider already downloaded the track): a row says so, and keeps the provider
+            // listed so that it can still be run by hand ("retry provider").
+            if (options.skipAs) {
+                applyRowUpdate(undefined, {
+                    state: "skipped",
+                    provider: options.skipAs as TrackDownloadSource["provider"],
+                    track: compatibleMetadata,
+                    downloadedAt: new Date(),
+                    selected: false,
+                });
+                return;
+            }
+
             this.logger.info(`Downloading using ${downloadService.id} from ${compatibleMetadata.apiProvider}`);
 
             // Reserve slot(s) for this service. The service emits intermediate sources
@@ -1661,7 +1681,12 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             };
 
             // Download the track
-            const downloadSource = await downloadService.downloadTrack(compatibleMetadata, onUpdate, signal);
+            const downloadSource = await downloadService.downloadTrack(
+                compatibleMetadata,
+                onUpdate,
+                signal,
+                options.maxDownloads !== undefined ? { maxDownloads: options.maxDownloads } : undefined
+            );
             const finalSlot = applyRowUpdate(slotByAttemptId.get(lastAttemptId), downloadSource);
             this.activeAbortBySourceIndex.delete(finalSlot);
             this.logger.info(`Successfully downloaded using ${downloadService.id}`);
@@ -1728,7 +1753,11 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 const hadSelected = before.some((s) => s.provider === provider && s.selected);
 
                 this.updateAttributes({ downloadSources: before.filter((s) => s.provider !== provider) });
-                await this.runDownloadService(service, undefined, firstIndex);
+                await this.runDownloadService(service, undefined, firstIndex, {
+                    maxDownloads: maxDownloadsPerProvider(
+                        parseDownloadStrategy(getMusicSettings().download.downloadStrategy)
+                    ),
+                });
 
                 // The selected row went away with its provider: pick again, as the first pass does. A
                 // selection that lives on another provider is the user's, and stays.
@@ -1759,9 +1788,18 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         // Only the download rows are redone: the saved file is the task's own record (`savedFile`) and stays.
         this.updateAttributes({ downloadSources: [], downloadsFetched: false });
 
-        for (const downloadService of this.downloadServices.getAllServices()) {
+        // How many files the track downloads: see `downloadStrategy.ts`. Providers are asked in registry order.
+        const strategy = parseDownloadStrategy(getMusicSettings().download.downloadStrategy);
+        const maxDownloads = maxDownloadsPerProvider(strategy);
+        for (const [provider, downloadService] of this.downloadServices.getAllEntries()) {
             throwIfAborted(signal);
-            await this.runDownloadService(downloadService, signal);
+            const done = (this.getAttributes()?.downloadSources ?? []).some((s) => s.state === "downloaded");
+            if (done && stopsAtFirstDownload(strategy)) {
+                this.logger.info(`Not using ${provider}: a file is already downloaded`);
+                await this.runDownloadService(downloadService, signal, undefined, { skipAs: provider });
+                continue;
+            }
+            await this.runDownloadService(downloadService, signal, undefined, { maxDownloads });
         }
 
         // Auto-select the best downloaded source — lossless-first when preferLossless

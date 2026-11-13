@@ -42,25 +42,30 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     onItemClick,
 }) => {
     const listAreaH = Math.max(3, height - SEARCH_H);
+    // Heights count wrapped lines: a long label takes 2+ rows, and counting it as one clips the last rows.
+    const heights = items.map((item) => itemRowHeight(item, width));
     const rowStarts: number[] = [];
     let cumRows = 0;
-    for (const item of items) {
+    for (const h of heights) {
         rowStarts.push(cumRows);
-        cumRows += itemRowHeight(item);
+        cumRows += h;
     }
     const totalRows = cumRows;
+    const scrolls = totalRows > listAreaH;
+    // When the list scrolls, the "↕ x–y of z" line below it takes one row of the area.
+    const capacity = scrolls ? listAreaH - 1 : listAreaH;
     const selectedRowStart = rowStarts[selectedIndex] ?? 0;
     const scrollRowOffset = Math.max(
         0,
-        Math.min(selectedRowStart - Math.floor(listAreaH / 2), Math.max(0, totalRows - listAreaH))
+        Math.min(selectedRowStart - Math.floor(capacity / 2), Math.max(0, totalRows - capacity))
     );
     const rawStart = rowStarts.findIndex((r) => r >= scrollRowOffset);
     const visibleStart = rawStart < 0 ? 0 : rawStart;
     const visibleItems: { item: SettingsItem; idx: number }[] = [];
     let visibleRows = 0;
     for (let i = visibleStart; i < items.length; i++) {
-        const h = itemRowHeight(items[i]);
-        if (visibleRows + h > listAreaH) break;
+        const h = heights[i];
+        if (visibleRows + h > capacity) break;
         visibleItems.push({ item: items[i], idx: i });
         visibleRows += h;
     }
@@ -104,7 +109,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 <Box flexDirection="column" overflow="hidden">
                     <Box flexDirection="row" flexShrink={0} flexGrow={1}></Box>
                     <Box flexDirection="row" flexShrink={1} flexGrow={0} alignSelf="flex-end">
-                        {totalRows > listAreaH && (
+                        {scrolls && (
                             <Text dimColor>
                                 {"  "}↕ {visibleStart + 1}–{visibleStart + visibleItems.length} of {items.length}
                             </Text>

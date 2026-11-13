@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { DownloadCancelledError, SlskClient, type SearchResult } from "slsk-client";
-import { DownloadService, type DownloadUpdateCallback } from "../../../downloadService";
+import { DownloadService, type DownloadTrackOptions, type DownloadUpdateCallback } from "../../../downloadService";
 import { type ProviderDisplay } from "#base/providerDisplay";
 import { type ProviderSettingsSchema } from "#base/providerSettings";
 import { type SetupWizardConfig } from "#base/setupWizard";
@@ -20,6 +20,7 @@ import {
 } from "#flows/musicDownloadFlow/types";
 import { type DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { readFileInfo } from "#flows/musicDownloadFlow/utils/readFileInfo";
+import { MAX_DOWNLOADS_PER_PROVIDER } from "#flows/musicDownloadFlow/utils/downloadStrategy";
 import { getTempDownloadDir, getDownloadProviderSettings } from "../../../saveSettings";
 import { generateTempFilename, deleteExistingTempFiles } from "#flows/musicDownloadFlow/utils/tempFile";
 import {
@@ -267,8 +268,11 @@ export class SoulseekService extends DownloadService {
     async downloadTrack(
         trackMetadata: TrackMetadata,
         reportUpdate?: DownloadUpdateCallback,
-        signal?: AbortSignal
+        signal?: AbortSignal,
+        options?: DownloadTrackOptions
     ): Promise<TrackDownloadSource> {
+        // Never more than the cap, whatever the caller asks: the temporary folder must not be flooded.
+        const maxDownloads = Math.min(Math.max(1, options?.maxDownloads ?? 1), MAX_DOWNLOADS_PER_PROVIDER);
         // The row last reported: a final "failed" result is applied to it (see the end of this method).
         let lastEmitted: TrackDownloadSource | undefined;
         const onUpdate: DownloadUpdateCallback = (source, options) => {
@@ -401,10 +405,11 @@ export class SoulseekService extends DownloadService {
                 const attemptedRows = attempts.slice(0, autoAttemptCount);
 
                 // Still only ever one candidate downloading at a time, sequentially,
-                // stopping at the first success — no extra files are fetched. Each
+                // stopping at the `maxDownloads`-th success (one, unless the download strategy
+                // asks for more) — no extra files are fetched. Each
                 // candidate's own row (opened above) is updated in place as it's
-                // attempted; any candidates never reached are marked "skipped" once a
-                // winner is found (see markRemainingSkipped below), rather than being
+                // attempted; any candidates never reached are marked "skipped" once the
+                // last winner is found (see markRemainingSkipped below), rather than being
                 // left in a "pending" state that would misleadingly imply they're still
                 // queued to run. Skipped (and failed) rows keep their `retryPayload` so
                 // the user can still manually download that exact candidate later.
@@ -414,6 +419,8 @@ export class SoulseekService extends DownloadService {
                     }
                 };
 
+                let lastWinner: { result: TrackDownloadSource; attemptId: string | undefined } | undefined;
+                let wins = 0;
                 for (const [attemptIndex, { candidate, attemptId }] of attemptedRows.entries()) {
                     throwIfAborted(signal);
                     const result = await this.attemptSingleCandidate(
@@ -425,14 +432,21 @@ export class SoulseekService extends DownloadService {
                         attemptId,
                         signal
                     );
-                    if (result) {
+                    if (!result) continue;
+                    onUpdate(result, { attemptId });
+                    lastWinner = { result, attemptId };
+                    if (++wins >= maxDownloads) {
                         markRemainingSkipped(attemptIndex + 1);
-                        // The task applies the returned source to the row of the *last*
-                        // onUpdate call — which is now the last skipped candidate's. Re-address
-                        // the winner's own row last so its result doesn't land on that one.
-                        onUpdate(result, { attemptId });
-                        return result;
+                        break;
                     }
+                }
+                // A format that gave a file is enough: the MP3 fallback is only for when there is no FLAC.
+                if (lastWinner) {
+                    // The task applies the returned source to the row of the *last*
+                    // onUpdate call — which may now be a skipped candidate's. Re-address
+                    // the winner's own row last so its result doesn't land on that one.
+                    onUpdate(lastWinner.result, { attemptId: lastWinner.attemptId });
+                    return lastWinner.result;
                 }
             }
 
