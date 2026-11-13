@@ -28,6 +28,9 @@ export function sessionLastUsedMs(session: StoredSession): number {
     return Math.max(0, ...times.filter((t) => Number.isFinite(t)));
 }
 
+/** Task snapshots, or a function that reads them when they are needed (so a burst of changes builds them once). */
+type SnapshotSource = SessionTaskSnapshot[] | (() => SessionTaskSnapshot[]);
+
 export class SessionManager {
     private static instance: SessionManager;
     private readonly emitter = new EventEmitter();
@@ -37,7 +40,8 @@ export class SessionManager {
     private isLoading = false;
 
     private persistTimer: ReturnType<typeof setTimeout> | null = null;
-    private pendingSnapshots: SessionTaskSnapshot[] | null = null;
+    /** What to save when the debounce fires: the snapshots, or a function reading them at that moment. */
+    private pendingSnapshots: SnapshotSource | null = null;
     private readonly DEBOUNCE_MS = 800;
     // Cap how long a persist can be starved. The debounce resets on every change, so a
     // busy run (metadata + downloads notifying constantly) could otherwise never write
@@ -96,10 +100,15 @@ export class SessionManager {
         }
     }
 
-    persistCurrent(snapshots: TaskSnapshot[]): void {
+    /**
+     * Saves the open session's tasks shortly after the last call. Pass a function to have the snapshots read when
+     * the save actually happens: with thousands of tasks, building them on every change (many a second during a
+     * run) costs far more than the save itself.
+     */
+    persistCurrent(snapshots: TaskSnapshot[] | (() => TaskSnapshot[])): void {
         if (this.isLoading) return;
 
-        this.pendingSnapshots = snapshots as SessionTaskSnapshot[];
+        this.pendingSnapshots = snapshots as SnapshotSource;
         const now = Date.now();
         if (this.firstPendingAt === null) this.firstPendingAt = now;
 
@@ -131,9 +140,9 @@ export class SessionManager {
             this.persistTimer = null;
         }
         this.firstPendingAt = null;
-        const snapshots = this.pendingSnapshots ?? [];
+        const source = this.pendingSnapshots;
         this.pendingSnapshots = null;
-        this._doPersist(snapshots);
+        this._doPersist(typeof source === "function" ? source() : (source ?? []));
     }
 
     /** Drop any debounced write without persisting (e.g. its session is being deleted). */

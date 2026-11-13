@@ -125,7 +125,6 @@
         "flat-cache": "^6.1.23",
         "ink": "^8.0.0",
         "ink-select-input": "^6.2.0",
-        "ink-spinner": "^5.0.0",
         "ink-text-input": "^6.0.0",
         "musicbrainz-api": "^2.0.1",
         "node-id3": "^0.2.9",

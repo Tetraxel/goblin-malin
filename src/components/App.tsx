@@ -6,7 +6,7 @@ import { ToolbarActionsProvider } from "#contexts/ToolbarActionsContext";
 import { ThemeProvider } from "#base/themeContext";
 import { ShortcutRegistryProvider } from "#base/shortcuts/ShortcutRegistry";
 import { TaskOrchestrator } from "#base/task/orchestrator";
-import { type Task, type TaskAttributes } from "#base/task/task";
+import { Task, type TaskAttributes } from "#base/task/task";
 import { computeColumns, type PrimaryMode } from "#flows/musicDownloadFlow/taskColumns";
 import { buildVisibleTaskOrder } from "#flows/musicDownloadFlow/utils/buildVisibleTaskOrder";
 import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
@@ -93,28 +93,26 @@ export const App: React.FC = () => {
         return () => clearTimeout(timer);
     }, []);
 
-    useEffect(() => {
-        const unsubscribe = orchestrator.subscribe((orch) => {
-            const currentTasks = orch.getTasks();
-            setTasks(currentTasks);
-            SessionManager.getInstance().persistCurrent(currentTasks.map((t) => t.get()));
-        });
-        return unsubscribe;
-    }, [orchestrator, orchestrator.id]);
-
-    // Persist on per-task attribute changes (metadata fetch, downloads, edits).
-    // The orchestrator only notifies on add/replace, but metadata updates notify the
-    // task's own subscribers — without mirroring those, the saved session keeps the
-    // empty-at-import metadata and reopening shows nothing.
+    // Persist when tasks come or go (orchestrator) and on per-task attribute changes (metadata fetch, downloads,
+    // edits): without the second, the saved session keeps the empty-at-import metadata and reopening shows nothing.
+    //
+    // The per-task part is ONE listener ("some task changed", once per frame), not a subscription per task: those
+    // were re-created on every change of the task list and replayed their callback immediately, which cost O(N²)
+    // with N tasks. The snapshots are read when the save happens, not on every change.
     useEffect(() => {
         const manager = SessionManager.getInstance();
-        const unsubscribes = tasks.map((task) =>
-            task.subscribe(() => {
-                manager.persistCurrent(orchestrator.getTasks().map((t) => t.get()));
-            })
-        );
-        return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
-    }, [tasks, orchestrator]);
+        const snapshots = () => orchestrator.getTasks().map((t) => t.get());
+        const persist = () => manager.persistCurrent(snapshots);
+        const offOrchestrator = orchestrator.subscribe((orch) => {
+            setTasks(orch.getTasks());
+            persist();
+        });
+        const offTasks = Task.subscribeToAny(persist);
+        return () => {
+            offOrchestrator();
+            offTasks();
+        };
+    }, [orchestrator, orchestrator.id]);
 
     // Collapse/expand (and other collection-only attribute changes) don't add or
     // remove tasks, so the orchestrator subscription above never fires for them —
@@ -126,7 +124,10 @@ export const App: React.FC = () => {
         const collectionTasks = tasks.filter(
             (t) => (t.getAttributes() as MusicDownloadTaskAttributes | undefined)?.kind === "collection"
         );
-        const unsubscribes = collectionTasks.map((t) => t.subscribe(() => setCollapseVersion((v) => v + 1)));
+        const unsubscribes = collectionTasks.map((t) =>
+            // No immediate call: `visibleTasks` is rebuilt for this very `tasks` change already.
+            t.subscribe(() => setCollapseVersion((v) => v + 1), { immediate: false })
+        );
         return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
     }, [tasks]);
 

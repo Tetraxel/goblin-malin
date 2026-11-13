@@ -156,7 +156,7 @@ export class YtDlpService extends DownloadService {
             const outputName = `${artistName} - ${trackMetadata.trackName}`;
 
             // A finished download in any audio format is reused: saving converts it to the wanted one.
-            const existingPath = findExistingTempFile(
+            const existingPath = await findExistingTempFile(
                 YtDlpService.display.label,
                 trackMetadata,
                 YTDLP_AUDIO_EXTENSIONS,
@@ -280,14 +280,14 @@ export class YtDlpService extends DownloadService {
                 // run, then re-raise as AbortError.
                 if (rowAbortController.signal.aborted) {
                     // Whatever name yt-dlp had got to: the finished file and any `.part` / intermediate leftovers.
-                    for (const leftover of listTempFilesWithStem(getTempDownloadDir(), tempStem)) {
+                    for (const leftover of await listTempFilesWithStem(getTempDownloadDir(), tempStem)) {
                         await fs.promises.unlink(leftover).catch(() => {});
                     }
                     throw makeAbortError();
                 }
 
                 if (!nativeFlac) {
-                    const produced = listTempFilesWithStem(getTempDownloadDir(), tempStem).find((file) =>
+                    const produced = (await listTempFilesWithStem(getTempDownloadDir(), tempStem)).find((file) =>
                         isFinishedAudioFile(file, tempStem)
                     );
                     if (!produced) throw new Error("yt-dlp finished but no audio file was found");

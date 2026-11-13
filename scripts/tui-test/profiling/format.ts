@@ -27,6 +27,10 @@ export function formatProfile(p: ProfileReport): string {
             `${GRAY}ink frames${R} ${t.inkFrames} (${t.inkMs}ms)   ${GRAY}worst commit${R} ${t.maxCommitMs}ms   ` +
             `${GRAY}components${R} ${t.components}`
     );
+    lines.push(
+        `  ${GRAY}process cpu${R} ${t.cpuMs}ms   ${GRAY}longest loop block${R} ${t.lagMaxMs}ms   ` +
+            `${GRAY}heap max${R} ${t.heapMaxMb}MB`
+    );
 
     // Top components by total self time.
     lines.push("\n  " + BOLD + "top components (by self ms)" + R);
@@ -52,7 +56,8 @@ export function formatProfile(p: ProfileReport): string {
         lines.push(
             `  ${tag.padEnd(28)} ${GRAY}commits${R} ${String(it.commits).padStart(3)}  ` +
                 `${GRAY}react${R} ${String(it.reactMs).padStart(6)}ms  ${GRAY}ink${R} ${String(it.inkMs).padStart(6)}ms  ` +
-                `${GRAY}wasted${R} ${String(it.wasted).padStart(4)}   ${DIM}${top}${R}`
+                `${GRAY}wasted${R} ${String(it.wasted).padStart(4)}  ${GRAY}cpu${R} ${String(it.cpuMs).padStart(5)}ms  ` +
+                `${GRAY}block${R} ${String(it.lagMaxMs).padStart(5)}ms   ${DIM}${top}${R}`
         );
     }
 

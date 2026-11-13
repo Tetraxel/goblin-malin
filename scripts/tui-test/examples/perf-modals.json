@@ -1,0 +1,31 @@
+{
+    "name": "perf-modals",
+    "terminal": { "cols": 128, "rows": 50 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "scale": { "tasks": 300, "otherSessions": 20, "otherSessionTasks": 200, "archived": 300 },
+    "profile": { "enabled": true },
+    "steps": [
+        { "type": "stable", "timeout": 40000, "quiescenceMs": 1000 },
+        { "type": "waitForContent", "text": "Hooked", "timeout": 20000 },
+        { "type": "wait", "ms": 2500 },
+
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "key", "key": "Enter" },
+        { "type": "stable", "quiescenceMs": 500 },
+        { "type": "assert", "contains": "Other session" },
+        { "type": "snapshot", "name": "sessions-open" },
+        { "type": "key", "key": "ArrowDown", "repeat": 8, "delayMs": 80 },
+        { "type": "stable", "quiescenceMs": 500 },
+        { "type": "key", "key": "Escape" },
+        { "type": "stable", "quiescenceMs": 500 },
+
+        { "type": "key", "key": "ArrowRight" },
+        { "type": "key", "key": "Enter" },
+        { "type": "stable", "quiescenceMs": 500 },
+        { "type": "snapshot", "name": "archive-open" },
+        { "type": "key", "key": "ArrowDown", "repeat": 8, "delayMs": 80 },
+        { "type": "stable", "quiescenceMs": 500 },
+        { "type": "key", "key": "Escape" },
+        { "type": "stable", "quiescenceMs": 500 }
+    ]
+}

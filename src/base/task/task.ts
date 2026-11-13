@@ -21,6 +21,17 @@ export type TaskSnapshot<TTAttributes = TaskAttributes> = {
     prompt: UserPrompt | null;
 };
 
+/**
+ * "Some task changed", once per frame. Code that only needs to know that something changed somewhere (saving the
+ * session) listens here instead of subscribing to every task: a subscription per task is re-created whenever the
+ * task list changes and replays its callback immediately, which costs O(N²) with N tasks.
+ */
+const anyTaskListeners = new Set<() => void>();
+/** Stable reference, so the scheduler dedupes it: any number of tasks changing in a frame emits once. */
+const emitAnyTaskChanged = (): void => {
+    anyTaskListeners.forEach((listener) => listener());
+};
+
 export class Task<TTaskAttributes = TaskAttributes> {
     public readonly id: string;
     protected initialInput?: string;
@@ -138,10 +149,25 @@ export class Task<TTaskAttributes = TaskAttributes> {
         throw Error("Not implemented");
     }
 
-    // Subscribe to any changes in the task (including status changes)
-    public subscribe(callback: TaskSubscriber<TTaskAttributes>): () => void {
+    /**
+     * Calls `listener` (at most once per frame) after any task changed: its attributes, its status or its prompt.
+     * It does not say which task: read the task list when you need it. Unlike `subscribe` it does not replay
+     * the current state.
+     */
+    public static subscribeToAny(listener: () => void): () => void {
+        anyTaskListeners.add(listener);
+        return () => {
+            anyTaskListeners.delete(listener);
+        };
+    }
+
+    /**
+     * Subscribe to any changes in the task (including status changes). The callback is called once right away with
+     * the current state, unless `immediate: false` (for a caller that already read it).
+     */
+    public subscribe(callback: TaskSubscriber<TTaskAttributes>, options: { immediate?: boolean } = {}): () => void {
         this.subscribers.add(callback);
-        callback(this); // Send current state immediately
+        if (options.immediate !== false) callback(this); // Send current state immediately
 
         return () => {
             this.subscribers.delete(callback);
@@ -156,6 +182,7 @@ export class Task<TTaskAttributes = TaskAttributes> {
         // is a stable bound reference, so repeated changes within a frame dedupe to a
         // single notification — N parallel updates → O(1) commits/frame.
         notificationScheduler.schedule(this.emitToSubscribers);
+        notificationScheduler.schedule(emitAnyTaskChanged);
     }
 
     private emitToSubscribers = (): void => {

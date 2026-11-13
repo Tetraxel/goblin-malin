@@ -1,0 +1,21 @@
+{
+    "name": "perf-load-tasks",
+    "terminal": { "cols": 128, "rows": 50 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "scale": { "tasks": 1000, "otherSessions": 5, "otherSessionTasks": 100 },
+    "load": { "tasksPerTick": 40, "tickMs": 250 },
+    "profile": { "enabled": true },
+    "steps": [
+        { "type": "stable", "timeout": 40000, "quiescenceMs": 1000 },
+        { "type": "waitForContent", "text": "Hooked", "timeout": 20000 },
+        { "type": "wait", "ms": 2000 },
+
+        { "type": "startLoad" },
+        { "type": "wait", "ms": 12000 },
+        { "type": "mark", "label": "during load" },
+        { "type": "key", "key": "ArrowDown", "repeat": 10, "delayMs": 100 },
+        { "type": "wait", "ms": 3000 },
+        { "type": "stopLoad" },
+        { "type": "wait", "ms": 3000 }
+    ]
+}

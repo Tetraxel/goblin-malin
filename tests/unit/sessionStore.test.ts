@@ -269,3 +269,49 @@ describe("SessionStore write failures", () => {
         expect(fs.readdirSync(dir).filter((name) => name.endsWith(".tmp"))).toEqual([]);
     });
 });
+
+describe("SessionStore.setLastSessionId", () => {
+    test("setting the id it already has writes nothing and wakes nobody", async () => {
+        fs.writeFileSync(file, valid(["a", "b"]));
+        const store = new SessionStore(file);
+        store.getAll();
+        let changes = 0;
+        store.onChanged(() => changes++);
+
+        store.setLastSessionId("a"); // already the last one
+        await store.flush();
+        expect(changes).toBe(0);
+
+        store.setLastSessionId("b");
+        await store.flush();
+        expect(changes).toBe(1);
+        expect(JSON.parse(fs.readFileSync(file, "utf-8")).lastSessionId).toBe("b");
+    });
+});
+
+describe("SessionStore writes", () => {
+    test("a save of the open session leaves the others byte for byte as they were", async () => {
+        const big = (id: string) => ({
+            ...session(id),
+            tasks: Array.from({ length: 20 }, (_, i) => ({
+                id: `${id}-${i}`,
+                attributes: { n: i, text: 'é"x"' },
+                status: { type: "success", message: "ok" },
+                prompt: null,
+            })),
+        });
+        fs.writeFileSync(file, JSON.stringify({ version: 1, lastSessionId: "a", sessions: [big("a"), big("b")] }));
+        const store = new SessionStore(file);
+        const before = JSON.parse(fs.readFileSync(file, "utf-8"));
+
+        const current = store.getAll()[0]!;
+        store.upsertSession({ ...current, name: "renamed", tasks: current.tasks.slice(0, 19) });
+        await store.flush();
+
+        const after = JSON.parse(fs.readFileSync(file, "utf-8"));
+        expect(after.sessions[0].name).toBe("renamed");
+        expect(after.sessions[0].tasks).toHaveLength(19);
+        expect(after.sessions[1]).toEqual(before.sessions[1]);
+        expect(after.lastSessionId).toBe("a");
+    });
+});

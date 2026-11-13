@@ -1,5 +1,6 @@
 import { StatusType, type TaskStatus } from "./task-status";
 import { type SetupWizardConfig } from "../setupWizard";
+import { pendingPrompts } from "./pending-prompts";
 
 export enum PromptType {
     Confirm = "confirm",
@@ -131,6 +132,7 @@ export class TaskPrompt {
                 resolve: resolve as (value: unknown) => void,
                 reject,
             };
+            pendingPrompts.add(this);
 
             this.notifySubscribers();
         });
@@ -151,6 +153,7 @@ export class TaskPrompt {
                 resolve: resolve as (value: unknown) => void,
                 reject,
             };
+            pendingPrompts.add(this);
 
             // Notify subscribers that a prompt is now active
             this.notifySubscribers();
@@ -166,6 +169,7 @@ export class TaskPrompt {
 
         const resolve = this.current.resolve;
         this.current = null;
+        pendingPrompts.remove(this);
 
         // Notify subscribers first (to update UI)
         this.notifySubscribers();
@@ -188,6 +192,7 @@ export class TaskPrompt {
 
         const reject = this.current.reject;
         this.current = null;
+        pendingPrompts.remove(this);
 
         // Notify subscribers first
         this.notifySubscribers();

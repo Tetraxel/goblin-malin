@@ -330,7 +330,7 @@ export class SoulseekService extends DownloadService {
                 // multi-candidate view down to whatever was cached before. Always
                 // search fresh, clearing out any leftover file from a previous attempt
                 // first so retries don't just pile up unused files in the temp dir.
-                deleteExistingTempFiles(SoulseekService.display.label, trackMetadata, extension, tempDir);
+                await deleteExistingTempFiles(SoulseekService.display.label, trackMetadata, extension, tempDir);
 
                 const query = this.searchQuery(trackMetadata, extension);
                 const queryFields = this.queryFields(trackMetadata, extension);

@@ -10,6 +10,7 @@ import { renderToImageBrowser } from "./screenshotBrowser.ts";
 import { renderToImagePowerShell } from "./screenshotPowerShell.ts";
 import { analyzeProfileFile } from "./profiling/analyze.ts";
 import { createIsolatedDataDir, DEFAULT_FIXTURE } from "./isolatedDataDir.ts";
+import { scaleSessionsFile } from "./scaleFixture.ts";
 import type { InteractionMark } from "./profiling/types.ts";
 import type { HarnessEvent, HarnessResult, RunOptions, Scenario, Snapshot } from "./types.ts";
 
@@ -28,9 +29,10 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
     const profileCfg = scenario.profile?.enabled ? scenario.profile : undefined;
     const marks: InteractionMark[] = [];
     let interactionIdx = 0;
-    const profileOut = profileCfg
-        ? path.join(os.tmpdir(), "goblin-tui-test", `profile-${Date.now()}.jsonl`)
-        : undefined;
+    const runId = `${Date.now()}-${process.pid}`;
+    const profileOut = profileCfg ? path.join(os.tmpdir(), "goblin-tui-test", `profile-${runId}.jsonl`) : undefined;
+    // The profiled app polls this file for `startLoad` / `stopLoad` (see src/profiling/loadDriver.ts).
+    const loadControl = profileCfg ? path.join(os.tmpdir(), "goblin-tui-test", `load-${runId}.json`) : undefined;
     if (profileOut) {
         fs.mkdirSync(path.dirname(profileOut), { recursive: true });
         try {
@@ -62,7 +64,8 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
     }
     // The app always runs on a throwaway copy of the fixture, never on the fixture itself (see isolatedDataDir.ts).
     const fixtureDir = path.resolve(ROOT, scenario.dataDir ?? DEFAULT_FIXTURE);
-    const isolated = createIsolatedDataDir(fixtureDir);
+    const isolated = createIsolatedDataDir(fixtureDir, scenario.settings);
+    if (scenario.scale) scaleSessionsFile(isolated.dir, scenario.scale);
     const keepDataDir = !!process.env["GOBLIN_TUI_KEEP_DATA"];
     if (keepDataDir) console.error(`[tui-test] data folder kept at ${isolated.dir}`);
     const slowMode = !!(process.env["GOBLIN_SLOW"] ?? scenario.env?.["GOBLIN_SLOW"]);
@@ -73,12 +76,15 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
         GOBLIN_NO_AUDIO: "1",
         GOBLIN_DATA_DIR: isolated.dir,
         ...(profileOut ? { DEV: "true", GOBLIN_PROFILE_OUT: profileOut } : {}),
+        ...(loadControl ? { GOBLIN_PROFILE_CONTROL: loadControl } : {}),
     });
 
     // Profile mode boots through the instrumented entry, which installs the
     // React devtools hook before Ink loads. Visual output is identical, so all
     // snapshot/assert steps still work.
-    const command = profileCfg ? "yarn tsx src/profiling/profiledEntry.tsx" : "yarn dev";
+    // `scenario.command` runs something else (e.g. `node dist/cli.js` to time the shipped bundle, which has no
+    // profiling hooks: only the `stable` / `waitForContent` timings are meaningful then).
+    const command = scenario.command ?? (profileCfg ? "yarn tsx src/profiling/profiledEntry.tsx" : "yarn dev");
     const ptyProcess = pty.spawn(shell, [shellFlag, command], {
         name: "xterm-256color",
         cols,
@@ -265,9 +271,36 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
                     break;
                 }
 
+                case "mark":
+                    markInteraction(step.label);
+                    break;
+
+                case "startLoad":
+                case "stopLoad": {
+                    if (!loadControl) throw new Error(`${step.type} needs profiling (run with --profile)`);
+                    markInteraction(step.type === "startLoad" ? "load start" : "load stop");
+                    fs.mkdirSync(path.dirname(loadControl), { recursive: true });
+                    fs.writeFileSync(
+                        loadControl,
+                        JSON.stringify(
+                            step.type === "startLoad" ? { action: "start", ...scenario.load } : { action: "stop" }
+                        )
+                    );
+                    break;
+                }
+
                 case "screenshot-powershell": {
                     await termEmulator.flush();
                     const imgPath = path.join(os.tmpdir(), "goblin-tui-test", `${step.name}.png`);
+                    if (process.platform !== "win32") {
+                        // Windows Terminal only exists on Windows: use the built-in emulator instead of crashing the run.
+                        console.error(
+                            `[tui-test] screenshot-powershell needs Windows: "${step.name}" uses the built-in emulator`
+                        );
+                        await termEmulator.renderToImage(imgPath);
+                        emit({ type: "screenshot", name: step.name, path: imgPath });
+                        break;
+                    }
                     await renderToImagePowerShell(
                         termEmulator.cols,
                         termEmulator.rows,

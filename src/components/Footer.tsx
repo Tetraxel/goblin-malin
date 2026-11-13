@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Box, Text } from "ink";
 import { useFocusChrome, useFocusSecondaryPanel } from "#contexts/FocusContext";
 import { inkTransport } from "#base/logger/ink-transport";
-import { type LogMetadata } from "#base/logger/types";
+import { LOG_LEVEL_ORDER, type LogLevel, type LogMetadata } from "#base/logger/types";
+import { SettingsStore } from "#settings/settingsStore";
 import { useTheme } from "#base/themeContext";
 import { statsDisplay } from "#base/statsDisplay";
 import { useFps } from "#hooks/useFps";
@@ -14,24 +15,40 @@ export const Footer: React.FC = () => {
     const secondaryPanel = useFocusSecondaryPanel();
     const height = footer.height;
     const subTab = secondaryPanel.subTab;
-    const [lastLog, setLastLog] = useState<LogMetadata | null>(null);
+    // Only the text is state: a batch of lines that changes nothing on screen (debug lines under the default
+    // "info" level, a repeated line) leaves it equal, so React skips the render, and a render is a whole Ink frame.
+    const [logText, setLogText] = useState("");
+    // The count is only on screen in the Logs tab. Counting in a ref keeps the other tabs from re-rendering on
+    // every batch (up to 10 a second while a download runs); the state is only updated while the count is shown.
+    const logCountRef = useRef(0);
+    const showCountRef = useRef(false);
     const [logCount, setLogCount] = useState(0);
+    useEffect(() => {
+        showCountRef.current = subTab === "logs";
+        if (subTab === "logs") setLogCount(logCountRef.current);
+    }, [subTab]);
     const [showStats, setShowStats] = useState(statsDisplay.get());
     const { fps, minFps, maxFps, renderMs } = useFps(showStats);
 
     useEffect(() => {
         const unsubscribe = inkTransport.subscribe((logs) => {
-            if (logs.length > 0) {
-                setLastLog(logs[logs.length - 1] as LogMetadata);
-                setLogCount((prev) => prev + logs.length);
+            if (logs.length === 0) return;
+            logCountRef.current += logs.length;
+            // The footer follows Settings → Logs → level like the Logs tab does (it used to show every debug line).
+            const minLevel = LOG_LEVEL_ORDER[SettingsStore.getInstance().getAppSettings().logs.logLevel];
+            for (let i = logs.length - 1; i >= 0; i--) {
+                const log = logs[i] as LogMetadata;
+                if (LOG_LEVEL_ORDER[log.level as LogLevel] < minLevel) continue;
+                setLogText(`[${log.level?.toUpperCase() ?? "LOG"}] ${log.message}`);
+                break;
             }
+            if (showCountRef.current) setLogCount(logCountRef.current);
         });
         return unsubscribe;
     }, []);
 
     useEffect(() => statsDisplay.subscribe(setShowStats), []);
 
-    const logText = lastLog ? `[${lastLog.level?.toUpperCase() ?? "LOG"}] ${lastLog.message}` : "";
     const countSuffix = `${logCount} logs • `;
 
     const fpsColor = fps >= 50 ? theme.status.success : fps >= 30 ? theme.status.warning : theme.status.error;

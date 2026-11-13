@@ -26,7 +26,16 @@ export interface InkFrameRecord {
     renderMs: number;
 }
 
-export type ProfileRecord = CommitRecord | InkFrameRecord;
+export interface RuntimeRecord {
+    type: "runtime";
+    t: number;
+    cpuMs: number;
+    lagMaxMs: number;
+    lagP99Ms: number;
+    heapMb: number;
+}
+
+export type ProfileRecord = CommitRecord | InkFrameRecord | RuntimeRecord;
 
 /** A keystroke/text step, timestamped by the runner, used to attribute commits. */
 export interface InteractionMark {
@@ -71,6 +80,10 @@ export interface InteractionStat {
     inkFrames: number;
     inkMs: number;
     wasted: number;
+    /** Process CPU time (user + system) spent during this interaction, from the ~250 ms runtime samples. */
+    cpuMs: number;
+    /** Longest event-loop block seen during this interaction, in ms. */
+    lagMaxMs: number;
     topComponents: { name: string; renders: number; selfMs: number }[];
 }
 
@@ -113,6 +126,12 @@ export interface ProfileReport {
         inkMs: number;
         components: number;
         maxCommitMs: number;
+        /** Process CPU time over the whole run (boot included), in ms. */
+        cpuMs: number;
+        /** Longest event-loop block of the whole run, in ms. */
+        lagMaxMs: number;
+        /** Largest heap in use, in MB. */
+        heapMaxMb: number;
     };
     components: ComponentStat[];
     interactions: InteractionStat[];

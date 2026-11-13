@@ -148,3 +148,4 @@ dist
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+scripts/tui-test/profiling/results/

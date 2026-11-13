@@ -1,0 +1,20 @@
+{
+    "name": "perf-load-logs",
+    "terminal": { "cols": 128, "rows": 50 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "settings": { "logs": { "logLevel": "INFO" } },
+    "load": { "logsPerTick": 5, "tickMs": 100, "logLevel": "debug" },
+    "profile": { "enabled": true },
+    "steps": [
+        { "type": "stable", "timeout": 15000 },
+        { "type": "waitForContent", "text": "Hooked", "timeout": 8000 },
+        { "type": "wait", "ms": 2000 },
+
+        { "type": "mark", "label": "quiet 5s" },
+        { "type": "wait", "ms": 5000 },
+        { "type": "startLoad" },
+        { "type": "wait", "ms": 8000 },
+        { "type": "stopLoad" },
+        { "type": "wait", "ms": 1000 }
+    ]
+}

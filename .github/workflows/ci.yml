@@ -68,10 +68,9 @@ jobs:
             - name: Build
               run: yarn build
 
-            # The unit tests are only run on Windows for now (the release is built there and the suite has not
-            # been run on Linux yet). Drop the `if` once they are green on ubuntu too.
+            # The unit tests run on both systems (the one failing test on Linux, see AUDIT-performance.md TOOL-01,
+            # now compares paths the way the platform does).
             - name: Unit tests
-              if: runner.os == 'Windows'
               run: npx vitest run tests/unit --coverage
               env:
                   GOBLIN_NO_AUDIO: "1"

@@ -3,9 +3,9 @@ import wrapAnsi from "wrap-ansi";
 import { Box, Text, useBoxMetrics, type DOMElement } from "ink";
 import clipboard from "clipboardy";
 import * as path from "path";
-import * as fs from "fs";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useWheelTarget } from "#base/mouse/useMouseTarget";
+import { useFileExists } from "#hooks/useFileExists";
 import { useTheme } from "#base/themeContext";
 import { type MetadataOverrides, type TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 import { type CompiledMetadata, type MusicBrainzIds } from "#flows/musicDownloadFlow/utils/compiledMetadata";
@@ -208,6 +208,9 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     emptyState,
 }) => {
     const theme = useTheme();
+    // Looked up off the UI thread (and again every few seconds), not with `existsSync` on every render. Until the
+    // first answer the folder is assumed to be there, so no warning flashes up.
+    const folderExists = useFileExists(outputDir) !== false;
 
     // Side by side: the saved file (OLD) next to what it would become (NEW). Everything below that says
     // "source" is the NEW side, so the pane is the very same one in both modes.
@@ -1359,7 +1362,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                     dir={outputDir}
                     filename={currentFilename}
                     isOverridden={isOutputOverridden}
-                    folderExists={fs.existsSync(outputDir)}
+                    folderExists={folderExists}
                     isFocused={isActive && current === "output"}
                     notice={notice}
                     replacesExisting={replacesExisting}

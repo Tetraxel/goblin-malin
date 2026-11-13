@@ -1,0 +1,18 @@
+{
+    "name": "perf-sessions-heavy",
+    "terminal": { "cols": 128, "rows": 50 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "scale": { "tasks": 300, "otherSessions": 20, "otherSessionTasks": 300, "archived": 300 },
+    "load": { "tasksPerTick": 20, "tickMs": 250 },
+    "profile": { "enabled": true },
+    "steps": [
+        { "type": "stable", "timeout": 60000, "quiescenceMs": 1000 },
+        { "type": "waitForContent", "text": "Hooked", "timeout": 30000 },
+        { "type": "wait", "ms": 2000 },
+
+        { "type": "startLoad" },
+        { "type": "wait", "ms": 10000 },
+        { "type": "stopLoad" },
+        { "type": "wait", "ms": 2000 }
+    ]
+}

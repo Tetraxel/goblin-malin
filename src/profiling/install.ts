@@ -13,6 +13,7 @@
 // on bailed-out memoized subtrees). We use the `PerformedWork` flag — the same
 // signal React DevTools uses.
 
+import { monitorEventLoopDelay } from "node:perf_hooks";
 import { initRecorder, isRecording, nextSeq, record, round } from "./recorder";
 import type { ComponentRender, ProfileHooks } from "./types";
 
@@ -192,3 +193,33 @@ const hooks: ProfileHooks = {
 };
 
 globalThis.__GOBLIN_PROFILE__ = hooks;
+
+// --- Process-level sampler -------------------------------------------------------------------------------
+// React's profiler only sees component renders. A big `JSON.stringify`, a synchronous `fs` call or a GC pause
+// blocks the event loop without showing up there, so every ~250 ms we also record how much CPU the process used
+// and how long the loop was blocked (histogram of its delay, sampled by a timer every LAG_RESOLUTION_MS).
+const SAMPLE_MS = 250;
+const LAG_RESOLUTION_MS = 5;
+const histogram = monitorEventLoopDelay({ resolution: LAG_RESOLUTION_MS });
+histogram.enable();
+let lastCpu = process.cpuUsage();
+
+const sampler = setInterval(() => {
+    if (!isRecording()) return;
+    const cpu = process.cpuUsage(lastCpu);
+    lastCpu = process.cpuUsage();
+    // `histogram` is in nanoseconds; an empty window reports NaN/very large sentinels, so guard on the count.
+    const idle = histogram.count === 0;
+    record({
+        type: "runtime",
+        t: Date.now(),
+        cpuMs: round((cpu.user + cpu.system) / 1000),
+        // The delay includes the timer's own period, so subtract it: a quiet loop reports ~0.
+        lagMaxMs: idle ? 0 : round(Math.max(0, histogram.max / 1e6 - LAG_RESOLUTION_MS)),
+        lagP99Ms: idle ? 0 : round(Math.max(0, histogram.percentile(99) / 1e6 - LAG_RESOLUTION_MS)),
+        heapMb: round(process.memoryUsage().heapUsed / 1048576),
+    });
+    histogram.reset();
+}, SAMPLE_MS);
+// Never keep the process alive for the sampler.
+sampler.unref();

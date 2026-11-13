@@ -42,7 +42,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
     const store = SessionStore.getInstance();
     const manager = SessionManager.getInstance();
 
-    const { sessions, currentSessionId } = useSessions(searchQuery);
+    const { sessions, currentSessionId } = useSessions(searchQuery, isVisible);
 
     const listHeight = Math.max(3, terminalHeight - MODAL_OVERHEAD);
     const safeIndex = Math.min(selectedIndex, Math.max(0, sessions.length - 1));

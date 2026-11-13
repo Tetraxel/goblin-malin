@@ -10,6 +10,7 @@ import type {
     InteractionStat,
     ProfileRecord,
     ProfileReport,
+    RuntimeRecord,
     Thresholds,
 } from "./types.ts";
 
@@ -54,12 +55,13 @@ interface Bucket {
     label: string;
     commits: CommitRecord[];
     inks: InkFrameRecord[];
+    runtimes: RuntimeRecord[];
 }
 
 function bucketize(records: ProfileRecord[], marks: InteractionMark[]): Bucket[] {
     const sorted = [...marks].sort((a, b) => a.t - b.t);
-    const buckets: Bucket[] = [{ index: -1, label: "boot", commits: [], inks: [] }];
-    for (const m of sorted) buckets.push({ index: m.index, label: m.label, commits: [], inks: [] });
+    const buckets: Bucket[] = [{ index: -1, label: "boot", commits: [], inks: [], runtimes: [] }];
+    for (const m of sorted) buckets.push({ index: m.index, label: m.label, commits: [], inks: [], runtimes: [] });
 
     const bucketFor = (t: number): Bucket => {
         let chosen = buckets[0]!;
@@ -73,7 +75,8 @@ function bucketize(records: ProfileRecord[], marks: InteractionMark[]): Bucket[]
     for (const r of records) {
         const b = bucketFor(r.t);
         if (r.type === "commit") b.commits.push(r);
-        else b.inks.push(r);
+        else if (r.type === "ink") b.inks.push(r);
+        else b.runtimes.push(r);
     }
     return buckets;
 }
@@ -143,16 +146,13 @@ function interactionStat(b: Bucket): InteractionStat {
         inkFrames: b.inks.length,
         inkMs: Math.round(inkMs * 100) / 100,
         wasted,
+        cpuMs: Math.round(b.runtimes.reduce((sum, r) => sum + r.cpuMs, 0)),
+        lagMaxMs: Math.round(b.runtimes.reduce((m, r) => Math.max(m, r.lagMaxMs), 0) * 10) / 10,
         topComponents,
     };
 }
 
-function detectAnomalies(
-    buckets: Bucket[],
-    components: ComponentStat[],
-    interactions: InteractionStat[],
-    thresholds: Thresholds
-): Anomaly[] {
+function detectAnomalies(buckets: Bucket[], interactions: InteractionStat[], thresholds: Thresholds): Anomaly[] {
     const anomalies: Anomaly[] = [];
 
     // Per-interaction (boot excluded — initial mounts legitimately burst).
@@ -210,8 +210,11 @@ function detectAnomalies(
         });
     }
 
-    // Per-component p95 self render time.
-    for (const c of components) {
+    // Per-component p95 self render time. Boot is left out, like in the rules above: the first render of a
+    // component pays one-off costs (first `string-width` call, module warm-up) that say nothing about its steady
+    // state, and a warning that is always there hides the real ones.
+    const steadyCommits = buckets.filter((b) => b.index >= 0).flatMap((b) => b.commits);
+    for (const c of aggregateComponents(steadyCommits)) {
         if (c.selfMsP95 > thresholds.maxComponentSelfMsP95) {
             anomalies.push({
                 severity: "warn",
@@ -242,8 +245,9 @@ export function analyzeRecords(records: ProfileRecord[], options: AnalyzeOptions
 
     const components = aggregateComponents(allCommits);
     const interactions = buckets.map(interactionStat);
-    const anomalies = detectAnomalies(buckets, components, interactions, thresholds);
+    const anomalies = detectAnomalies(buckets, interactions, thresholds);
 
+    const allRuntimes = records.filter((r): r is RuntimeRecord => r.type === "runtime");
     const maxCommitMs = allCommits.reduce((m, c) => Math.max(m, c.durationMs), 0);
     const report: ProfileReport = {
         scenario: options.scenario,
@@ -254,6 +258,9 @@ export function analyzeRecords(records: ProfileRecord[], options: AnalyzeOptions
             inkMs: Math.round(allInks.reduce((s, f) => s + f.renderMs, 0) * 100) / 100,
             components: components.length,
             maxCommitMs: Math.round(maxCommitMs * 100) / 100,
+            cpuMs: Math.round(allRuntimes.reduce((s, r) => s + r.cpuMs, 0)),
+            lagMaxMs: Math.round(allRuntimes.reduce((m, r) => Math.max(m, r.lagMaxMs), 0) * 10) / 10,
+            heapMaxMb: Math.round(allRuntimes.reduce((m, r) => Math.max(m, r.heapMb), 0)),
         },
         components: components.slice(0, TOP_COMPONENTS),
         interactions,

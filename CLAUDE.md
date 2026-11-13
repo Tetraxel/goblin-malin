@@ -95,6 +95,18 @@ yarn tsx scripts/tui-test/cli.ts <scenario.json> --profile # + per-component ren
 
 `--profile` (or `"profile": { "enabled": true }` in a scenario) boots the app through `src/profiling/profiledEntry.tsx`, which installs a React devtools hook and reads per-component render timing/counts/reasons on every commit, attributed to each keystroke. The harness reports a per-component table, a per-interaction breakdown, axis-E Ink output cost, and **anomalies** (component-agnostic thresholds, so new components are covered automatically). See [scripts/tui-test/README.md](scripts/tui-test/README.md#render-profiling) and [docs/projects/p18/tasks.md](docs/projects/p18/tasks.md). The `render profile` vitest test fails CI on `error`-severity anomalies (render cascades); ms budgets are advisory `warn`s.
 
+## Performance rules
+
+A frame is the budget: Ink repaints the whole screen for every React commit, whatever changed. Measure with the suite in [scripts/tui-test/README.md](scripts/tui-test/README.md#performance-suite) (`perfSuite.ts` + `perfCompare.ts`) before and after a change that touches a hot path, and keep these rules:
+
+- **Never subscribe to every task.** `tasks.map((t) => t.subscribe(...))` in an effect is O(N²): it is re-created when the task list changes and every subscription replays its callback at once. To react to "something changed", use `Task.subscribeToAny(cb)` (once per frame, however many tasks changed); to know who waits for the user, use `pendingPrompts` (`src/base/task/pending-prompts.ts`, fed by `TaskPrompt`). If a per-task subscription is really needed, pass `{ immediate: false }` when you already read the state. Pass `persistCurrent` a function, not a snapshot array, so the snapshots are built when the save happens.
+- **A component that follows the session store must not re-render for a save that changes nothing it shows.** Use `useSyncExternalStore` with `subscribeToSessions` and a snapshot that is a primitive or a stable reference (`useArchivedCount`, `useCurrentSessionName`). Modals are always mounted: gate their data hooks on `isVisible` (`useSessions(query, enabled)`, `useArchive(query, enabled)`) so a closed modal costs nothing.
+- **Snapshots are immutable once handed out.** `src/sessions/serialize.ts` remembers the JSON text of each task snapshot and session by object identity; changing one in place, without `notify`, would save stale text. Build a new object (`Task.get()` already does after every notification).
+- **No synchronous file-system calls in render or in the download path.** Use `useFileExists` in components and `fs.promises` (see `utils/tempFile.ts`) in the pipeline.
+- **Animations go through `useGlobalTicker` / `AnimatedIcon`**, never a library spinner with its own timer (it ignores Settings → Animations).
+- **The footer follows the log level setting** and only re-renders when its text changes.
+- **Sounds ship as Ogg Vorbis, never as WAV/MP3** (the npm package was 131 MB, 125 of them sounds). Keep a sample's base name, drop the original in a folder and run `node scripts/encode-sounds.mjs <src> <dest>`: it keeps each file's sample rate (the cue sheet's `pitched(96000, …)` and `loopSamples` count in source samples; Opus would force 48 kHz) and a unit test enforces a size budget. The drone is cut to `DRONE_SECONDS`. Check a re-encode without listening: `scripts/render-intro-mix.ts` + `scripts/compare-audio.mjs`.
+
 ## Tips for common mistakes
 
 Prefer use of import aliases from `package.json`

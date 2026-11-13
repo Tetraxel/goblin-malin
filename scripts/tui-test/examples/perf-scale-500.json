@@ -1,0 +1,23 @@
+{
+    "name": "perf-scale-500",
+    "terminal": { "cols": 128, "rows": 50 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "scale": { "tasks": 500 },
+    "profile": { "enabled": true },
+    "steps": [
+        { "type": "stable", "timeout": 30000 },
+        { "type": "waitForContent", "text": "Hooked", "timeout": 15000 },
+        { "type": "wait", "ms": 3000 },
+
+        { "type": "key", "key": "ArrowDown", "repeat": 20, "delayMs": 60 },
+        { "type": "stable" },
+        { "type": "key", "key": "Ctrl+A" },
+        { "type": "stable" },
+        { "type": "key", "key": "Escape" },
+        { "type": "stable" },
+        { "type": "key", "key": "2" },
+        { "type": "stable" },
+        { "type": "key", "key": "1" },
+        { "type": "stable" }
+    ]
+}

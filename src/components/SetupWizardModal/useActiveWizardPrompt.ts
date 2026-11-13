@@ -1,7 +1,8 @@
-﻿import { useEffect, useState } from "react";
 import { type Task } from "#base/task/task";
 import { type TaskPrompt } from "#base/task/task-prompt";
 import { PromptType, type SetupWizardPrompt } from "#base/task/task-prompt";
+import { pendingPrompts } from "#base/task/pending-prompts";
+import { usePendingPromptLookup } from "#hooks/usePendingPromptLookup";
 import { type SetupWizardConfig } from "#base/setupWizard";
 
 interface ActiveWizardPromptResult {
@@ -13,6 +14,8 @@ interface ActiveWizardPromptResult {
 const NULL_RESULT: ActiveWizardPromptResult = { task: null, prompt: null, config: null };
 
 function getFirstWizardPrompt(tasks: Task[]): ActiveWizardPromptResult {
+    // O(1) when nobody is waiting for the user (see `pendingPrompts`).
+    if (!pendingPrompts.hasAny()) return NULL_RESULT;
     for (const task of tasks) {
         const p = task.getPrompt();
         const current = p.getCurrentPrompt();
@@ -27,23 +30,8 @@ function getFirstWizardPrompt(tasks: Task[]): ActiveWizardPromptResult {
     return NULL_RESULT;
 }
 
-export const useActiveWizardPrompt = (tasks: Task[]): ActiveWizardPromptResult => {
-    const [active, setActive] = useState<ActiveWizardPromptResult>(() => getFirstWizardPrompt(tasks));
+const isStillAWizard = (prev: ActiveWizardPromptResult): boolean =>
+    prev.task?.getPrompt().getCurrentPrompt()?.type === PromptType.SetupWizard;
 
-    useEffect(() => {
-        const update = () => {
-            setActive((prev) => {
-                if (prev.task?.getPrompt().getCurrentPrompt()?.type === PromptType.SetupWizard) return prev;
-                return getFirstWizardPrompt(tasks);
-            });
-        };
-
-        const unsubscribers = tasks.map((task) => task.subscribe(() => update()));
-        update();
-        return () => {
-            unsubscribers.forEach((u) => u());
-        };
-    }, [tasks]);
-
-    return active;
-};
+export const useActiveWizardPrompt = (tasks: Task[]): ActiveWizardPromptResult =>
+    usePendingPromptLookup(tasks, getFirstWizardPrompt, isStillAWizard);

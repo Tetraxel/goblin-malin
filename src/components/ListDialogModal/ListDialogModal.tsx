@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Box, Text, type DOMElement } from "ink";
-import Spinner from "ink-spinner";
+import { AnimatedIcon, Icon } from "#components/AnimatedIcon";
 import open from "open";
 import { useClickTarget, useHoverTarget } from "#base/mouse/useMouseTarget";
 import { providerDisplayRegistry } from "#base/providerDisplay";
@@ -239,7 +239,8 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
                     {loading && (
                         <Box marginTop={1}>
                             <Text color={theme.text.secondary}>
-                                <Spinner type="dots" /> {dialog.loadingLabel ?? "Loading…"}
+                                <AnimatedIcon icon={Icon.Dots} interval={125} color={theme.text.secondary} />{" "}
+                                {dialog.loadingLabel ?? "Loading…"}
                             </Text>
                         </Box>
                     )}

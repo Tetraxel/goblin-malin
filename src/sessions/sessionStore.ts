@@ -13,6 +13,7 @@ import {
     runMigrations,
 } from "#utils/dataFile";
 import { type StoredSession, type SessionsFile } from "./types";
+import { serializeSessionsFile } from "./serialize";
 
 export const SESSIONS_PATH = path.join(DEFAULT_APP_DATA_DIR, "sessions.json");
 
@@ -132,7 +133,8 @@ export class SessionStore {
     /**
      * Drain pending writes to disk without ever running two writes concurrently.
      * The `dirty`/`writing` pair coalesces a burst of edits into the minimum number
-     * of atomic writes (temp file + rename), each off the main thread.
+     * of atomic writes (temp file + rename). Only the file write is asynchronous; the text is built on this thread,
+     * but from per-object caches (see serialize.ts), so it costs what changed, not the size of the file.
      */
     private async flushToDisk(): Promise<void> {
         if (this.writing) return; // an in-flight flush will pick up the latest `dirty`
@@ -151,8 +153,8 @@ export class SessionStore {
                 if (!snapshot) break;
                 // A name of its own, so two writers never share (and corrupt) one temp file.
                 tmp = `${this.filePath}.${process.pid}.${this.tmpCounter++}.tmp`;
-                // Compact JSON: smaller payload → faster stringify + write.
-                await fs.promises.writeFile(tmp, JSON.stringify(snapshot), "utf-8");
+                // Compact JSON, and only what changed is stringified (see serialize.ts).
+                await fs.promises.writeFile(tmp, serializeSessionsFile(snapshot), "utf-8");
                 await renameReplacing(tmp, this.filePath, this.renameRetryDelaysMs);
                 tmp = null;
             }
@@ -269,6 +271,9 @@ export class SessionStore {
 
     setLastSessionId(id: string | null): void {
         const current = this.getCached();
+        // Every save of the open session calls this with the id it already has: nothing to write, and no reason to
+        // wake every listener (the sessions list, the archive, the toolbar) for it.
+        if (current.lastSessionId === id) return;
         this.writeToDisk({ ...current, lastSessionId: id });
     }
 

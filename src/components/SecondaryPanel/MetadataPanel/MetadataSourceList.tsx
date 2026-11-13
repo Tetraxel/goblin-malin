@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { Box, Text, type DOMElement } from "ink";
-import Spinner from "ink-spinner";
+import { AnimatedIcon, Icon } from "#components/AnimatedIcon";
 import { useClickTarget, useHoverTarget, useWheelTarget } from "#base/mouse/useMouseTarget";
 import { useTheme } from "#base/themeContext";
 import { type MetadataGroupState, type MetadataOverrides } from "#flows/musicDownloadFlow/types";
@@ -191,7 +191,7 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
                     <Box flexDirection="row" height={1} paddingLeft={3} flexShrink={0} overflow="hidden">
                         <Box flexDirection="row" paddingRight={1} flexShrink={0}>
                             <Text color={theme.text.secondary}>
-                                <Spinner type="dots" />
+                                <AnimatedIcon icon={Icon.Dots} interval={125} color={theme.text.secondary} />
                             </Text>
                         </Box>
                         <Text color={theme.text.secondary} wrap="truncate-end">

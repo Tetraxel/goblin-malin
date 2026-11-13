@@ -5,6 +5,8 @@
 import "./install";
 import { start } from "../index";
 import { redirectConsoleToLog } from "../base/logger/redirectConsole";
+import { startLoadDriver } from "./loadDriver";
 
 redirectConsoleToLog();
 start();
+startLoadDriver();

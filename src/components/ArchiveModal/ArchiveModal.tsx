@@ -6,6 +6,7 @@ import { Box, Text, type DOMElement } from "ink";
 import { ClickArea } from "#base/mouse/ClickArea";
 import { useWheelTarget } from "#base/mouse/useMouseTarget";
 import { useShortcuts } from "#hooks/useShortcuts";
+import { useFileExists } from "#hooks/useFileExists";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { providerDisplayRegistry } from "#base/providerDisplay";
@@ -64,7 +65,7 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({
     const [scrollTop, setScrollTop] = useState(0);
 
     const manager = SessionManager.getInstance();
-    const { entries, total } = useArchive(searchQuery);
+    const { entries, total } = useArchive(searchQuery, isVisible);
 
     const listHeight = Math.min(MAX_LIST_HEIGHT, Math.max(3, terminalHeight - MODAL_OVERHEAD));
     const safeIndex = Math.min(selectedIndex, Math.max(0, entries.length - 1));
@@ -442,7 +443,8 @@ const EntryDetail: React.FC<{ entry: ArchivedEntry }> = ({ entry }) => {
                   compiled?.isrc ? `ISRC ${compiled.isrc}` : undefined,
               ];
 
-    const fileMissing = !!entry.filePath && !fs.existsSync(entry.filePath);
+    // Looked up off the UI thread (see useFileExists), not with `existsSync` on every render.
+    const fileMissing = useFileExists(entry.filePath) === false;
     const label = (text: string) => (
         <Box width={9} minWidth={9} flexShrink={0}>
             <Text dimColor>{text}</Text>

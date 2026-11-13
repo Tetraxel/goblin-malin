@@ -69,8 +69,11 @@ describe("releaseSavedFile", () => {
     });
 
     test("paths are compared the way the file system does (separators; case on Windows)", () => {
-        const a = holder("a", { kind: "track", savedFile: { ...saved, path: "C:\\Music\\Mode avion.flac" } });
-        const sameName = process.platform === "win32" ? "c:/music/mode avion.flac" : "C:/Music/Mode avion.flac";
+        // On POSIX a backslash is an ordinary file-name character, so the same file is spelled with a `./` instead.
+        const win = process.platform === "win32";
+        const stored = win ? "C:\\Music\\Mode avion.flac" : "/Music/./Mode avion.flac";
+        const a = holder("a", { kind: "track", savedFile: { ...saved, path: stored } });
+        const sameName = win ? "c:/music/mode avion.flac" : "/Music/Mode avion.flac";
         expect(releaseSavedFile([a], sameName, "owner")).toEqual(["a"]);
     });
 

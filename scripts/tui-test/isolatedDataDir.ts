@@ -26,7 +26,7 @@ export interface IsolatedDataDir {
  * The copy's music folders are pointed inside the copy too, because the defaults live under `~/Music`, and a
  * "temporary downloads are piling up" dialog built from the real folder covers the screen mid-scenario.
  */
-export function createIsolatedDataDir(fixtureDir: string): IsolatedDataDir {
+export function createIsolatedDataDir(fixtureDir: string, settingsPatch?: Json): IsolatedDataDir {
     if (!fs.existsSync(fixtureDir)) throw new Error(`Fixture data folder not found: ${fixtureDir}`);
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "goblin-tui-"));
     copyFixture(fixtureDir, dir);
@@ -35,7 +35,7 @@ export function createIsolatedDataDir(fixtureDir: string): IsolatedDataDir {
     const outputTemporaryDir = path.join(dir, "tmp");
     fs.mkdirSync(outputDir, { recursive: true });
     fs.mkdirSync(outputTemporaryDir, { recursive: true });
-    pointMusicFoldersInside(path.join(dir, "settings.json"), outputDir, outputTemporaryDir);
+    pointMusicFoldersInside(path.join(dir, "settings.json"), outputDir, outputTemporaryDir, settingsPatch);
 
     return {
         dir,
@@ -63,7 +63,7 @@ function copyFixture(from: string, to: string): void {
     }
 }
 
-type Json = Record<string, unknown>;
+export type Json = Record<string, unknown>;
 const isObject = (value: unknown): value is Json =>
     typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -76,8 +76,21 @@ function child(parent: Json, key: string): Json {
     return created;
 }
 
+/** Deep-merges `patch` into `target` (objects merge, anything else is replaced). */
+function mergeInto(target: Json, patch: Json): void {
+    for (const [key, value] of Object.entries(patch)) {
+        if (isObject(value)) mergeInto(child(target, key), value);
+        else target[key] = value;
+    }
+}
+
 /** Settings live under `music` (current) or `flows["music-downloader"]` (the pre-P20b shape some fixtures keep). */
-function pointMusicFoldersInside(settingsPath: string, outputDir: string, outputTemporaryDir: string): void {
+function pointMusicFoldersInside(
+    settingsPath: string,
+    outputDir: string,
+    outputTemporaryDir: string,
+    settingsPatch?: Json
+): void {
     let raw: Json = {};
     if (fs.existsSync(settingsPath)) {
         const parsed: unknown = JSON.parse(fs.readFileSync(settingsPath, "utf-8").replace(/^\uFEFF/, ""));
@@ -91,5 +104,6 @@ function pointMusicFoldersInside(settingsPath: string, outputDir: string, output
 
     download.outputDir = outputDir;
     download.outputTemporaryDir = outputTemporaryDir;
+    if (settingsPatch) mergeInto(raw, settingsPatch);
     fs.writeFileSync(settingsPath, JSON.stringify(raw, null, 4));
 }

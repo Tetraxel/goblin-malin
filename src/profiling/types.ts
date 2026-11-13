@@ -47,7 +47,25 @@ export interface InkFrameRecord {
     renderMs: number;
 }
 
-export type ProfileRecord = CommitRecord | InkFrameRecord;
+/**
+ * What the process itself did during the last sampling window (~250 ms): the costs React's profiler cannot see,
+ * such as a `JSON.stringify` of the sessions file or a synchronous file-system call.
+ */
+export interface RuntimeRecord {
+    type: "runtime";
+    /** End of the window, Date.now() epoch ms. */
+    t: number;
+    /** CPU time (user + system) used by the process during the window, in ms. */
+    cpuMs: number;
+    /** Longest time the event loop was blocked during the window, in ms (0 when idle). */
+    lagMaxMs: number;
+    /** 99th percentile of the event-loop delay during the window, in ms. */
+    lagP99Ms: number;
+    /** Heap in use at the end of the window, in MB. */
+    heapMb: number;
+}
+
+export type ProfileRecord = CommitRecord | InkFrameRecord | RuntimeRecord;
 
 /**
  * Callbacks the app pulls off `globalThis` in profile mode. Set by

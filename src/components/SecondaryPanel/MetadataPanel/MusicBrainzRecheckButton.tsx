@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { Box, Text, type DOMElement } from "ink";
-import Spinner from "ink-spinner";
+import { AnimatedIcon, Icon } from "#components/AnimatedIcon";
 import { useClickTarget, useHoverTarget } from "#base/mouse/useMouseTarget";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 
@@ -36,7 +36,7 @@ export const MusicBrainzButton = React.memo(function MusicBrainzButton({
             >
                 {busy ? (
                     <Text color="white">
-                        <Spinner type="dots" /> {busyLabel}
+                        <AnimatedIcon icon={Icon.Dots} interval={125} color="white" /> {busyLabel}
                     </Text>
                 ) : (
                     <Text color="white" bold wrap="truncate-end">

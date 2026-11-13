@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import Spinner from "ink-spinner";
+import { AnimatedIcon, Icon } from "#components/AnimatedIcon";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
 import { darken, lighten, isLight } from "#utils/color";
@@ -30,7 +30,7 @@ export const Uri = React.memo(function Uri({
         return (
             <Box flexDirection="row" flexShrink={0} height={1} backgroundColor={darken(theme.palette.gray, 0.2)}>
                 <Text color={theme.text.secondary} dimColor>
-                    <Spinner type="dots" />
+                    <AnimatedIcon icon={Icon.Dots} interval={125} color={theme.text.secondary} />
                 </Text>
                 <Text color={theme.text.secondary} dimColor wrap="truncate-end">
                     {" " + uri}

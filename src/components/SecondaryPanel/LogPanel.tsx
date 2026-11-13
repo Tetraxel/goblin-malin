@@ -6,7 +6,7 @@ import { useScreenSize } from "#hooks/useScreenSize";
 import { useAppSettings } from "#hooks/useAppSettings";
 import { useFocusContext } from "#contexts/FocusContext";
 import { inkTransport } from "#base/logger/ink-transport";
-import { LogLevel, type LogMetadata } from "#base/logger/types";
+import { LOG_LEVEL_ORDER, type LogMetadata } from "#base/logger/types";
 import { type Task } from "#base/task/task";
 import { useTheme } from "#base/themeContext";
 import { formatLogRows, type LogRow } from "./logFormat";
@@ -41,13 +41,6 @@ function formatRowsCached(logs: LogMetadata[], width: number): LogRow[] {
         return rows;
     });
 }
-
-const LEVEL_ORDER: Record<LogLevel, number> = {
-    [LogLevel.DEBUG]: 0,
-    [LogLevel.INFO]: 1,
-    [LogLevel.WARN]: 2,
-    [LogLevel.ERROR]: 3,
-};
 
 export const LogPanel = ({
     tasks,
@@ -92,13 +85,13 @@ export const LogPanel = ({
 
     const isActive = focusState.activeWindow === "secondaryPanel" && focusState.secondaryPanel.subTab === "logs";
 
-    const minLevel = LEVEL_ORDER[settings.logs.logLevel];
+    const minLevel = LOG_LEVEL_ORDER[settings.logs.logLevel];
     const includeGlobal = settings.logs.includeGlobalLogsInFocusedTask;
 
     const filteredLogs = useMemo(
         () =>
             logs.filter((log) => {
-                if (LEVEL_ORDER[log.level] < minLevel) return false;
+                if (LOG_LEVEL_ORDER[log.level] < minLevel) return false;
                 if (!selectedTask) return true; // not focusing a task → show everything
                 if (log.task === selectedTask) return true; // this task's logs
                 if (!log.task && includeGlobal) return true; // optionally include global logs

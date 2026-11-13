@@ -22,6 +22,10 @@ Scenarios are JSON files in `scripts/tui-test/examples/`.
 {
     "terminal": { "cols": 128, "rows": 64 }, // optional, defaults: 200×50
     "dataDir": "scripts/tui-test/fixtures/empty", // optional: sets GOBLIN_DATA_DIR
+    "scale": { "tasks": 2000 }, // optional: grows the copy of the fixture (see "Large sessions")
+    "load": { "tasksPerTick": 40 }, // optional: synthetic activity for startLoad steps
+    "settings": { "logs": { "logLevel": "INFO" } }, // optional: deep-merged into the copy's settings.json
+    "command": "node dist/cli.js", // optional: start something else than `yarn dev` (times the built bundle)
     "steps": [/* ...see step types below... */],
 }
 ```
@@ -40,6 +44,10 @@ Scenarios are JSON files in `scripts/tui-test/examples/`.
 | `{ "type": "screenshot", "name": "my-shot" }`            | Render a PNG via the built-in terminal emulator. Fast, no external dependency, but fonts and glyphs are approximate.                                                                                              |
 | `{ "type": "screenshot-powershell", "name": "my-shot" }` | Render a PNG via Windows Terminal — real font, box-drawing, emoji. Saved to `%TEMP%\goblin-tui-test\<name>.png`. Closest to what the user actually sees, but slower (~3–5s). **Preferred for visual validation.** |
 | `{ "type": "screenshot-browser", "name": "my-shot" }`    | ⚠️ Deprecated. Render a PNG via headless Edge + xterm.js.                                                                                                                                                         |
+| `{ "type": "mark", "label": "idle 8s" }`                 | Starts a new profiling bucket without sending a key, to measure a stretch of `wait` (idle, a synthetic load) on its own.                                                                                          |
+| `{ "type": "startLoad" }` / `{ "type": "stopLoad" }`     | Starts / stops the synthetic activity described by the scenario's `load` (see [Performance suite](#performance-suite)). Needs profiling.                                                                          |
+
+On a machine without Windows Terminal, `screenshot-powershell` falls back to the built-in emulator (with a warning on stderr) instead of crashing the run.
 
 ## Key reference
 
@@ -138,3 +146,68 @@ yarn tsx scripts/tui-test/cli.ts <scenario.json> --profile           # compare
 ```
 
 Baselines live in `scripts/tui-test/profiling/baselines/<name>.json`. A regenerated baseline is diffed against the current run: a **render-count** regression is an `error` (machine-independent); a **render-time** regression is a `warn` (with generous tolerance). New components are listed and still covered by the global p95 threshold.
+
+## Large sessions
+
+The tracked fixtures stop at 50 tasks, but most scaling problems only show with hundreds or thousands. A scenario can ask for a size and the runner grows its throwaway copy of the fixture before the app starts (`scaleFixture.ts`), so nothing big is committed:
+
+```jsonc
+{
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "scale": {
+        "tasks": 2000, // tasks in the open session (the fixture's tasks, repeated with fresh ids)
+        "otherSessions": 20, // sessions the user is not looking at (still parsed and written on every save)
+        "otherSessionTasks": 300, // tasks in each of them (default 100)
+        "archived": 300, // archived entries in the open session
+    },
+}
+```
+
+The fixture needs a first session with tasks, such as `50-tasks-with-metadata`.
+
+## Performance suite
+
+Scenarios named `perf-*.json` in `examples/` are the performance scenarios. They measure with profiling on, and use two things the other scenarios do not:
+
+- **Process-level samples.** Every ~250 ms the profiled app records its CPU time and the longest time its event loop was blocked (`cpu` / `block` in the interactions table; `process cpu`, `longest loop block`, `heap max` in the totals). React's profiler cannot see a `JSON.stringify` of a big file or a synchronous `fs` call; these can.
+- **Synthetic load** (`src/profiling/loadDriver.ts`, never loaded in production). `startLoad` makes the app change the status of some tasks and write log lines on a fixed tick, through the same APIs the real services use, so the cost of a long run is measured offline and repeatably:
+
+    ```jsonc
+    "load": { "tasksPerTick": 40, "tickMs": 250, "logsPerTick": 5, "logLevel": "debug" }
+    ```
+
+| Scenario              | What it exercises                                                                  |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| `perf-idle`           | 8 s of nothing: should be 0 commits.                                               |
+| `perf-scale-500/2000` | Boot, navigation, select all and view switch with 500 / 2,000 tasks.               |
+| `perf-load-tasks`     | 1,000 tasks, 5 other sessions, 40 tasks changing every 250 ms (a run in progress). |
+| `perf-load-logs`      | 50 debug log lines per second (yt-dlp output) with the default `info` level.       |
+| `perf-sessions-heavy` | 20 sessions × 300 tasks + archive, tasks changing: the cost of saving a big file.  |
+| `perf-modals`         | Opening and scrolling the Sessions and Archive modals with a big store.            |
+
+### Comparing a change with the state before it
+
+```bash
+yarn tsx scripts/tui-test/perfSuite.ts --label before     # 3 runs per scenario (--runs N), medians, + micro-benchmarks
+# ...make the change...
+yarn tsx scripts/tui-test/perfSuite.ts --label after
+yarn tsx scripts/tui-test/perfCompare.ts before after
+```
+
+Results go to `profiling/results/<label>.json` (git-ignored). **Counts** (commits, Ink frames, renders per component) are reliable from run to run and from machine to machine; **milliseconds** only compare runs made on the same machine, back to back, and are development-build numbers. `--only a,b`, `--no-bench` and `--no-scenarios` narrow a run. Run nothing else heavy while it measures; a full run takes about 20 minutes.
+
+To measure from a state you are about to change, copy the tree first (without `node_modules`, with a junction to it) and run the suite there, so you can keep editing.
+
+### Micro-benchmarks
+
+`bench/microBench.ts` times the paths no screen scenario isolates (saving and loading a 14 MB `sessions.json`, listing a 3,000-file temp folder, the log ring) through the modules' public API, so it measures the code before and after a fix. `yarn tsx scripts/tui-test/bench/microBench.ts` prints a table; `--json` is what the suite stores.
+
+### Finding a cascade: the commit timeline
+
+The tables say how much; `profiling/timeline.ts` says what, commit by commit, with the reason each component rendered:
+
+```bash
+yarn tsx scripts/tui-test/profiling/timeline.ts "$TEMP/goblin-tui-test/profile-<id>.jsonl" --from 9000 --to 10500
+```
+
+Every profiled run leaves its raw `profile-<id>.jsonl` in the OS temp folder (`goblin-tui-test/`).

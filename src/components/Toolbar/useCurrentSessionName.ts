@@ -1,33 +1,21 @@
-import { useState, useEffect } from "react";
+import { useSyncExternalStore } from "react";
 import { SessionStore } from "#sessions/sessionStore";
 import { SessionManager } from "#sessions/sessionManager";
+import { subscribeToSessions } from "#sessions/subscribeToSessions";
+
+/** The current session's name when the user explicitly renamed it; derived default names give null. */
+function currentSessionName(): string | null {
+    const id = SessionManager.getInstance().getCurrentSessionId();
+    if (!id) return null;
+    const session = SessionStore.getInstance().getById(id);
+    return session?.renamed ? session.name : null;
+}
 
 /**
  * Name of the current session, but only when the user explicitly renamed it
- * (derived default names return null). Re-renders on session switch / rename.
+ * (derived default names return null). A string, so a save of the open session (every few seconds during a run)
+ * re-renders the toolbar only when the name really changed.
  */
 export function useCurrentSessionName(): string | null {
-    const store = SessionStore.getInstance();
-    const manager = SessionManager.getInstance();
-
-    const compute = (): string | null => {
-        const id = manager.getCurrentSessionId();
-        if (!id) return null;
-        const session = store.getById(id);
-        return session?.renamed ? session.name : null;
-    };
-
-    const [name, setName] = useState<string | null>(compute);
-
-    useEffect(() => {
-        const unsubStore = store.onChanged(() => setName(compute()));
-        const unsubManager = manager.onChanged(() => setName(compute()));
-        return () => {
-            unsubStore();
-            unsubManager();
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [store, manager]);
-
-    return name;
+    return useSyncExternalStore(subscribeToSessions, currentSessionName);
 }

@@ -7,6 +7,14 @@ export enum LogLevel {
     DEBUG = "DEBUG",
 }
 
+/** Severity order, for "show this level and above" filters. */
+export const LOG_LEVEL_ORDER: Record<LogLevel, number> = {
+    [LogLevel.DEBUG]: 0,
+    [LogLevel.INFO]: 1,
+    [LogLevel.WARN]: 2,
+    [LogLevel.ERROR]: 3,
+};
+
 export type LogDetails = {
     [key: string]: unknown;
 };
