@@ -62,6 +62,7 @@
         "format": "prettier --write src/ tests/ scripts/",
         "format:check": "prettier --check src/ tests/ scripts/",
         "postinstall": "node scripts/save-install-source.mjs",
+        "prepare": "node scripts/apply-ink-patch.mjs",
         "prepublishOnly": "tsup"
     },
     "keywords": [
@@ -123,7 +124,7 @@
         "dotenv": "^18.0.9",
         "flac-tagger": "^2.1.0",
         "flat-cache": "^6.1.23",
-        "ink": "^8.0.0",
+        "ink": "8.0.0",
         "ink-select-input": "^6.2.0",
         "ink-text-input": "^6.0.0",
         "musicbrainz-api": "^2.0.1",
@@ -132,7 +133,7 @@
         "react": "^19.3.1",
         "slsk-client": "^2.0.2",
         "spotify-url-info": "^3.3.3",
-        "string-width": "^8.2.1",
+        "string-width": "^8.3.0",
         "strip-ansi": "^7.2.0",
         "winston": "^3.19.0",
         "winston-transport": "^4.9.0",

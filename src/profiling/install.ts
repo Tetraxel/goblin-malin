@@ -11,7 +11,13 @@
 //
 // "Did this fiber render this commit?" cannot use `actualDuration` (it is stale
 // on bailed-out memoized subtrees). We use the `PerformedWork` flag — the same
-// signal React DevTools uses.
+// signal React DevTools uses — and, like DevTools, we only walk into a fiber's
+// children when the child list changed (`fiber.child !== fiber.alternate.child`):
+// a subtree that was reused untouched keeps the flags of the render that made it,
+// which would be counted again at every commit (AUDIT-performance-2.md, TOOL2-01).
+//
+// Besides React, two costs outside `onRender`'s "ink" time are recorded: the Yoga layout of each commit
+// (`onComputeLayout` of the Ink root) and every write to stdout (time spent and bytes).
 
 import { monitorEventLoopDelay } from "node:perf_hooks";
 import { initRecorder, isRecording, nextSeq, record, round } from "./recorder";
@@ -43,8 +49,13 @@ interface FiberNode {
     actualDuration?: number;
     selfBaseDuration?: number;
 }
+interface InkRootNode {
+    onComputeLayout?: (...args: unknown[]) => unknown;
+}
 interface FiberRoot {
     current: FiberNode;
+    /** The Ink root node (`ink-root`) the reconciler renders into. */
+    containerInfo?: InkRootNode;
 }
 
 function getComponentName(fiber: FiberNode): string | null {
@@ -70,8 +81,7 @@ function getComponentName(fiber: FiberNode): string | null {
     return null;
 }
 
-function didRender(fiber: FiberNode): boolean {
-    if (fiber.alternate == null) return true; // mount
+function performedWork(fiber: FiberNode): boolean {
     const flags = fiber.flags ?? fiber.effectTag ?? 0;
     return (flags & PERFORMED_WORK) !== 0;
 }
@@ -102,42 +112,64 @@ function diffChanges(fiber: FiberNode): string[] {
     return changes;
 }
 
+// Ink calls `rootNode.onComputeLayout()` from the reconciler's `resetAfterCommit`: wrap it once to time Yoga.
+const wrappedRoots = new WeakSet<object>();
+function timeLayoutOf(root: FiberRoot): void {
+    const container = root.containerInfo;
+    if (!container || wrappedRoots.has(container) || typeof container.onComputeLayout !== "function") return;
+    wrappedRoots.add(container);
+    const original = container.onComputeLayout;
+    container.onComputeLayout = function (this: unknown, ...args: unknown[]): unknown {
+        const start = performance.now();
+        try {
+            return original.apply(this, args);
+        } finally {
+            record({ type: "layout", t: Date.now(), ms: round(performance.now() - start) });
+        }
+    };
+}
+
 function onCommit(root: FiberRoot): void {
     if (!isRecording()) return;
+    timeLayoutOf(root);
     const t = Date.now();
     const components: ComponentRender[] = [];
     let hostNodes = 0;
 
     // Post-order: returns this fiber's actualDuration so the parent can derive
-    // self = actual − Σ(children actual).
-    function visit(fiber: FiberNode): number {
+    // self = actual − Σ(children actual). `mounted` is true inside a subtree that was created by this commit
+    // (its fibers have no alternate yet): everything in it is a mount. Otherwise a fiber is an update when it
+    // performed work, and its children are only visited when the child list is not the one of the previous tree.
+    function visit(fiber: FiberNode, mounted: boolean): number {
+        const isMount = mounted || fiber.alternate == null;
         let childSum = 0;
-        let child = fiber.child;
-        while (child) {
-            childSum += visit(child);
-            child = child.sibling;
+        if (isMount || fiber.child !== fiber.alternate?.child) {
+            let child = fiber.child;
+            while (child) {
+                childSum += visit(child, isMount);
+                child = child.sibling;
+            }
         }
 
         if (typeof fiber.type === "string") hostNodes++;
 
         const name = getComponentName(fiber);
         const actual = fiber.actualDuration ?? 0;
-        if (name && didRender(fiber)) {
-            const mount = fiber.alternate == null;
-            const changes = mount ? [] : diffChanges(fiber);
+        if (name && (isMount || performedWork(fiber))) {
+            const changes = isMount ? [] : diffChanges(fiber);
             components.push({
                 name,
-                phase: mount ? "mount" : "update",
+                phase: isMount ? "mount" : "update",
                 self: round(Math.max(0, actual - childSum)),
                 actual: round(actual),
                 base: round(fiber.selfBaseDuration ?? 0),
-                changes: mount ? [] : changes.length ? changes : ["parent"],
+                changes: isMount ? [] : changes.length ? changes : ["parent"],
             });
         }
         return actual;
     }
 
-    const rootActual = visit(root.current);
+    const rootActual = visit(root.current, false);
     record({ type: "commit", seq: nextSeq(), t, durationMs: round(rootActual), hostNodes, components });
 }
 
@@ -193,6 +225,20 @@ const hooks: ProfileHooks = {
 };
 
 globalThis.__GOBLIN_PROFILE__ = hooks;
+
+// Every byte the app writes to the terminal, and how long the write call took. A `write` to a PTY can block
+// when the reader is slow, which is exactly what a slow terminal looks like from here.
+if (isRecording()) {
+    const originalWrite = process.stdout.write.bind(process.stdout) as (...args: unknown[]) => boolean;
+    process.stdout.write = ((chunk: unknown, ...rest: unknown[]): boolean => {
+        const start = performance.now();
+        const result = originalWrite(chunk, ...rest);
+        const ms = performance.now() - start;
+        const bytes = typeof chunk === "string" ? Buffer.byteLength(chunk) : ((chunk as Uint8Array)?.byteLength ?? 0);
+        record({ type: "write", t: Date.now(), ms: round(ms), bytes });
+        return result;
+    }) as typeof process.stdout.write;
+}
 
 // --- Process-level sampler -------------------------------------------------------------------------------
 // React's profiler only sees component renders. A big `JSON.stringify`, a synchronous `fs` call or a GC pause

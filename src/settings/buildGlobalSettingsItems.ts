@@ -54,6 +54,13 @@ export function buildGlobalSettingsItems(
             set: (v) => onChange({ general: { animationsEnabled: v } }),
         },
         {
+            kind: "checkbox",
+            indent: 0,
+            label: "Reduce terminal output (redraw changed lines only; applies on next start)",
+            get: () => settings.general.reduceTerminalOutput,
+            set: (v) => onChange({ general: { reduceTerminalOutput: v } }),
+        },
+        {
             kind: "readonlyText",
             indent: 0,
             label: "🗁  App directory",

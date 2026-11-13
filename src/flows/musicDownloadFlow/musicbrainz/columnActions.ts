@@ -7,7 +7,9 @@ import { metadataLimiter } from "../utils/stageLimiters";
 import { type MusicDownloadTaskAttributes } from "../types";
 import { dialogBridge } from "#base/bridges/dialogBridge";
 import { getMusicSettings } from "../settings";
+import { computeCompiledMetadata } from "../utils/compiledMetadata";
 import { picardPort, picardTargetFor, sendToPicard } from "./picard";
+import { tagLookupUrl } from "./tagLookup";
 import {
     addToMusicBrainz,
     chooseMusicBrainzAlternative,
@@ -35,7 +37,7 @@ const isTrackTask = (t: Task<any>): t is DownloadTask =>
  */
 export type MusicBrainzActionItem = {
     /** Stable name, e.g. for tests. */
-    id: "picard" | "open" | "links" | "alternatives" | "group" | "review" | "artist" | "add" | "recheck";
+    id: "picard" | "open" | "links" | "alternatives" | "group" | "review" | "artist" | "add" | "search" | "recheck";
     /** The action bar's label (the shortcut's registry id derives from it: keep it stable). */
     label: string;
     /** The short text of a button. */
@@ -162,6 +164,20 @@ export function musicBrainzActionItems(task: DownloadTask): MusicBrainzActionIte
             description: "Open the release group (all the editions of this album) in your browser",
             shortcut: { input: "g" },
             run: () => fire("Open release group", () => open(url)),
+        });
+    }
+    // Always on offer once the sources gave a title and an artist: a hand search is what the user reaches for when the
+    // automatic check found nothing, or the wrong thing.
+    const attrs = task.getAttributes();
+    const lookup = attrs && tagLookupUrl(computeCompiledMetadata(attrs.metadataGroups, attrs.metadataOverride));
+    if (lookup) {
+        items.push({
+            id: "search",
+            label: "Search on MusicBrainz",
+            buttonLabel: "⌕ Search",
+            description: "Open MusicBrainz's tag lookup in your browser, prefilled with this track",
+            shortcut: { input: "f" },
+            run: () => fire("Search on MusicBrainz", () => open(lookup)),
         });
     }
     items.push({

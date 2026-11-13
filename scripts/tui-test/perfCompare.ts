@@ -69,8 +69,12 @@ for (const name of Object.keys(before.scenarios)) {
         `  ${GRAY}${"".padEnd(30)}${before.label.slice(0, 8).padStart(9)}${after.label.slice(0, 8).padStart(9)}${R}\n`
     );
     process.stdout.write(row("boot (ms to first stable)", a.bootMs, b.bootMs) + "\n");
-    for (const key of ["commits", "inkFrames", "reactMs", "inkMs", "cpuMs", "lagMaxMs", "heapMaxMb"] as const) {
-        process.stdout.write(row(key, a.totals[key], b.totals[key]) + "\n");
+    for (const key of [
+        ...["commits", "inkFrames", "reactMs", "inkMs", "layoutMs", "writeMs", "bytes"],
+        ...["cpuMs", "lagMaxMs", "heapMaxMb"],
+    ] as const) {
+        // Results stored before layout / write / bytes were recorded have no such field.
+        process.stdout.write(row(key, a.totals[key] ?? 0, b.totals[key] ?? 0) + "\n");
     }
 
     // Interactions whose cost moved.
@@ -105,6 +109,25 @@ for (const name of Object.keys(before.scenarios)) {
         }
     }
     if (comps.length > 0) process.stdout.write(`  ${GRAY}renders:${R} ${comps.slice(0, 10).join(", ")}\n`);
+}
+
+if (before.latency && after.latency) {
+    process.stdout.write(
+        `\n${BOLD}key latency${R} ${GRAY}(built bundle, 2,000 tasks, truecolor; ms, p50 of the keys)${R}\n`
+    );
+    process.stdout.write(
+        `  ${GRAY}${"".padEnd(26)}${"first byte".padStart(16)}${"settled".padStart(16)}${"bytes/key".padStart(18)}${"backlog".padStart(16)}${R}\n`
+    );
+    const cell = (x: number, y: number, unit = ""): string =>
+        `${num(x)}→${(String(Math.round(y * 10) / 10) + unit).padEnd(6)} ${delta(x, y)}`;
+    for (const [name, a] of Object.entries(before.latency)) {
+        const b = after.latency[name];
+        if (!b) continue;
+        process.stdout.write(
+            `  ${name.padEnd(26)}${cell(a.firstByteMs, b.firstByteMs)}${cell(a.settledMs, b.settledMs)}` +
+                `${cell(a.bytesPerKey, b.bytesPerKey)}${a.backlogMs || b.backlogMs ? cell(a.backlogMs, b.backlogMs) : ""}\n`
+        );
+    }
 }
 
 if (before.bench.length > 0) {
