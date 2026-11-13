@@ -529,7 +529,24 @@ describe("the MusicBrainz actions on offer", () => {
     test("matched: Picard, the release page, re-check", async () => {
         const task = await makeTask("t1");
         await task.checkMusicBrainz();
-        expect(await ids(task)).toEqual(["picard", "open", "links", "group", "recheck"]);
+        expect(await ids(task)).toEqual(["picard", "open", "links", "group", "search", "recheck"]);
+    });
+
+    test("the search button opens MusicBrainz's tag lookup prefilled with the track", async () => {
+        const { tagLookupUrl } = await import("#flows/musicDownloadFlow/musicbrainz/tagLookup");
+        expect(
+            tagLookupUrl({
+                trackName: "don't you miss me",
+                artists: [{ type: "artist", name: "Aki Oke" }],
+                album: { id: "a", albumName: "don't you miss me", url: "u", uri: "u" },
+                trackNumber: 1,
+                duration: 213000,
+            })
+        ).toBe(
+            "https://musicbrainz.org/taglookup/index?tag-lookup.artist=Aki+Oke&tag-lookup.release=don%27t+you+miss+me" +
+                "&tag-lookup.tracknum=1&tag-lookup.track=don%27t+you+miss+me&tag-lookup.duration=213000&tag-lookup.filename="
+        );
+        expect(tagLookupUrl({ trackName: "x", artists: [] })).toBeUndefined();
     });
 
     test("Picard opens the matched RELEASE (to match files to it), from the verdict", async () => {
@@ -574,7 +591,7 @@ describe("the MusicBrainz actions on offer", () => {
                 evidence: [],
             },
         });
-        expect(await ids(task)).toEqual(["review", "picard", "recheck"]);
+        expect(await ids(task)).toEqual(["review", "picard", "search", "recheck"]);
     });
 
     test("needs review: review the match first", async () => {
@@ -587,13 +604,13 @@ describe("the MusicBrainz actions on offer", () => {
 
     test("not found: add the release; unknown: only a re-check", async () => {
         const task = await addableTask();
-        expect(await ids(task)).toEqual(["add", "recheck"]);
+        expect(await ids(task)).toEqual(["add", "search", "recheck"]);
 
         world.albumDetails = null;
         world.withAlbumDetails = false;
         const unknown = await makeTask("t2");
         await unknown.checkMusicBrainz();
-        expect(await ids(unknown)).toEqual(["recheck"]);
+        expect(await ids(unknown)).toEqual(["search", "recheck"]);
     });
 
     test("the task list's column and the panel's buttons are made from the same list", async () => {
