@@ -12,7 +12,7 @@ const pkg = _require("./package.json") as { version: string };
 const inkState = inkPatchState() as string;
 if (inkState !== "patched") {
     throw new Error(
-        `node_modules/ink/build/output.js is "${inkState}", not the patched file. Run \`node scripts/apply-ink-patch.mjs\` (see patches/ink/README.md).`
+        `node_modules/ink/build/ is "${inkState}", not the patched files. Run \`node scripts/apply-ink-patch.mjs\` (see patches/ink/README.md).`
     );
 }
 

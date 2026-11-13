@@ -5,6 +5,13 @@ export type AppSettings = {
     general: {
         reopenLastSession: boolean;
         animationsEnabled: boolean;
+        /**
+         * Let Ink redraw only the screen lines that changed, instead of the whole screen for every frame: 2-4x
+         * fewer bytes for the terminal to parse (a held arrow key in 200x60: 30 KB -> 15 KB per frame), for a
+         * few ms of extra work in the app. Read once at start-up. Defaults to on for Windows (ConPTY / Windows
+         * Terminal pay for every byte), off elsewhere.
+         */
+        reduceTerminalOutput: boolean;
         theme: string;
         showWelcomeTutorial: boolean;
         checkForUpdates: boolean;
@@ -36,6 +43,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     general: {
         reopenLastSession: true,
         animationsEnabled: true,
+        reduceTerminalOutput: process.platform === "win32",
         theme: "dark",
         showWelcomeTutorial: true,
         checkForUpdates: true,

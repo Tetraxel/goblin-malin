@@ -7,7 +7,8 @@
  *   yarn tsx scripts/tui-test/perfSuite.ts --label after
  *   yarn tsx scripts/tui-test/perfCompare.ts before after
  *
- * Options: --runs N (default 3; the median is kept), --only a,b (scenario names), --no-bench, --no-scenarios.
+ * Options: --runs N (default 3; the median is kept), --only a,b (scenario names), --no-bench, --no-scenarios,
+ * --no-latency (the end-to-end key latency of the built bundle, see bench/latency.ts; needs `yarn build`).
  * Results go to `scripts/tui-test/profiling/results/<label>.json` (git-ignored).
  *
  * What is comparable between runs and machines: the **counts** (commits, ink frames, renders per component).
@@ -44,6 +45,9 @@ export interface InteractionSummary {
     reactMs: number;
     inkFrames: number;
     inkMs: number;
+    layoutMs: number;
+    writeMs: number;
+    bytes: number;
     cpuMs: number;
     lagMaxMs: number;
 }
@@ -57,6 +61,9 @@ export interface ScenarioSummary {
         reactMs: number;
         inkFrames: number;
         inkMs: number;
+        layoutMs: number;
+        writeMs: number;
+        bytes: number;
         cpuMs: number;
         lagMaxMs: number;
         heapMaxMb: number;
@@ -66,6 +73,34 @@ export interface ScenarioSummary {
     components: Record<string, { renders: number; selfMs: number }>;
 }
 
+/** What `bench/latency.ts` reports for one configuration, the numbers a user feels (production bundle, PTY). */
+export interface LatencySummary {
+    /** Key to first byte, median, ms. */
+    firstByteMs: number;
+    /** Key to last byte of the key's own output, median and 95th percentile, ms. */
+    settledMs: number;
+    settledP95Ms: number;
+    /** Bytes the terminal had to parse per key (median) and writes per key. */
+    bytesPerKey: number;
+    writesPerKey: number;
+    /** After a held key (30 keys at 33 ms): how long the screen keeps moving after the last key, ms. */
+    backlogMs: number;
+}
+
+/** Terminal sizes and keys the latency numbers are taken for (2,000 tasks, truecolor, built bundle). */
+export const LATENCY_CONFIGS: Record<string, string[]> = {
+    "down 128x50": ["--cols", "128", "--rows", "50", "--count", "30", "--interval", "400", "--burst", "30"],
+    "down 200x60": ["--cols", "200", "--rows", "60", "--count", "30", "--interval", "400", "--burst", "30"],
+    "ctrl+a/esc 200x60": [
+        ...["--cols", "200", "--rows", "60", "--pre", "ArrowDown", "--key", "Ctrl+A", "--back-key", "Escape"],
+        ...["--count", "16", "--interval", "700", "--burst", "0"],
+    ],
+    "view 1/2 200x60": [
+        ...["--cols", "200", "--rows", "60", "--pre", "ArrowDown", "--key", "2", "--back-key", "1"],
+        ...["--count", "16", "--interval", "700", "--burst", "0"],
+    ],
+};
+
 export interface SuiteResult {
     label: string;
     date: string;
@@ -74,6 +109,7 @@ export interface SuiteResult {
     runs: number;
     scenarios: Record<string, ScenarioSummary>;
     bench: BenchResult[];
+    latency?: Record<string, LatencySummary>;
 }
 
 const median = (values: number[]): number => {
@@ -113,6 +149,9 @@ async function runOnce(name: string): Promise<{ summary: ScenarioSummary; bootMs
                 reactMs: p.totals.reactMs,
                 inkFrames: p.totals.inkFrames,
                 inkMs: p.totals.inkMs,
+                layoutMs: p.totals.layoutMs,
+                writeMs: p.totals.writeMs,
+                bytes: p.totals.bytes,
                 cpuMs: p.totals.cpuMs,
                 lagMaxMs: p.totals.lagMaxMs,
                 heapMaxMb: p.totals.heapMaxMb,
@@ -123,6 +162,9 @@ async function runOnce(name: string): Promise<{ summary: ScenarioSummary; bootMs
                 reactMs: it.reactMs,
                 inkFrames: it.inkFrames,
                 inkMs: it.inkMs,
+                layoutMs: it.layoutMs,
+                writeMs: it.writeMs,
+                bytes: it.bytes,
                 cpuMs: it.cpuMs,
                 lagMaxMs: it.lagMaxMs,
             })),
@@ -151,6 +193,9 @@ function mergeRuns(runs: ScenarioSummary[]): ScenarioSummary {
             reactMs: pick((s) => s.totals.reactMs),
             inkFrames: pick((s) => s.totals.inkFrames),
             inkMs: pick((s) => s.totals.inkMs),
+            layoutMs: pick((s) => s.totals.layoutMs),
+            writeMs: pick((s) => s.totals.writeMs),
+            bytes: pick((s) => s.totals.bytes),
             cpuMs: pick((s) => s.totals.cpuMs),
             lagMaxMs: pick((s) => s.totals.lagMaxMs),
             heapMaxMb: pick((s) => s.totals.heapMaxMb),
@@ -164,6 +209,9 @@ function mergeRuns(runs: ScenarioSummary[]): ScenarioSummary {
                 reactMs: at((x) => x.reactMs),
                 inkFrames: at((x) => x.inkFrames),
                 inkMs: at((x) => x.inkMs),
+                layoutMs: at((x) => x.layoutMs),
+                writeMs: at((x) => x.writeMs),
+                bytes: at((x) => x.bytes),
                 cpuMs: at((x) => x.cpuMs),
                 lagMaxMs: at((x) => x.lagMaxMs),
             };
@@ -188,11 +236,36 @@ function runBench(): BenchResult[] {
     }
 }
 
+function runLatency(args: string[]): LatencySummary | undefined {
+    const out = spawnSync(
+        "yarn",
+        ["-s", "tsx", "scripts/tui-test/bench/latency.ts", "--tasks", "2000", ...args, "--json"],
+        { cwd: ROOT, encoding: "utf-8", shell: true, maxBuffer: 64 * 1024 * 1024 }
+    );
+    try {
+        const r = JSON.parse(out.stdout.trim().split("\n").pop() ?? "") as {
+            paced: Record<string, number>;
+            burst: Record<string, number>;
+        };
+        return {
+            firstByteMs: r.paced["firstByteP50"]!,
+            settledMs: r.paced["settledP50"]!,
+            settledP95Ms: r.paced["settledP95"]!,
+            bytesPerKey: r.paced["bytesPerKeyP50"]!,
+            writesPerKey: r.paced["writesPerKeyP50"]!,
+            backlogMs: r.burst["keys"]! > 0 ? r.burst["settleAfterLastKeyMs"]! : 0,
+        };
+    } catch {
+        process.stderr.write(`latency.ts produced no JSON:\n${out.stdout}\n${out.stderr}\n`);
+        return undefined;
+    }
+}
+
 async function main(): Promise<void> {
     const label = arg("label");
     if (!label) {
         process.stderr.write(
-            "Usage: tsx scripts/tui-test/perfSuite.ts --label <name> [--runs N] [--only a,b] [--no-bench] [--no-scenarios]\n"
+            "Usage: tsx scripts/tui-test/perfSuite.ts --label <name> [--runs N] [--only a,b] [--no-bench] [--no-scenarios] [--no-latency]\n"
         );
         process.exit(1);
     }
@@ -231,6 +304,32 @@ async function main(): Promise<void> {
     if (!process.argv.includes("--no-bench")) {
         process.stderr.write("[perf] micro-benchmarks\n");
         result.bench = runBench();
+    }
+
+    if (!process.argv.includes("--no-latency")) {
+        if (!fs.existsSync(path.join(ROOT, "dist", "cli.js"))) {
+            process.stderr.write("[perf] latency: dist/cli.js not found (run `yarn build`), skipped\n");
+        } else {
+            result.latency = {};
+            for (const [name, args] of Object.entries(LATENCY_CONFIGS)) {
+                const samples: LatencySummary[] = [];
+                for (let i = 0; i < runs; i++) {
+                    process.stderr.write(`[perf] latency ${name} run ${i + 1}/${runs}\n`);
+                    const sample = runLatency(args);
+                    if (sample) samples.push(sample);
+                }
+                if (samples.length === 0) continue;
+                const pick = (get: (x: LatencySummary) => number): number => round(median(samples.map(get)));
+                result.latency[name] = {
+                    firstByteMs: pick((x) => x.firstByteMs),
+                    settledMs: pick((x) => x.settledMs),
+                    settledP95Ms: pick((x) => x.settledP95Ms),
+                    bytesPerKey: pick((x) => x.bytesPerKey),
+                    writesPerKey: pick((x) => x.writesPerKey),
+                    backlogMs: pick((x) => x.backlogMs),
+                };
+            }
+        }
     }
 
     fs.mkdirSync(RESULTS_DIR, { recursive: true });

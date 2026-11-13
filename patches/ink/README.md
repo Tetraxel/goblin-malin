@@ -1,14 +1,17 @@
 # Patched Ink output stage
 
-`output.js` replaces `node_modules/ink/build/output.js` (Ink 8.0.0). It keeps what Ink computes from one frame to
-the next (the tokenised lines, the clipped slices, the rows) so a frame that changed two rows costs about what two
-rows cost, instead of the whole screen. The terminal output is byte-for-byte the same. Measurements and the
-reasoning: [AUDIT-performance-2.md](../../AUDIT-performance-2.md), PERF2-01.
+`output.js` and `render-node-to-output.js` replace the files of the same name in `node_modules/ink/build/`
+(Ink 8.0.0). They keep what Ink computes from one frame to the next (the tokenised lines, the clipped slices, the
+rows, the width of each text) so a frame that changed two rows costs about what two rows cost, instead of the whole
+screen. The terminal output is byte-for-byte the same. Measurements and the reasoning:
+[AUDIT-performance-2.md](../../AUDIT-performance-2.md), PERF2-01 and PERF2-07.
 
-- `output.stock.js` — the unmodified Ink 8.0.0 file. `scripts/apply-ink-patch.mjs` only overwrites a file that
-  equals it, and `tests/unit/inkOutputPatch.test.ts` renders the same random frames through both files and compares
-  the strings.
-- `output.js` — the patched file. Every change is marked with `[1]`, `[2]`, `[3]` in its header comment.
+- `*.stock.js` — the unmodified Ink 8.0.0 files. `scripts/apply-ink-patch.mjs` only overwrites files that equal
+  them (or an older version of our own patch), and `tests/unit/inkOutputPatch.test.ts` renders the same random frames
+  through the stock and the patched `output.js` and compares the strings, and checks that the patched
+  `render-node-to-output.js` differs from the stock one only in where `widestLine` comes from.
+- `output.js` — the patched output stage. Every change is marked with `[1]` … `[4]` in its header comment.
+- `render-node-to-output.js` — one changed import: `widestLine` comes from the cache of `output.js` ([4]).
 
 ## Who uses it
 
@@ -20,7 +23,8 @@ reasoning: [AUDIT-performance-2.md](../../AUDIT-performance-2.md), PERF2-01.
 ## Upgrading Ink
 
 1. `yarn upgrade ink`; `apply-ink-patch` now fails ("neither the stock file nor the patched one").
-2. Copy the new `node_modules/ink/build/output.js` to `output.stock.js`, redo the three changes on it into
-   `output.js` (the diff between the old `output.stock.js` and `output.js` shows them), run
+2. Copy the new `node_modules/ink/build/output.js` and `render-node-to-output.js` to `output.stock.js` and
+   `render-node-to-output.stock.js` (without the trailing `//# sourceMappingURL` line), redo the changes on them into
+   `output.js` and `render-node-to-output.js` (the diff between each stock file and its patched file shows them), run
    `yarn test tests/unit/inkOutputPatch.test.ts`, then `node scripts/apply-ink-patch.mjs`.
 3. If the new Ink caches across frames itself, delete the patch (`patches/`, the script, `prepare`, `noExternal`).

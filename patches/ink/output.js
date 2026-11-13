@@ -8,10 +8,12 @@
 //   [1] one `OutputCaches` shared by all frames (a two-generation cache with a size budget, below);
 //   [2] the split lines of a write are cached by its text, and clipped slices by (line, from, to);
 //   [3] blank cells share one frozen object, and a row whose cells are all the same objects as in the previous
-//       frame reuses that frame's string.
+//       frame reuses that frame's string;
+//   [4] `widestLine`, exported for the patched render-node-to-output.js, measures through the same cache.
 //
 // It is installed over `node_modules/ink/build/output.js` by `scripts/apply-ink-patch.mjs` (which checks that
-// the file it replaces is the stock one), and bundled into `dist` by tsup.
+// the file it replaces is the stock one), and bundled into `dist` by tsup. Its sibling render-node-to-output.js
+// is patched for [4] only.
 import stringWidth from 'string-width';
 import { styledCharsFromTokens, styledCharsToString, tokenize, } from '@alcalzone/ansi-tokenize';
 // Replaces a partially visible wide character with a space that keeps its styles.
@@ -150,6 +152,10 @@ class OutputCaches {
     }
 }
 const sharedCaches = new OutputCaches();
+// [4] The width of the widest line of a text, memoised for all frames. Replaces `widest-line` in
+// render-node-to-output.js, which ran `string-width` (and its emoji regex) on every text node of every frame.
+// Same result: the width of each line by `string-width`, and the maximum.
+export const widestLine = (text) => sharedCaches.getWidestLine(text);
 // [3] The rows of the previous frame (cells + the string made from them), per output size, so a frame that
 // changed two rows stringifies two rows. Correctness never depends on it: a row is reused only when every cell
 // is the same object as before.

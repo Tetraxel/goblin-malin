@@ -15,6 +15,9 @@ interface OutputLike {
 }
 type OutputClass = new (options: { width: number; height: number }) => OutputLike;
 
+const importPatch = async (file: string): Promise<Record<string, unknown>> =>
+    (await import(pathToFileURL(path.resolve(__dirname, "../../patches/ink", file)).href)) as Record<string, unknown>;
+
 const load = async (file: string): Promise<OutputClass> =>
     ((await import(pathToFileURL(path.resolve(__dirname, "../../patches/ink", file)).href)) as { default: OutputClass })
         .default;
@@ -159,5 +162,35 @@ describe("patched Ink output.js", () => {
             const ops: Op[] = [{ kind: "write", x: 0, y: 0, text: "abc", transform: false }];
             expect(render(Patched, ops, width, height)).toEqual(render(Stock, ops, width, height));
         }
+    });
+
+    test("widestLine (used by the patched render-node-to-output.js) agrees with the widest-line package", async () => {
+        const { widestLine } = (await importPatch("output.js")) as { widestLine: (text: string) => number };
+        const stock = (await import("widest-line")).default as (text: string) => number;
+        const random = rng(7);
+        for (let i = 0; i < 300; i++) {
+            const parts: string[] = [];
+            for (let n = 1 + Math.floor(random() * 4); n > 0; n--)
+                parts.push(WORDS[Math.floor(random() * WORDS.length)]!);
+            const text = parts.join(random() < 0.5 ? "\n" : " ");
+            expect(widestLine(text), JSON.stringify(text)).toBe(stock(text));
+            expect(widestLine(text)).toBe(stock(text)); // second call: from the cache
+        }
+        expect(widestLine("")).toBe(stock(""));
+    });
+
+    test("the patched render-node-to-output.js differs from the stock one only in where widestLine comes from", async () => {
+        const fs = await import("node:fs");
+        const read = (file: string) => fs.readFileSync(path.resolve(__dirname, "../../patches/ink", file), "utf-8");
+        const body = (text: string) =>
+            text
+                .split("\n")
+                .filter(
+                    (line) =>
+                        !line.startsWith("//") &&
+                        !line.includes("import widestLine") &&
+                        !line.includes("import { widestLine }")
+                );
+        expect(body(read("render-node-to-output.js"))).toEqual(body(read("render-node-to-output.stock.js")));
     });
 });
