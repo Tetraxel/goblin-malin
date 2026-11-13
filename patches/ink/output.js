@@ -65,7 +65,8 @@ const intersectClips = (outer, inner) => {
 // [1] A cache that survives between frames without growing for ever: two generations. A lookup that misses in
 // the current one but hits in the previous one promotes the entry; when the current one is over its budget it
 // becomes the previous one and a new one starts. What the last frames used stays; the rest is dropped within two
-// rotations. The budget counts characters (the size of the key), not entries.
+// rotations. The budget is in approximate bytes: each caller says what an entry weighs (the key, and what the value
+// holds: a styled character is an object of ~100 bytes, not the 2 bytes of the character it stands for).
 class GenerationalCache {
     budget;
     current = new Map();
@@ -81,13 +82,19 @@ class GenerationalCache {
         }
         const old = this.previous.get(key);
         if (old !== undefined) {
-            this.set(key, old);
+            // Promoted without its value's weight (not kept): what was promoted came out of a generation that was
+            // already within budget, so the total stays under three budgets.
+            this.set(key, old, 0);
         }
         return old;
     }
-    set(key, value) {
+    set(key, value, weight) {
         this.current.set(key, value);
-        this.used += typeof key === 'string' ? key.length + 16 : 16;
+        this.charge(typeof key === 'string' ? key.length * 2 + 48 + weight : 48 + weight);
+    }
+    // Accounts for memory an entry gained after it was stored (the inner map of a slices entry grows).
+    charge(weight) {
+        this.used += weight;
         if (this.used > this.budget) {
             this.previous = this.current;
             this.current = new Map();
@@ -95,20 +102,24 @@ class GenerationalCache {
         }
     }
 }
+// Approximate bytes of one styled character object (value, styles, flags) and of one cached string character.
+const STYLED_CHAR_BYTES = 100;
+const STRING_CHAR_BYTES = 2;
+const MB = 1024 * 1024;
 class OutputCaches {
-    widths = new GenerationalCache(200_000);
-    blockWidths = new GenerationalCache(100_000);
-    styledChars = new GenerationalCache(400_000);
+    widths = new GenerationalCache(4 * MB);
+    blockWidths = new GenerationalCache(2 * MB);
+    styledChars = new GenerationalCache(40 * MB);
     // [2] text -> its lines as strings (after splitting on '\n', styles kept across the split).
-    lines = new GenerationalCache(400_000);
+    lines = new GenerationalCache(8 * MB);
     // [2] line -> Map(`${from}:${to}` -> the line clipped to those columns).
-    slices = new GenerationalCache(400_000);
+    slices = new GenerationalCache(8 * MB);
     getStyledChars(line) {
         let cached = this.styledChars.get(line);
         if (cached === undefined) {
             // Standalone invisible Unicode characters must not occupy terminal cells.
             cached = styledCharsFromTokens(tokenize(line)).filter(character => !/^\p{Default_Ignorable_Code_Point}+$/u.test(character.value));
-            this.styledChars.set(line, cached);
+            this.styledChars.set(line, cached, cached.length * STYLED_CHAR_BYTES);
         }
         return cached;
     }
@@ -116,7 +127,7 @@ class OutputCaches {
         let cached = this.widths.get(text);
         if (cached === undefined) {
             cached = stringWidth(text);
-            this.widths.set(text, cached);
+            this.widths.set(text, cached, 8);
         }
         return cached;
     }
@@ -128,7 +139,7 @@ class OutputCaches {
                 lineWidth = Math.max(lineWidth, this.getStringWidth(line));
             }
             cached = lineWidth;
-            this.blockWidths.set(text, cached);
+            this.blockWidths.set(text, cached, 8);
         }
         return cached;
     }
@@ -146,12 +157,18 @@ class OutputCaches {
                 }
             }
             cached = characterLines.map(line => styledCharsToString(line));
-            this.lines.set(text, cached);
+            this.lines.set(text, cached, cached.reduce((total, line) => total + line.length * STRING_CHAR_BYTES + 48, 0));
         }
         return cached;
     }
 }
 const sharedCaches = new OutputCaches();
+// For tests: a tiny budget makes the caches rotate on almost every entry, which is how rotation is exercised.
+export const setCacheBudgetForTests = (bytes) => {
+    for (const cache of [sharedCaches.widths, sharedCaches.blockWidths, sharedCaches.styledChars, sharedCaches.lines, sharedCaches.slices]) {
+        cache.budget = bytes;
+    }
+};
 // [4] The width of the widest line of a text, memoised for all frames. Replaces `widest-line` in
 // render-node-to-output.js, which ran `string-width` (and its emoji regex) on every text node of every frame.
 // Same result: the width of each line by `string-width`, and the maximum.
@@ -350,9 +367,11 @@ export default class Output {
         const sliced = styledCharsToString(result);
         if (slicesOfLine === undefined) {
             slicesOfLine = new Map();
-            this.caches.slices.set(line, slicesOfLine);
+            this.caches.slices.set(line, slicesOfLine, 0);
         }
         slicesOfLine.set(key, sliced);
+        // The inner map grows with every distinct (from, to) of a line (a resize clips the same line at many widths).
+        this.caches.slices.charge(key.length * STRING_CHAR_BYTES + sliced.length * STRING_CHAR_BYTES + 96);
         return sliced;
     }
     get() {

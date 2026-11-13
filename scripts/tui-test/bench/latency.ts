@@ -72,7 +72,15 @@ const chunks: Chunk[] = [];
 let total = 0;
 let lastData = 0;
 const t0 = performance.now();
-const p = pty.spawn("/bin/sh", ["-c", cmd], { name: "xterm-256color", cols, rows, cwd: ROOT, env });
+// The same shell choice as runner.ts: COMSPEC /c on Windows, /bin/sh -c elsewhere.
+const isWin = process.platform === "win32";
+const p = pty.spawn(isWin ? (process.env["COMSPEC"] ?? "cmd.exe") : "/bin/sh", [isWin ? "/c" : "-c", cmd], {
+    name: "xterm-256color",
+    cols,
+    rows,
+    cwd: ROOT,
+    env,
+});
 let screen = "";
 p.onData((d) => {
     const now = performance.now();

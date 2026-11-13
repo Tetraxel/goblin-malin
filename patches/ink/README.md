@@ -22,7 +22,7 @@ screen. The terminal output is byte-for-byte the same. Measurements and the reas
 
 ## Upgrading Ink
 
-1. `yarn upgrade ink`; `apply-ink-patch` now fails ("neither the stock file nor the patched one").
+1. Change the exact `ink` version in `package.json` (it is pinned on purpose: the patch only knows 8.0.0) and `yarn install`; `apply-ink-patch` now warns ("neither the stock files nor the patched ones") and `yarn build` refuses to run.
 2. Copy the new `node_modules/ink/build/output.js` and `render-node-to-output.js` to `output.stock.js` and
    `render-node-to-output.stock.js` (without the trailing `//# sourceMappingURL` line), redo the changes on them into
    `output.js` and `render-node-to-output.js` (the diff between each stock file and its patched file shows them), run

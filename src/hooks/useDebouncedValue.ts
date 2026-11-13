@@ -14,7 +14,7 @@ interface State<T> {
     shown: T;
     /** The last `value` this hook saw, to notice a change during render. */
     seen: T;
-    /** When `seen` last changed (`Date.now()`), 0 before the first change. */
+    /** When `seen` last changed (`performance.now()`, monotonic), -Infinity before the first change. */
     changedAt: number;
 }
 
@@ -33,12 +33,13 @@ interface State<T> {
  * extra timer).
  */
 export function useDebouncedValue<T>(value: T, delayMs: number, { leading = false }: DebouncedValueOptions = {}): T {
-    const [state, setState] = useState<State<T>>({ shown: value, seen: value, changedAt: 0 });
+    const [state, setState] = useState<State<T>>({ shown: value, seen: value, changedAt: -Infinity });
 
     let current = state;
     if (leading && !Object.is(state.seen, value)) {
+        // A monotonic clock: a wall-clock step (NTP) must not make "recent" negative or hide a change.
         // eslint-disable-next-line react-hooks/purity -- the clock is the point: "was the previous change recent?"
-        const now = Date.now();
+        const now = performance.now();
         current = {
             shown: now - state.changedAt > delayMs ? value : state.shown,
             seen: value,

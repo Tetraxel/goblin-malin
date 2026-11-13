@@ -135,6 +135,32 @@ describe("patched Ink output.js", () => {
         }
     });
 
+    test("renders the same while the caches rotate on almost every entry", async () => {
+        const [Stock, Patched, patch] = await Promise.all([
+            load("output.stock.js"),
+            load("output.js"),
+            importPatch("output.js"),
+        ]);
+        const setBudget = patch["setCacheBudgetForTests"] as (bytes: number) => void;
+        try {
+            for (const budget of [1, 600, 5_000]) {
+                setBudget(budget);
+                const random = rng(budget);
+                const width = 40 + Math.floor(random() * 30);
+                const height = 10 + Math.floor(random() * 8);
+                let ops = makeFrame(random, width, height);
+                for (let frame = 0; frame < 15; frame++) {
+                    if (random() < 0.3) ops = makeFrame(random, width, height);
+                    expect(render(Patched, ops, width, height), `budget ${budget}, frame ${frame}`).toEqual(
+                        render(Stock, ops, width, height)
+                    );
+                }
+            }
+        } finally {
+            setBudget(40 * 1024 * 1024);
+        }
+    });
+
     test("a resize between frames does not leak rows of the old size", async () => {
         const [Stock, Patched] = await Promise.all([load("output.stock.js"), load("output.js")]);
         const random = rng(99);

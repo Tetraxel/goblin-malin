@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { runScenario } from "../../scripts/tui-test/runner.ts";
+import type { Scenario } from "../../scripts/tui-test/types.ts";
 
 // Component render-profiling regression guard. Unlike the screenshot smoke test,
 // this asserts on machine-independent render signals: it fails only on
@@ -72,6 +73,53 @@ describe("render profile", () => {
         for (const it of keys) {
             expect(it.bytes, `${it.label}: ${it.bytes} bytes`).toBeGreaterThan(10_000);
             expect(it.bytes, `${it.label}: ${it.bytes} bytes`).toBeLessThan(30_000);
+        }
+    });
+
+    // AUDIT-performance-2.md, PERF2-03: "Reduce terminal output" (Ink's incremental rendering) is on by default on
+    // Windows, on top of the patched Output with its cross-frame row cache. Both keep state from frame to frame, so
+    // the screens they leave behind must be the same as with a full redraw after every kind of change: cursor moves,
+    // focus changes, a view switch, a modal opening (more lines) and closing (fewer lines).
+    test("incremental rendering leaves the same screen as a full redraw", async () => {
+        const steps = [
+            { type: "stable", timeout: 20000, quiescenceMs: 1000 },
+            { type: "waitForContent", text: "Hooked", timeout: 10000 },
+            { type: "wait", ms: 1000 },
+            // Focus starts on the toolbar: → then Enter opens the Sessions modal, Escape closes it.
+            { type: "key", key: "ArrowRight" },
+            { type: "key", key: "Enter" },
+            { type: "wait", ms: 700 },
+            { type: "snapshot", name: "modal-open" },
+            { type: "key", key: "Escape" },
+            { type: "wait", ms: 700 },
+            { type: "snapshot", name: "modal-closed" },
+            ...["ArrowDown", "ArrowDown", "Tab", "ArrowDown", "Tab", "2", "ArrowDown", "1", "Ctrl+A", "Escape"].flatMap(
+                (key, i) => [
+                    { type: "key", key },
+                    { type: "wait", ms: 500 },
+                    { type: "snapshot", name: `step-${i}-${key}` },
+                ]
+            ),
+        ] as Scenario["steps"];
+        const run = (reduceTerminalOutput: boolean) =>
+            runScenario({
+                terminal: { cols: 128, rows: 50 },
+                dataDir: "scripts/tui-test/fixtures/50-tasks-with-metadata",
+                settings: { general: { animationsEnabled: false, showWelcomeTutorial: false, reduceTerminalOutput } },
+                steps,
+            });
+        // Ids and times differ from one run to the next; they are not what is compared.
+        const normalize = (text: string) => text.replace(/[0-9a-f]{6,}|\d+:\d+|\d+\s*(?:ms|s|m|h)\b/gi, "#");
+        const full = await run(false);
+        const incremental = await run(true);
+        const names = Object.keys(full.snapshots).filter(
+            (name) => name.startsWith("step-") || name.startsWith("modal-")
+        );
+        expect(names.length).toBeGreaterThan(10);
+        // The modal really changed the screen (otherwise the shrink case is not exercised).
+        expect(full.snapshots["modal-open"]!.plain).not.toEqual(full.snapshots["modal-closed"]!.plain);
+        for (const name of names) {
+            expect(normalize(incremental.snapshots[name]!.plain), name).toEqual(normalize(full.snapshots[name]!.plain));
         }
     });
 });

@@ -124,7 +124,7 @@
         "dotenv": "^18.0.9",
         "flac-tagger": "^2.1.0",
         "flat-cache": "^6.1.23",
-        "ink": "^8.0.0",
+        "ink": "8.0.0",
         "ink-select-input": "^6.2.0",
         "ink-text-input": "^6.0.0",
         "musicbrainz-api": "^2.0.1",

@@ -11,9 +11,9 @@ const pkg = _require("./package.json") as { version: string };
 // `ink` from the registry, where the stock file would silently give back the slow frames.
 const inkState = inkPatchState() as string;
 if (inkState !== "patched") {
-    throw new Error(
-        `node_modules/ink/build/ is "${inkState}", not the patched files. Run \`node scripts/apply-ink-patch.mjs\` (see patches/ink/README.md).`
-    );
+  throw new Error(
+    `node_modules/ink/build/ is "${inkState}", not the patched files. Run \`node scripts/apply-ink-patch.mjs\` (see patches/ink/README.md).`
+  );
 }
 
 export default defineConfig({
@@ -39,12 +39,19 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
   async onSuccess() {
-    // A bare `from "ink"` left in the output would load the stock Ink next to the bundled one.
-    for (const file of readdirSync("dist").filter((name) => name.endsWith(".js"))) {
-      if (/(?:from|import)\s*\(?\s*["']ink["']/.test(readFileSync(`dist/${file}`, "utf-8"))) {
-        throw new Error(`dist/${file} imports "ink": it must be bundled (patched Ink, see patches/ink).`);
+    // A leftover `ink` import (any form: import, dynamic import, require, `ink/...` subpath), in any file of dist,
+    // would load the stock Ink next to the bundled one: two React contexts, no input, or the slow frames back.
+    const inkImport = /(?:from|import|require)\s*\(?\s*["']ink(?:\/[^"']*)?["']/;
+    const scan = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const file = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) scan(file);
+        else if (/\.[cm]?js$/.test(entry.name) && inkImport.test(readFileSync(file, "utf-8"))) {
+          throw new Error(`${file} imports "ink": it must be bundled (patched Ink, see patches/ink).`);
+        }
       }
-    }
+    };
+    scan("dist");
     cpSync("src/assets", "dist/assets", { recursive: true });
   },
 });

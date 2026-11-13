@@ -76,11 +76,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     if (result === "applied")
         console.log("goblin-malin: patched node_modules/ink/build/ (output.js, render-node-to-output.js)");
     if (result === "unknown") {
-        console.error(
+        // A warning, not a failure: this runs from `prepare`, and an install must not break for work that has
+        // nothing to do with rendering. `yarn build` (tsup.config.ts) refuses to bundle unpatched files.
+        console.warn(
             "goblin-malin: node_modules/ink/build/{output,render-node-to-output}.js are neither the stock Ink 8.0.0 files nor the patched ones.\n" +
-                "Ink was probably upgraded: redo the patch on the new file (see patches/ink/README.md)."
+                "Ink was probably upgraded: redo the patch on the new file (see patches/ink/README.md). `yarn build` will refuse to run until then."
         );
-        process.exit(1);
     }
     if (result === "missing") console.warn("goblin-malin: ink is not installed, nothing to patch.");
 }
