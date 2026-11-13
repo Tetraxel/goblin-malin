@@ -25,7 +25,7 @@ const TEMP_MAINTENANCE_DELAY_MS = 2000;
 
 export const App: React.FC = () => {
     useEffect(() => {
-        const initWav = getAssetPath("sounds", "init.wav");
+        const initWav = getAssetPath("sounds", "init.ogg");
         const { showWelcomeTutorial, animationsEnabled } = SettingsStore.getInstance().getAppSettings().general;
         // The animated intro brings its own sounds, which this would play over.
         const introPlays = showWelcomeTutorial && animationsEnabled;

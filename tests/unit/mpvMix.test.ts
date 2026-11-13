@@ -1,6 +1,12 @@
-import { existsSync } from "fs";
+import { existsSync, readdirSync, statSync } from "fs";
+import * as path from "path";
 import { describe, expect, it } from "vitest";
-import { INTRO_CUES, OUTRO_CUES, SOUND_VOLUME } from "../../src/components/WelcomeModal/intro/introSounds";
+import {
+    DRONE_SECONDS,
+    INTRO_CUES,
+    OUTRO_CUES,
+    SOUND_VOLUME,
+} from "../../src/components/WelcomeModal/intro/introSounds";
 import { buildMixGraph, mixFiles, MpvMix } from "../../src/utils/mpvMix";
 
 describe("buildMixGraph", () => {
@@ -55,7 +61,39 @@ describe("intro sounds", () => {
         for (const cue of [...INTRO_CUES, ...OUTRO_CUES]) expect(existsSync(cue.file), cue.file).toBe(true);
     });
 
+    it("only ask the drone for the part of it that was kept", () => {
+        // The drone's file is cut to DRONE_SECONDS (it was 93 s, 53 MB): a cue reaching further would play silence.
+        const drone = [...INTRO_CUES, ...OUTRO_CUES].filter((cue) =>
+            path.basename(cue.file).startsWith("DroneDemonic")
+        );
+        expect(drone.length).toBeGreaterThan(0);
+        for (const cue of drone)
+            expect((cue.from ?? 0) + (cue.duration ?? Infinity)).toBeLessThanOrEqual(DRONE_SECONDS);
+    });
+
     it("stay silent, without waiting, when audio is off", async () => {
         await expect(new MpvMix(INTRO_CUES, SOUND_VOLUME).started).resolves.toBeNull();
+    });
+});
+
+describe("sound files", () => {
+    // The package used to weigh 131 MB, 125 of them sounds, downloaded again with every update (AUDIT-performance.md,
+    // PERF-03). Encode new sounds with scripts/encode-sounds.mjs; this keeps the folder from growing back unnoticed.
+    const SOUNDS_DIR = path.resolve(__dirname, "../../src/assets/sounds");
+    const BUDGET_MB = 20;
+
+    const files = (dir: string): string[] =>
+        readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+            entry.isDirectory() ? files(path.join(dir, entry.name)) : [path.join(dir, entry.name)]
+        );
+
+    it(`weigh less than ${BUDGET_MB} MB in total`, () => {
+        const bytes = files(SOUNDS_DIR).reduce((sum, file) => sum + statSync(file).size, 0);
+        expect(bytes / 1048576).toBeLessThan(BUDGET_MB);
+    });
+
+    it("are all encoded (no WAV or MP3 left behind)", () => {
+        const raw = files(SOUNDS_DIR).filter((file) => /\.(wav|mp3|flac|aiff?)$/i.test(file));
+        expect(raw).toEqual([]);
     });
 });
