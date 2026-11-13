@@ -6,7 +6,7 @@ All notable changes to this project are documented here.
 
 ### Changed
 
-- **Faster keys.** In the shipped build a `↓` on a 2,000-task list used to paint two full frames, the second 130–270 ms late, and Ink rebuilt every character of the screen for each of them. The lower panel now follows the cursor in the same frame for a single key press (and still waits while a key is held), and a patched Ink keeps its work from one frame to the next. At 200×60 the screen is settled ~16 ms after the key instead of ~155 ms, with half the bytes ([AUDIT-performance-2.md](AUDIT-performance-2.md)).
+- **Faster keys.** In the shipped build a `↓` on a 2,000-task list used to paint two full frames, the second 130–270 ms late, and Ink rebuilt every character of the screen for each of them. The lower panel now follows the cursor in the same frame for a single key press (and still waits while a key is held), and a patched Ink keeps its work from one frame to the next. At 200×60 the screen is settled ~20 ms after the key instead of ~170 ms, with half the bytes ([AUDIT-performance-2.md](AUDIT-performance-2.md)).
 - Ink is now bundled into `dist` (with the patch from `patches/ink/`); in a checkout, `yarn install` applies the patch to `node_modules`.
 - The YouTube client library loads on first use, not at start-up.
 

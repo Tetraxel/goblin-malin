@@ -13,6 +13,58 @@ Legend — **Severity**: `high` felt on every keystroke · `medium` felt in a co
 
 ---
 
+## 0. Implementation status
+
+Done on the branch of this audit's pull request. **Before** = the base commit with stock Ink (`d5098e1` + `latency.ts`); **after** = the branch tip. Same machine (Linux container, 4 cores, Node 22.23), back to back, 2,000 tasks, truecolor, `perfSuite.ts` (`--runs 3` for the latency rows of "before", 2 elsewhere; medians). The numbers of this machine are lower than the ones above (a faster run of the same code), so compare rows, not absolute values with section 1.
+
+| Finding                                          | State                        | What was done                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------ | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [PERF2-01](#perf2-01) Ink re-tokenises the frame | **done**                     | `patches/ink/output.js` (cross-frame caches, row cache, shared blank cell), applied by `scripts/apply-ink-patch.mjs` (`prepare`) and **bundled into `dist`** (`noExternal: ink, ink-select-input, ink-text-input`; the build fails if the patch is not applied). Test: `tests/unit/inkOutputPatch.test.ts` (random frames, stock vs patched, byte for byte). |
+| [PERF2-02](#perf2-02) two frames per key         | **done**                     | `useDebouncedValue(..., { leading: true })` in `SecondaryPanel`; unit tests; `tests/e2e/perf.test.ts` asserts the bytes of an isolated key (fails with the old debounce).                                                                                                                                                                                    |
+| [PERF2-03](#perf2-03) whole screen rewritten     | **done as a setting**        | Settings → General → _Reduce terminal output_ (Ink `incrementalRendering`, read at start-up), **default on for Windows, off elsewhere**: not measured on Windows, as the audit asked. Screens compared cell by cell with the standard mode over 22 keys incl. resize and modals: identical.                                                                  |
+| [PERF2-04](#perf2-04) select all / view switch   | **met by PERF2-01, no code** | First byte 66 → 38 ms and 56 → 31 ms. A profile of `Ctrl+A`/`Esc` after the patch is flat (no function above 4 %), so nothing else was changed.                                                                                                                                                                                                              |
+| [PERF2-05](#perf2-05) animation frames           | **met by PERF2-01, no code** | `perf-load-tasks`, 12 s of load: 4,415 → 1,498 ms of CPU, i.e. ~37 % → ~12.5 % of a core (target ≤ 15 %).                                                                                                                                                                                                                                                    |
+| [PERF2-06](#perf2-06) start-up                   | **partly**                   | `ytmusic-api` (~90 ms) loads on first use. `clipboardy` (~50 ms) is used synchronously from click handlers in six places and was left. Boot to first stable screen is 10–14 % lower (mostly the bundle).                                                                                                                                                     |
+| [PERF2-07](#perf2-07) what is left               | **partly**                   | Text widths (`widest-line`, 9 % of busy CPU after PERF2-01) are memoised across frames through the patched `render-node-to-output.js`. The rest (blank grid, Yoga) is small and flat.                                                                                                                                                                        |
+| [TOOL2-01](#tool2-01) profiler                   | **done**                     | The fiber walk follows DevTools (descend only when `child !== alternate.child`; mounts only in new subtrees): render counts of the scenarios fell by 2–30× (`Uri` 903 → 106), `profile-navigate` baseline regenerated. Frames now carry `layoutMs`, `writeMs`, `bytes`. `profile.build: "production"` added.                                                 |
+| [TOOL2-02](#tool2-02) 16 colours                 | **done**                     | The runner defaults to `FORCE_COLOR=3`; a scenario `env` overrides it (it used to be overridden _by_ the runner).                                                                                                                                                                                                                                            |
+| [TOOL2-03](#tool2-03) nothing measures latency   | **done**                     | `perfSuite.ts` runs four `latency.ts` configurations, `perfCompare.ts` prints them, `--latency-cmd` times another build; the e2e test above is the CI gate.                                                                                                                                                                                                  |
+
+### Key latency, built bundle, 2,000 tasks (p50 of the keys)
+
+| Keys                     | First byte, before → after | Screen settled, before → after | Bytes per key, before → after | Held-key backlog |
+| ------------------------ | -------------------------: | -----------------------------: | ----------------------------: | ---------------: |
+| `↓`, 128×50              |             33.8 → 18.0 ms |                144.5 → 18.2 ms |                41.7 → 20.9 KB |       85 → 72 ms |
+| `↓`, 200×60              |             47.0 → 18.9 ms |                170.1 → 19.6 ms |                59.3 → 29.7 KB |      166 → 69 ms |
+| `Ctrl+A` / `Esc`, 200×60 |             66.2 → 38.2 ms |                 66.6 → 38.7 ms |                30.2 → 30.2 KB |                – |
+| `2` / `1`, 200×60        |             55.6 → 31.4 ms |                 55.7 → 32.0 ms |                29.4 → 29.4 KB |                – |
+
+With _Reduce terminal output_ on (the Windows default), `↓` at 200×60 is 15.3 KB per key (measured separately, settled 23 ms).
+
+### Targets of section 4
+
+| Metric                                 |     Before |  Target | After                                            |
+| -------------------------------------- | ---------: | ------: | ------------------------------------------------ |
+| Full frames (written) per isolated `↓` |          2 |       1 | **1** (e2e test)                                 |
+| Bytes per isolated `↓`, 200×60         |    59.3 KB | ≤ 16 KB | 29.7 KB; **15.3 KB** with Reduce terminal output |
+| `↓` settled p50, 200×60                |     170 ms | ≤ 40 ms | **19.6 ms** (p95 ≈ 22–30 ms)                     |
+| Backlog after a held key, 200×60       |     166 ms | ≤ 80 ms | **69 ms**                                        |
+| `Ctrl+A` / `Esc` first byte p50        |      66 ms | ≤ 40 ms | **38 ms** (borderline)                           |
+| CPU while a run animates (dev, 128×50) | ~37 % core |  ≤ 15 % | **~12.5 %**                                      |
+
+### Dev-profile scenarios (`perfSuite.ts`, medians of 2)
+
+Ink's output stage (`inkMs`, which the dev profiler can see) fell 55–80 % in every scenario, process CPU 5–58 % (`perf-load-tasks` 8.6 → 3.6 s, `perf-sessions-heavy` 6.2 → 3.3 s), peak heap 5–42 % (fewer allocations per frame). `reactMs` is 2–14 % _higher_: the lower panel now renders in the same commit as the cursor instead of in a second one, so its React work moves, it does not grow. `inkFrames` rose in the scroll scenarios for the same reason it is not a paint count: a key now causes two `onRender` calls (the second, after an effect-driven re-registration of shortcuts, produces identical output and writes nothing); `bytes` is the number to read, and it is the one the e2e test gates.
+
+### Not done / open
+
+- **Windows** (ConPTY, Windows Terminal) is still not measured: the _Reduce terminal output_ default and the byte savings are to be confirmed there.
+- The second, output-less commit per key (shortcut registration effects, `ShortcutDispatcher`/`InputRouter`/`ToolbarButtonInvoker` state) costs ~5 ms of React + Ink per key for nothing; it is outside this audit's findings.
+- Open the same Ink change upstream: **not done** (out of scope for this PR).
+- `clipboardy` lazy loading, and `measureText`'s own `widest-line` call (12 ms of 2.9 s).
+
+---
+
 ## 1. Summary
 
 **In the production build, React is not the problem: Ink's output stage is.** While scrolling the task list, 75–83 % of the app's CPU goes to turning the React tree into terminal text (`ink/build/output.js` and `@alcalzone/ansi-tokenize`). React and the reconciler are about 2–5 %, the app's own code about 1–3 %. Ink rebuilds every character of the screen on every frame and caches nothing from one frame to the next, so a frame costs the same whatever changed: **~46 ms at 200×60**, more on a larger terminal.
