@@ -31,6 +31,7 @@
 **Housekeeping**
 
 - [ ] Dependencies left: `zod` advisory (waits for `ytmusic-api` on zod 4), ESLint 10 (waits for `eslint-plugin-react`; add `cause`s), TypeScript 7 (waits for `typescript-eslint`) — `DEP-02`, `DEP-03`
+- [ ] `tests/e2e/perf.test.ts` › "an isolated key paints one frame, not two" fails on Windows: in the profiling entry (`src/profiling/profiledEntry.tsx`, React dev mode) every other key still makes a second commit that renders none of our components (≈6 ms after the key, 0 components, 2 host nodes) and repaints the whole screen (~41 KB instead of ~20 KB). The shipped build is fine (`scripts/tui-test/bench/latency.ts`: one frame per key). Not run by CI. Find what triggers that commit, or move the check onto the shipped bundle
 - [ ] Get the unit tests green on Linux CI, then enable them there (they only run on Windows now)
 - [ ] **Linux has no working ffmpeg/ffprobe download** — `resolveFfmpegSource` has a macOS branch and treats everything else as Windows (fetches the win64 zip); check, and either add a Linux build or state Linux is unsupported
 

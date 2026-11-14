@@ -26,7 +26,9 @@ export const ActionBar: React.FC<{
     const [, setTaskVersion] = useState(0);
     useEffect(() => {
         if (!selectedTask) return;
-        return selectedTask.subscribe(() => setTaskVersion((v) => v + 1));
+        // `immediate: false`: the bar already reads the task while rendering. The default replays the callback at
+        // once, which cost every selection change a second commit (and a second full frame).
+        return selectedTask.subscribe(() => setTaskVersion((v) => v + 1), { immediate: false });
     }, [selectedTask]);
 
     const bar =
