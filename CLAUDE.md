@@ -10,6 +10,7 @@
 ## Key documents
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — Short architecture map: layers, the task pipeline, provider registries, data on disk. Read this before exploring the codebase.
+- [docs/RELEASING.md](docs/RELEASING.md) — How to release a version (changelog → bump → tag) and how the GitHub release page is built.
 - [docs/projects/README.md](docs/projects/README.md) — High-level technical projects (roadmap and history). Older projects may describe code that has since been removed; they say so at the top.
 
 ## Provider extensibility

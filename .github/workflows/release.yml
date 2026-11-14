@@ -8,7 +8,8 @@ name: Release
 #   verify          the tag must be `v` + the version in package.json
 #   check           the full CI workflow (type-check, lint, build, unit tests) on the tagged commit
 #   publish-npm     `npm publish` -- the one step that cannot be undone, so it runs after everything that can fail
-#   github-release  creates the GitHub release for the tag (release notes generated from the commits)
+#   github-release  creates the GitHub release for the tag; its text comes from scripts/release-notes.mjs
+#                   (install instructions + the CHANGELOG.md section + every commit since the previous tag)
 #
 # Trigger it by pushing a `v*` tag. To rehearse, run it by hand (Actions -> Release -> Run workflow) with
 # `dry_run` ticked: it does everything except publish to npm and create the GitHub release (`npm pack --dry-run`
@@ -48,6 +49,7 @@ jobs:
             - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
               with:
                   ref: ${{ inputs.tag || github.ref }}
+                  fetch-depth: 0 # the release notes list the commits since the previous tag
 
             - name: Tag must be v<package.json version>
               shell: bash
@@ -58,6 +60,14 @@ jobs:
                     exit 1
                   fi
                   echo "Releasing $TAG (package.json $version)"
+
+            # Fails when CHANGELOG.md has no section for this version, before anything is published. The text is
+            # also shown in the run summary: that is the preview of the release page (and what a dry run is for).
+            - name: Release notes (preview)
+              shell: bash
+              run: |
+                  node scripts/release-notes.mjs "$TAG" | tee release-notes.md
+                  { echo "### Release notes for $TAG"; echo; cat release-notes.md; } >> "$GITHUB_STEP_SUMMARY"
 
     check:
         name: CI
@@ -112,9 +122,17 @@ jobs:
         permissions:
             contents: write
         steps:
+            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+              with:
+                  ref: ${{ inputs.tag || github.ref }}
+                  fetch-depth: 0
+
+            - name: Build the release notes
+              run: node scripts/release-notes.mjs "$TAG" > release-notes.md
+
             - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
               with:
                   tag_name: ${{ env.TAG }}
-                  generate_release_notes: true
+                  body_path: release-notes.md
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
