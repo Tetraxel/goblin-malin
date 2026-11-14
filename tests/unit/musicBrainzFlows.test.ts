@@ -532,6 +532,15 @@ describe("the MusicBrainz actions on offer", () => {
         expect(await ids(task)).toEqual(["picard", "open", "links", "group", "search", "recheck"]);
     });
 
+    // The metadata panel can ask for an album row while it still shows the previous track (holding ↑ in a long list
+    // threw "groups is not iterable": an album has no metadata groups).
+    test("an album or playlist row offers none, and does not throw", async () => {
+        const album = {
+            getAttributes: () => ({ kind: "collection", collectionKind: "album", childTaskIds: [] }),
+        } as unknown as DownloadTask;
+        expect(await ids(album)).toEqual([]);
+    });
+
     test("the search button opens MusicBrainz's tag lookup prefilled with the track", async () => {
         const { tagLookupUrl } = await import("#flows/musicDownloadFlow/musicbrainz/tagLookup");
         expect(

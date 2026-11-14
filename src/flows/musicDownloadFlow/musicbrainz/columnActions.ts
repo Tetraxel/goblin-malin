@@ -65,6 +65,8 @@ async function openInPicard(url: string, port: number): Promise<void> {
 
 /** What can be done about the track's verdict right now, most relevant first. */
 export function musicBrainzActionItems(task: DownloadTask): MusicBrainzActionItem[] {
+    // An album/playlist row has no metadata groups to check (`computeCompiledMetadata` would throw on them).
+    if (!isTrackTask(task)) return [];
     const identity = task.getAttributes()?.musicBrainzIdentity;
     const items: MusicBrainzActionItem[] = [];
 
