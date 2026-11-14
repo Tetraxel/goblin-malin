@@ -1,5 +1,7 @@
 ### Claude Code
-.claude/
+.claude/*
+# Project skills are shared with the repo (settings.local.json and the rest stay local)
+!.claude/skills/
 
 ### Specific to this project
 data/
