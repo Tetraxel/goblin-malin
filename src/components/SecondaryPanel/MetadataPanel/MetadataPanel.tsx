@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Box } from "ink";
 import { useTheme } from "#base/themeContext";
 import { type Task, type TaskSnapshot } from "#base/task/task";
+import { useFollowTaskSnapshot } from "#hooks/useFollowTaskSnapshot";
 import { type CursorPosition, type Updater } from "#hooks/useFocusManager";
 import {
     type MusicDownloadTaskAttributes,
@@ -77,12 +78,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
         setSnapshot(typedTask?.get() as TaskSnapshot<MusicDownloadTaskAttributes> | undefined);
     }
 
-    useEffect(() => {
-        if (!typedTask) return;
-        return (typedTask as Task<MusicDownloadTaskAttributes>).subscribe((t) => {
-            setSnapshot(t.get() as TaskSnapshot<MusicDownloadTaskAttributes>);
-        });
-    }, [typedTask]);
+    useFollowTaskSnapshot(typedTask, snapshot, setSnapshot);
 
     // Stable identities while the task snapshot is unchanged (e.g. navigating
     // fields/sources), so `compiled` and the memoized rows below can bail.

@@ -42,6 +42,8 @@ describe("render profile", () => {
     // so every isolated key painted two full-screen frames, the second one late. Bytes per key do not depend on
     // the machine, unlike milliseconds, so they can gate CI: with a full redraw (the default on Linux and macOS) a
     // frame of this 128x50 screen is ~20 KB, so one frame per key is ~20 KB and two are ~41 KB.
+    // Windows is the strict case: there Ink repaints a full-screen frame after every commit, even an unchanged one,
+    // so an empty commit (a `setState` that React re-renders for and then bails out of) costs a frame too.
     test("an isolated key paints one frame, not two", async () => {
         const result = await runScenario({
             terminal: { cols: 128, rows: 50 },
@@ -53,8 +55,12 @@ describe("render profile", () => {
                 { type: "stable", timeout: 20000, quiescenceMs: 1000 },
                 { type: "waitForContent", text: "Hooked", timeout: 10000 },
                 { type: "wait", ms: 1500 },
-                // Longer than the debounce (80 ms): each key is isolated. The first one only puts the cursor on the
-                // list (it also mounts the hints of the focused list: a few frames of its own).
+                // Longer than the debounce (80 ms): each key is isolated. The first two keys are set-up, not measured:
+                // the first only puts the cursor on the list (it also mounts the hints of the focused list), the
+                // second selects a task, whose contextual actions register new shortcuts while rendering (the hint
+                // bar then needs a second commit; moving between tasks with the same actions does not).
+                { type: "key", key: "ArrowDown" },
+                { type: "wait", ms: 1000 },
                 { type: "key", key: "ArrowDown" },
                 { type: "wait", ms: 1000 },
                 { type: "key", key: "ArrowDown" },
@@ -68,7 +74,7 @@ describe("render profile", () => {
             ],
         });
 
-        const keys = result.profile!.interactions.filter((it) => it.index >= 1 && it.label !== "end");
+        const keys = result.profile!.interactions.filter((it) => it.index >= 2 && it.label !== "end");
         expect(keys).toHaveLength(3);
         for (const it of keys) {
             expect(it.bytes, `${it.label}: ${it.bytes} bytes`).toBeGreaterThan(10_000);
