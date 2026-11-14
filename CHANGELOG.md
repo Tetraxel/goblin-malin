@@ -4,15 +4,28 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
-### Changed
-
-- **Faster keys.** In the shipped build a `↓` on a 2,000-task list used to paint two full frames, the second 130–270 ms late, and Ink rebuilt every character of the screen for each of them. The lower panel now follows the cursor in the same frame for a single key press (and still waits while a key is held), and a patched Ink keeps its work from one frame to the next. At 200×60 the screen is settled ~20 ms after the key instead of ~170 ms, with half the bytes ([AUDIT-performance-2.md](AUDIT-performance-2.md)).
-- Ink is now bundled into `dist` (with the patch from `patches/ink/`); in a checkout, `yarn install` applies the patch to `node_modules`.
-- The YouTube client library loads on first use, not at start-up.
+## [0.2.2] — 2026-11-14
 
 ### Added
 
+- **MusicBrainz release check.** For each track the app works out which MusicBrainz release it belongs to (from the barcode, the streaming link, the ISRC, or the title and artist) and shows a verdict with the evidence behind it. You can review a match, pick the artist, re-check, or add a release MusicBrainz doesn't have yet (through Picard, Harmony or a local seed page). A **Search** button opens the tag lookup already filled with the track. Like the other third-party lookups, it only runs after you allow it once.
+- MusicBrainz ids in saved files: the album artist and release track ids are now written next to the recording, release, artist and release group ids (FLAC, MP3 and the ffmpeg formats), and read back from the file. A per-track **Include MusicBrainz tags** switch overrides the setting.
+- Settings → Download → **Download strategy**: `best` (the first provider that downloads wins), `each` (one file per provider, the default) or `all` (up to 5 files per provider). Providers skipped by `best` show a "not needed" row and can still be run by hand.
 - Settings → General → **Reduce terminal output**: redraw only the screen lines that changed (2–4× fewer bytes for the terminal to parse). On by default on Windows, off elsewhere; applies on the next start.
+- A saved file that was moved or deleted is flagged in the task list and the file panel, with a **Relocate** button (Ctrl+F); play, update and compare are blocked until it is found again. The panel also shows the tags the saved file really holds (in file / differs / not in file) instead of the download's.
+- Pasting a link while a track is focused can add it to that track, and links you add by hand are kept when the task is restarted.
+
+### Changed
+
+- **Much smaller install.** The sound effects now ship as Ogg Vorbis: the npm package goes from about 131 MB to 14 MB, so every update downloads far less.
+- **Faster keys.** In the shipped build a `↓` on a 2,000-task list used to paint two full frames, the second 130–270 ms late, and Ink rebuilt every character of the screen for each of them. The lower panel now follows the cursor in the same frame for a single key press (and still waits while a key is held), and a patched Ink keeps its work from one frame to the next. At 200×60 the screen is settled ~20 ms after the key instead of ~170 ms, with half the bytes ([AUDIT-performance-2.md](AUDIT-performance-2.md)). The action bar under the task list also no longer repaints the screen a second time after every selection change: a single key now costs half the output it did (about 10 KB instead of 20 KB at 128×50) and settles in ~25 ms instead of ~50 ms.
+- Ink is now bundled into `dist` (with the patch from `patches/ink/`); in a checkout, `yarn install` applies the patch to `node_modules`.
+- The YouTube client library loads on first use, not at start-up.
+- Long task lists stay responsive: saving only rewrites what changed, the footer and the Sessions/Archive badges only redraw when their text changes, closed modals no longer follow every save, and spinners use the shared animation ticker (so Settings → Animations applies to all of them).
+
+### Fixed
+
+- Settings: the last row is no longer cut off when rows wrap onto several lines.
 
 ## [0.2.1] — 2026-11-11
 
