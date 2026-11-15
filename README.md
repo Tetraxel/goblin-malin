@@ -22,10 +22,6 @@
         - [Metadata view](#metadata-view)
         - [Download view](#download-view)
 
-> [!CAUTION]
-> **This project is in early, early, early development.**<br>
-> Be aware that the data model can change drastically, making previous versions incompatible with the current one. Use at your own risk 😉
-
 A keyboard-driven terminal UI for downloading and tagging music tracks with metadata. Import links from Spotify and YouTube, the app cross-references metadata across providers, finds the best download source, and saves it to disk as a tagged audio file (a FLAC by default).
 
 ## What it does
