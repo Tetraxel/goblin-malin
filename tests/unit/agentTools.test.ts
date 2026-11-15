@@ -682,6 +682,55 @@ describe("archive_tasks", () => {
             /being processed right now/
         );
     });
+
+    test("an album or playlist can be archived with tracks, and an id that is no task does not refuse the rest", async () => {
+        const { CollectionTask } = await import("#flows/musicDownloadFlow/utils/collectionTask");
+        const { globalLogger } = await import("#base/logger/logger");
+        const { SessionManager } = await import("#sessions/sessionManager");
+        const album = new CollectionTask({
+            id: "alb9",
+            initialInput: "https://open.spotify.com/album/y",
+            attributes: {
+                kind: "collection",
+                collectionKind: "album",
+                state: "finished",
+                name: "Some Album",
+                userInput: { type: "url", url: "https://open.spotify.com/album/y" },
+                childTaskIds: [],
+            },
+            logger: globalLogger,
+        });
+        TaskOrchestrator.getInstance().setTasks([album as never, a]);
+        const archive = vi.spyOn(SessionManager.getInstance(), "archiveTasks").mockReturnValue(2);
+        try {
+            const ui = answerDialogs(1);
+            const result = await callTool("archive_tasks", { taskIds: ["alb9", "aaa1", "ghost"] });
+            expect(result.isError).toBe(false);
+            expect(archive).toHaveBeenCalledWith(["alb9", "aaa1"]);
+            expect(result.json).toMatchObject({
+                archived: 2,
+                skipped: [{ taskId: "ghost", reason: "no task with this id" }],
+            });
+            // The dialog names the album as such.
+            expect(ui.asked[0]).toBe("Let Claude archive 2 tasks? | Cancel/Archive");
+        } finally {
+            archive.mockRestore();
+        }
+    });
+
+    test("a declined question does not use up the turn's budget", async () => {
+        answerDialogs(0);
+        const turn = new AgentTurn();
+        for (let i = 0; i < 10; i++) await callTool("archive_tasks", { taskIds: ["aaa1"] }, turn);
+        expect(turn.touched.size).toBe(0);
+        // So the track can still be changed afterwards.
+        const set = await callTool(
+            "set_metadata_override",
+            { taskId: "aaa1", revision: a.getRevision(), patch: { trackName: "Fixed" } },
+            turn
+        );
+        expect(set.isError).toBe(false);
+    });
 });
 
 describe("add_user_source and rediscover", () => {

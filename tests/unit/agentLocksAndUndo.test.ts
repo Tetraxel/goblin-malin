@@ -116,7 +116,77 @@ describe("a part run again on a finished track", () => {
     });
 });
 
+describe("who may start a track Claude holds", () => {
+    const real = () =>
+        vi.importActual<typeof import("#flows/musicDownloadFlow/runController")>(
+            "#flows/musicDownloadFlow/runController"
+        );
+
+    test("Claude's own start of a track it holds goes through; the user's is refused", async () => {
+        const { runSelected: realRunSelected } = await real();
+        const t = makeTrack("task:own1", "Song", { state: "pending" });
+        installWorld([t]);
+        const process = vi.spyOn(TaskOrchestrator.getInstance(), "processTasks").mockResolvedValue(undefined);
+        const got = new AgentTurn().acquire(["task:own1"]);
+        expect("lease" in got).toBe(true);
+
+        expect(await realRunSelected(new Set(["task:own1"]))).toMatch(/Claude is working/);
+        expect(process).not.toHaveBeenCalled();
+
+        expect(await realRunSelected(new Set(["task:own1"]), { actor: "agent" })).toBeUndefined();
+        expect([...(process.mock.calls[0]?.[0] ?? [])]).toEqual(["task:own1"]);
+    });
+
+    test("the tool says so when the run controller started nothing", async () => {
+        const t = makeTrack("task:refused1", "Song", { state: "pending", toTag: false, toDownload: false });
+        installWorld([t]);
+        vi.mocked(runSelected).mockResolvedValueOnce("Another run is going on.");
+        const result = await callTool("run_metadata", { taskIds: ["task:refused1"] });
+        expect(result.json.started).toEqual([]);
+        expect(result.json.skipped).toEqual([{ taskId: "task:refused1", reason: "Another run is going on." }]);
+    });
+
+    test('"Run all" leaves out a track Claude holds, and starts the others', async () => {
+        const { runAll } = await real();
+        const held1 = makeTrack("task:ra1", "Held", { state: "pending" });
+        const free = makeTrack("task:ra2", "Free", { state: "pending" });
+        installWorld([held1, free]);
+        const process = vi.spyOn(TaskOrchestrator.getInstance(), "processTasks").mockResolvedValue(undefined);
+        new AgentTurn().acquire(["task:ra1"]);
+
+        await runAll();
+        expect([...(process.mock.calls[0]?.[0] ?? [])]).toEqual(["task:ra2"]);
+        expect(held1.getStatus().get().message).not.toBe("Queued");
+
+        // Nobody holds anything: no filter, as before.
+        installWorld([held1, free]);
+        process.mockClear();
+        await runAll();
+        expect(process).toHaveBeenCalledWith(undefined);
+    });
+});
+
 describe("/undo", () => {
+    test("two undos at once restore the entry once, and a change recorded meanwhile keeps its own undo", async () => {
+        const { AgentJournal } = await import("#base/agent/journal");
+        const journal = new AgentJournal(() => 1);
+        const work = held();
+        const restoreOld = vi.fn(() => work.promise);
+        const restoreNew = vi.fn();
+        journal.record({ tool: "old", label: "old", checks: [], restore: restoreOld });
+
+        const first = journal.undoLast();
+        const second = await journal.undoLast();
+        expect(second).toMatchObject({ done: false, reason: "busy" });
+        // Recorded while the first restore is still waiting.
+        journal.record({ tool: "new", label: "new", checks: [], restore: restoreNew });
+        work.finish();
+        expect(await first).toMatchObject({ done: true });
+        expect(restoreOld).toHaveBeenCalledTimes(1);
+        // The newer entry was not popped in place of the one just restored.
+        expect(journal.list().map((e) => e.tool)).toEqual(["new"]);
+    });
+
     test("waits while Claude still holds the task, then undoes the change whole", async () => {
         const t = makeTrack("task:und1", "Song");
         installWorld([t]);

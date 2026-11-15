@@ -133,6 +133,25 @@ function joinSameCall<T>(
     return promise;
 }
 
+/**
+ * Starts never-run tracks through the batch and returns the ones that really started. The run controller says no
+ * (answers a reason) when it started none: those are reported as skipped instead of "started", so the model is not
+ * told a track is running that nothing is going to run.
+ */
+async function startBatch(label: string, tasks: readonly DownloadTask[], skipped: Skipped[]): Promise<DownloadTask[]> {
+    if (tasks.length === 0) return [];
+    try {
+        const refusal = await runSelected(new Set(tasks.map((t) => t.getId())), { actor: "agent" });
+        if (!refusal) return [...tasks];
+        logger.warn(`${label} not started: ${refusal}`);
+        for (const t of tasks) skipped.push({ taskId: t.getId(), reason: refusal });
+    } catch (error) {
+        logger.warn(`${label} failed: ${error instanceof Error ? error.message : String(error)}`);
+        for (const t of tasks) skipped.push({ taskId: t.getId(), reason: "it could not be started" });
+    }
+    return [];
+}
+
 /** Starts `work` without waiting for it: the call answers at once, the run goes on in the background. */
 function inBackground(label: string, work: Promise<unknown>): void {
     work.catch((error) => logger.warn(`${label} failed: ${error instanceof Error ? error.message : String(error)}`));
@@ -148,20 +167,23 @@ export const runMetadata = defineAgentTool<RunInput>({
     input: taskIdsSchema,
     example: { taskIds: ["task:1a2b3c4d5e6f"] },
     describeCall: (input) => `run_metadata (${input.taskIds.length})`,
-    run: ({ taskIds }, ctx) => {
+    run: async ({ taskIds }, ctx) => {
         const { tasks, skipped } = pickRunnable(taskIds);
         if (tasks.length === 0) return { started: [], skipped };
-        const fresh = takeFreeBatch(tasks.filter(isUnrun), skipped);
+        const freeBatch = takeFreeBatch(tasks.filter(isUnrun), skipped);
         const again = tasks.filter((t) => !isUnrun(t));
-        if (fresh.length === 0 && again.length === 0) return { started: [], skipped };
-        const overBudget = ctx.turn.spend([...fresh, ...again].map((t) => t.getId()));
+        if (freeBatch.length === 0 && again.length === 0) return { started: [], skipped };
+        const overBudget = ctx.turn.checkBudget([...freeBatch, ...again].map((t) => t.getId()));
         if (overBudget) throw new AgentToolError(overBudget, "budget");
         // A track that was never run goes through the normal start (queue, limits, state), with downloads off.
-        for (const task of fresh) task.setRunFlags({ toTag: true, toDownload: false }, { actor: "agent" });
-        if (fresh.length > 0) inBackground("run_metadata", runSelected(new Set(fresh.map((t) => t.getId()))));
+        for (const task of freeBatch) task.setRunFlags({ toTag: true, toDownload: false }, { actor: "agent" });
+        const fresh = await startBatch("run_metadata", freeBatch, skipped);
         for (const task of again) inBackground("run_metadata", task.runMetadataPart({ actor: "agent" }));
+        const started = [...fresh, ...again];
+        if (started.length === 0) return { started: [], skipped };
+        ctx.turn.count(started.map((t) => t.getId()));
         return {
-            started: [...fresh, ...again].map((t) => ({
+            started: started.map((t) => ({
                 taskId: t.getId(),
                 how: fresh.includes(t) ? "first run" : "again",
             })),
@@ -193,7 +215,8 @@ export const runDownload = defineAgentTool<RunInput>({
                 skipped.push({ taskId: t.getId(), reason: "its metadata is not ready: run_metadata first" });
             }
             if (tasks.length === 0) return { started: [], skipped };
-            const overBudget = ctx.turn.spend(tasks.map((t) => t.getId()));
+            // Counted only once the user said yes: a declined question changes nothing, so it costs nothing.
+            const overBudget = ctx.turn.checkBudget(tasks.map((t) => t.getId()));
             if (overBudget) throw new AgentToolError(overBudget, "budget");
             const allowed = await askToDownload(ctx, tasks);
             // Checked before the answer: Stop takes the dialog away (answer null), which is not the user saying no.
@@ -202,6 +225,7 @@ export const runDownload = defineAgentTool<RunInput>({
 
             // The answer may have taken a while: only what can still be started is.
             const live = pickRunnable(tasks.map((t) => t.getId())).tasks.filter(ready);
+            ctx.turn.count(live.map((t) => t.getId()));
             for (const task of live) inBackground("run_download", task.runDownloadPart({ actor: "agent" }));
             return {
                 started: live.map((t) => ({ taskId: t.getId() })),
@@ -232,17 +256,20 @@ export const runTask = defineAgentTool<RunInput>({
                 });
             }
             if (tasks.length === 0) return { started: [], skipped };
-            const overBudget = ctx.turn.spend(tasks.map((t) => t.getId()));
+            // Counted only once the user said yes: a declined question changes nothing, so it costs nothing.
+            const overBudget = ctx.turn.checkBudget(tasks.map((t) => t.getId()));
             if (overBudget) throw new AgentToolError(overBudget, "budget");
             const allowed = await askToDownload(ctx, tasks);
             if (conversationMovedOn(ctx)) return movedOn;
             if (!allowed) return declined;
 
             // The answer may have taken a while (and another run may have started these tracks meanwhile).
-            const live = takeFreeBatch(pickRunnable(tasks.map((t) => t.getId())).tasks.filter(isUnrun), skipped);
-            if (live.length === 0) return { started: [], skipped, note: "They were started in the meantime." };
-            for (const task of live) task.setRunFlags({ toTag: true, toDownload: true }, { actor: "agent" });
-            inBackground("run_task", runSelected(new Set(live.map((t) => t.getId()))));
+            const freeBatch = takeFreeBatch(pickRunnable(tasks.map((t) => t.getId())).tasks.filter(isUnrun), skipped);
+            if (freeBatch.length === 0) return { started: [], skipped, note: "They were started in the meantime." };
+            for (const task of freeBatch) task.setRunFlags({ toTag: true, toDownload: true }, { actor: "agent" });
+            const live = await startBatch("run_task", freeBatch, skipped);
+            if (live.length === 0) return { started: [], skipped };
+            ctx.turn.count(live.map((t) => t.getId()));
             return {
                 started: live.map((t) => ({ taskId: t.getId() })),
                 ...(skipped.length > 0 ? { skipped } : {}),

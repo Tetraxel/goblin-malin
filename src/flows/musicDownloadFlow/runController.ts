@@ -1,20 +1,41 @@
 import { TaskOrchestrator } from "#base/task/orchestrator";
 import { StatusType } from "#base/task/task-status";
-import { taskLocks } from "#base/task/taskLock";
+import { taskLocks, type LockHolder } from "#base/task/taskLock";
 import { globalLogger } from "#base/logger/logger";
 import { dialogBridge } from "#base/bridges/dialogBridge";
 import { type DownloadTask } from "./utils/downloadTask";
 import { type CollectionTask } from "./utils/collectionTask";
 
-/** Queue every candidate task and start processing. */
+/** Whether one of the task's parts (re-fetch, re-discover, download) is running: it leaves `state` alone. */
+const isPartRunning = (task: object): boolean => Boolean((task as { partRunning?: boolean }).partRunning);
+
+/**
+ * Queue every candidate task and start processing.
+ *
+ * A task Claude holds, or one of whose parts is running, is left out, as {@link runSelected} does: starting it would
+ * rebuild the groups under whoever is writing to them. It stays pending for the next run.
+ */
 export async function runAll(): Promise<void> {
     const orchestrator = TaskOrchestrator.getInstance();
+    // Set only when something was left out: the orchestrator then processes just these (without a filter it takes
+    // every pending task, the locked ones included).
+    let only: Set<string> | undefined;
     if (!orchestrator.isProcessing()) {
-        for (const task of orchestrator.getTasksCandidates()) {
-            task.getStatus().set({ type: StatusType.Pending, message: "Queued" });
+        const candidates = orchestrator.getTasksCandidates();
+        const startable = candidates.filter((task) => {
+            if (taskLocks.isLocked(task.getId(), "user") || isPartRunning(task)) {
+                globalLogger.info(`Not started: ${task.getId()} is being worked on`);
+                return false;
+            }
+            return true;
+        });
+        for (const task of startable) task.getStatus().set({ type: StatusType.Pending, message: "Queued" });
+        if (startable.length < candidates.length) {
+            if (startable.length === 0) return;
+            only = new Set(startable.map((t) => t.getId()));
         }
     }
-    orchestrator.processTasks();
+    orchestrator.processTasks(only);
 }
 
 /**
@@ -37,7 +58,13 @@ export async function explainRefusedRun(refusal: string | undefined): Promise<vo
  * or being edited by Claude): a sentence the user can read, see {@link explainRefusedRun}. `undefined` when at least
  * one task was started.
  */
-export async function runSelected(selectedIds: ReadonlySet<string>): Promise<string | undefined> {
+export async function runSelected(
+    selectedIds: ReadonlySet<string>,
+    options: { actor?: LockHolder } = {}
+): Promise<string | undefined> {
+    // Who asks: a task is refused when the OTHER one holds it. Claude starting a track it holds itself (it set the
+    // run flags just before) is fine; the user starting a track Claude holds is not.
+    const actor = options.actor ?? "user";
     const orchestrator = TaskOrchestrator.getInstance();
     // The caller's set may be live UI state (the list's selection): the ones left out are removed from our own copy.
     const ids = new Set(selectedIds);
@@ -53,8 +80,10 @@ export async function runSelected(selectedIds: ReadonlySet<string>): Promise<str
     for (const t of tasks) {
         if (!ids.has(t.getId())) continue;
         // Claude is changing this task right now: starting it would reset what it is editing. Not run this time.
-        if (taskLocks.isLocked(t.getId(), "user")) {
-            globalLogger.info(`Not started: Claude is working on ${t.getId()}`);
+        if (taskLocks.isLocked(t.getId(), actor)) {
+            globalLogger.info(
+                `Not started: ${actor === "agent" ? "the user is" : "Claude is"} working on ${t.getId()}`
+            );
             ids.delete(t.getId());
             claudeBusy++;
             continue;
@@ -63,7 +92,7 @@ export async function runSelected(selectedIds: ReadonlySet<string>): Promise<str
         const state = attrs?.state;
         // Already running (or one of its parts is, which leaves `state` alone): resetting it now would empty the rows
         // the running work is writing to.
-        if (state === "running" || (t as unknown as { partRunning?: boolean }).partRunning) {
+        if (state === "running" || isPartRunning(t)) {
             globalLogger.info(`Not started: ${t.getId()} is already running`);
             ids.delete(t.getId());
             alreadyRunning++;
@@ -94,7 +123,7 @@ export async function runSelected(selectedIds: ReadonlySet<string>): Promise<str
     // Every task asked for was left out above: nothing to process, and the user must be told why.
     if (selectedIds.size > 0 && ids.size === 0 && (claudeBusy > 0 || alreadyRunning > 0)) {
         return claudeBusy > 0 && alreadyRunning === 0
-            ? "Claude is working on this right now. Try again in a moment."
+            ? `${actor === "agent" ? "The user is" : "Claude is"} working on this right now. Try again in a moment.`
             : "Already running.";
     }
     // Pass the ID filter so the orchestrator only processes the selected tasks,

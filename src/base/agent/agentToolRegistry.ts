@@ -100,6 +100,7 @@ export class AgentToolRegistry {
                 const taskId = (input as Record<string, unknown>).taskId;
                 if (typeof taskId !== "string") return failure(`${name} needs a taskId.`);
                 const got = turn.acquire([this.canonicalTaskId(taskId)], tool.leaseMs);
+                if ("ended" in got) return failure("The user stopped this turn.");
                 if ("heldBy" in got) {
                     return failure(`Task ${taskId} is being edited by someone else right now. Try again in a moment.`);
                 }

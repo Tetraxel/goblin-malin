@@ -66,21 +66,37 @@ export class AgentJournal {
     async undoLast(): Promise<UndoResult> {
         const entry = this.entries.at(-1);
         if (!entry) return { done: false, reason: "nothing" };
+        // A restore can yield to the event loop: a second undo started meanwhile would restore the same entry twice.
+        if (this.undoing) return { done: false, reason: "busy", entry };
         for (const { taskId, revisionAfter } of entry.checks) {
             const revision = this.revisionOf(taskId);
             if (revision === undefined) {
-                this.entries.pop();
-                this.emit();
+                this.remove(entry);
                 return { done: false, reason: "gone", entry, taskId };
             }
             if (revision !== revisionAfter) return { done: false, reason: "changed", entry, taskId };
         }
         const busy = entry.checks.find(({ taskId }) => this.isBusy(taskId));
         if (busy) return { done: false, reason: "busy", entry, taskId: busy.taskId };
-        await entry.restore();
-        this.entries.pop();
-        this.emit();
+        this.undoing = true;
+        try {
+            await entry.restore();
+        } finally {
+            this.undoing = false;
+        }
+        // That entry, not "the last one": a change recorded while the restore was waiting is newer and stays.
+        this.remove(entry);
         return { done: true, entry };
+    }
+
+    /** Whether an undo is restoring an entry right now. */
+    private undoing = false;
+
+    private remove(entry: JournalEntry): void {
+        const index = this.entries.indexOf(entry);
+        if (index === -1) return;
+        this.entries.splice(index, 1);
+        this.emit();
     }
 
     clear(): void {

@@ -170,7 +170,7 @@ describe("AgentTurn", () => {
         turn.end();
         expect(locks.isLocked("a")).toBe(false);
         expect(turn.signal.aborted).toBe(true);
-        expect(turn.acquire(["c"])).toEqual({ heldBy: {} });
+        expect(turn.acquire(["c"])).toEqual({ ended: true });
     });
 
     test("a task someone else holds cannot be taken", () => {

@@ -297,6 +297,7 @@ export const applyBatch = defineAgentTool<{ planId: string }>({
             plan.items.map((i) => i.taskId),
             180_000
         );
+        if ("ended" in got) throw new AgentToolError("The user stopped this turn: nothing was applied.", "stopped");
         if ("heldBy" in got)
             throw new AgentToolError(
                 "Some of those tasks are being edited right now. Try again in a moment.",

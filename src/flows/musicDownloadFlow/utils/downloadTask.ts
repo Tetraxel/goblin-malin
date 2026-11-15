@@ -1326,8 +1326,11 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         return taskLocks.isLocked(this.id, actor);
     }
 
-    /** Throws {@link TaskLockedError} when another holder has the task. */
-    private assertWritable(options?: WriteOptions): void {
+    /**
+     * Throws {@link TaskLockedError} when another holder has the task. Public for the list's start / restart actions,
+     * which have no named write method of their own (they go through the pipeline) but must be refused the same way.
+     */
+    assertWritable(options?: WriteOptions): void {
         const actor = options?.actor ?? "user";
         if (taskLocks.isLocked(this.id, actor)) throw new TaskLockedError(taskLocks.heldBy(this.id)!);
     }
@@ -2073,26 +2076,38 @@ export class DownloadTask extends Task<TrackDownloadTask> {
     async startDownloads(signal?: AbortSignal): Promise<void> {
         // One download run per track: a second one would empty `downloadSources` under the first, whose rows are
         // addressed by position. The callers check too (a clear message); this is what keeps the rows whole.
-        if (this.downloadRunActive) {
-            this.logger.warn("startDownloads ignored: a download run is already going on this task");
-            return;
+        if (this.downloadRun) {
+            // A run that was stopped is still unwinding (its processes end after the abort): this one waits for it
+            // instead of being dropped, which the caller would take for a download that ran.
+            if (this.downloadRun.signal?.aborted) await this.downloadRun.done.catch(() => undefined);
+            // Still one going (not stopped, or another call got in first): saying so beats returning as if it ran.
+            if (this.downloadRun) {
+                const message = "A download run is already going on this track: wait for it to finish, or stop it.";
+                this.logger.warn(`Downloads not started: ${message}`);
+                throw new Error(message);
+            }
         }
-        this.downloadRunActive = true;
         this.status.setFallback("downloads", {
             type: StatusType.Processing,
             message: "Searching downloads",
             timeTracking: true,
         });
+        const run: { signal?: AbortSignal; done: Promise<void> } = { signal, done: this.runDownloads(signal) };
+        this.downloadRun = run;
         try {
-            await this.runDownloads(signal);
+            await run.done;
         } finally {
-            this.downloadRunActive = false;
-            this.status.setFallback("downloads", undefined);
+            // Only the run that is still the current one clears the status: a stopped run that ends late must not
+            // wipe the one that took over.
+            if (this.downloadRun === run) {
+                this.downloadRun = undefined;
+                this.status.setFallback("downloads", undefined);
+            }
         }
     }
 
-    /** Whether {@link startDownloads} is in flight. */
-    private downloadRunActive = false;
+    /** The download run in flight ({@link startDownloads}), with the signal that can stop it. */
+    private downloadRun?: { signal?: AbortSignal; done: Promise<void> };
 
     private async runDownloads(signal?: AbortSignal): Promise<void> {
         const metadataGroups = this.getAttributes()?.metadataGroups;

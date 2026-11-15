@@ -99,7 +99,7 @@ describe("runSelected", () => {
 });
 
 describe("one download run per track", () => {
-    test("a second startDownloads on the same track is ignored while the first goes on", async () => {
+    test("a second startDownloads on the same track is refused (not silently dropped) while the first goes on", async () => {
         const task = makeTrack("dl", "Song") as DownloadTask;
         let release!: () => void;
         const gate = new Promise<void>((resolve) => (release = resolve));
@@ -107,12 +107,34 @@ describe("one download run per track", () => {
             .spyOn(task as unknown as { runDownloads: () => Promise<void> }, "runDownloads")
             .mockImplementation(() => gate);
         const first = task.startDownloads();
-        await task.startDownloads();
+        // A caller must not take "nothing happened" for "the downloads ran".
+        await expect(task.startDownloads()).rejects.toThrow(/already going/);
         expect(run).toHaveBeenCalledTimes(1);
         release();
         await first;
         // Once the first is over, the track can be run again.
         await task.startDownloads();
+        expect(run).toHaveBeenCalledTimes(2);
+    });
+
+    test("a run that was stopped and is still unwinding is waited for, not mistaken for a running one", async () => {
+        const task = makeTrack("dl2", "Song") as DownloadTask;
+        let release!: () => void;
+        const gate = new Promise<void>((resolve) => (release = resolve));
+        const run = vi
+            .spyOn(task as unknown as { runDownloads: () => Promise<void> }, "runDownloads")
+            .mockImplementationOnce(() => gate)
+            .mockImplementation(() => Promise.resolve());
+        const stop = new AbortController();
+        const first = task.startDownloads(stop.signal);
+        stop.abort();
+        // The restart arrives while the aborted run's processes are still ending.
+        const second = task.startDownloads(new AbortController().signal);
+        await Promise.resolve();
+        expect(run).toHaveBeenCalledTimes(1);
+        release();
+        await first;
+        await second;
         expect(run).toHaveBeenCalledTimes(2);
     });
 });

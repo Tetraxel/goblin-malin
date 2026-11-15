@@ -7,7 +7,7 @@ import { type ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
 import { runWithoutCache } from "#utils/cache";
 import { startOptionsBridge } from "#base/bridges/startOptionsBridge";
 import { deleteConfirmBridge } from "#base/bridges/deleteConfirmBridge";
-import { TaskLockedError, type DownloadTask } from "./utils/downloadTask";
+import { TaskLockedError, runUserEdit, type DownloadTask } from "./utils/downloadTask";
 import { type CollectionTask } from "./utils/collectionTask";
 import { explainRefusedRun, runSelected } from "./runController";
 import { toAppUri as toOpenableUri } from "#utils/appLinks";
@@ -43,6 +43,16 @@ type BarAttributes = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isTrackTask = (t: Task<any>): t is DownloadTask =>
     (t.getAttributes() as MusicDownloadTaskAttributes | undefined)?.kind === "track";
+
+/**
+ * Sets TAG? / DL? on a task of a multi-selection. A track goes through `setRunFlags`, which refuses one Claude holds
+ * (logged); an album or playlist has no such method and keeps the plain attribute write.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function setFlag(task: Task<any>, flags: { toTag?: boolean; toDownload?: boolean }): void {
+    if (isTrackTask(task)) runUserEdit(() => task.setRunFlags(flags));
+    else task.updateAttributes(flags);
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isCollectionTask = (t: Task<any>): t is CollectionTask =>
@@ -167,10 +177,16 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
     // Stopped and pending tasks start fresh; anything else is a restart.
     const hasBeenRun = state !== "pending" && state !== "stopped";
     // Already-run tasks restart without cache; pending/stopped tasks start normally.
-    const runTask = (t: DownloadTask) =>
-        t.getAttributes()?.state !== "pending" && t.getAttributes()?.state !== "stopped"
-            ? fire(runWithoutCache(() => t.restart()))
-            : fire(t.start());
+    // A track Claude holds is not started or restarted: that would rebuild what it is editing (the batch path,
+    // `runSelected`, refuses it the same way). The refusal is logged, as the panels do.
+    const runTask = (t: DownloadTask) => {
+        if (!runUserEdit(() => t.assertWritable())) return;
+        if (t.getAttributes()?.state !== "pending" && t.getAttributes()?.state !== "stopped") {
+            fire(runWithoutCache(() => t.restart()));
+        } else {
+            fire(t.start());
+        }
+    };
     const needsOptions = (t: DownloadTask) => {
         const a = t.getAttributes();
         return !a?.toTag && !a?.toDownload;
@@ -186,7 +202,7 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
                     startOptionsBridge.request({
                         taskCount: 1,
                         apply: (opts) => {
-                            task.updateAttributes(opts);
+                            if (!runUserEdit(() => task.setRunFlags(opts))) return;
                             runTask(task);
                         },
                     });
@@ -204,7 +220,8 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
                     startOptionsBridge.request({
                         taskCount: selected.length,
                         apply: (opts) => {
-                            needing.forEach((t) => t.updateAttributes(opts));
+                            // One held by Claude keeps its flags (and `runSelected` leaves it out below).
+                            needing.forEach((t) => runUserEdit(() => t.setRunFlags(opts)));
                             doRun(selected);
                         },
                     });
@@ -292,10 +309,10 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
             label: "Toggle tagging",
             multiSelectAllowed: true,
             runOnCellClick: true,
-            onClick: () => task.updateAttributes({ toTag: !attrs?.toTag }),
+            onClick: () => void runUserEdit(() => task.setRunFlags({ toTag: !attrs?.toTag })),
             onClickBatch: (tasks) => {
                 const newValue = !attrs?.toTag;
-                tasks.forEach((t) => t.updateAttributes({ toTag: newValue }));
+                tasks.forEach((t) => setFlag(t, { toTag: newValue }));
             },
         });
     }
@@ -306,10 +323,10 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
             label: "Toggle downloading",
             multiSelectAllowed: true,
             runOnCellClick: true,
-            onClick: () => task.updateAttributes({ toDownload: !attrs?.toDownload }),
+            onClick: () => void runUserEdit(() => task.setRunFlags({ toDownload: !attrs?.toDownload })),
             onClickBatch: (tasks) => {
                 const newValue = !attrs?.toDownload;
-                tasks.forEach((t) => t.updateAttributes({ toDownload: newValue }));
+                tasks.forEach((t) => setFlag(t, { toDownload: newValue }));
             },
         });
     }

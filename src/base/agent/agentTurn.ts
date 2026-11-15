@@ -43,8 +43,11 @@ export class AgentTurn {
      * Takes the tasks for the agent. Returns the lease, or the ids someone else holds. The turn remembers the lease
      * and releases it at {@link end} if the caller did not.
      */
-    acquire(taskIds: readonly string[], ttlMs?: number): { lease: TaskLease } | { heldBy: Record<string, string> } {
-        if (this.ended) return { heldBy: {} };
+    acquire(
+        taskIds: readonly string[],
+        ttlMs?: number
+    ): { lease: TaskLease } | { heldBy: Record<string, string> } | { ended: true } {
+        if (this.ended) return { ended: true };
         const result = this.locks.acquire(taskIds, "agent", { ttlMs });
         if (!result.ok) return { heldBy: result.heldBy };
         const lease = result.lease;

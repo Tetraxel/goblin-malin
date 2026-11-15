@@ -2,6 +2,7 @@ import { AgentToolError, defineAgentTool } from "#base/agent/agentTool";
 import { urlParserRegistry } from "#base/urlParser";
 import { taskLocks } from "#base/task/taskLock";
 import { untilAborted } from "#utils/errors";
+import { withTimeout } from "#utils/withTimeout";
 import { buildTrackTask } from "../../utils/buildTrackTask";
 import { MusicBrainzClient } from "../../services/apis/musicbrainz-client";
 import { type TrackDownloadTask } from "../../types";
@@ -18,6 +19,9 @@ import {
 } from "../views";
 
 const isLocked = (id: string) => taskLocks.isLocked(id);
+
+/** How long lookup_url waits for a platform to read one link. */
+const LOOKUP_TIMEOUT_MS = 25_000;
 
 type ListInput = { filter?: TaskFilter; cursor?: string };
 
@@ -159,7 +163,7 @@ export const lookupUrl = defineAgentTool<{ url: string }>({
     },
     example: { url: "https://open.spotify.com/track/4rye8ZgoRgbQPfgBqxjfqG" },
     describeCall: (input) => `lookup_url ${input.url.slice(0, 60)}`,
-    run: async ({ url }) => {
+    run: async ({ url }, ctx) => {
         let parsed: ReturnType<typeof urlParserRegistry.parse> = null;
         try {
             parsed = urlParserRegistry.parse(url.trim());
@@ -178,8 +182,16 @@ export const lookupUrl = defineAgentTool<{ url: string }>({
         // A throwaway task, never added to the list: it only gives the services somewhere to report to.
         const scratch = buildTrackTask(url.trim(), { toTag: true, toDownload: false });
         try {
-            await scratch.startPrimaryMetadataFetching();
+            // Stop ends the wait at once, and a service that never answers ends it after a while (search_music has the
+            // same two limits): the request in flight finishes by itself and its answer is dropped.
+            await withTimeout(
+                untilAborted(scratch.startPrimaryMetadataFetching(), ctx.signal),
+                LOOKUP_TIMEOUT_MS,
+                "the platform did not answer in time"
+            );
         } catch (error) {
+            // Stop is not a failed lookup: let the turn end instead of answering "could not read the link".
+            if (ctx.signal.aborted) throw error;
             return {
                 recognized: true,
                 platform: parsed.platform,
