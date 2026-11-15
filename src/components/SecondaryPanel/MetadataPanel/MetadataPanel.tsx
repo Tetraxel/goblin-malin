@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Box } from "ink";
 import { useTheme } from "#base/themeContext";
 import { type Task, type TaskSnapshot } from "#base/task/task";
+import { useFollowTaskSnapshot } from "#hooks/useFollowTaskSnapshot";
 import { type CursorPosition, type Updater } from "#hooks/useFocusManager";
 import {
     type MusicDownloadTaskAttributes,
@@ -77,12 +78,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
         setSnapshot(typedTask?.get() as TaskSnapshot<MusicDownloadTaskAttributes> | undefined);
     }
 
-    useEffect(() => {
-        if (!typedTask) return;
-        return (typedTask as Task<MusicDownloadTaskAttributes>).subscribe((t) => {
-            setSnapshot(t.get() as TaskSnapshot<MusicDownloadTaskAttributes>);
-        });
-    }, [typedTask]);
+    useFollowTaskSnapshot(typedTask, snapshot, setSnapshot);
 
     // Stable identities while the task snapshot is unchanged (e.g. navigating
     // fields/sources), so `compiled` and the memoized rows below can bail.
@@ -113,7 +109,9 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
     // What can be done about the verdict, as buttons next to it. The plain "re-check" is left out while the louder
     // "sources changed" button is shown: it would be the same thing twice.
     const musicBrainzActions = useMemo(() => {
-        if (!typedTask || snapshot?.attributes?.kind !== "track") return [];
+        // The task's own kind, not `snapshot`'s: in the render where the selection changes, `snapshot` is still the
+        // previous task's until the reset above re-runs this component (a track's, while `typedTask` is an album).
+        if (!typedTask || typedTask.getAttributes()?.kind !== "track") return [];
         return musicBrainzActionItems(typedTask as unknown as DownloadTask)
             .filter((item) => !(item.id === "recheck" && showMusicBrainzRecheck))
             .map((item) => ({ id: item.id, label: item.buttonLabel, run: item.run }));

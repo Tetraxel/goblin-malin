@@ -109,16 +109,30 @@ The JSON result gains a `profile` field; `--pretty` prints a `profile` section.
 
 - **Per-component table** — `renders`, total `self ms`, `p95`, and `wasted` (parent-only re-renders — React.memo candidates), sorted by self time. Ink's own `Box`/`Text` appear here and show the raw redraw volume.
 - **Per-interaction breakdown** — for `boot` and each keystroke: commit count, React time, Ink output time (`ink`), app-component wasted renders, and the top components by self time. This is a per-keystroke render budget.
-- **Two cost axes** — `react` is the cost of running component functions (reconciliation); `ink` is Ink's output cost (Yoga layout + ANSI diff + write), captured from Ink's own `onRender`. A component can be cheap to render but expensive to lay out — both are reported.
+- **Cost axes** — `react` is the cost of running component functions (reconciliation); `ink` is the time of Ink's `Output` stage (React tree → string), captured from Ink's own `onRender`; `layout` is Yoga's layout of each commit and `write` / `KB` the time spent in `stdout.write` and the bytes sent to the terminal. Ink's `renderTime` alone leaves out layout and the write, so the three are recorded separately. A component can be cheap to render but expensive to lay out — all are reported.
 - **Anomalies** — see below.
 
 ### How it works (so you can trust the numbers)
 
 - `src/profiling/install.ts` installs a `__REACT_DEVTOOLS_GLOBAL_HOOK__` and sets `DEV=true` so Ink wires the reconciler into it. The app is wrapped in one `<Profiler>` to force React's ProfileMode tree-wide, which is what populates per-fiber timing. On each commit the hook walks the fiber tree.
-- "Did this component render this commit?" uses React's `PerformedWork` flag (the same signal DevTools uses) — **not** `actualDuration`, which is stale on memoized/bailed-out subtrees.
+- "Did this component render this commit?" uses React's `PerformedWork` flag (the same signal DevTools uses) — **not** `actualDuration`, which is stale on memoized/bailed-out subtrees. Like DevTools, the walk only descends into a fiber's children when its child list is not the one of the previous tree (`fiber.child !== fiber.alternate.child`): a subtree that was reused untouched keeps the flags of the render that made it and would otherwise be counted again at every commit. A fiber is a mount only inside a subtree created by that commit.
 - Records are written as JSONL synchronously per commit, so they survive the harness killing the PTY. The harness buckets them against timestamped keystroke marks.
 
 > Visual output is identical to a normal run, so all `snapshot`/`assert`/`screenshot` steps still work under `--profile`.
+
+### Development vs production build
+
+By default the profiled app runs the **development** build of React (`yarn tsx src/profiling/profiledEntry.tsx`), which is the only one that records per-component times. That build is not what users run: in the shipped bundle React is 2–5 % of a keystroke's CPU and Ink's output stage 75–83 % (AUDIT-performance-2.md), so per-component milliseconds rank the wrong things first. For frame, layout, write and byte numbers use the production build:
+
+```json
+{ "profile": { "enabled": true, "build": "production" } }
+```
+
+It runs the same entry with `NODE_ENV=production`: `ink`, `layout`, `write`, bytes, CPU and event-loop samples stay valid; per-component times are 0 (React's profiler timer is off there; render counts and reasons are still recorded). For the **built bundle itself** (what users run, no hooks at all) use [`bench/latency.ts`](#key-latency).
+
+### Colours
+
+The scenario runner starts the app with `FORCE_COLOR=3` (truecolor, what Windows Terminal, iTerm2 and most Linux terminals give it): 16-colour output would make every frame about 30 % shorter than a user's. A scenario that wants another level sets it in its `env` (`{ "env": { "FORCE_COLOR": "1" } }`).
 
 ### Anomalies, thresholds, and baselines
 
@@ -197,6 +211,12 @@ yarn tsx scripts/tui-test/perfCompare.ts before after
 Results go to `profiling/results/<label>.json` (git-ignored). **Counts** (commits, Ink frames, renders per component) are reliable from run to run and from machine to machine; **milliseconds** only compare runs made on the same machine, back to back, and are development-build numbers. `--only a,b`, `--no-bench` and `--no-scenarios` narrow a run. Run nothing else heavy while it measures; a full run takes about 20 minutes.
 
 To measure from a state you are about to change, copy the tree first (without `node_modules`, with a junction to it) and run the suite there, so you can keep editing.
+
+### Key latency
+
+`bench/latency.ts` drives the **built bundle** (`yarn build`, then `node dist/cli.js`) through a PTY and reports what a user feels: per key, the time to the first byte and until the screen has settled, and the bytes the terminal had to parse; for a held key, how long the screen keeps moving after release. `perfSuite.ts` runs four configurations of it (`↓` at 128×50 and 200×60, `Ctrl+A`/`Esc`, view switch `2`/`1`, all with 2,000 tasks) and `perfCompare.ts` prints them as "key latency"; `--no-latency` skips them. Options and the reasoning are in the header of the file and in AUDIT-performance-2.md. Use `--interval 400` or more for `↓`: the second frame of a trailing debounce lands 130–270 ms after the key.
+
+The machine-independent part is checked in CI: `tests/e2e/perf.test.ts` asserts that an isolated `↓` sends one frame of bytes, not two.
 
 ### Micro-benchmarks
 

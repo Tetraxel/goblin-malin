@@ -15,6 +15,16 @@ export type DownloadUpdateOptions = {
     abort?: () => void;
 };
 
+/** What the user's download strategy (Settings → Download) asks of one `downloadTrack` call. */
+export type DownloadTrackOptions = {
+    /**
+     * The most files this call may download for the track (1 when the options are left out). A provider that
+     * finds several candidates (e.g. Soulseek) may keep going after a success until it has this many; one that
+     * can only produce a single file (e.g. yt-dlp) ignores it. Never exceeded, never above `MAX_DOWNLOADS_PER_PROVIDER`.
+     */
+    maxDownloads: number;
+};
+
 export type DownloadUpdateCallback = (source: TrackDownloadSource, options?: DownloadUpdateOptions) => void;
 
 /**
@@ -60,12 +70,14 @@ export abstract class DownloadService extends ServiceBase {
      *                 row was most recently touched. This lets a service show every real
      *                 attempt (pending/downloading/failed/downloaded) as its own row
      *                 instead of collapsing them into one shared status.
-     * @returns The completed track download source
+     * @param options See {@link DownloadTrackOptions}.
+     * @returns The completed track download source (with several downloads: the last one reported)
      */
     abstract downloadTrack(
         trackMetadata: TrackMetadata,
         onUpdate?: DownloadUpdateCallback,
-        signal?: AbortSignal
+        signal?: AbortSignal,
+        options?: DownloadTrackOptions
     ): Promise<TrackDownloadSource>;
 
     /**

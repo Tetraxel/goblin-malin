@@ -43,10 +43,11 @@ export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) 
     const contentHeight = Math.max(1, height - 1);
 
     const liveSelectedTask = tasks[taskList.selectedTaskIndex] ?? null;
-    // Freeze the heavy detail panels while the task cursor is moving; they catch up
-    // ~80ms after the user settles. This keeps task-list scrolling smooth — the
-    // secondary panel is the dominant per-keystroke render cost otherwise.
-    const selectedTask = useDebouncedValue(liveSelectedTask, 80);
+    // Freeze the heavy detail panels while the task cursor is moving fast (a held arrow key); they catch up
+    // ~80ms after the user settles. A single press shows the panel in the same frame as the cursor (`leading`):
+    // a trailing-only debounce painted a second full-screen frame 80 ms later for every key, see
+    // AUDIT-performance-2.md (PERF2-02).
+    const selectedTask = useDebouncedValue(liveSelectedTask, 80, { leading: true });
 
     const activeTabKey = subTab === "metadataSources" ? "3" : subTab === "downloadSources" ? "4" : "5";
 

@@ -1,9 +1,10 @@
-﻿import React, { useState, useEffect, useMemo } from "react";
+﻿import React, { useState, useMemo } from "react";
 import { Box } from "ink";
 import fs from "fs";
 import path from "path";
 import { useFocusActions, useFocusChrome, useFocusSecondaryPanel } from "#contexts/FocusContext";
 import { type Task, type TaskSnapshot } from "#base/task/task";
+import { useFollowTaskSnapshot } from "#hooks/useFollowTaskSnapshot";
 import { StatusType } from "#base/task/task-status";
 import { useTheme } from "#base/themeContext";
 import {
@@ -81,12 +82,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
         setSavedFocused(false);
     }
 
-    useEffect(() => {
-        if (!typedTask) return;
-        return (typedTask as Task<MusicDownloadTaskAttributes>).subscribe((t) => {
-            setSnapshot(t.get() as TaskSnapshot<MusicDownloadTaskAttributes>);
-        });
-    }, [typedTask]);
+    useFollowTaskSnapshot(typedTask, snapshot, setSnapshot);
 
     // A collection (album/playlist) task has no download sources of its own —
     // select a child track to see its downloads.

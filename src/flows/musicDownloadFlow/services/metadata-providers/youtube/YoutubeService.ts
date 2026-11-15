@@ -1,4 +1,5 @@
-﻿import YTMusic, { type SongFull, type VideoFull, type ArtistFull, type AlbumFull } from "ytmusic-api";
+﻿import type YTMusic from "ytmusic-api";
+import type { SongFull, VideoFull, ArtistFull, AlbumFull } from "ytmusic-api";
 import { type Logger } from "#base/logger/logger";
 import { type ParsedUrl, type CollectionExpansion } from "#base/urlParser";
 import { type Task } from "#base/task/task";
@@ -41,7 +42,9 @@ export class YoutubeService extends MetadataService {
     private async getClient(): Promise<YTMusic> {
         return this.runExclusive("init", async () => {
             if (!YoutubeService.client) {
-                const ytMusic = new YTMusic();
+                // Loaded on first use: ~90 ms of start-up the app does not need until a YouTube link is read.
+                const { default: YTMusicClient } = await import("ytmusic-api");
+                const ytMusic = new YTMusicClient();
                 await ytMusic.initialize();
                 YoutubeService.client = ytMusic;
             }

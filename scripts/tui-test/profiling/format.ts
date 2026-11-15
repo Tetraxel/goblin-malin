@@ -24,12 +24,13 @@ export function formatProfile(p: ProfileReport): string {
     const t = p.totals;
     lines.push(
         `  ${GRAY}commits${R} ${t.commits}   ${GRAY}react${R} ${t.reactMs}ms   ` +
-            `${GRAY}ink frames${R} ${t.inkFrames} (${t.inkMs}ms)   ${GRAY}worst commit${R} ${t.maxCommitMs}ms   ` +
+            `${GRAY}ink frames${R} ${t.inkFrames} (output ${t.inkMs}ms, layout ${t.layoutMs}ms)   ` +
+            `${GRAY}worst commit${R} ${t.maxCommitMs}ms   ` +
             `${GRAY}components${R} ${t.components}`
     );
     lines.push(
         `  ${GRAY}process cpu${R} ${t.cpuMs}ms   ${GRAY}longest loop block${R} ${t.lagMaxMs}ms   ` +
-            `${GRAY}heap max${R} ${t.heapMaxMb}MB`
+            `${GRAY}heap max${R} ${t.heapMaxMb}MB   ${GRAY}written${R} ${(t.bytes / 1024).toFixed(0)}KB in ${t.writeMs}ms`
     );
 
     // Top components by total self time.
@@ -55,7 +56,8 @@ export function formatProfile(p: ProfileReport): string {
             .join(" ");
         lines.push(
             `  ${tag.padEnd(28)} ${GRAY}commits${R} ${String(it.commits).padStart(3)}  ` +
-                `${GRAY}react${R} ${String(it.reactMs).padStart(6)}ms  ${GRAY}ink${R} ${String(it.inkMs).padStart(6)}ms  ` +
+                `${GRAY}react${R} ${String(it.reactMs).padStart(6)}ms  ${GRAY}ink${R} ${String(it.inkMs).padStart(6)}ms  ${GRAY}layout${R} ${String(it.layoutMs).padStart(5)}ms  ` +
+                `${GRAY}write${R} ${String(it.writeMs).padStart(5)}ms ${(it.bytes / 1024).toFixed(0).padStart(4)}KB  ` +
                 `${GRAY}wasted${R} ${String(it.wasted).padStart(4)}  ${GRAY}cpu${R} ${String(it.cpuMs).padStart(5)}ms  ` +
                 `${GRAY}block${R} ${String(it.lagMaxMs).padStart(5)}ms   ${DIM}${top}${R}`
         );

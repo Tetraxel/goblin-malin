@@ -43,8 +43,26 @@ export interface CommitRecord {
 export interface InkFrameRecord {
     type: "ink";
     t: number;
-    /** Ink's measured output render time in ms (from its `onRender` option). */
+    /**
+     * Ink's measured output render time in ms (from its `onRender` option). It times only the `Output` stage
+     * (React tree → string): Yoga layout and the terminal write are the `layout` and `write` records.
+     */
     renderMs: number;
+}
+
+/** The Yoga layout run for one React commit (`calculateLayout`), which Ink's `renderTime` does not include. */
+export interface LayoutRecord {
+    type: "layout";
+    t: number;
+    ms: number;
+}
+
+/** One `process.stdout.write`: how long the call took and how many bytes it sent to the terminal. */
+export interface WriteRecord {
+    type: "write";
+    t: number;
+    ms: number;
+    bytes: number;
 }
 
 /**
@@ -65,7 +83,7 @@ export interface RuntimeRecord {
     heapMb: number;
 }
 
-export type ProfileRecord = CommitRecord | InkFrameRecord | RuntimeRecord;
+export type ProfileRecord = CommitRecord | InkFrameRecord | LayoutRecord | WriteRecord | RuntimeRecord;
 
 /**
  * Callbacks the app pulls off `globalThis` in profile mode. Set by

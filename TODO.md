@@ -31,6 +31,7 @@
 **Housekeeping**
 
 - [ ] Dependencies left: `zod` advisory (waits for `ytmusic-api` on zod 4), ESLint 10 (waits for `eslint-plugin-react`; add `cause`s), TypeScript 7 (waits for `typescript-eslint`) — `DEP-02`, `DEP-03`
+- [x] `tests/e2e/perf.test.ts` › "an isolated key paints one frame, not two" failed on Windows — the Metadata and Download tabs re-set the snapshot they had just rendered (`Task.subscribe` replay); React re-rendered for it every other key (an empty commit) and Ink on Windows repaints every full-screen commit, even an unchanged one. Fixed with `useFollowTaskSnapshot` (`immediate: false` + identity catch-up); the test now treats the first two keys as set-up
 - [ ] Get the unit tests green on Linux CI, then enable them there (they only run on Windows now)
 - [ ] **Linux has no working ffmpeg/ffprobe download** — `resolveFfmpegSource` has a macOS branch and treats everything else as Windows (fetches the win64 zip); check, and either add a Linux build or state Linux is unsupported
 

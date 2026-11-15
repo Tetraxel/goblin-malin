@@ -10,6 +10,7 @@ import { DISABLE_MOUSE, ENABLE_MOUSE, extractMouseEvents, mouseRegistry } from "
 import { fpsTracker } from "./base/fpsTracker";
 import { initMusicApp } from "./flows/musicDownloadFlow/init";
 import os from "node:os";
+import { SettingsStore } from "./settings/settingsStore";
 import { textInputFocus } from "./base/textInputFocus";
 import { getAppDataDir } from "./utils/appPaths";
 import { acquireInstanceLock, releaseInstanceLock } from "./utils/instanceLock";
@@ -112,6 +113,8 @@ export function start(): void {
     const options: RenderOptions & { onRender?: (info: { renderTime: number }) => void } = {
         patchConsole: true,
         maxFps: 60,
+        // Redraw only the lines that changed (Settings → General): a fraction of the bytes per frame. Read once.
+        incrementalRendering: SettingsStore.getInstance().getAppSettings().general.reduceTerminalOutput,
         exitOnCtrlC: false,
     };
     options.onRender = (info) => {

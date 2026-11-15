@@ -69,13 +69,17 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
     const keepDataDir = !!process.env["GOBLIN_TUI_KEEP_DATA"];
     if (keepDataDir) console.error(`[tui-test] data folder kept at ${isolated.dir}`);
     const slowMode = !!(process.env["GOBLIN_SLOW"] ?? scenario.env?.["GOBLIN_SLOW"]);
-    Object.assign(ptyEnv, scenario.env ?? {}, {
+    // Truecolor (`FORCE_COLOR=3`) like Windows Terminal, iTerm2 and most Linux terminals give the app: 16 colours
+    // would make every frame ~30 % shorter than a user's (AUDIT-performance-2.md, TOOL2-02). A scenario can
+    // still ask for another level in its `env` (a screenshot test of the 16-colour theme, say).
+    Object.assign(ptyEnv, { FORCE_COLOR: "3" }, scenario.env ?? {}, {
         TERM: "xterm-256color",
-        FORCE_COLOR: "1",
         COLORTERM: "truecolor",
         GOBLIN_NO_AUDIO: "1",
         GOBLIN_DATA_DIR: isolated.dir,
         ...(profileOut ? { DEV: "true", GOBLIN_PROFILE_OUT: profileOut } : {}),
+        // The build users run (`profile.build: "production"`): see ProfileConfig.build.
+        ...(profileCfg?.build === "production" ? { NODE_ENV: "production" } : {}),
         ...(loadControl ? { GOBLIN_PROFILE_CONTROL: loadControl } : {}),
     });
 

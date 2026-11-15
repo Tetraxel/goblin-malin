@@ -26,6 +26,19 @@ export interface InkFrameRecord {
     renderMs: number;
 }
 
+export interface LayoutRecord {
+    type: "layout";
+    t: number;
+    ms: number;
+}
+
+export interface WriteRecord {
+    type: "write";
+    t: number;
+    ms: number;
+    bytes: number;
+}
+
 export interface RuntimeRecord {
     type: "runtime";
     t: number;
@@ -35,7 +48,7 @@ export interface RuntimeRecord {
     heapMb: number;
 }
 
-export type ProfileRecord = CommitRecord | InkFrameRecord | RuntimeRecord;
+export type ProfileRecord = CommitRecord | InkFrameRecord | LayoutRecord | WriteRecord | RuntimeRecord;
 
 /** A keystroke/text step, timestamped by the runner, used to attribute commits. */
 export interface InteractionMark {
@@ -78,7 +91,14 @@ export interface InteractionStat {
     commits: number;
     reactMs: number;
     inkFrames: number;
+    /** Ink's `Output` stage only (see `layoutMs` and `writeMs` for the rest of a frame). */
     inkMs: number;
+    /** Yoga layout, summed over the interaction's commits. */
+    layoutMs: number;
+    /** Time spent inside `stdout.write`. */
+    writeMs: number;
+    /** Bytes sent to the terminal. */
+    bytes: number;
     wasted: number;
     /** Process CPU time (user + system) spent during this interaction, from the ~250 ms runtime samples. */
     cpuMs: number;
@@ -124,6 +144,10 @@ export interface ProfileReport {
         reactMs: number;
         inkFrames: number;
         inkMs: number;
+        layoutMs: number;
+        writeMs: number;
+        /** Bytes sent to the terminal over the whole run (boot included). */
+        bytes: number;
         components: number;
         maxCommitMs: number;
         /** Process CPU time over the whole run (boot included), in ms. */
@@ -146,4 +170,10 @@ export interface ProfileConfig {
     thresholds?: Partial<Thresholds>;
     /** Regenerate the baseline for this scenario instead of comparing. */
     updateBaseline?: boolean;
+    /**
+     * Which build of React/Ink the profiled app runs. `development` (default) gives per-component render times;
+     * `production` (`NODE_ENV=production`) is what users run: frame, layout, write and byte numbers stay valid,
+     * per-component times and render counts are not recorded (React's profiler timer is off there).
+     */
+    build?: "development" | "production";
 }

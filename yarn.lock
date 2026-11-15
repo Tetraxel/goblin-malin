@@ -2410,7 +2410,7 @@ ink-text-input@^6.0.0:
     chalk "^5.3.0"
     type-fest "^4.18.2"
 
-ink@^8.0.0:
+ink@8.0.0:
   version "8.0.0"
   resolved "https://registry.yarnpkg.com/ink/-/ink-8.0.0.tgz#7023d1e0022c44b54ecab3ac91e306fa00129e9b"
   integrity sha512-M2aFwZOqmkFxCwedy6xrP4E+DGoK57iahAFnfTqNyOyJ54O7DZzu027z/NI8EGy44Sw9O9BcbTF4QEUS2GHAtg==
@@ -3785,7 +3785,7 @@ stop-iteration-iterator@^1.1.0:
     es-errors "^1.3.0"
     internal-slot "^1.1.0"
 
-string-width@^8.1.0, string-width@^8.2.0, string-width@^8.2.1, string-width@^8.3.0:
+string-width@^8.1.0, string-width@^8.2.0, string-width@^8.3.0:
   version "8.3.0"
   resolved "https://registry.yarnpkg.com/string-width/-/string-width-8.3.0.tgz#f1e85ca6d276ed9226c979c3651fb7abf548fbbe"
   integrity sha512-ZbmZM0JCihQN91dWnxoipT2KOEyHqEyfRXUyjuRhW8b/xnqPDoq4gWEVApTVa9db2wN8mmoikgFBbjh71+cGeQ==

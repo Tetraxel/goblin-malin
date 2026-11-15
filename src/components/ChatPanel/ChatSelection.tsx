@@ -8,7 +8,7 @@ import { computeCompiledMetadata } from "#flows/musicDownloadFlow/utils/compiled
 import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import { CHAT_AGENT_COLOR } from "./chatPanelState";
 
-/** How long the task cursor must rest before the chip follows it (the Metadata and Download panels wait the same). */
+/** How long the task cursor must rest before the chip follows it (the Metadata and Download panels wait the same, and show a single key press at once). */
 const SELECTION_DEBOUNCE_MS = 80;
 
 /** A track's "Title – Artist" as the list shows it; an album or playlist is named by its kind. */
@@ -50,7 +50,7 @@ export const ChatSelection: React.FC<Props> = ({ tasks, selectionRef, show }) =>
         selectionRef.current = live;
     }, [live, selectionRef]);
 
-    const ids = useDebouncedValue(live, SELECTION_DEBOUNCE_MS);
+    const ids = useDebouncedValue(live, SELECTION_DEBOUNCE_MS, { leading: true });
     if (!show) return null;
 
     if (ids.length === 0) {

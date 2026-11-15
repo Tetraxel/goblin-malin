@@ -7,11 +7,13 @@ import type {
     ComponentStat,
     InkFrameRecord,
     InteractionMark,
+    LayoutRecord,
     InteractionStat,
     ProfileRecord,
     ProfileReport,
     RuntimeRecord,
     Thresholds,
+    WriteRecord,
 } from "./types.ts";
 
 const TOP_COMPONENTS = 40;
@@ -55,13 +57,18 @@ interface Bucket {
     label: string;
     commits: CommitRecord[];
     inks: InkFrameRecord[];
+    layouts: LayoutRecord[];
+    writes: WriteRecord[];
     runtimes: RuntimeRecord[];
 }
 
 function bucketize(records: ProfileRecord[], marks: InteractionMark[]): Bucket[] {
     const sorted = [...marks].sort((a, b) => a.t - b.t);
-    const buckets: Bucket[] = [{ index: -1, label: "boot", commits: [], inks: [], runtimes: [] }];
-    for (const m of sorted) buckets.push({ index: m.index, label: m.label, commits: [], inks: [], runtimes: [] });
+    const buckets: Bucket[] = [
+        { index: -1, label: "boot", commits: [], inks: [], layouts: [], writes: [], runtimes: [] },
+    ];
+    for (const m of sorted)
+        buckets.push({ index: m.index, label: m.label, commits: [], inks: [], layouts: [], writes: [], runtimes: [] });
 
     const bucketFor = (t: number): Bucket => {
         let chosen = buckets[0]!;
@@ -76,6 +83,8 @@ function bucketize(records: ProfileRecord[], marks: InteractionMark[]): Bucket[]
         const b = bucketFor(r.t);
         if (r.type === "commit") b.commits.push(r);
         else if (r.type === "ink") b.inks.push(r);
+        else if (r.type === "layout") b.layouts.push(r);
+        else if (r.type === "write") b.writes.push(r);
         else b.runtimes.push(r);
     }
     return buckets;
@@ -145,6 +154,9 @@ function interactionStat(b: Bucket): InteractionStat {
         reactMs: Math.round(reactMs * 100) / 100,
         inkFrames: b.inks.length,
         inkMs: Math.round(inkMs * 100) / 100,
+        layoutMs: Math.round(b.layouts.reduce((sum, l) => sum + l.ms, 0) * 100) / 100,
+        writeMs: Math.round(b.writes.reduce((sum, w) => sum + w.ms, 0) * 100) / 100,
+        bytes: b.writes.reduce((sum, w) => sum + w.bytes, 0),
         wasted,
         cpuMs: Math.round(b.runtimes.reduce((sum, r) => sum + r.cpuMs, 0)),
         lagMaxMs: Math.round(b.runtimes.reduce((m, r) => Math.max(m, r.lagMaxMs), 0) * 10) / 10,
@@ -242,6 +254,8 @@ export function analyzeRecords(records: ProfileRecord[], options: AnalyzeOptions
     const buckets = bucketize(records, options.marks);
     const allCommits = records.filter((r): r is CommitRecord => r.type === "commit");
     const allInks = records.filter((r): r is InkFrameRecord => r.type === "ink");
+    const allLayouts = records.filter((r): r is LayoutRecord => r.type === "layout");
+    const allWrites = records.filter((r): r is WriteRecord => r.type === "write");
 
     const components = aggregateComponents(allCommits);
     const interactions = buckets.map(interactionStat);
@@ -256,6 +270,9 @@ export function analyzeRecords(records: ProfileRecord[], options: AnalyzeOptions
             reactMs: Math.round(allCommits.reduce((s, c) => s + c.durationMs, 0) * 100) / 100,
             inkFrames: allInks.length,
             inkMs: Math.round(allInks.reduce((s, f) => s + f.renderMs, 0) * 100) / 100,
+            layoutMs: Math.round(allLayouts.reduce((s, l) => s + l.ms, 0) * 100) / 100,
+            writeMs: Math.round(allWrites.reduce((s, w) => s + w.ms, 0) * 100) / 100,
+            bytes: allWrites.reduce((s, w) => s + w.bytes, 0),
             components: components.length,
             maxCommitMs: Math.round(maxCommitMs * 100) / 100,
             cpuMs: Math.round(allRuntimes.reduce((s, r) => s + r.cpuMs, 0)),
