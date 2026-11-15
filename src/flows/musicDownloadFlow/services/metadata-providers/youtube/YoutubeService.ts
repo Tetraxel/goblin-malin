@@ -303,6 +303,48 @@ export class YoutubeService extends MetadataService {
         return metadata;
     }
 
+    async searchTracks(query: string, limit: number): Promise<TrackMetadata[]> {
+        const client = await this.getClient();
+        const songs = await client.searchSongs(query);
+        return songs.slice(0, Math.max(1, limit)).map((song): TrackMetadata => {
+            const url = `https://www.youtube.com/watch?v=${song.videoId}`;
+            return {
+                id: song.videoId,
+                isrc: undefined,
+                trackName: song.name,
+                duration: song.duration ? song.duration * 1000 : undefined,
+                trackNumber: undefined,
+                url,
+                uri: `YOUTUBE::TRACK::${song.videoId}` as TrackUri<"youtube">,
+                album: song.album
+                    ? {
+                          id: song.album.albumId,
+                          albumName: song.album.name,
+                          url: `https://music.youtube.com/browse/${song.album.albumId}`,
+                          uri: `youtube:album:${song.album.albumId}`,
+                      }
+                    : undefined,
+                artists: song.artist
+                    ? [
+                          {
+                              id: song.artist.artistId || "",
+                              type: "artist" as const,
+                              name: song.artist.name,
+                              url: song.artist.artistId
+                                  ? `https://music.youtube.com/browse/${song.artist.artistId}`
+                                  : "",
+                              uri: `youtube:artist:${song.artist.artistId || song.artist.name}`,
+                          },
+                      ]
+                    : [],
+                platform: "youtube",
+                apiProvider: "youtube",
+                fetchedAt: new Date(),
+                type: "track",
+            } as TrackMetadata;
+        });
+    }
+
     async searchTrack(sourceTrackMetadata: TrackMetadata): Promise<SearchTrackResult[]> {
         const artist = sourceTrackMetadata.artists?.[0]?.name;
         const trackName = sourceTrackMetadata.trackName;

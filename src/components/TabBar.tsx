@@ -14,11 +14,23 @@ interface TabBarProps {
     activeTabKey: string;
     /** If provided, inserts a ┴ junction at this x position instead of a plain ├ */
     splitPos?: number;
+    /** The last character of the line: ┤ closes it on the frame; ┬ when a vertical line starts under it and `trailing` goes on. */
+    endChar?: string;
+    /** Drawn on the same row after the bar (the title of a panel beside it). */
+    trailing?: React.ReactNode;
     /** Called with the tab's key when it is clicked. Tabs are not clickable without it. */
     onSelect?: (key: string) => void;
 }
 
-export const TabBar: React.FC<TabBarProps> = ({ width, tabs, activeTabKey, splitPos, onSelect }) => {
+export const TabBar: React.FC<TabBarProps> = ({
+    width,
+    tabs,
+    activeTabKey,
+    splitPos,
+    endChar = "┤",
+    trailing,
+    onSelect,
+}) => {
     const theme = useTheme();
     const tabRefs = useRef<(DOMElement | null)[]>([]);
     const hoveredKey = useTabBarMouse(
@@ -36,8 +48,8 @@ export const TabBar: React.FC<TabBarProps> = ({ width, tabs, activeTabKey, split
             ? "├" + "─".repeat(Math.max(0, splitPos - 1)) + "┴" + "─".repeat(fill)
             : "├" + "─".repeat(fill);
 
-    return (
-        <Box height={1} width={width} overflow="hidden">
+    const bar = (
+        <Box height={1} width={width} overflow="hidden" flexShrink={0}>
             <Text color={theme.ui.border}>{lineStr}</Text>
             <Text color={theme.ui.border}>{"  "}</Text>
             {tabs.map((tab, i) => {
@@ -70,7 +82,15 @@ export const TabBar: React.FC<TabBarProps> = ({ width, tabs, activeTabKey, split
                     </React.Fragment>
                 );
             })}
-            <Text color={theme.ui.border}>{" ─┤"}</Text>
+            <Text color={theme.ui.border}>{` ─${endChar}`}</Text>
         </Box>
+    );
+    return trailing ? (
+        <Box height={1} flexShrink={0}>
+            {bar}
+            {trailing}
+        </Box>
+    ) : (
+        bar
     );
 };

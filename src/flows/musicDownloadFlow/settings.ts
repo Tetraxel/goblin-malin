@@ -58,6 +58,21 @@ export type MusicDownloadFlowSettings = {
         /** The port of MusicBrainz Picard's browser integration (Picard: Options → Network → Browser integration). */
         picardPort: string;
     };
+    /**
+     * The chat agent (P32): Claude, through the user's own Claude Code CLI, reads and changes the tasks on request.
+     * Off until the user allows it, once. Its CLI path is the one of the Claude discovery provider (Settings → Metadata).
+     */
+    agent: {
+        enabled: boolean;
+        /** The user has been asked (so a "no" is not asked again). */
+        consentAsked: boolean;
+        /** A `CLAUDE_MODELS` alias or a full model name. */
+        model: string;
+        /** Columns of the chat panel beside the task list: set by dragging its edge or with the resize shortcuts. */
+        panelWidth: number;
+        /** Keep `agent.log` (in the data folder): everything said to and by Claude, and every tool call, raw. */
+        keepLog: boolean;
+    };
     collections: {
         /** How often a live-enabled playlist re-fetches its track list, in seconds. */
         defaultLiveRefreshIntervalSeconds: number;
@@ -127,6 +142,13 @@ export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSetting
         contributeVia: "harmony",
         harmonyUrl: "https://harmony.pulsewidth.org.uk",
         picardPort: "8000",
+    },
+    agent: {
+        enabled: false,
+        consentAsked: false,
+        model: "sonnet",
+        panelWidth: 42,
+        keepLog: true,
     },
     collections: {
         defaultLiveRefreshIntervalSeconds: 120,

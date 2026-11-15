@@ -21,7 +21,8 @@ interface MetadataSourceDetailProps {
     isActive: boolean;
     width: number;
     height: number;
-    onOverrideChange: (overrides: MetadataOverrides) => void;
+    /** Returns false when the edit was refused (the field then shows an error). */
+    onOverrideChange: (overrides: MetadataOverrides) => boolean | void;
     /** A field row was clicked: focus the detail pane and move the field cursor there. Must be referentially stable. */
     onSelectField: (index: number) => void;
     /** Mouse-wheel: move the field cursor without moving keyboard focus. */
@@ -192,7 +193,10 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
                 }
             }
 
-            onOverrideChange({ ...overrides, [editingField]: parsed });
+            if (onOverrideChange({ ...overrides, [editingField]: parsed }) === false) {
+                setEditError(true);
+                return;
+            }
             stopEditing();
         },
         [editingField, compiled, overrides, onOverrideChange, stopEditing]

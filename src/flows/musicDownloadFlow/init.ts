@@ -11,6 +11,8 @@ import { MusicBrainzDiscoveryService } from "./services/metadata-providers/music
 import { ClaudeDiscoveryService } from "./services/metadata-providers/claude/ClaudeDiscoveryService";
 import { YtDlpService } from "./services/download-providers/ytdlp/YtDlpService";
 import { SoulseekService } from "./services/download-providers/soulseek/SoulseekService";
+import { registerAgentTools } from "./agent/registerAgentTools";
+import { taskLocks } from "#base/task/taskLock";
 
 let initialized = false;
 
@@ -36,6 +38,11 @@ export function initMusicApp(): void {
 
     downloadServiceRegistry.register("ytdlp", YtDlpService);
     downloadServiceRegistry.register("soulseek", SoulseekService);
+
+    // The tools the chat agent can call (the chat itself only starts when the user asks and allows it).
+    registerAgentTools();
+    // A lock never outlives the process: begin with every task free.
+    taskLocks.clear();
 
     applyConcurrencySettings();
     SettingsStore.getInstance().onSettingsChanged(applyConcurrencySettings);

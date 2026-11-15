@@ -36,6 +36,7 @@ export const SUITE_SCENARIOS = [
     "perf-scale-2000",
     "perf-load-tasks",
     "perf-load-logs",
+    "perf-chat-stream",
     "perf-sessions-heavy",
     "perf-modals",
 ];

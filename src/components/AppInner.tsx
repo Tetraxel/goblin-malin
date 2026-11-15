@@ -41,6 +41,9 @@ import { TempCleanupModal } from "./TempCleanupModal/TempCleanupModal";
 import { useConfirmModal } from "./ConfirmModal/useConfirmModal";
 import { useTheme } from "#base/themeContext";
 import { useQuitShortcut } from "#hooks/useQuitShortcut";
+import { useFocusChrome } from "#contexts/FocusContext";
+import { ChatPanel } from "./ChatPanel/ChatPanel";
+import { CHAT_PANEL_WIDTH, clampChatWidth, isChatDocked, useChatOpen, useChatWidth } from "./ChatPanel/chatPanelState";
 
 export const AppInner: React.FC<{
     tasks: Task<TaskAttributes>[];
@@ -50,11 +53,25 @@ export const AppInner: React.FC<{
     updateInfo: UpdateInfo | null;
 }> = ({ tasks, columns, terminalHeight, terminalWidth, updateInfo }) => {
     const theme = useTheme();
-    const { pendingConfig, openConfirmModal, openConfirmModalWhenFree, handleConfirm, handleCancel } =
-        useConfirmModal();
+    const {
+        pendingConfig,
+        openConfirmModal,
+        openConfirmModalWhenFree,
+        withdrawConfirmModal,
+        handleConfirm,
+        handleCancel,
+    } = useConfirmModal();
     // Notices raised by background work wait for the welcome intro to close: they would land in its animation.
     const introOpen = useSyncExternalStore(introState.subscribe, introState.isOpen);
     const tooSmall = isTerminalTooSmall(terminalWidth, terminalHeight);
+    // The chat (P32) sits beside the task list when the terminal is wide enough, and is a window over it otherwise.
+    const chatOpen = useChatOpen();
+    const { layout } = useFocusChrome();
+    const chatDocked = chatOpen && isChatDocked(terminalWidth);
+    const chatWindow = chatOpen && !chatDocked;
+    const chatWidth = clampChatWidth(useChatWidth(), terminalWidth);
+    const mainWidth = chatDocked ? terminalWidth - chatWidth : terminalWidth;
+    const mainHeight = layout.taskListHeight + layout.secondaryPanelHeight;
     useQuitShortcut(openConfirmModal, pendingConfig, !tooSmall);
     const { pendingImport, openImportFlow, handleImportConfirm, handleImportCancel } = useImportFlow(openConfirmModal);
     const { pendingStart, openStartFlow, handleStartConfirm, handleStartCancel } = useStartFlow();
@@ -184,16 +201,19 @@ Check your internet connection, then try again.`,
                 muted: theme.text.muted,
                 success: theme.status.success,
             };
-            openConfirmModalWhenFree({
+            const config = {
                 title: dialog.title,
                 message: dialog.message,
                 choices: dialog.choices.map((c) => ({ label: c.label, color: colors[c.tone] })),
                 accentColor: dialog.accent ?? theme.action.primary,
-                onConfirm: (i) => resolve(i),
+                onConfirm: (i: number) => resolve(i),
                 onCancel: () => resolve(null),
-            });
+            };
+            openConfirmModalWhenFree(config);
+            // Lets the asker take the dialog back (see `dialogBridge.confirm`'s `signal`).
+            return () => withdrawConfirmModal(config);
         },
-        [openConfirmModalWhenFree, theme]
+        [openConfirmModalWhenFree, withdrawConfirmModal, theme]
     );
 
     useEffect(() => {
@@ -255,13 +275,54 @@ Check your internet connection, then try again.`,
                 <TerminalTooSmall width={terminalWidth} height={terminalHeight} />
             ) : (
                 <Box flexDirection="column" height={terminalHeight} backgroundColor={theme.ui.background}>
-                    <Toolbar width={terminalWidth} updateInfo={updateInfo} />
-                    <TaskListPanel columns={columns} tasks={tasks} width={terminalWidth} />
-                    <SecondaryPanel tasks={tasks} width={terminalWidth} />
-                    <Separator width={terminalWidth} />
+                    <Toolbar
+                        width={terminalWidth}
+                        updateInfo={updateInfo}
+                        chatWidth={chatDocked ? chatWidth : undefined}
+                    />
+                    {/* The same wrapper whether the chat is open or not: the panels must never remount. */}
+                    <Box flexDirection="row" flexShrink={0}>
+                        <Box flexDirection="column" width={mainWidth} flexShrink={0}>
+                            <TaskListPanel columns={columns} tasks={tasks} width={mainWidth} />
+                            <SecondaryPanel tasks={tasks} width={mainWidth} />
+                        </Box>
+                        {chatDocked && (
+                            <ChatPanel
+                                tasks={tasks}
+                                width={chatWidth}
+                                height={mainHeight}
+                                variant="docked"
+                                terminalWidth={terminalWidth}
+                            />
+                        )}
+                    </Box>
+                    <Separator
+                        width={terminalWidth}
+                        splitPositions={chatDocked ? [mainWidth - 1] : undefined}
+                        splitCharacter="┴"
+                    />
                     <Footer />
 
                     {/* Modals rendered above everything else */}
+
+                    {chatWindow && (
+                        <Box
+                            position="absolute"
+                            width="100%"
+                            height={terminalHeight}
+                            flexDirection="column"
+                            justifyContent="center"
+                            alignItems="center"
+                        >
+                            <ChatPanel
+                                tasks={tasks}
+                                width={Math.min(CHAT_PANEL_WIDTH + 28, terminalWidth - 2)}
+                                height={Math.max(8, terminalHeight - 4)}
+                                variant="modal"
+                                terminalWidth={terminalWidth}
+                            />
+                        </Box>
+                    )}
 
                     <PromptModal tasks={tasks} terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
 

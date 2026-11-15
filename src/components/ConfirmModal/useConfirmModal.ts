@@ -42,6 +42,19 @@ export function useConfirmModal() {
         [show]
     );
 
+    /**
+     * Takes `config` away without answering it: off the screen if it is shown (the next one takes its place), out of
+     * the line if it is waiting. For a question whose asker gave up on it.
+     */
+    const withdrawConfirmModal = useCallback(
+        (config: ConfirmModalConfig) => {
+            const waiting = waitingRef.current.indexOf(config);
+            if (waiting >= 0) waitingRef.current.splice(waiting, 1);
+            else if (shownRef.current === config) show(waitingRef.current.shift() ?? null);
+        },
+        [show]
+    );
+
     const handleConfirm = useCallback(
         (index: number) => {
             pendingConfig?.onConfirm(index);
@@ -55,5 +68,12 @@ export function useConfirmModal() {
         show(waitingRef.current.shift() ?? null);
     }, [pendingConfig, show]);
 
-    return { pendingConfig, openConfirmModal, openConfirmModalWhenFree, handleConfirm, handleCancel };
+    return {
+        pendingConfig,
+        openConfirmModal,
+        openConfirmModalWhenFree,
+        withdrawConfirmModal,
+        handleConfirm,
+        handleCancel,
+    };
 }

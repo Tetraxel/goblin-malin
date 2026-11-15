@@ -11,12 +11,14 @@ import fs from "node:fs";
 import { TaskOrchestrator } from "../base/task/orchestrator";
 import { StatusType } from "../base/task/task-status";
 import { globalLogger } from "../base/logger/logger";
+import { chatStore } from "../flows/musicDownloadFlow/agent/chatStore";
 
 interface LoadOptions {
     tasksPerTick?: number;
     tickMs?: number;
     logsPerTick?: number;
     logLevel?: "debug" | "info" | "warn";
+    chatWordsPerTick?: number;
 }
 
 const POLL_MS = 100;
@@ -31,9 +33,12 @@ export function startLoadDriver(): void {
     let tick = 0;
     let cursor = 0;
 
+    let chatStreaming = false;
     const stop = (): void => {
         if (timer) clearInterval(timer);
         timer = undefined;
+        if (chatStreaming) chatStore.setBusy(false);
+        chatStreaming = false;
     };
 
     const start = (options: LoadOptions): void => {
@@ -41,8 +46,34 @@ export function startLoadDriver(): void {
         const tasksPerTick = options.tasksPerTick ?? 0;
         const logsPerTick = options.logsPerTick ?? 0;
         const level = options.logLevel ?? "debug";
+        const chatWordsPerTick = options.chatWordsPerTick ?? 0;
+        if (chatWordsPerTick > 0) {
+            // An answer being written: the chat is busy and text keeps arriving in small pieces.
+            chatStreaming = true;
+            chatStore.addUser("Write something long");
+            chatStore.setBusy(true);
+        }
         timer = setInterval(() => {
             tick++;
+            if (chatWordsPerTick > 0) {
+                // Markdown, like a real answer: a list item with a bold lead now and then.
+                const table =
+                    tick === 4
+                        ? "\n\n| Tool | Kind |\n|---|---|\n| list_tasks | read |\n| set_override | write |\n\n"
+                        : tick === 6
+                          ? "\n\n| Tool | Resource | What I get |\n|---|---|---|\n| list_tasks | Tasks (tracks, albums) | id, title, state |\n\n"
+                          : "";
+                const item = table || (tick % 8 === 0 ? `\n- **item ${tick}**: ` : "");
+                // A tool call with its raw input and answer, so the "details" of a tool line can be looked at.
+                if (tick === 2)
+                    chatStore.addTool("load-tool", "get_task task:3d6da40a5c5c", { taskId: "task:3d6da40a5c5c" });
+                if (tick === 3) {
+                    chatStore.finishTool("load-tool", false, '{"revision":42,"title":"Toc toc"}');
+                }
+                chatStore.appendAssistant(
+                    item + Array.from({ length: chatWordsPerTick }, (_, i) => `word${tick}-${i} `).join("")
+                );
+            }
             if (tasksPerTick > 0) {
                 const tasks = TaskOrchestrator.getInstance().getTasks();
                 for (let i = 0; i < tasksPerTick && tasks.length > 0; i++) {

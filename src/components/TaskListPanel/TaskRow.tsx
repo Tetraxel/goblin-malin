@@ -4,6 +4,8 @@ import { type Task } from "#base/task/task";
 import { type Theme } from "#base/theme";
 import { useTheme } from "#base/themeContext";
 import { useTask } from "#hooks/useTask";
+import { useTaskLocked } from "#hooks/useTaskLocked";
+import { CHAT_AGENT_COLOR } from "../ChatPanel/chatPanelState";
 import { type CalculatedColumn, type PlaybackState } from "./TaskListPanel";
 
 function getRowBackground(
@@ -46,14 +48,23 @@ export const TaskRow = React.memo(function TaskRow<TAttributes>({
     const theme = useTheme();
     const task = useTask<TAttributes>(taskReference);
 
+    // Claude is changing this task right now: it is greyed, with the agent's glyph where the tick goes. Static on
+    // purpose (like the chat's "working" line): a lease can last minutes, and an animation would repaint the whole
+    // screen several times a second for all that time.
+    const locked = useTaskLocked(task.id);
+
     const isActiveIndicator = isActive ? "☛" : " ";
-    const indicator = isActiveIndicator + (isMultiSelected ? "✓" : " ");
-    const backgroundColor = getRowBackground(theme, isActive, isHighlighted, isMultiSelected);
+    const backgroundColor =
+        getRowBackground(theme, isActive, isHighlighted, isMultiSelected) ??
+        (locked ? theme.ui.rowBackground.regular.highlighted : undefined);
 
     return (
         <Box key={task.id} paddingX={1} overflowY="hidden" backgroundColor={backgroundColor}>
             <Box width={2} flexShrink={0}>
-                <Text color={isActive ? "white" : isMultiSelected ? "cyan" : "white"}>{indicator}</Text>
+                <Text color={isActive ? "white" : isMultiSelected ? "cyan" : "white"}>
+                    {isActiveIndicator}
+                    {locked ? <Text color={CHAT_AGENT_COLOR}>✻</Text> : isMultiSelected ? "✓" : " "}
+                </Text>
             </Box>
             {columns.map((column, index) => {
                 const CellComponent = column.component;

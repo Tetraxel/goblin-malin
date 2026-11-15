@@ -46,7 +46,8 @@ export type FocusableWindow =
     | "updateModal"
     | "confirmModal"
     | "listDialog"
-    | "tempCleanupModal";
+    | "tempCleanupModal"
+    | "chatPanel";
 
 export interface FocusState {
     activeWindow: FocusableWindow;

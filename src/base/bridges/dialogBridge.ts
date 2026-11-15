@@ -52,6 +52,8 @@ export type ListDialogBody = {
 export type ListDialog = ListDialogBody & {
     title: string;
     accent?: string;
+    /** The row the cursor starts on (e.g. the current choice). Default: the first. */
+    initialIndex?: number;
     /**
      * When the content takes a while to get (a network lookup): the dialog opens at once with a loader, and shows
      * this body when it arrives. `null` or a failure closes it (answer `null`). `items` is only shown until then
@@ -63,7 +65,11 @@ export type ListDialog = ListDialogBody & {
 
 export type ListAnswer = { index: number } | { none: true } | null;
 
-type ConfirmOpener = (dialog: ConfirmDialog, resolve: (index: number | null) => void) => void;
+/**
+ * Shows a confirm dialog. May return a function that takes it off the screen again without answering (used when the
+ * caller gives up on it: see `confirm`'s `signal`).
+ */
+type ConfirmOpener = (dialog: ConfirmDialog, resolve: (index: number | null) => void) => void | (() => void);
 type ListOpener = (dialog: ListDialog, resolve: (answer: ListAnswer) => void) => void;
 
 let confirmOpener: ConfirmOpener | null = null;
@@ -123,22 +129,51 @@ export const dialogBridge = {
         if (fn) pump();
         else cancelLists();
     },
-    /** The index of the button pressed, or null when dismissed / nobody to ask. */
-    confirm(dialog: ConfirmDialog): Promise<number | null> {
+    /**
+     * The index of the button pressed, or null when dismissed / nobody to ask.
+     *
+     * With a `signal`: when it aborts (the question is no longer wanted, e.g. the user pressed Stop on the chat
+     * turn that asked it) the dialog is taken off the screen, or out of the queue if it was not shown yet, and the
+     * answer is null. A button pressed later cannot reach the caller.
+     */
+    confirm(dialog: ConfirmDialog, options: { signal?: AbortSignal } = {}): Promise<number | null> {
+        const { signal } = options;
         return new Promise((resolve) => {
-            if (!confirmOpener) return resolve(null);
-            queue.push({
+            if (!confirmOpener || signal?.aborted) return resolve(null);
+            let settled = false;
+            let release: () => void = () => undefined;
+            let withdraw: (() => void) | void = undefined;
+            const settle = (value: number | null) => {
+                if (settled) return;
+                settled = true;
+                signal?.removeEventListener("abort", onAbort);
+                resolve(value);
+            };
+            const entry: Entry = {
                 kind: "confirm",
                 open: (done) => {
                     if (!confirmOpener) return false;
-                    confirmOpener(dialog, (index) => {
+                    release = done;
+                    withdraw = confirmOpener(dialog, (index) => {
                         done();
-                        resolve(index);
+                        settle(index);
                     });
                     return true;
                 },
-                cancel: () => resolve(null),
-            });
+                cancel: () => settle(null),
+            };
+            function onAbort(): void {
+                if (settled) return;
+                const waiting = queue.indexOf(entry);
+                if (waiting >= 0) queue.splice(waiting, 1);
+                else {
+                    withdraw?.();
+                    release();
+                }
+                settle(null);
+            }
+            signal?.addEventListener("abort", onAbort, { once: true });
+            queue.push(entry);
             pump();
         });
     },

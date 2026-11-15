@@ -22,6 +22,8 @@ Design rules, shared by every Claude-backed feature:
 
 ## Next: Claude as an agent
 
+> **Partly taken over by [P32](../p32/tasks.md):** the chat-and-actions half is planned there as one generic mechanism (typed tools, locks, batches, a chat panel). T29.2 and T29.4 are absorbed. **T29.1 stays here**: picking the best source is a non-interactive pipeline decision (one `--json-schema` call), not a chat feature. The rules below still apply.
+
 All of these go through `ClaudeClient` and must follow the rules above (consent, verify, visible). Each needs its own `consent` copy, since "look up a track" and "edit my tags" are different permissions.
 
 ### T29.1 — Pick the best source among several candidates
@@ -34,7 +36,7 @@ Per task: send the compiled metadata + all source metadata; ask for a list of de
 
 ### T29.3 — Find or create a MusicBrainz release
 
-> **Built without Claude, as [P30](../p30/tasks.md):** the lookups, the verdict rules and the "add a missing release" flow are deterministic and guarded. Claude could later be one more *proposer* of candidates (verified by the same rules), never the judge.
+> **Built without Claude, as [P30](../p30/tasks.md):** the lookups, the verdict rules and the "add a missing release" flow are deterministic and guarded. Claude could later be one more _proposer_ of candidates (verified by the same rules), never the judge.
 
 Given a track with no MusicBrainz match, have Claude search MusicBrainz (and the web) for the right release, or draft a new release's data for the user to submit. Output is a release MBID candidate verified against the MusicBrainz API, or a prefilled "add release" link. Overlaps P27's auto-MB-ID work — build the verification once.
 

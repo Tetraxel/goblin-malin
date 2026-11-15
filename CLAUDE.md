@@ -30,7 +30,18 @@ Optional static capabilities a service class can declare (all read generically �
 - `static trackUrl = (id) => url` (metadata services) — canonical URL of one of the service's tracks; read through `platformRegistry.trackUrl()`.
 - `static openUri = (parsed) => uri | undefined` (metadata services) — the address that opens one of the service's links in its desktop app (`spotify:track:<id>`). A link a registered service reads takes its name, colors and app address from that service (`src/utils/appLinks.ts` asks `urlParserRegistry` first); the regex/site table there is only the fallback for sites no service reads.
 - `static columnActions = (task) => ContextualActions[]` (any service) — extra actions for the service's column in the task list (MusicBrainz: review a match, add a missing release); read by `contextualActions.ts` through the registry, shown before the generic copy/open actions. Never branch on a provider key.
+- `searchTracks?(query, limit)` (metadata services, instance method) — a free-text search of the service's catalogue, best matches first. `DownloadTask.searchCatalog` asks every enabled service that has it; the chat agent's `search_music` tool is built on that, so a new provider that can search is found by Claude with no other change.
 - `getAlbumDetails?(album, { withIsrcs })` (metadata services, instance method) — the whole album the track belongs to (barcode, track list, artist pages). A track's own `album` is usually the "simplified" one; the MusicBrainz checks ask the service that owns the album's link (`DownloadTask.fetchAlbumDetails`).
+
+### Agent tools (the chat with Claude)
+
+The chat agent ([P32](docs/projects/p32/tasks.md)) calls **tools**, each declared once with `defineAgentTool` (`src/flows/musicDownloadFlow/agent/tools/`) and registered by `registerAgentTools()` (called from `initMusicApp()`). Nothing lists tools anywhere else: the MCP server, the CLI's `--allowedTools`, `yarn run agent:tools` and [docs/agent-tools.md](docs/agent-tools.md) all read the registry.
+
+- **After adding or changing a tool, run `yarn run agent:tools --write`**: a unit test fails when the committed `docs/agent-tools.md` is out of date. A tool needs a `summary`, an input schema, a `kind` (`read` / `write` / `confirm`), what it `locks` and an `example`, or it does not register.
+- **A tool changes a track only through a named `DownloadTask` method** (`setMetadataOverride`, `selectDownloadSourceById`…), never `updateAttributes`, and goes through `agentWrite()` (`agent/taskAccess.ts`): it refuses a running task and a stale revision, spends the turn's budget and records the undo. The panels call the **same** methods (wrapped in `runUserEdit`, which turns a "Claude holds this task" refusal into a log line). A new field the user can edit gets a method that validates it and checks `assertWritable`, and goes into `computeTaskRevision` if a stale read of it matters.
+- Anything irreversible or public is a `confirm` tool: it asks through `ctx.confirm` (safe button first, "not done" when nobody answers).
+- The agent session has **no built-in tool and no web**; web research stays in the sandboxed `ClaudeClient`. Text from tasks, titles and logs is untrusted data: views return it inside fields, never inside sentences a tool writes.
+- Text streaming into the chat is gathered by `ChatStore` and shown every 300 ms. Do not add a spinner or a faster timer to the chat: every React commit repaints the whole screen.
 
 ### User data is never rebuilt away
 
@@ -42,7 +53,7 @@ Most terminals catch `Ctrl+V` and type the clipboard into the app as plain input
 
 ### Asking the user from plain TypeScript
 
-`dialogBridge.confirm({ title, message, choices })` and `dialogBridge.choose({ title, items, noneLabel })` (`src/base/bridges/dialogBridge.ts`) let a flow ask and `await` the answer; both resolve `null` when dismissed **or when no UI is mounted**, so "nobody answered" is never read as consent. When a list needs a lookup first (a network request), pass `body: Promise<{ items, intro?, noneLabel? } | null>` to `choose`: the dialog opens **at once** with a loader and shows the body when it arrives (`null` or a failure closes it, answered `null`) — never make the user wait on a blank screen before it opens. Dialogs are shown one at a time, in the order asked. Anything that ends in a public or irreversible action (e.g. adding a release to MusicBrainz) goes through it, with the safe button first.
+`dialogBridge.confirm({ title, message, choices })` and `dialogBridge.choose({ title, items, noneLabel })` (`src/base/bridges/dialogBridge.ts`) let a flow ask and `await` the answer; both resolve `null` when dismissed **or when no UI is mounted**, so "nobody answered" is never read as consent. When a list needs a lookup first (a network request), pass `body: Promise<{ items, intro?, noneLabel? } | null>` to `choose`: the dialog opens **at once** with a loader and shows the body when it arrives (`null` or a failure closes it, answered `null`) — never make the user wait on a blank screen before it opens. `confirm` also takes `{ signal }`: when it aborts (the chat turn that asked was stopped) the dialog leaves the screen, or the line if it was not shown yet, and the answer is `null` — an opener returns a "withdraw" function for that, and returns nothing else. Dialogs are shown one at a time, in the order asked. Anything that ends in a public or irreversible action (e.g. adding a release to MusicBrainz) goes through it, with the safe button first.
 
 - `defaultSettings` entries can be `kind: "checkbox" | "textInput" | "select"`.
 - A discovery anchor can set `openLabel` to name the app its `openUri` opens (e.g. "MusicBrainz Picard"); when `url` differs from `openUri`, the web page gets its own "Open in …" action. Both are generic — no provider branching in `contextualActions.ts`.
@@ -58,6 +69,7 @@ Unregistered API platforms (youtubeMusic, deezer, appleMusic, etc.) that appear 
 How it fits together:
 
 - Register shortcuts with `useShortcuts({ id, shortcuts: [{ id, defaultShortcut, label, handler }], ... })`. The `id` (e.g. `sessionsModal.delete`) is the stable key the override is stored against. Dispatch already applies overrides — never call `useInput` directly (the only one lives in `ShortcutDispatcher`).
+    - The one exception is a **text field** that reads the keyboard itself: `ink-text-input` (see `#components/TextInput`) and the chat's `ChatInput`, which replaces it for multi-row text. It calls `useInput` only while it has focus, announces itself with `textInputFocus`, and leaves every key that is a shortcut (Ctrl chords, Esc, Tab, ↑ ↓ PgUp PgDn) to the registry. Its own editing keys (←/→, Home/End, Ctrl+A/E/U, Backspace) are text editing, not app shortcuts, and are not rebindable. Do not add another `useInput` for anything else.
 - **Hints must reference the shortcut `id`, not a literal.** Use the shared `Hint` component:
     - `<Hint label="Delete" shortcutId="sessionsModal.delete" />`
     - `<Hint label="Navigate" shortcutIds={["settingsModal.up", "settingsModal.down"]} />` (resolved literals joined with `/`)

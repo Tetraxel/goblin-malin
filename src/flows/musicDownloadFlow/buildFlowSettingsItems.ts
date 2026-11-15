@@ -7,6 +7,9 @@ import { type SettingsItem } from "#settings/buildSettingsItems";
 import { BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS, type MusicDownloadFlowSettings } from "./settings";
 import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
 import { runTempCleanup } from "./tempCleanupFlow";
+import { chatStore } from "./agent/chatStore";
+import { DEFAULT_CLAUDE_MODEL } from "./services/apis/claude-client";
+import { AGENT_MODELS } from "./agent/chooseAgentModel";
 import { OUTPUT_FORMATS, OUTPUT_FORMAT_KEYS, parseOutputFormat } from "./utils/outputFormat";
 import { DOWNLOAD_STRATEGY_KEYS, DOWNLOAD_STRATEGY_NOTES, parseDownloadStrategy } from "./utils/downloadStrategy";
 
@@ -229,6 +232,53 @@ export function buildFlowSettingsItems(
         label: "MusicBrainz Picard port (its browser integration)",
         get: () => mb.picardPort,
         set: (v) => onChange({ musicBrainz: { picardPort: v } }),
+    });
+
+    // ── Claude agent (P32) ────────────────────────────────────────
+    const agent = { ...BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS.agent, ...flowSettings.agent };
+    items.push({ kind: "sectionHeader", label: "Claude agent (chat)" });
+    items.push({
+        kind: "checkbox",
+        indent: 0,
+        label: "Let Claude read and change my tasks, when I ask in the chat (uses your Claude plan)",
+        // Flipping the switch is an explicit answer: never ask again.
+        get: () => agent.enabled,
+        set: (v) => onChange({ agent: { enabled: v, consentAsked: true } }),
+    });
+    items.push({
+        kind: "select",
+        indent: 0,
+        label: "Model",
+        // A full model name saved earlier is what the agent really runs: it stays listed (and shown) instead of
+        // being displayed as the default.
+        options:
+            agent.model && !(AGENT_MODELS as readonly string[]).includes(agent.model)
+                ? [...AGENT_MODELS, agent.model]
+                : AGENT_MODELS,
+        get: () => agent.model || DEFAULT_CLAUDE_MODEL,
+        set: (v) => onChange({ agent: { model: v } }),
+    });
+    items.push({
+        kind: "checkbox",
+        indent: 0,
+        label: "Keep a log of the conversations and the tool calls (agent.log, in the data folder)",
+        get: () => agent.keepLog !== false,
+        set: (v) => onChange({ agent: { keepLog: v } }),
+    });
+    items.push({
+        kind: "note",
+        indent: 0,
+        text: "Uses the Claude CLI command set under Discovery providers → Claude. It never sees your files or the web, only the tools of the chat.",
+    });
+    const usage = chatStore.getSnapshot().usage;
+    items.push({
+        kind: "readonlyText",
+        indent: 0,
+        label: "Used since launch",
+        value:
+            usage.messages === 0
+                ? "nothing yet"
+                : `${usage.messages} message${usage.messages === 1 ? "" : "s"}, ${usage.turns} model turn${usage.turns === 1 ? "" : "s"}, about $${usage.costUsd.toFixed(3)} at list price`,
     });
 
     // ── Collections (albums/playlists) ─────────────────────────────

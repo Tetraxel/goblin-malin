@@ -7,13 +7,14 @@ import { type ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
 import { runWithoutCache } from "#utils/cache";
 import { startOptionsBridge } from "#base/bridges/startOptionsBridge";
 import { deleteConfirmBridge } from "#base/bridges/deleteConfirmBridge";
-import { type DownloadTask } from "./utils/downloadTask";
+import { TaskLockedError, runUserEdit, type DownloadTask } from "./utils/downloadTask";
 import { type CollectionTask } from "./utils/collectionTask";
-import { runSelected } from "./runController";
+import { explainRefusedRun, runSelected } from "./runController";
 import { toAppUri as toOpenableUri } from "#utils/appLinks";
 import { addLinkFromClipboard } from "./utils/addLinkFromClipboard";
 import { discoveryServiceRegistry } from "./registries";
 import { metadataLimiter, downloadLimiter } from "./utils/stageLimiters";
+import { computeCompiledMetadata } from "./utils/compiledMetadata";
 import type { Task } from "#base/task/task";
 import type { Semaphore } from "#utils/semaphore";
 import { globalLogger } from "#base/logger/logger";
@@ -22,7 +23,10 @@ import { type MusicDownloadTaskAttributes, type TrackDownloadTask, type Collecti
 
 // Suppress the re-throw from @SafeAction — logging is already handled by the decorator.
 const fire = (p: Promise<unknown>): void => {
-    p.catch(() => {});
+    p.catch((error: unknown) => {
+        // "Claude holds this task" is an answer for the user, not a failure to hide.
+        if (error instanceof TaskLockedError) globalLogger.info(error.message);
+    });
 };
 
 type BarAttributes = {
@@ -39,6 +43,16 @@ type BarAttributes = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isTrackTask = (t: Task<any>): t is DownloadTask =>
     (t.getAttributes() as MusicDownloadTaskAttributes | undefined)?.kind === "track";
+
+/**
+ * Sets TAG? / DL? on a task of a multi-selection. A track goes through `setRunFlags`, which refuses one Claude holds
+ * (logged); an album or playlist has no such method and keeps the plain attribute write.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function setFlag(task: Task<any>, flags: { toTag?: boolean; toDownload?: boolean }): void {
+    if (isTrackTask(task)) runUserEdit(() => task.setRunFlags(flags));
+    else task.updateAttributes(flags);
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isCollectionTask = (t: Task<any>): t is CollectionTask =>
@@ -82,11 +96,15 @@ function copyAction(label: string, task: DownloadTask, valueOf: (t: DownloadTask
     };
 }
 
-const primaryResultOf = (t: DownloadTask) =>
-    t
-        .getAttributes()
-        ?.metadataGroups.flatMap((g) => g.results)
-        .find((r) => r.isPrimaryInput);
+/**
+ * The task's metadata as the list shows it: what the platforms found, merged, with the user's overrides on top. The
+ * "Copy artist" / "Copy track title" actions copy this, so they give what the cell shows (not the raw artist of the
+ * link the user pasted, which for a YouTube video is the uploader's channel).
+ */
+const compiledOf = (t: DownloadTask) => {
+    const attrs = t.getAttributes();
+    return computeCompiledMetadata(attrs?.metadataGroups ?? [], attrs?.metadataOverride ?? {});
+};
 
 /** Registry key of the service that provided (or would recognize) the task's source URL. */
 function primaryServiceKeyOf(t: DownloadTask): string | undefined {
@@ -159,10 +177,16 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
     // Stopped and pending tasks start fresh; anything else is a restart.
     const hasBeenRun = state !== "pending" && state !== "stopped";
     // Already-run tasks restart without cache; pending/stopped tasks start normally.
-    const runTask = (t: DownloadTask) =>
-        t.getAttributes()?.state !== "pending" && t.getAttributes()?.state !== "stopped"
-            ? fire(runWithoutCache(() => t.restart()))
-            : fire(t.start());
+    // A track Claude holds is not started or restarted: that would rebuild what it is editing (the batch path,
+    // `runSelected`, refuses it the same way). The refusal is logged, as the panels do.
+    const runTask = (t: DownloadTask) => {
+        if (!runUserEdit(() => t.assertWritable())) return;
+        if (t.getAttributes()?.state !== "pending" && t.getAttributes()?.state !== "stopped") {
+            fire(runWithoutCache(() => t.restart()));
+        } else {
+            fire(t.start());
+        }
+    };
     const needsOptions = (t: DownloadTask) => {
         const a = t.getAttributes();
         return !a?.toTag && !a?.toDownload;
@@ -178,7 +202,7 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
                     startOptionsBridge.request({
                         taskCount: 1,
                         apply: (opts) => {
-                            task.updateAttributes(opts);
+                            if (!runUserEdit(() => task.setRunFlags(opts))) return;
                             runTask(task);
                         },
                     });
@@ -190,13 +214,14 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
                 const selected = tasks as DownloadTask[];
                 const needing = selected.filter(needsOptions);
                 const doRun = (selectedTasks: DownloadTask[]) => {
-                    runSelected(new Set(selectedTasks.map((t) => t.getId())));
+                    fire(runSelected(new Set(selectedTasks.map((t) => t.getId()))).then(explainRefusedRun));
                 };
                 if (needing.length > 0) {
                     startOptionsBridge.request({
                         taskCount: selected.length,
                         apply: (opts) => {
-                            needing.forEach((t) => t.updateAttributes(opts));
+                            // One held by Claude keeps its flags (and `runSelected` leaves it out below).
+                            needing.forEach((t) => runUserEdit(() => t.setRunFlags(opts)));
                             doRun(selected);
                         },
                     });
@@ -225,7 +250,8 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
             }),
     });
     if (group.some((t) => attrsOf(t)?.primaryMetadataFetched)) {
-        const refetch = (t: DownloadTask) => runWithoutCache(() => t.startPrimaryMetadataFetching());
+        const refetch = (t: DownloadTask) =>
+            t.trackPartRun(() => runWithoutCache(() => t.startPrimaryMetadataFetching()));
         taskActions.push({
             shortcuts: [{ input: "f" }],
             label: "Re-fetch primary metadata",
@@ -240,23 +266,24 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
             shortcuts: [{ input: "d" }],
             label: "Re-discover metadata providers",
             multiSelectAllowed: true,
-            onClick: () => fire(task.startMetadataDiscovering()),
+            onClick: () => fire(task.trackPartRun(() => task.startMetadataDiscovering())),
             onClickBatch: (tasks) =>
                 runBatch(
                     tasks,
                     metadataLimiter,
                     (t) => Boolean(attrsOf(t)?.metadataDiscovered),
-                    (t) => t.startMetadataDiscovering()
+                    (t) => t.trackPartRun(() => t.startMetadataDiscovering())
                 ),
         });
     }
     const downloadable = (t: DownloadTask) => Boolean(attrsOf(t)?.downloadsFetched || attrsOf(t)?.metadataDiscovered);
     const eligibleDownloads = group.filter(downloadable);
     if (eligibleDownloads.length > 0) {
-        const download = (t: DownloadTask) => {
-            if (!attrsOf(t)?.downloadsFetched) t.updateAttributes({ toDownload: true });
-            return t.startDownloads();
-        };
+        const download = (t: DownloadTask) =>
+            t.trackPartRun(() => {
+                if (!attrsOf(t)?.downloadsFetched) t.updateAttributes({ toDownload: true });
+                return t.startDownloads();
+            });
         taskActions.push({
             shortcuts: [{ input: "w" }],
             label: eligibleDownloads.every((t) => attrsOf(t)?.downloadsFetched)
@@ -282,10 +309,10 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
             label: "Toggle tagging",
             multiSelectAllowed: true,
             runOnCellClick: true,
-            onClick: () => task.updateAttributes({ toTag: !attrs?.toTag }),
+            onClick: () => void runUserEdit(() => task.setRunFlags({ toTag: !attrs?.toTag })),
             onClickBatch: (tasks) => {
                 const newValue = !attrs?.toTag;
-                tasks.forEach((t) => t.updateAttributes({ toTag: newValue }));
+                tasks.forEach((t) => setFlag(t, { toTag: newValue }));
             },
         });
     }
@@ -296,10 +323,10 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
             label: "Toggle downloading",
             multiSelectAllowed: true,
             runOnCellClick: true,
-            onClick: () => task.updateAttributes({ toDownload: !attrs?.toDownload }),
+            onClick: () => void runUserEdit(() => task.setRunFlags({ toDownload: !attrs?.toDownload })),
             onClickBatch: (tasks) => {
                 const newValue = !attrs?.toDownload;
-                tasks.forEach((t) => t.updateAttributes({ toDownload: newValue }));
+                tasks.forEach((t) => setFlag(t, { toDownload: newValue }));
             },
         });
     }
@@ -317,11 +344,11 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
     }
 
     if (column?.id === "artist") {
-        columnActions.push(copyAction("Copy artist", task, (t) => primaryResultOf(t)?.metadata.artists[0]?.name ?? ""));
+        columnActions.push(copyAction("Copy artist", task, (t) => compiledOf(t).artists[0]?.name ?? ""));
     }
 
     if (column?.id === "track") {
-        columnActions.push(copyAction("Copy track title", task, (t) => primaryResultOf(t)?.metadata.trackName ?? ""));
+        columnActions.push(copyAction("Copy track title", task, (t) => compiledOf(t).trackName ?? ""));
     }
 
     if (column && column.id.startsWith("metadataService-")) {

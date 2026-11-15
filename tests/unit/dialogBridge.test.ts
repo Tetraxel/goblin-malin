@@ -59,7 +59,9 @@ describe("dialogBridge", () => {
 
     test("swapping the confirm opener (a theme change) does not cancel the dialog on screen", async () => {
         let answer: ((i: number | null) => void) | undefined;
-        dialogBridge.setConfirmOpener((_d, resolve) => (answer = resolve));
+        dialogBridge.setConfirmOpener((_d, resolve) => {
+            answer = resolve;
+        });
         const pending = dialogBridge.confirm(confirmDialog("x"));
         dialogBridge.setConfirmOpener(null);
         dialogBridge.setConfirmOpener(() => {});

@@ -11,6 +11,7 @@ import { type UpdateInfo } from "#updater/updateChecker";
 import { UpdateBadge } from "./UpdateBadge";
 import { useCurrentSessionName } from "./useCurrentSessionName";
 import { APP_VERSION } from "#constants";
+import { ChatTitleBar } from "../ChatPanel/ChatTitleBar";
 
 export type ToolbarButtonHook = ({ isSelected }: { isSelected: boolean }) => {
     enabled: boolean;
@@ -30,7 +31,16 @@ export type ToolbarButtonHook = ({ isSelected }: { isSelected: boolean }) => {
  */
 export const TOOLBAR_LOGO_CELL = { x: 2, y: 1 } as const;
 
-export const Toolbar = ({ width, updateInfo }: { width: number; updateInfo?: UpdateInfo | null }) => {
+export const Toolbar = ({
+    width,
+    updateInfo,
+    chatWidth,
+}: {
+    width: number;
+    updateInfo?: UpdateInfo | null;
+    /** Width of the docked chat, if there is one: the view tabs then stop where it starts, and its title takes the rest of the line. */
+    chatWidth?: number;
+}) => {
     const theme = useTheme();
     const { activeWindow, toolbar } = useFocusChrome();
     const isActive = activeWindow === "toolbar";
@@ -110,18 +120,26 @@ export const Toolbar = ({ width, updateInfo }: { width: number; updateInfo?: Upd
                     )}
                 </Box>
             </Box>
-            <PrimaryModeTabBar width={width} splitPos={splitPositions[0] ?? 0} />
+            <PrimaryModeTabBar width={width} splitPos={splitPositions[0] ?? 0} chatWidth={chatWidth} />
         </>
     );
 };
 
-const PrimaryModeTabBar: React.FC<{ width: number; splitPos: number }> = ({ width, splitPos }) => {
+const PrimaryModeTabBar: React.FC<{ width: number; splitPos: number; chatWidth?: number }> = ({
+    width,
+    splitPos,
+    chatWidth,
+}) => {
     const { primaryMode } = useFocusSecondaryPanel();
     const { setPrimaryMode } = useFocusActions();
 
     return (
         <TabBar
-            width={width}
+            // With the chat docked the tabs sit above the main panels, like the ones below them, and the line goes on
+            // into the chat's title.
+            width={chatWidth === undefined ? width : width - chatWidth}
+            endChar={chatWidth === undefined ? undefined : "┬"}
+            trailing={chatWidth === undefined ? undefined : <ChatTitleBar width={chatWidth} />}
             tabs={[
                 { key: "1", label: "Metadata view" },
                 { key: "2", label: "Download view" },

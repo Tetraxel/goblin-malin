@@ -104,7 +104,7 @@ interface CliEnvelope {
     total_cost_usd?: number;
 }
 
-function classifyFailure(text: string): ClaudeErrorCode {
+export function classifyFailure(text: string): ClaudeErrorCode {
     if (/not logged in|please run \/login|invalid api key|authentication|unauthori[sz]ed|credit balance/i.test(text)) {
         return "not-logged-in";
     }
@@ -152,6 +152,19 @@ export class ClaudeClient {
     // Process-wide so the cap and the cooldown hold across every parallel task.
     private static limiter = new Semaphore(MAX_PARALLEL_CALLS);
     private static blockedUntil = 0;
+
+    /**
+     * The plan's usage limit was hit (by any Claude feature: discovery or the chat agent): every further call would
+     * fail the same way, so refuse fast for a while.
+     */
+    static noteQuotaHit(): void {
+        ClaudeClient.blockedUntil = Date.now() + QUOTA_COOLDOWN_MS;
+    }
+
+    /** When Claude may be asked again after a quota failure (epoch ms); 0 or in the past = now. */
+    static quotaBlockedUntil(): number {
+        return ClaudeClient.blockedUntil;
+    }
     private readonly logger = globalLogger.createChild({ service: "ClaudeClient" });
 
     async run<T>(opts: ClaudeRunOptions): Promise<ClaudeRunResult<T>> {

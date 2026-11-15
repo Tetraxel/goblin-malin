@@ -93,7 +93,8 @@ interface DownloadSourceDetailProps {
     onChangeFilename: (filename: string | undefined) => void;
     onChangeOverwriteTags: (overwrite: boolean) => void;
     onChangeIncludeMusicBrainzTags: (include: boolean) => void;
-    onOverridesChange: (overrides: MetadataOverrides) => void;
+    /** Returns false when the edit was refused (a value that is not acceptable, or Claude holds the track). */
+    onOverridesChange: (overrides: MetadataOverrides) => boolean | void;
     setIsEditingField: (editing: boolean) => void;
     /** A click landed in this pane: give it keyboard focus. */
     onFocusPane: () => void;
@@ -458,8 +459,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
         if (value === textOf(target)) return null;
         const parsed = field.parseValue ? field.parseValue(value) : value;
         if (parsed === null) return "Invalid value";
-        onOverridesChange({ ...overrides, [key]: parsed });
-        return null;
+        return onOverridesChange({ ...overrides, [key]: parsed }) === false ? "Not accepted" : null;
     }
 
     /** What Enter (or a second click) does on a row: flip the switch, or start typing in it. */

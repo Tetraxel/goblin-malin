@@ -17,6 +17,8 @@ export interface LoadConfig {
     logsPerTick?: number;
     /** Level of the emitted lines. Default `debug` (what yt-dlp's stdout lines are). */
     logLevel?: "debug" | "info" | "warn";
+    /** Words "streamed" into the chat with Claude on every tick, as if an answer were being written. Default 0. */
+    chatWordsPerTick?: number;
 }
 
 export type Step =

@@ -55,6 +55,8 @@ function statusEqual(a: StatusAttributes, b: StatusAttributes): boolean {
 
 export class TaskStatus {
     private attributes: StatusAttributes = DEFAULT_ATTRIBUTES;
+    // The label of each stage going on (see setFallback), oldest first.
+    private fallbacks = new Map<string, StatusAttributes>();
     private subscribers: Set<(status: StatusAttributes, elapsed?: number) => void> = new Set();
 
     constructor(initialStatus: StatusAttributes = DEFAULT_ATTRIBUTES) {
@@ -109,9 +111,54 @@ export class TaskStatus {
         return this.attributes;
     }
 
+    /** The stage shown when nobody says otherwise: the one that named itself last (see {@link setFallback}). */
+    private currentFallback(): StatusAttributes | undefined {
+        let last: StatusAttributes | undefined;
+        for (const fallback of this.fallbacks.values()) last = fallback;
+        return last;
+    }
+
+    /** Back to what the task shows when nobody says otherwise: the stage it is in (see {@link setFallback}), else nothing. */
     public clear(): void {
-        this.attributes = DEFAULT_ATTRIBUTES;
+        this.attributes = this.currentFallback() ?? DEFAULT_ATTRIBUTES;
         this.notifySubscribers();
+    }
+
+    /**
+     * What to show while a stage is going on and no service is reporting anything: the services set and clear their
+     * own status (`Searching Spotify`…) one after the other, so between two of them the row would say "No status"
+     * while the task is still working. The stage names itself here, and the services' statuses show over it. Pass
+     * `undefined` when the stage ends: if the row still shows it, the stage still going (if any) shows instead,
+     * else it is cleared.
+     *
+     * Stages are told apart by `stage`: two of them can overlap on one track (a re-discovery started while a
+     * download runs), and the end of one must not take the other's label away. Starting a stage again replaces its
+     * own label.
+     */
+    public setFallback(stage: string, fallback: StatusAttributes | undefined): void {
+        const previous = this.fallbacks.get(stage);
+        // Re-inserted, so the stage that began last is the last one of the map.
+        this.fallbacks.delete(stage);
+        if (fallback) {
+            const next = { ...fallback, startTime: fallback.timeTracking ? new Date() : fallback.startTime };
+            this.fallbacks.set(stage, next);
+            // Shown when the row says nothing, or is still showing a stage's label (the newest stage wins it).
+            if (
+                this.attributes.type === StatusType.NoStatus ||
+                this.attributes === previous ||
+                this.isStageLabel(this.attributes)
+            ) {
+                this.attributes = next;
+                this.notifySubscribers();
+            }
+        } else if (previous && this.attributes === previous) {
+            this.clear();
+        }
+    }
+
+    private isStageLabel(attributes: StatusAttributes): boolean {
+        for (const fallback of this.fallbacks.values()) if (fallback === attributes) return true;
+        return false;
     }
 
     // Subscribe to status changes

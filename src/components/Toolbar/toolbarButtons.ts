@@ -3,6 +3,7 @@ import { useRunAllButton } from "#flows/musicDownloadFlow/toolbar/useRunAllButto
 import { useSessionsButton } from "./useSessionsButton";
 import { useArchiveButton } from "./useArchiveButton";
 import { useSettingsButton } from "./useSettingsButton";
+import { useChatButton } from "./useChatButton";
 import { useExitButton } from "./useExitButton";
 
 // The toolbar's button list, as a module constant — the set is static for the
@@ -12,5 +13,6 @@ export const TOOLBAR_BUTTONS: ToolbarButtonHook[] = [
     useSessionsButton,
     useArchiveButton,
     useSettingsButton,
+    useChatButton,
     useExitButton,
 ];

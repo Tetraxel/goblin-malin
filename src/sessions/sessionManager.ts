@@ -238,7 +238,10 @@ export class SessionManager {
         }
 
         const requested = all.filter((t) => idSet.has(t.getId()));
-        const toArchive = requested.filter((t) => !t.running);
+        // A track a part run (re-discover, download…) works on counts as running, though its state does not say so.
+        const isBusy = (t: (typeof all)[number]): boolean =>
+            t.running || Boolean((t as { partRunning?: boolean }).partRunning);
+        const toArchive = requested.filter((t) => !isBusy(t));
         if (toArchive.length < requested.length) {
             globalLogger.warn(`Archive: skipped ${requested.length - toArchive.length} running task(s)`);
         }

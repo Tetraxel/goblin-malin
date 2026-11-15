@@ -5,7 +5,16 @@ import {
 } from "#flows/musicDownloadFlow/types";
 import { savedFileFromLegacyRows } from "./savedSource";
 
-function reviveTrackDates(attrs: TrackDownloadTask): TrackDownloadTask {
+/** Rows and results that were saved as `null` (holes left by a write to a row that was gone) are dropped. */
+const present = <T>(items: readonly (T | null | undefined)[] | undefined): T[] =>
+    (items ?? []).filter((item): item is T => item !== null && item !== undefined);
+
+function reviveTrackDates(raw: TrackDownloadTask): TrackDownloadTask {
+    const attrs: TrackDownloadTask = {
+        ...raw,
+        downloadSources: present(raw.downloadSources),
+        metadataGroups: present(raw.metadataGroups).map((group) => ({ ...group, results: present(group.results) })),
+    };
     // Older sessions kept the saved file on the download row it was made from.
     const savedFile = attrs.savedFile ?? savedFileFromLegacyRows(attrs.downloadSources);
     return {

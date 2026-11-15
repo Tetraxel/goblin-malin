@@ -13,7 +13,7 @@ import { computeCompiledMetadata, pickGroupRepresentative } from "#flows/musicDo
 import { navigableFields } from "#flows/musicDownloadFlow/utils/metadataFields";
 import { pasteRouter } from "#base/pasteRouter";
 import { musicBrainzActionItems } from "#flows/musicDownloadFlow/musicbrainz/columnActions";
-import { type DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { type DownloadTask, runUserEdit } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { addLinkFromClipboard } from "#flows/musicDownloadFlow/utils/addLinkFromClipboard";
 import { canCheckMusicBrainz, isMusicBrainzVerdictStale } from "#flows/musicDownloadFlow/musicbrainz/inputKey";
 import { MetadataSourceList } from "./MetadataSourceList";
@@ -196,12 +196,16 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
     // Stable while the task is unchanged so memoized children (FieldRow via
     // onEditSubmit, source rows) bail during field/source navigation.
     const handleGroupsChange = useCallback(
-        (updated: MetadataGroupState[]) => typedTask?.updateAttributes({ metadataGroups: updated }),
+        (updated: MetadataGroupState[]) => {
+            if (typedTask) runUserEdit(() => (typedTask as unknown as DownloadTask).setMetadataGroups(updated));
+        },
         [typedTask]
     );
 
     const handleOverrideChange = useCallback(
-        (updated: MetadataOverrides) => typedTask?.updateAttributes({ metadataOverride: updated }),
+        // false when the edit was refused (Claude holds the task, or the value is not acceptable).
+        (updated: MetadataOverrides): boolean =>
+            !typedTask || runUserEdit(() => (typedTask as unknown as DownloadTask).setMetadataOverride(updated)),
         [typedTask]
     );
 
@@ -220,7 +224,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
     // Delete (not reject) a link the user added by hand: the row and its durable entry.
     const handleDeleteUserResult = useCallback(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (uri: string) => (typedTask as any)?.removeUserSource?.(uri),
+        (uri: string) => runUserEdit(() => (typedTask as any)?.removeUserSource?.(uri)),
         [typedTask]
     );
 
@@ -295,7 +299,8 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
     const sortedGroups = [...groups].sort((a, b) => a.rank - b.rank);
     const selectedResult =
         cursor.type === "result"
-            ? sortedGroups[cursor.groupIndex]?.results.sort((a, b) => a.rank - b.rank)[cursor.resultIndex]
+            ? // A copy: sorting `results` in place would reorder the task's own data while rendering (and its revision).
+              [...(sortedGroups[cursor.groupIndex]?.results ?? [])].sort((a, b) => a.rank - b.rank)[cursor.resultIndex]
             : cursor.type === "group"
               ? sortedGroups[cursor.groupIndex]
                   ? pickGroupRepresentative(sortedGroups[cursor.groupIndex])
