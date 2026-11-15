@@ -5,6 +5,7 @@ import { SessionStore } from "#sessions/sessionStore";
 import { shutdownState } from "#utils/shutdownState";
 import { DISABLE_MOUSE } from "#base/mouse/mouse";
 import { releaseInstanceLock } from "#utils/instanceLock";
+import { runAgentCleanups } from "#base/agent/cleanup";
 
 const LEAVE_ALT_SCREEN_COMMAND = "\x1b[?1049l";
 
@@ -57,6 +58,9 @@ async function runStep(label: string, work: () => void | Promise<void>): Promise
 async function shutdown(): Promise<void> {
     const startedAt = performance.now();
     let sessionSaved = true;
+    // First, so the Claude chat changes nothing after the session is written (its process and server must not
+    // outlive the app either).
+    await runStep("Stopping Claude…", () => runAgentCleanups());
     await runStep("Saving your session…", async () => {
         // Changes are written a moment after they happen: drop none of the latest ones.
         SessionManager.getInstance().flushNow();
@@ -114,6 +118,8 @@ export function emergencyExit(reason: string, exitCode: number, error?: unknown)
     setTimeout(end, EMERGENCY_MAX_MS).unref();
     void (async () => {
         try {
+            // Stopped first (not awaited: killing the process is enough), so nothing changes after the save.
+            void runAgentCleanups(500);
             SessionManager.getInstance().flushNow();
             await SessionStore.getInstance().flush(EMERGENCY_MAX_MS - 1000);
             cache.save();

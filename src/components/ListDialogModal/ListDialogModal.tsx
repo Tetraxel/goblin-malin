@@ -92,7 +92,9 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
     const [prevPending, setPrevPending] = useState(pending);
     if (prevPending !== pending) {
         setPrevPending(pending);
-        setSelected(0);
+        // Starts on the row the dialog asked for (the current choice), else on the first.
+        const start = pending?.dialog.initialIndex ?? 0;
+        setSelected(pending && start >= 0 && start < pending.dialog.items.length ? start : 0);
     }
 
     useEffect(() => {

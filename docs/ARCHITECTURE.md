@@ -63,6 +63,28 @@ Three registries, defined in [registries.ts](../src/flows/musicDownloadFlow/regi
 
 Adding a provider = one service class + one `register()` call in `init.ts`. Display info (`static display`), settings (`defaultSettings`), consent, last-resort, URL parsing and its cell component are all declared on the class and read generically, so the UI and the pipeline never branch on a provider key. The details of these static capabilities are in [CLAUDE.md](../CLAUDE.md#provider-extensibility).
 
+## The chat agent (P32)
+
+A second, separate way to use Claude (the first is the last-resort discovery provider, which runs with no tools but web search): a **chat** where Claude, through the user's own Claude Code CLI, reads and changes the tasks by calling typed **tools**. See [P32](projects/p32/tasks.md) for the why and [agent-tools.md](agent-tools.md) for the tools (generated from the registry).
+
+```
+ Chat panel ──► claude CLI (one process per message, --resume; no built-in tool, no web)
+                  │ allowlist: only the app's tools
+                  ▼
+        MCP server inside the app (127.0.0.1, a token per message)  ──►  tool registry
+                                                                              │
+                                                  locks + revisions + journal ▼
+                                              named DownloadTask methods (the same the panels call)
+```
+
+- **`src/base/agent/`** is generic: `defineAgentTool` and the registry (every tool declares its kind, input schema, locks and an example once; nothing lists tools by hand), the JSON-Schema checker every call goes through, the MCP server, the turn (abort signal, per-task mutation budget, the leases it took), the undo journal, and the catalogue renderer. `src/base/task/taskLock.ts` holds who may write a task.
+- **`src/flows/musicDownloadFlow/agent/`** is the music side: the tools (`tools/`), the compact views Claude reads, batch plans (plan → preview → apply), consent, settings, the chat controller (`agentChat.ts`) and its store (`chatStore.ts`, which gathers streamed text and shows it every 300 ms). The CLI runner is `services/apis/claude-agent-client.ts`.
+- **Claude never edits a file** and never sees one: it can only call the tools. Changes go through the named methods of `DownloadTask` (`setMetadataOverride`, `selectDownloadSourceById`…), which validate the value and check the lock, so a change made by Claude has the checks of one typed by hand. A write carries the **revision** it read (a fingerprint of what the user can edit) and is refused if the task changed; a task the pipeline is processing refuses agent writes.
+- Claude can **start tasks** (`run_metadata`, `run_download`, `run_task`, in `tools/runTools.ts`): they go through the named `DownloadTask` methods the list's own actions use (`setRunFlags`, `runMetadataPart`, `runDownloadPart`) and the same `runSelected`, start in the background and answer at once. A download asks first (`confirm`); "don't ask again" lasts for the conversation (`runAllowance`). A track already run is never restarted whole (that erases overrides).
+- After starting tasks Claude uses **`wait_for_tasks`** (`tools/reportTools.ts`): it polls the tracks every 500 ms (`isTaskBusy` in `agent/runReport.ts`: a run, a part started by `runMetadataPart` / `runDownloadPart` (`DownloadTask.partRunning`), the in-progress flags, a download row searching or downloading, or the "Queued" status), for at most 4 minutes and until Stop, then returns `assessTask` for each: a verdict computed by the app, not by a model. `review_metadata` (`reviewTask`) and `get_settings` (`settingsView.ts`, secrets redacted) are read tools too. Every message, answer and tool call goes to `agent.log` (`agent/agentLog.ts`: async queued JSON lines, rotated at 10 MB).
+- Claude can also **search music** (`search_music`: free text, on every metadata service that implements `searchTracks`) and **add tasks** (`add_tasks`: the same as pasting links, not started, undone by `/undo` while untouched).
+- The UI is `src/components/ChatPanel/`: docked beside the task list from 108 columns, a window over the screen below it. Each tool line keeps the raw call and answer (`ChatMessage.detail`), opened with `Ctrl+O` or a click. The last conversation is saved to `agent-chat.json` in the data folder (`agent/chatHistory.ts`) and offered, never reopened by itself: a launch starts empty because resuming costs the user's plan.
+
 ## Data on disk
 
 Everything lives in one folder (`GOBLIN_DATA_DIR`, else the OS default; `<repo>/data` when running from source): `settings.json`, `sessions.json` (+ `.bak`), `.env` (credentials), `cache/`, `bin/` (downloaded tools, `cookies.txt`), `app.log` (+ `app.prev.log`). The folder is derived at start-up and never read back from `settings.json` ([utils/appPaths.ts](../src/utils/appPaths.ts)). A lock file keeps a second instance out of the same folder.

@@ -8,6 +8,7 @@ import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types
 import { useImportActions } from "#contexts/ImportActionsContext";
 import { statsDisplay } from "#base/statsDisplay";
 import { getInstance } from "#utils/mpvPlayer";
+import { chatPanelState } from "./ChatPanel/chatPanelState";
 
 /**
  * Registers all global and window-specific keyboard shortcuts with the
@@ -84,6 +85,16 @@ export const InputRouter: React.FC<{
                 defaultShortcut: { input: "5" },
                 label: "Logs tab",
                 handler: () => setSecondaryTab("logs"),
+            },
+            {
+                id: "global.chat",
+                defaultShortcut: { input: "t", ctrl: true },
+                label: "Talk to Claude",
+                // Opens the chat and puts the keyboard in it (the chat's own Ctrl+T closes it).
+                handler: () => {
+                    chatPanelState.setOpen(true);
+                    switchWindow("chatPanel");
+                },
             },
             {
                 id: "global.togglePlayback",

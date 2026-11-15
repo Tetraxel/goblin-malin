@@ -1,0 +1,29 @@
+{
+    "terminal": { "cols": 130, "rows": 44 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "load": { "chatWordsPerTick": 2, "tickMs": 50 },
+    "steps": [
+        { "type": "stable", "timeout": 40000, "quiescenceMs": 1000 },
+        { "type": "waitForContent", "text": "Hooked", "timeout": 20000 },
+        { "type": "key", "key": "Ctrl+T" },
+        { "type": "waitForContent", "text": "Message Claude", "timeout": 5000 },
+        { "type": "assert", "contains": "Model sonnet" },
+        { "type": "startLoad" },
+        { "type": "wait", "ms": 700 },
+        { "type": "stopLoad" },
+        { "type": "wait", "ms": 600 },
+        { "type": "key", "key": "PageUp" },
+        { "type": "key", "key": "PageUp" },
+        { "type": "key", "key": "PageUp" },
+        { "type": "key", "key": "PageUp" },
+        { "type": "waitForContent", "text": "▸ get_task", "timeout": 3000 },
+        { "type": "snapshot", "name": "tool-closed" },
+        { "type": "key", "key": "Ctrl+O" },
+        { "type": "waitForContent", "text": "\"revision\":42", "timeout": 3000 },
+        { "type": "assert", "contains": "▾ get_task" },
+        { "type": "snapshot", "name": "tool-open" },
+        { "type": "key", "key": "Ctrl+O" },
+        { "type": "waitForContent", "text": "▸ get_task", "timeout": 3000 },
+        { "type": "screenshot-powershell", "name": "chat-details" }
+    ]
+}

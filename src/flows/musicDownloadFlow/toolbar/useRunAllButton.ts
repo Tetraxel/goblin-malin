@@ -5,7 +5,7 @@ import { type Task } from "#base/task/task";
 import { StatusType } from "#base/task/task-status";
 import { useTheme } from "#base/themeContext";
 import { useFocusTaskList } from "#contexts/FocusContext";
-import { runAll, runSelected, stopAll } from "../runController";
+import { explainRefusedRun, runAll, runSelected, stopAll } from "../runController";
 
 export const useRunAllButton: ToolbarButtonHook = () => {
     const theme = useTheme();
@@ -96,7 +96,7 @@ export const useRunAllButton: ToolbarButtonHook = () => {
             enabled: true,
             onPress: () => {
                 setRunMode("selected");
-                runSelected(selectedIds);
+                void runSelected(selectedIds).then(explainRefusedRun);
             },
         };
     }

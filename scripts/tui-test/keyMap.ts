@@ -39,11 +39,15 @@ const KEY_MAP: Record<string, string> = {
     "Ctrl+A": "\x01",
     "Ctrl+C": "\x03",
     "Ctrl+D": "\x04",
+    "Ctrl+L": "\x0c",
     "Ctrl+N": "\x0e",
+    "Ctrl+O": "\x0f",
     "Ctrl+Q": "\x11",
     "Ctrl+R": "\x12",
     "Ctrl+S": "\x13",
+    "Ctrl+T": "\x14",
     "Ctrl+V": "\x16",
+    "Ctrl+Z": "\x1a",
 
     // Navigation
     Home: "\x1b[H",

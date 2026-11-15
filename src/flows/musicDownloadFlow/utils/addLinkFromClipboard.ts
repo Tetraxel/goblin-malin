@@ -2,7 +2,7 @@ import clipboard from "clipboardy";
 import { dialogBridge } from "#base/bridges/dialogBridge";
 import { globalLogger } from "#base/logger/logger";
 import { detectUrls } from "#components/ImportModal/detectUrls";
-import { type DownloadTask } from "./downloadTask";
+import { type DownloadTask, TaskLockedError } from "./downloadTask";
 
 const logger = globalLogger.createChild({ service: "AddLink" });
 
@@ -44,7 +44,15 @@ export async function addLinkFromClipboard(task: DownloadTask, text?: string): P
         return;
     }
 
-    const { added, skipped } = await task.addUserSources(links);
+    let result: Awaited<ReturnType<typeof task.addUserSources>>;
+    try {
+        result = await task.addUserSources(links);
+    } catch (error) {
+        if (!(error instanceof TaskLockedError)) throw error;
+        await notify("Claude is working on this track", "Try again in a moment.");
+        return;
+    }
+    const { added, skipped } = result;
     logger.info(`Added ${added.length} link(s) to the track by hand; ${skipped.length} not added`);
     if (skipped.length > 0) {
         await notify(

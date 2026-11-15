@@ -3,8 +3,19 @@ import type { FocusableWindow } from "#hooks/useFocusManager";
 /** Windows whose on-screen widgets react to clicks. Modals and prompts own the keyboard, so they own input. */
 const CLICKABLE_WINDOWS = new Set<FocusableWindow>(["toolbar", "taskList", "secondaryPanel"]);
 
+/**
+ * Windows that have the keyboard but do not cover the main screen (the docked chat): the screen stays clickable
+ * while they are focused, and a click on something else moves the keyboard there.
+ */
+const CLICK_THROUGH_WINDOWS = new Set<FocusableWindow>();
+
+export function setClickThroughWindow(window: FocusableWindow, on: boolean): void {
+    if (on) CLICK_THROUGH_WINDOWS.add(window);
+    else CLICK_THROUGH_WINDOWS.delete(window);
+}
+
 export function isClickableWindow(window: FocusableWindow): boolean {
-    return CLICKABLE_WINDOWS.has(window);
+    return CLICKABLE_WINDOWS.has(window) || CLICK_THROUGH_WINDOWS.has(window);
 }
 
 /**

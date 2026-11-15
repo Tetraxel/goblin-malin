@@ -1,0 +1,26 @@
+{
+    "terminal": { "cols": 130, "rows": 40 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "steps": [
+        { "type": "stable", "timeout": 8000 },
+        { "type": "snapshot", "name": "closed" },
+        { "type": "key", "key": "Ctrl+T" },
+        { "type": "waitForContent", "text": "Message Claude", "timeout": 3000 },
+        { "type": "assert", "contains": "Ask about your tasks" },
+        { "type": "snapshot", "name": "open" },
+        { "type": "type", "text": "/undo" },
+        { "type": "wait", "ms": 400 },
+        { "type": "key", "key": "Enter" },
+        { "type": "waitForContent", "text": "Nothing to undo.", "timeout": 3000 },
+        { "type": "snapshot", "name": "after-undo" },
+        { "type": "key", "key": "Esc" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "Message Claude" },
+        { "type": "key", "key": "Ctrl+T" },
+        { "type": "stable" },
+        { "type": "key", "key": "Ctrl+T" },
+        { "type": "stable" },
+        { "type": "snapshot", "name": "closed-again" },
+        { "type": "screenshot-powershell", "name": "chat-panel" }
+    ]
+}

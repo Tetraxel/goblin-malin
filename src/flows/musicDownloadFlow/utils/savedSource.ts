@@ -55,7 +55,7 @@ export function releaseSavedFile(tasks: readonly SavedFileHolder[], filePath: st
  * it was made from. `undefined` when no row has one.
  */
 export function savedFileFromLegacyRows(sources: readonly TrackDownloadSource[]): SavedFile | undefined {
-    const row = sources.find((s) => s.savedFile);
+    const row = sources.find((s) => s?.savedFile);
     if (!row?.savedFile) return undefined;
     return {
         ...row.savedFile,

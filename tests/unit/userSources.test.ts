@@ -39,6 +39,8 @@ const meta = (platform: "spotify" | "youtube", id: string, title: string, artist
 let catalog: Record<string, TrackMetadata>;
 let lastResortCalls: (DiscoveryContext | undefined)[];
 let spotifyEnabled: boolean;
+// What the fake Spotify's free-text search finds (Phase A of discovery).
+let spotifyHits: TrackMetadata[];
 
 const PRIMARY = meta("youtube", "repost1", "Orelsan - Dans ma ville on traine (clip non officiel)", "Paul LATOUR");
 
@@ -75,7 +77,9 @@ beforeAll(async () => {
                 return catalog[url] ?? Promise.reject(new Error(`unknown ${url}`));
             }
             async searchTrack() {
-                return [];
+                return platform === "spotify"
+                    ? spotifyHits.map((metadata) => ({ metadata, searchKeys: ["trackName" as const] }))
+                    : [];
             }
         };
     };
@@ -118,6 +122,7 @@ beforeEach(() => {
     };
     lastResortCalls = [];
     spotifyEnabled = true;
+    spotifyHits = [];
 });
 
 function attributes(over: Partial<TrackDownloadTask> = {}): TrackDownloadTask {
@@ -512,5 +517,81 @@ describe("pasting a link (Ctrl+V)", () => {
         expect(userResults(task)).toHaveLength(1);
         expect(notices[0].title).toBe("Some links were not added");
         expect(notices[0].message).toContain("deezer.example");
+    });
+});
+
+describe("the user's picks on what the search found", () => {
+    test("a favorite or a reject is put back when a re-discovery finds the same link again", async () => {
+        const official = catalog[OFFICIAL_SPOTIFY];
+        const other = meta("spotify", "sp2", "Dans ma ville on traine (live)", "Orelsan");
+        spotifyHits = [official, other];
+        const task = await runTask();
+        const spotify = () => group(task, "spotify")!;
+        expect(spotify().results).toHaveLength(2);
+
+        // The user picks one and turns the other down.
+        const picked = spotify().results.findIndex((r) => r.metadata.uri === official.uri);
+        task.setMetadataGroups(
+            task.getAttributes()!.metadataGroups.map((g) =>
+                g.serviceKey !== "spotify"
+                    ? g
+                    : {
+                          ...g,
+                          results: g.results.map((r, i) => ({
+                              ...r,
+                              isFavorited: i === picked,
+                              isRejected: i !== picked,
+                          })),
+                      }
+            )
+        );
+
+        await task.startMetadataDiscovering();
+
+        const byUri = (uri: string | undefined) => spotify().results.find((r) => r.metadata.uri === uri)!;
+        expect(byUri(official.uri)).toMatchObject({ isFavorited: true, isRejected: false });
+        expect(byUri(other.uri)).toMatchObject({ isFavorited: false, isRejected: true });
+    });
+
+    test("a result the search no longer finds does not bring its pick back onto another one", async () => {
+        const official = catalog[OFFICIAL_SPOTIFY];
+        spotifyHits = [official];
+        const task = await runTask();
+        task.setMetadataGroups(
+            task.getAttributes()!.metadataGroups.map((g) => ({
+                ...g,
+                results: g.results.map((r) => (g.serviceKey === "spotify" ? { ...r, isFavorited: true } : r)),
+            }))
+        );
+        spotifyHits = [meta("spotify", "sp9", "Something else entirely", "Nobody")];
+
+        await task.startMetadataDiscovering();
+
+        expect(group(task, "spotify")!.results.some((r) => r.isFavorited)).toBe(false);
+    });
+});
+
+describe("a part run started from the list", () => {
+    test("counts as a run while it works, so the agent cannot write under it", async () => {
+        const task = await runTask();
+        let release!: () => void;
+        const work = task.trackPartRun(() => new Promise<void>((resolve) => (release = resolve)));
+        expect(task.partRunning).toBe(true);
+        release();
+        await work;
+        expect(task.partRunning).toBe(false);
+    });
+
+    test("is refused while Claude holds the task", async () => {
+        const { taskLocks } = await import("#base/task/taskLock");
+        const task = await runTask();
+        const got = taskLocks.acquire([task.getId()], "agent");
+        if (!got.ok) throw new Error("expected a lease");
+        try {
+            await expect(task.trackPartRun(async () => {})).rejects.toThrow();
+            expect(task.partRunning).toBe(false);
+        } finally {
+            got.lease.release();
+        }
     });
 });

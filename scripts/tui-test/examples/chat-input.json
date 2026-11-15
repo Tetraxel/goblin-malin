@@ -1,0 +1,27 @@
+{
+    "terminal": { "cols": 130, "rows": 40 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "steps": [
+        { "type": "stable", "timeout": 8000 },
+        { "type": "key", "key": "Ctrl+T" },
+        { "type": "waitForContent", "text": "Message Claude", "timeout": 3000 },
+        { "type": "key", "key": "Ctrl+C" },
+        { "type": "waitForContent", "text": "Nothing to copy yet", "timeout": 3000 },
+        {
+            "type": "type",
+            "text": "this is a long message that does not fit on one line of the chat panel so it wraps over several rows ENDOFMESSAGE"
+        },
+        { "type": "wait", "ms": 400 },
+        { "type": "assert", "contains": "SSAGE" },
+        { "type": "snapshot", "name": "long-input" },
+        { "type": "key", "key": "Shift+ArrowLeft" },
+        { "type": "wait", "ms": 400 },
+        { "type": "snapshot", "name": "wider" },
+        { "type": "key", "key": "Shift+ArrowRight" },
+        { "type": "key", "key": "Shift+ArrowRight" },
+        { "type": "wait", "ms": 400 },
+        { "type": "snapshot", "name": "narrower" },
+        { "type": "assert", "contains": "SSAGE" },
+        { "type": "screenshot-powershell", "name": "chat-input" }
+    ]
+}

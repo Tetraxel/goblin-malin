@@ -11,7 +11,7 @@ import {
     type MusicDownloadTaskAttributes,
     type TrackDownloadSource,
 } from "#flows/musicDownloadFlow/types";
-import { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { DownloadTask, runUserEdit } from "#flows/musicDownloadFlow/utils/downloadTask";
 import {
     computeCompiledMetadata,
     musicBrainzIdsFromIdentity,
@@ -274,20 +274,25 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
         });
     }
 
+    /** Makes a download row the one that will be saved. False when refused (Claude holds the track right now). */
+    function chooseDownload(idx: number): boolean {
+        return runUserEdit(() => (typedTask as unknown as DownloadTask)?.selectDownloadSource(idx));
+    }
+
     function handleRequestSelect(idx: number) {
         const isAlreadySelected = downloadSources[idx]?.selected;
         if (isSourceSwitch && idx === downloadNavIndex) {
             // Replacing the saved file is confirmed in the side-by-side view.
             setSourcesInnerFocus("detail");
         } else if (!isAlreadySelected) {
-            (typedTask as unknown as DownloadTask)?.selectDownloadSource(idx);
+            chooseDownload(idx);
         }
     }
 
     function handleRejectSource(idx: number) {
         const source = downloadSources[idx];
         if (!source) return;
-        (typedTask as unknown as DownloadTask)?.rejectDownloadSource(idx, !source.isRejected);
+        runUserEdit(() => (typedTask as unknown as DownloadTask)?.rejectDownloadSource(idx, !source.isRejected));
     }
 
     function handleRetrySource(idx: number) {
@@ -306,12 +311,10 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
         if (isSaving || !source || source.localFile?.state !== "found") return;
         if (isSourceSwitch) {
             // The comparison with the saved file is already on screen: this source takes its place.
-            (typedTask as unknown as DownloadTask)?.selectDownloadSource(idx);
-            handleSave();
+            if (chooseDownload(idx)) handleSave();
         } else if (source.selected) {
             handleSave();
-        } else {
-            (typedTask as unknown as DownloadTask)?.selectDownloadSource(idx);
+        } else if (chooseDownload(idx)) {
             handleSave();
         }
     }
@@ -319,7 +322,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     function handleConfirmDiff() {
         if (isSourceSwitch) {
             // The source under the cursor takes the saved file's place.
-            (typedTask as unknown as DownloadTask)?.selectDownloadSource(downloadNavIndex);
+            if (!chooseDownload(downloadNavIndex)) return;
             setSourcesInnerFocus("list");
             handleSave();
         } else if (isMetadataChange) {
@@ -469,7 +472,9 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                     onChangeIncludeMusicBrainzTags={(include) =>
                         (typedTask as unknown as DownloadTask)?.setIncludeMusicBrainzTags(include)
                     }
-                    onOverridesChange={(updated) => typedTask?.updateAttributes({ metadataOverride: updated })}
+                    onOverridesChange={(updated) =>
+                        runUserEdit(() => (typedTask as unknown as DownloadTask)?.setMetadataOverride(updated))
+                    }
                     setIsEditingField={setIsEditingField}
                     onFocusPane={() => focusSourcesPane("detail")}
                 />

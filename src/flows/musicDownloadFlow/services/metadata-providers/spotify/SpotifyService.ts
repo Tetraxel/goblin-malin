@@ -518,6 +518,31 @@ export class SpotifyService extends MetadataService {
         }
     }
 
+    async searchTracks(query: string, limit: number): Promise<TrackMetadata[]> {
+        await this.resolveAuth();
+        if ((SpotifyService.authMode ?? "official") === "scrape") {
+            throw new Error("Spotify search needs the official API mode (Settings → Metadata → Spotify).");
+        }
+        const client = await this.getClient();
+        const found = await client.search(
+            query,
+            ["track"],
+            resolveSpotifyMarket(getMetadataProviderSettings("spotify").market),
+            Math.max(1, Math.min(limit, 50)) as Parameters<typeof client.search>[3]
+        );
+        return (found.tracks?.items ?? []).map((spotifyTrack) => {
+            const standardTrack = this.convertSpotifyTrack(spotifyTrack, spotifyTrack.external_urls?.spotify || "");
+            return {
+                ...standardTrack,
+                platform: "spotify",
+                apiProvider: "spotify",
+                uri: `SPOTIFY::TRACK::${spotifyTrack.id}` as TrackUri<"spotify">,
+                fetchedAt: new Date(),
+                type: "track",
+            } as TrackMetadata;
+        });
+    }
+
     async searchTrack(sourceTrackMetadata: TrackMetadata): Promise<SearchTrackResult[]> {
         await this.resolveAuth();
 

@@ -9,7 +9,9 @@ import { providerDisplayRegistry } from "#base/providerDisplay";
 import { platformRegistry } from "#base/platformRegistry";
 import { urlParserRegistry } from "#base/urlParser";
 import { type StatusAttributes, StatusType } from "#base/task/task-status";
+import { taskLocks, type LockHolder } from "#base/task/taskLock";
 import { throwIfAborted } from "#utils/errors";
+import { withTimeout } from "#utils/withTimeout";
 import {
     type TrackDownloadTask,
     type TrackMetadata,
@@ -22,6 +24,7 @@ import {
     type DiscoveryResult,
     type Platform,
     type LocalFile,
+    type MetadataOverrides,
 } from "#flows/musicDownloadFlow/types";
 import { runWithoutCache, isCacheSkipped } from "#utils/cache";
 import { overwriteConfirmBridge } from "#base/bridges/overwriteConfirmBridge";
@@ -42,6 +45,8 @@ import { tagAudioFile } from "./tagAudioFile";
 import { createSingleFlight } from "./singleFlight";
 import { writeViaStaging } from "./writeViaStaging";
 import { pickAutoSelectedIndex } from "./sourceSelection";
+import { computeTaskRevision, downloadSourceIds } from "./taskRevision";
+import { OverrideValidationError, checkOverrideChange } from "./overrideValidation";
 import { type MetadataService } from "../metadataService";
 import { type DiscoveryMetadataService } from "../discoveryMetadataService";
 import { type DownloadService, type DownloadUpdateOptions } from "../downloadService";
@@ -84,8 +89,45 @@ export type AddUserSourcesResult = {
     skipped: { url: string; reason: string }[];
 };
 
+/** Who is making a change to a task's user-owned data. Another holder's lock (see `taskLocks`) refuses it. */
+export type WriteOptions = { actor?: LockHolder };
+
+/** How long one platform has to answer a free-text search (a stalled one must not hold the others, or the chat). */
+const CATALOG_SEARCH_TIMEOUT_MS = 25_000;
+
+/** What one metadata service answered to a free-text search. */
+export type CatalogSearchOutcome = { platform: string; results: TrackMetadata[]; error?: string };
+
+/** A change was refused because someone else holds the task (Claude is working on it). Nothing was changed. */
+export class TaskLockedError extends Error {
+    constructor(public readonly holder: LockHolder) {
+        super(holder === "agent" ? "Claude is working on this task" : "Someone else is editing this task");
+        this.name = "TaskLockedError";
+    }
+}
+
+/**
+ * Runs an edit the user made in a panel. A refusal (Claude holds the task, a value is not acceptable) is logged and
+ * answers false instead of throwing into the key handler; anything else is a bug and still throws.
+ */
+export function runUserEdit(edit: () => unknown): boolean {
+    try {
+        edit();
+        return true;
+    } catch (error) {
+        if (error instanceof TaskLockedError || error instanceof OverrideValidationError) {
+            globalLogger.info(error.message);
+            return false;
+        }
+        throw error;
+    }
+}
+
 export class DownloadTask extends Task<TrackDownloadTask> {
     private discoveryRun?: DiscoveryRun;
+    // The revision of the attributes object it was last computed for (see `getRevision`).
+    private revisionFor?: TrackDownloadTask;
+    private revisionValue = 0;
     /** The MusicBrainz checks of this track, one after the other (see `checkMusicBrainz`). */
     private musicBrainzQueue: Promise<unknown> = Promise.resolve();
     private metadataServices: ServiceScope<DownloadTask, MetadataService>;
@@ -316,6 +358,11 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             primaryMetadataInProgress: true,
             primaryMetadataFetched: false,
         });
+        this.status.setFallback("primary", {
+            type: StatusType.Processing,
+            message: "Fetching metadata",
+            timeTracking: true,
+        });
 
         try {
             // Step 1: Recognition was resolved once at import time (resolveTrackRecognition)
@@ -410,6 +457,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 throw new Error(`No metadata service could fetch metadata for the URL: ${url}`);
             }
         } finally {
+            this.status.setFallback("primary", undefined);
             this.updateAttributes({ primaryMetadataInProgress: false });
         }
 
@@ -436,6 +484,18 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         const primaryUri = primaryMetadata.uri ?? primaryMetadata.url;
 
         this.logger.info(`Discovering metadata from all other sources`);
+        // The user's favorite / reject picks on what the search found: those results are rebuilt below, so the picks
+        // are put back on the same link when the search finds it again (user data is never rebuilt away).
+        const pickKey = (serviceKey: string, r: MetadataResultState) =>
+            `${serviceKey}|${r.metadata.uri ?? r.metadata.url ?? ""}`;
+        const picks = new Map<string, { isFavorited: boolean; isRejected: boolean }>();
+        for (const g of this.getAttributes()?.metadataGroups ?? []) {
+            for (const r of g.results) {
+                if ((r.isFavorited || r.isRejected) && !r.isPrimaryInput && !r.addedByUser) {
+                    picks.set(pickKey(g.serviceKey, r), { isFavorited: r.isFavorited, isRejected: r.isRejected });
+                }
+            }
+        }
         this.updateAttributes({
             // Keep all groups and their order, only remove previously discovered (non-primary) results
             metadataGroups: (this.getAttributes()?.metadataGroups ?? []).map((g) => ({
@@ -445,6 +505,12 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             })),
             metadataDiscoveringInProgress: true,
             metadataDiscovered: false,
+        });
+        // The services report on their own, one after the other: this is what the row says between them.
+        this.status.setFallback("discovery", {
+            type: StatusType.Processing,
+            message: "Discovering on other platforms",
+            timeTracking: true,
         });
 
         // The user can end this stage early with skipDiscovery(). The run stops waiting at once; any
@@ -554,9 +620,32 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             await Promise.race([discoverEverywhere(), skippedSignal]);
         } finally {
             if (this.discoveryRun === run) this.discoveryRun = undefined;
+            this.status.setFallback("discovery", undefined);
             this.updateAttributes({ metadataDiscoveringInProgress: false });
         }
         if (run.skipped) this.logger.info("Discovery skipped by the user; keeping the sources found so far");
+        if (picks.size > 0) {
+            this.updateAttributes({
+                metadataGroups: (this.getAttributes()?.metadataGroups ?? []).map((g) => {
+                    // At most one favorite per group: one the user has just made meanwhile wins.
+                    let hasFavorite = g.results.some((r) => r.isFavorited);
+                    return {
+                        ...g,
+                        results: g.results.map((r) => {
+                            const pick = picks.get(pickKey(g.serviceKey, r));
+                            if (!pick || r.isPrimaryInput || r.addedByUser) return r;
+                            const favorite = pick.isFavorited && !hasFavorite;
+                            if (favorite) hasFavorite = true;
+                            return {
+                                ...r,
+                                isFavorited: r.isFavorited || favorite,
+                                isRejected: r.isRejected || (pick.isRejected && !favorite),
+                            };
+                        }),
+                    };
+                }),
+            });
+        }
         this.updateAttributes({ metadataDiscovered: true });
     }
 
@@ -700,6 +789,43 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         } catch (error) {
             this.logger.warn(`Phase B discovery failed for ${discoveryService.id}`, { error });
         }
+    }
+
+    // ── Free-text catalogue search (chat agent) ──────────────────────────────
+
+    /**
+     * Searches the catalogue of every enabled metadata service that can search (`searchTracks`) for `query`, in
+     * parallel. A service that fails or cannot search answers with an `error` instead of breaking the others.
+     * Meant for a scratch task: the services report their progress on the task they are given.
+     */
+    async searchCatalog(
+        query: string,
+        options: { platforms?: readonly string[]; limit?: number; signal?: AbortSignal } = {}
+    ): Promise<CatalogSearchOutcome[]> {
+        const limit = Math.max(1, Math.min(options.limit ?? 8, 25));
+        const wanted = options.platforms?.map((p) => platformRegistry.canonical(p));
+        const outcomes: Promise<CatalogSearchOutcome>[] = [];
+        for (const key of this.metadataServiceRegistry.getAllConstructors().keys()) {
+            if (!this.isMetadataServiceEnabled(key)) continue;
+            if (wanted && wanted.length > 0 && !wanted.includes(key)) continue;
+            const service = this.metadataServices.get(key);
+            if (typeof service.searchTracks !== "function") continue;
+            outcomes.push(
+                withTimeout(
+                    service.searchTracks(query, limit),
+                    CATALOG_SEARCH_TIMEOUT_MS,
+                    "the search took too long"
+                ).then(
+                    (results): CatalogSearchOutcome => ({ platform: key, results }),
+                    (error): CatalogSearchOutcome => ({
+                        platform: key,
+                        results: [],
+                        error: error instanceof Error ? error.message.slice(0, 200) : "the search failed",
+                    })
+                )
+            );
+        }
+        return Promise.all(outcomes);
     }
 
     // ── MusicBrainz identity (P30) ────────────────────────────────────────────
@@ -969,7 +1095,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
      * stored, fetched, and shown as a favorited "[USER]" result of that platform. Links no service can read are
      * reported back, not stored.
      */
-    async addUserSources(urls: string[]): Promise<AddUserSourcesResult> {
+    async addUserSources(urls: string[], options?: WriteOptions): Promise<AddUserSourcesResult> {
+        this.assertWritable(options);
         const added: UserSource[] = [];
         const skipped: { url: string; reason: string }[] = [];
         const attrs = this.getAttributes();
@@ -1023,7 +1150,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
      * only thing that ever removes such an entry; "reject" keeps it. A group the link created, left empty, goes with it.
      * `uri` is the row's `metadata.uri`. Returns false when no such row (the search's own results are never deleted).
      */
-    removeUserSource(uri: string): boolean {
+    removeUserSource(uri: string, options?: WriteOptions): boolean {
+        this.assertWritable(options);
         const attrs = this.getAttributes();
         if (!attrs) return false;
         const canonical = (u: string | undefined): string | undefined => {
@@ -1173,6 +1301,100 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.updateAttributes({ metadataGroups: groups });
     }
 
+    // ── What the user (or the agent) edits ────────────────────────────────────
+    //
+    // Every write to a field the user owns goes through one of these named methods, never through a bare
+    // `updateAttributes`: they validate the data and check that nobody else holds the task. The panels and the
+    // agent's tools call the same ones, so a change made by Claude has exactly the checks of one typed by hand.
+
+    /**
+     * The revision of the user-editable surface of this track (see `computeTaskRevision`). Reads carry it, writes
+     * from an out-of-date read are refused by comparing it.
+     */
+    getRevision(): number {
+        const attrs = this.getAttributes();
+        if (!attrs) return 0;
+        if (this.revisionFor !== attrs) {
+            this.revisionFor = attrs;
+            this.revisionValue = computeTaskRevision(attrs);
+        }
+        return this.revisionValue;
+    }
+
+    /** Whether someone other than `actor` (default: the user) holds this task right now. */
+    isLockedFor(actor: LockHolder = "user"): boolean {
+        return taskLocks.isLocked(this.id, actor);
+    }
+
+    /** Throws {@link TaskLockedError} when another holder has the task. */
+    private assertWritable(options?: WriteOptions): void {
+        const actor = options?.actor ?? "user";
+        if (taskLocks.isLocked(this.id, actor)) throw new TaskLockedError(taskLocks.heldBy(this.id)!);
+    }
+
+    /**
+     * Replaces the track's metadata overrides (what the user typed over the sources' values). Validated: a bad
+     * value throws an Error whose message says why, and nothing is changed.
+     */
+    setMetadataOverride(overrides: MetadataOverrides, options?: WriteOptions): MetadataOverrides {
+        this.assertWritable(options);
+        // Only what this call changes is checked (see `checkOverrideChange`).
+        // A person may blank a tag; Claude clears the override instead (see `ValidateOptions`).
+        const check = checkOverrideChange(this.getAttributes()?.metadataOverride ?? {}, overrides, {
+            allowBlank: (options?.actor ?? "user") === "user",
+        });
+        if (!check.ok) throw new OverrideValidationError(check.error);
+        const next = check.value;
+        this.updateAttributes({ metadataOverride: next });
+        return next;
+    }
+
+    /**
+     * Changes some overrides and leaves the others: a value sets the field, `null` clears its override. Returns the
+     * overrides as they are now.
+     */
+    patchMetadataOverride(patch: Record<string, unknown>, options?: WriteOptions): MetadataOverrides {
+        this.assertWritable(options);
+        const next: Record<string, unknown> = { ...(this.getAttributes()?.metadataOverride ?? {}) };
+        for (const [key, value] of Object.entries(patch)) {
+            if (value === null) delete next[key];
+            else next[key] = value;
+        }
+        return this.setMetadataOverride(next as MetadataOverrides, options);
+    }
+
+    /** Puts back overrides that were there before a change (an undo): not validated again, they were accepted once. */
+    restoreMetadataOverride(previous: MetadataOverrides, options?: WriteOptions): void {
+        this.assertWritable(options);
+        this.updateAttributes({ metadataOverride: previous });
+    }
+
+    /**
+     * Puts back which download rows were selected and rejected (an undo). Rows are found by id; one that is gone
+     * (the downloads were redone since) is left alone.
+     */
+    restoreDownloadFlags(
+        flags: { id: string; selected: boolean; isRejected: boolean }[],
+        options?: WriteOptions
+    ): void {
+        this.assertWritable(options);
+        const sources = this.getAttributes()?.downloadSources ?? [];
+        const ids = downloadSourceIds(sources);
+        const byId = new Map(flags.map((f) => [f.id, f]));
+        this.updateAttributes({
+            downloadSources: sources.map((s, i) => {
+                const flag = byId.get(ids[i]);
+                return flag ? { ...s, selected: flag.selected, isRejected: flag.isRejected } : s;
+            }),
+        });
+    }
+
+    /** Replaces the metadata groups (the favorite / rejected choices the user makes in the Metadata panel). */
+    setMetadataGroups(groups: MetadataGroupState[], options?: WriteOptions): void {
+        this.assertWritable(options);
+        this.updateAttributes({ metadataGroups: groups });
+    }
+
     // ── Misc mutations ────────────────────────────────────────────────────────
 
     @TaskScoped()
@@ -1199,14 +1421,112 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         await this.start();
     }
 
-    selectDownloadSource(index: number): void {
+    // ── Running a part of the pipeline (chat agent, and the same as the list's own actions) ──────────────
+
+    // How many runs of a part (see below) are in flight: the task's `state` does not say, they do not change it.
+    private partRuns = 0;
+
+    /** Whether a part started by {@link runMetadataPart} or {@link runDownloadPart} is still running. */
+    get partRunning(): boolean {
+        return this.partRuns > 0;
+    }
+
+    /**
+     * Runs `run` as a run of a part (see {@link partRunning}): refused while another holder (Claude) has the task, and
+     * the task counts as busy until it settles. The list's own actions (re-fetch, re-discover, download) go through
+     * here, so the agent never writes under them and they never start under the agent.
+     */
+    async trackPartRun<T>(run: () => Promise<T>, options?: WriteOptions): Promise<T> {
+        this.assertWritable(options);
+        this.partRuns++;
+        try {
+            return await run();
+        } finally {
+            this.partRuns--;
+        }
+    }
+
+    /** Sets what a run of this task does: the metadata part (TAG?) and/or the download part (DL?). */
+    setRunFlags(flags: { toTag?: boolean; toDownload?: boolean }, options?: WriteOptions): void {
+        this.assertWritable(options);
+        this.updateAttributes({
+            ...(flags.toTag !== undefined ? { toTag: flags.toTag } : {}),
+            ...(flags.toDownload !== undefined ? { toDownload: flags.toDownload } : {}),
+        });
+    }
+
+    /**
+     * The metadata part again, for a task that was run before: its own metadata if it never got it, then the other
+     * platforms. What the user typed (overrides, links) is kept. Waits for the stage's turn like a batch does.
+     */
+    async runMetadataPart(options?: WriteOptions): Promise<void> {
+        return this.trackPartRun(
+            () =>
+                metadataLimiter.run(async () => {
+                    if (!this.getAttributes()?.primaryMetadataFetched) await this.startPrimaryMetadataFetching();
+                    await this.startMetadataDiscovering();
+                }),
+            options
+        );
+    }
+
+    /**
+     * Looks for the track on the other platforms again: one discovery service when `provider` is given, the whole
+     * stage otherwise. Counts as a run of a part (see {@link partRunning}): while it goes on, the pipeline and the
+     * agent see the task as busy, because it rebuilds `metadataGroups` under whoever writes to them.
+     */
+    async rediscoverPart(provider?: string, options?: WriteOptions): Promise<void> {
+        return this.trackPartRun(
+            () =>
+                metadataLimiter.run(() =>
+                    provider ? this.startSingleProviderDiscovery(provider) : this.startMetadataDiscovering()
+                ),
+            options
+        );
+    }
+
+    /**
+     * The download part, for a task whose metadata is ready: searches the download providers and downloads. The
+     * saved file, if there is one, stays (see `startDownloads`).
+     */
+    async runDownloadPart(options?: WriteOptions): Promise<void> {
+        return this.trackPartRun(() => {
+            if (!this.getAttributes()?.downloadsFetched) this.updateAttributes({ toDownload: true });
+            return downloadLimiter.run(() => this.startDownloads());
+        }, options);
+    }
+
+    selectDownloadSource(index: number, options?: WriteOptions): void {
+        this.assertWritable(options);
         const sources = this.getAttributes()?.downloadSources ?? [];
         this.updateAttributes({
             downloadSources: sources.map((s, i) => ({ ...s, selected: i === index })),
         });
     }
 
-    rejectDownloadSource(index: number, rejected: boolean): void {
+    /** Where a download row is now, from its stable id (see `downloadSourceIds`); -1 when there is no such row. */
+    indexOfDownloadSource(sourceId: string): number {
+        return downloadSourceIds(this.getAttributes()?.downloadSources ?? []).indexOf(sourceId);
+    }
+
+    /** `selectDownloadSource`, addressed by the row's id instead of its position (positions shift; ids do not). */
+    selectDownloadSourceById(sourceId: string, options?: WriteOptions): TrackDownloadSource {
+        const index = this.indexOfDownloadSource(sourceId);
+        if (index === -1) throw new Error(`No download source "${sourceId}"`);
+        this.selectDownloadSource(index, options);
+        return this.getAttributes()!.downloadSources[index];
+    }
+
+    /** `rejectDownloadSource`, addressed by the row's id. */
+    rejectDownloadSourceById(sourceId: string, rejected: boolean, options?: WriteOptions): TrackDownloadSource {
+        const index = this.indexOfDownloadSource(sourceId);
+        if (index === -1) throw new Error(`No download source "${sourceId}"`);
+        this.rejectDownloadSource(index, rejected, options);
+        return this.getAttributes()!.downloadSources[index];
+    }
+
+    rejectDownloadSource(index: number, rejected: boolean, options?: WriteOptions): void {
+        this.assertWritable(options);
         const sources = this.getAttributes()?.downloadSources ?? [];
         if (!sources[index]) return;
         this.updateAttributes({
@@ -1573,7 +1893,10 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         const applyRowUpdate = (existingSlot: number | undefined, patch: TrackDownloadSource): number => {
             const current = [...(this.getAttributes()?.downloadSources ?? [])];
             let slotIndex: number;
-            if (existingSlot === undefined) {
+            // A row this run created may be gone (the user removed it, or a session saved by an older version had two
+            // runs on one track). Writing at its old position would leave holes (saved as null), so it becomes a new
+            // row. Two runs at once are refused by `startDownloads`.
+            if (existingSlot === undefined || existingSlot >= current.length) {
                 slotIndex = insertAt === undefined ? current.length : insertAt + createdRows;
                 createdRows++;
                 current.splice(slotIndex, 0, patch);
@@ -1748,6 +2071,30 @@ export class DownloadTask extends Task<TrackDownloadTask> {
     @TaskScoped()
     @SafeAction("Start downloads")
     async startDownloads(signal?: AbortSignal): Promise<void> {
+        // One download run per track: a second one would empty `downloadSources` under the first, whose rows are
+        // addressed by position. The callers check too (a clear message); this is what keeps the rows whole.
+        if (this.downloadRunActive) {
+            this.logger.warn("startDownloads ignored: a download run is already going on this task");
+            return;
+        }
+        this.downloadRunActive = true;
+        this.status.setFallback("downloads", {
+            type: StatusType.Processing,
+            message: "Searching downloads",
+            timeTracking: true,
+        });
+        try {
+            await this.runDownloads(signal);
+        } finally {
+            this.downloadRunActive = false;
+            this.status.setFallback("downloads", undefined);
+        }
+    }
+
+    /** Whether {@link startDownloads} is in flight. */
+    private downloadRunActive = false;
+
+    private async runDownloads(signal?: AbortSignal): Promise<void> {
         const metadataGroups = this.getAttributes()?.metadataGroups;
 
         if (!metadataGroups || metadataGroups.length === 0) {

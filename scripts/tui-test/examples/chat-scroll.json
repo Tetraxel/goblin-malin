@@ -1,0 +1,27 @@
+{
+    "terminal": { "cols": 130, "rows": 40 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "load": { "chatWordsPerTick": 6, "tickMs": 50 },
+    "steps": [
+        { "type": "stable", "timeout": 40000, "quiescenceMs": 1000 },
+        { "type": "waitForContent", "text": "Hooked", "timeout": 20000 },
+        { "type": "key", "key": "Ctrl+T" },
+        { "type": "waitForContent", "text": "Message Claude", "timeout": 5000 },
+        { "type": "startLoad" },
+        { "type": "wait", "ms": 4000 },
+        { "type": "snapshot", "name": "streaming-at-the-bottom" },
+        { "type": "key", "key": "PageUp" },
+        { "type": "waitForContent", "text": "more row", "timeout": 3000 },
+        { "type": "snapshot", "name": "scrolled-up" },
+        { "type": "key", "key": "↑" },
+        { "type": "wait", "ms": 500 },
+        { "type": "snapshot", "name": "scrolled-up-a-bit-more" },
+        { "type": "key", "key": "PageDown" },
+        { "type": "key", "key": "PageDown" },
+        { "type": "key", "key": "PageDown" },
+        { "type": "wait", "ms": 800 },
+        { "type": "stopLoad" },
+        { "type": "wait", "ms": 800 },
+        { "type": "screenshot-powershell", "name": "chat-markdown" }
+    ]
+}

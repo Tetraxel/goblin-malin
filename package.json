@@ -57,6 +57,7 @@
         "test:tui": "tsx scripts/tui-test/cli.ts",
         "type-check:src": "tsc --noEmit",
         "type-check:tui": "tsc --noEmit --project scripts/tui-test/tsconfig.json",
+        "agent:tools": "tsx scripts/agent-tools.ts",
         "lint": "eslint src/ tests/ scripts/",
         "check:utf8": "node scripts/check-utf8.mjs",
         "format": "prettier --write src/ tests/ scripts/",

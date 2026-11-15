@@ -39,6 +39,13 @@ export abstract class MetadataService extends ServiceBase {
     abstract searchTrack(sourceTrackMetadata: TrackMetadata): Promise<SearchTrackResult[]>;
 
     /**
+     * Optional capability: a free-text search of the service's catalogue ("Neverender Justice remix"), as its own
+     * search box would answer it, best matches first. Unlike `searchTrack` it is not about a track the app already
+     * knows. Used by the chat agent's `search_music` tool, which asks every enabled service that has it.
+     */
+    searchTracks?(query: string, limit: number): Promise<TrackMetadata[]>;
+
+    /**
      * Optional capability: the whole album a track belongs to — its barcode (UPC/EAN), the track list and the
      * artists' pages. A track's own metadata usually lacks the barcode, and it is the strongest key for recognising
      * the release in MusicBrainz. `withIsrcs` also fetches each track's ISRC (costs more requests; only a seed needs it).

@@ -16,6 +16,8 @@ export default defineConfig({
             reportsDirectory: "coverage",
         },
         environment: "node",
+        // Gives each test file its own data folder (see the file).
+        setupFiles: ["tests/setup/dataDir.ts"],
         pool: "forks",
         env: {
             GOBLIN_NO_AUDIO: "1",

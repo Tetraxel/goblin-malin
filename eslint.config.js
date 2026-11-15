@@ -4,7 +4,7 @@ import reactPlugin from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 
 export default tseslint.config(
-    { ignores: ["dist/", "node_modules/", "scripts/tui-test/fixtures/", "scripts/*.mjs"] },
+    { ignores: ["dist/", "node_modules/", "scripts/tui-test/fixtures/", "scripts/*.mjs", "tests/unit/fixtures/"] },
 
     js.configs.recommended,
     ...tseslint.configs.recommended,

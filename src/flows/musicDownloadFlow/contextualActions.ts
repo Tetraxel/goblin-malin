@@ -7,13 +7,14 @@ import { type ColumnDefinition } from "#components/TaskListPanel/TaskListPanel";
 import { runWithoutCache } from "#utils/cache";
 import { startOptionsBridge } from "#base/bridges/startOptionsBridge";
 import { deleteConfirmBridge } from "#base/bridges/deleteConfirmBridge";
-import { type DownloadTask } from "./utils/downloadTask";
+import { TaskLockedError, type DownloadTask } from "./utils/downloadTask";
 import { type CollectionTask } from "./utils/collectionTask";
-import { runSelected } from "./runController";
+import { explainRefusedRun, runSelected } from "./runController";
 import { toAppUri as toOpenableUri } from "#utils/appLinks";
 import { addLinkFromClipboard } from "./utils/addLinkFromClipboard";
 import { discoveryServiceRegistry } from "./registries";
 import { metadataLimiter, downloadLimiter } from "./utils/stageLimiters";
+import { computeCompiledMetadata } from "./utils/compiledMetadata";
 import type { Task } from "#base/task/task";
 import type { Semaphore } from "#utils/semaphore";
 import { globalLogger } from "#base/logger/logger";
@@ -22,7 +23,10 @@ import { type MusicDownloadTaskAttributes, type TrackDownloadTask, type Collecti
 
 // Suppress the re-throw from @SafeAction — logging is already handled by the decorator.
 const fire = (p: Promise<unknown>): void => {
-    p.catch(() => {});
+    p.catch((error: unknown) => {
+        // "Claude holds this task" is an answer for the user, not a failure to hide.
+        if (error instanceof TaskLockedError) globalLogger.info(error.message);
+    });
 };
 
 type BarAttributes = {
@@ -82,11 +86,15 @@ function copyAction(label: string, task: DownloadTask, valueOf: (t: DownloadTask
     };
 }
 
-const primaryResultOf = (t: DownloadTask) =>
-    t
-        .getAttributes()
-        ?.metadataGroups.flatMap((g) => g.results)
-        .find((r) => r.isPrimaryInput);
+/**
+ * The task's metadata as the list shows it: what the platforms found, merged, with the user's overrides on top. The
+ * "Copy artist" / "Copy track title" actions copy this, so they give what the cell shows (not the raw artist of the
+ * link the user pasted, which for a YouTube video is the uploader's channel).
+ */
+const compiledOf = (t: DownloadTask) => {
+    const attrs = t.getAttributes();
+    return computeCompiledMetadata(attrs?.metadataGroups ?? [], attrs?.metadataOverride ?? {});
+};
 
 /** Registry key of the service that provided (or would recognize) the task's source URL. */
 function primaryServiceKeyOf(t: DownloadTask): string | undefined {
@@ -190,7 +198,7 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
                 const selected = tasks as DownloadTask[];
                 const needing = selected.filter(needsOptions);
                 const doRun = (selectedTasks: DownloadTask[]) => {
-                    runSelected(new Set(selectedTasks.map((t) => t.getId())));
+                    fire(runSelected(new Set(selectedTasks.map((t) => t.getId()))).then(explainRefusedRun));
                 };
                 if (needing.length > 0) {
                     startOptionsBridge.request({
@@ -225,7 +233,8 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
             }),
     });
     if (group.some((t) => attrsOf(t)?.primaryMetadataFetched)) {
-        const refetch = (t: DownloadTask) => runWithoutCache(() => t.startPrimaryMetadataFetching());
+        const refetch = (t: DownloadTask) =>
+            t.trackPartRun(() => runWithoutCache(() => t.startPrimaryMetadataFetching()));
         taskActions.push({
             shortcuts: [{ input: "f" }],
             label: "Re-fetch primary metadata",
@@ -240,23 +249,24 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
             shortcuts: [{ input: "d" }],
             label: "Re-discover metadata providers",
             multiSelectAllowed: true,
-            onClick: () => fire(task.startMetadataDiscovering()),
+            onClick: () => fire(task.trackPartRun(() => task.startMetadataDiscovering())),
             onClickBatch: (tasks) =>
                 runBatch(
                     tasks,
                     metadataLimiter,
                     (t) => Boolean(attrsOf(t)?.metadataDiscovered),
-                    (t) => t.startMetadataDiscovering()
+                    (t) => t.trackPartRun(() => t.startMetadataDiscovering())
                 ),
         });
     }
     const downloadable = (t: DownloadTask) => Boolean(attrsOf(t)?.downloadsFetched || attrsOf(t)?.metadataDiscovered);
     const eligibleDownloads = group.filter(downloadable);
     if (eligibleDownloads.length > 0) {
-        const download = (t: DownloadTask) => {
-            if (!attrsOf(t)?.downloadsFetched) t.updateAttributes({ toDownload: true });
-            return t.startDownloads();
-        };
+        const download = (t: DownloadTask) =>
+            t.trackPartRun(() => {
+                if (!attrsOf(t)?.downloadsFetched) t.updateAttributes({ toDownload: true });
+                return t.startDownloads();
+            });
         taskActions.push({
             shortcuts: [{ input: "w" }],
             label: eligibleDownloads.every((t) => attrsOf(t)?.downloadsFetched)
@@ -317,11 +327,11 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
     }
 
     if (column?.id === "artist") {
-        columnActions.push(copyAction("Copy artist", task, (t) => primaryResultOf(t)?.metadata.artists[0]?.name ?? ""));
+        columnActions.push(copyAction("Copy artist", task, (t) => compiledOf(t).artists[0]?.name ?? ""));
     }
 
     if (column?.id === "track") {
-        columnActions.push(copyAction("Copy track title", task, (t) => primaryResultOf(t)?.metadata.trackName ?? ""));
+        columnActions.push(copyAction("Copy track title", task, (t) => compiledOf(t).trackName ?? ""));
     }
 
     if (column && column.id.startsWith("metadataService-")) {
