@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.2.3] — 2026-11-16
+
 ### Added
 
 - **Chat with Claude** (`Ctrl+T`, or the **Claude** toolbar button): Claude, through your own Claude Code CLI, reads and changes your tasks when you ask: fix titles and artists, pick or reject a download source, add a link you give it, search a track on a platform again. It has no access to your files, a shell or the web, only to the app's tools ([docs/agent-tools.md](docs/agent-tools.md)). Off until you allow it, once.
@@ -26,10 +28,12 @@ All notable changes to this project are documented here.
 - Edits of a track's metadata, favorites and download selection go through validated `DownloadTask` methods (an invalid ISRC, year… is refused with a reason instead of being stored).
 
 - The STATUS column says what a track is doing for the whole of a stage ("Fetching metadata", "Discovering on other platforms", "Searching downloads", with a clock), instead of "No status" in the gaps between the platforms' own messages (`TaskStatus.setFallback`).
+- Moving the cursor on Windows no longer paints a second, identical screen on every other key: the Metadata and Download panels follow the selected task without an extra redraw, so a key costs about half the output.
 - The dialog that asks before Claude starts downloads names a track that was not read yet by a short link (no `https://`, cut with an ellipsis), so each one stays on its own line.
 
 ### Fixed
 
+- The Metadata panel crashed the app ("groups is not iterable") when the cursor moved onto an album or playlist row, easy to hit by holding `↑` in a long list.
 - A track whose download rows were written by two runs at once (two starts of the same track) was saved with `null` where a row should be, which crashed the Download view and the app at start-up. A run on a track that is already running is now refused (it emptied the rows under the run writing to them), a write to a row that is gone adds a row instead of leaving a hole, and sessions already saved with holes load again.
 - The chat's tool calls were cut by the Claude CLI after 60 seconds ("The operation timed out"), so a question left unanswered for a minute made Claude ask again: the dialog appeared twice. The CLI is now given 9 minutes per call, a repeated call joins the one being answered instead of asking again, and an answer given after the conversation moved on starts nothing.
 - "Copy artist" and "Copy track title" on a task row copy what the cell shows (the merged metadata, with your overrides), not the artist of the pasted link: for a YouTube lyrics upload that was the uploader's channel instead of the artist.
