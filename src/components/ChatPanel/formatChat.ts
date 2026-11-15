@@ -1,4 +1,5 @@
 import wrapAnsi from "wrap-ansi";
+import stripAnsi from "strip-ansi";
 import { type ChatMessage } from "#flows/musicDownloadFlow/agent/chatStore";
 import { parseMarkdown } from "./markdown";
 import { layoutTable } from "./tableLayout";
@@ -39,6 +40,20 @@ const MARKERS: Record<ChatMessage["role"], string> = {
     error: "✗",
 };
 
+// C0 controls except tab and newline (ESC, BEL, CR…), DEL, and the C1 controls (8-bit CSI / OSC).
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/g;
+
+/**
+ * Text that came from the model, a tool or the CLI, made safe to draw: no escape sequence or control character. A
+ * track title is untrusted and can make the model write one (OSC 52 rewrites the clipboard, others move the cursor or
+ * clear the screen), and Ink would pass it straight to the terminal. Only the app's own styling (added after this, by
+ * the Markdown reader) may carry codes.
+ */
+export function cleanText(text: string): string {
+    return stripAnsi(text).replace(CONTROL_CHARS, "").replace(/\t/g, "    ");
+}
+
 /** The text of one message cut into lines no wider than `width` (a word longer than a line is cut). */
 export function wrapMessage(text: string, width: number): string[] {
     const limit = Math.max(1, width);
@@ -64,10 +79,13 @@ const clip = (text: string): string =>
 function toolPieces(message: ChatMessage, room: number): Piece[] {
     const toggleId = message.detail ? message.id : undefined;
     const arrow = message.detail ? (message.expanded ? "▾ " : "▸ ") : "";
-    const pieces: Piece[] = wrapMessage(arrow + message.text, room).map((text) => ({ ...plain(text), toggleId }));
+    const pieces: Piece[] = wrapMessage(arrow + cleanText(message.text), room).map((text) => ({
+        ...plain(text),
+        toggleId,
+    }));
     if (!message.expanded || !message.detail) return pieces;
     const add = (lead: string, raw: string): void => {
-        const lines = wrapAnsi(clip(raw), Math.max(1, room - 3), { hard: true, trim: false }).split("\n");
+        const lines = wrapAnsi(clip(cleanText(raw)), Math.max(1, room - 3), { hard: true, trim: false }).split("\n");
         lines.forEach((text, i) =>
             pieces.push({ text, lead: i === 0 ? lead : "", nest: 0, indent: 3, rule: false, dim: true, toggleId })
         );
@@ -130,14 +148,15 @@ export function formatMessage(message: ChatMessage, width: number): ChatRow[] {
     const cached = byWidth.get(width);
     if (cached) return cached;
     const room = Math.max(1, width - MARKER_WIDTH);
+    const text = cleanText(message.text);
     const pieces =
         message.role === "assistant"
-            ? answerPieces(message.text, room)
+            ? answerPieces(text, room)
             : message.role === "tool"
               ? toolPieces(message, room)
               : message.role === "user"
-                ? userPieces(message.text, room)
-                : wrapMessage(message.text, room).map(plain);
+                ? userPieces(text, room)
+                : wrapMessage(text, room).map(plain);
     // The marker goes on the first row of text (a message of the user has a blank row above it).
     const markerRow = message.role === "user" ? 1 : 0;
     const previous = lastRows.get(message.id);

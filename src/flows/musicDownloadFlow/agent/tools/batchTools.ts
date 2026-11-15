@@ -6,6 +6,7 @@ import { computeCompiledMetadata } from "../../utils/compiledMetadata";
 import { type TrackDownloadTask } from "../../types";
 import { batchPlans, cleanTitle, planOverrideChange, stalePlanTasks, type BatchItem } from "../batchPlans";
 import { agentJournal, allTasks, findTask, isTaskRunning, requireDownloadTask } from "../taskAccess";
+import { joinSameCall } from "../joinSameCall";
 import { OVERRIDE_FIELDS } from "../../utils/overrideValidation";
 import { TASK_PROBLEMS, filterTasks, type TaskFilter } from "../views";
 import { overridePatchSchema, toOverridePatch } from "./writeTools";
@@ -233,121 +234,123 @@ export const applyBatch = defineAgentTool<{ planId: string }>({
     },
     example: { planId: "plan-1a2b3c4d" },
     describeCall: (input) => `apply_batch ${input.planId}`,
-    run: async ({ planId }, ctx) => {
-        const plan = batchPlans.get(planId);
-        if (!plan) throw new AgentToolError(`No plan "${planId}" (it may have expired). Make a new plan.`, "not-found");
-        const taskOf = (id: string): DownloadTask | undefined => {
-            const t = findTask(id);
-            return t instanceof DownloadTask ? (t as DownloadTask) : undefined;
-        };
-
-        const expire = (stale: { taskId: string; reason: string }[]): never => {
-            batchPlans.drop(plan.id);
-            throw new AgentToolError(
-                `The plan expired: ${stale.length} task(s) changed since it was made (${stale
-                    .slice(0, 5)
-                    .map((s) => `${s.taskId}: ${s.reason}`)
-                    .join("; ")}). Read them again and make a new plan.`,
-                "stale"
-            );
-        };
-        const staleBefore = stalePlanTasks(plan, taskOf);
-        if (staleBefore.length > 0) expire(staleBefore);
-
-        // Only the changes that are applied count, and only after the user said yes (a cancelled plan costs nothing).
-        const overBudget = ctx.turn.checkBudget(plan.items.map((i) => i.taskId));
-        if (overBudget) throw new AgentToolError(overBudget, "budget");
-
-        const preview = plan.items
-            .slice(0, DIALOG_LINES)
-            .map((i) => `• ${i.label}\n    ${i.diff.slice(0, 2).join("\n    ")}`)
-            .join("\n");
-        const answer = await ctx.confirm({
-            title: `Apply ${plan.items.length} change${plan.items.length === 1 ? "" : "s"} from Claude?`,
-            message:
-                `${plan.summary}\n\n${preview}` +
-                (plan.items.length > DIALOG_LINES ? `\n…and ${plan.items.length - DIALOG_LINES} more` : "") +
-                "\n\nYou can undo the whole batch afterwards with /undo in the chat.",
-            // The safe answer first.
-            choices: [
-                { label: "Cancel", tone: "muted" },
-                { label: `Apply ${plan.items.length}`, tone: "primary" },
-            ],
-            accent: "#d97757",
-        });
-        // Stop was pressed (or the message ended) while the dialog was open: it was taken off the screen (answer null)
-        // and nothing is applied. Checked first, so that is not mistaken for the user saying no.
-        if (ctx.turn.isEnded || ctx.signal.aborted) {
-            return {
-                applied: 0,
-                cancelled: true,
-                note: "The conversation had moved on before the answer: nothing was applied.",
+    run: ({ planId }, ctx) =>
+        joinSameCall("apply_batch", ctx, [planId], async () => {
+            const plan = batchPlans.get(planId);
+            if (!plan)
+                throw new AgentToolError(`No plan "${planId}" (it may have expired). Make a new plan.`, "not-found");
+            const taskOf = (id: string): DownloadTask | undefined => {
+                const t = findTask(id);
+                return t instanceof DownloadTask ? (t as DownloadTask) : undefined;
             };
-        }
-        if (answer !== 1) {
-            return {
-                applied: 0,
-                cancelled: true,
-                note: "The user did not allow it. Do not apply it again unless they ask.",
+
+            const expire = (stale: { taskId: string; reason: string }[]): never => {
+                batchPlans.drop(plan.id);
+                throw new AgentToolError(
+                    `The plan expired: ${stale.length} task(s) changed since it was made (${stale
+                        .slice(0, 5)
+                        .map((s) => `${s.taskId}: ${s.reason}`)
+                        .join("; ")}). Read them again and make a new plan.`,
+                    "stale"
+                );
             };
-        }
+            const staleBefore = stalePlanTasks(plan, taskOf);
+            if (staleBefore.length > 0) expire(staleBefore);
 
-        // The whole set, for the length of the apply. The dialog may have waited a long time: look again.
-        const got = ctx.turn.acquire(
-            plan.items.map((i) => i.taskId),
-            180_000
-        );
-        if ("ended" in got) throw new AgentToolError("The user stopped this turn: nothing was applied.", "stopped");
-        if ("heldBy" in got)
-            throw new AgentToolError(
-                "Some of those tasks are being edited right now. Try again in a moment.",
-                "locked"
+            // Only the changes that are applied count, and only after the user said yes (a cancelled plan costs nothing).
+            const overBudget = ctx.turn.checkBudget(plan.items.map((i) => i.taskId));
+            if (overBudget) throw new AgentToolError(overBudget, "budget");
+
+            const preview = plan.items
+                .slice(0, DIALOG_LINES)
+                .map((i) => `• ${i.label}\n    ${i.diff.slice(0, 2).join("\n    ")}`)
+                .join("\n");
+            const answer = await ctx.confirm({
+                title: `Apply ${plan.items.length} change${plan.items.length === 1 ? "" : "s"} from Claude?`,
+                message:
+                    `${plan.summary}\n\n${preview}` +
+                    (plan.items.length > DIALOG_LINES ? `\n…and ${plan.items.length - DIALOG_LINES} more` : "") +
+                    "\n\nYou can undo the whole batch afterwards with /undo in the chat.",
+                // The safe answer first.
+                choices: [
+                    { label: "Cancel", tone: "muted" },
+                    { label: `Apply ${plan.items.length}`, tone: "primary" },
+                ],
+                accent: "#d97757",
+            });
+            // Stop was pressed (or the message ended) while the dialog was open: it was taken off the screen (answer null)
+            // and nothing is applied. Checked first, so that is not mistaken for the user saying no.
+            if (ctx.turn.isEnded || ctx.signal.aborted) {
+                return {
+                    applied: 0,
+                    cancelled: true,
+                    note: "The conversation had moved on before the answer: nothing was applied.",
+                };
+            }
+            if (answer !== 1) {
+                return {
+                    applied: 0,
+                    cancelled: true,
+                    note: "The user did not allow it. Do not apply it again unless they ask.",
+                };
+            }
+
+            // The whole set, for the length of the apply. The dialog may have waited a long time: look again.
+            const got = ctx.turn.acquire(
+                plan.items.map((i) => i.taskId),
+                180_000
             );
-        try {
-            const staleNow = stalePlanTasks(plan, taskOf);
-            if (staleNow.length > 0) expire(staleNow);
+            if ("ended" in got) throw new AgentToolError("The user stopped this turn: nothing was applied.", "stopped");
+            if ("heldBy" in got)
+                throw new AgentToolError(
+                    "Some of those tasks are being edited right now. Try again in a moment.",
+                    "locked"
+                );
+            try {
+                const staleNow = stalePlanTasks(plan, taskOf);
+                if (staleNow.length > 0) expire(staleNow);
 
-            const done: BatchItem[] = [];
-            const failed: { taskId: string; reason: string }[] = [];
-            for (const [i, item] of plan.items.entries()) {
-                if (ctx.signal.aborted) break;
-                const task = taskOf(item.taskId)!;
-                try {
-                    task.patchMetadataOverride(item.patch, { actor: "agent" });
-                    done.push(item);
-                } catch (error) {
-                    failed.push({ taskId: item.taskId, reason: error instanceof Error ? error.message : "failed" });
+                const done: BatchItem[] = [];
+                const failed: { taskId: string; reason: string }[] = [];
+                for (const [i, item] of plan.items.entries()) {
+                    if (ctx.signal.aborted) break;
+                    const task = taskOf(item.taskId)!;
+                    try {
+                        task.patchMetadataOverride(item.patch, { actor: "agent" });
+                        done.push(item);
+                    } catch (error) {
+                        failed.push({ taskId: item.taskId, reason: error instanceof Error ? error.message : "failed" });
+                    }
+                    ctx.turn.progress(`Applying ${i + 1} of ${plan.items.length}`);
+                    got.lease.renew();
+                    // Let the screen repaint between items instead of freezing for a long batch.
+                    if (i % 20 === 19) await new Promise((resolve) => setImmediate(resolve));
                 }
-                ctx.turn.progress(`Applying ${i + 1} of ${plan.items.length}`);
-                got.lease.renew();
-                // Let the screen repaint between items instead of freezing for a long batch.
-                if (i % 20 === 19) await new Promise((resolve) => setImmediate(resolve));
-            }
-            batchPlans.drop(plan.id);
-            ctx.turn.count(done.map((i) => i.taskId));
+                batchPlans.drop(plan.id);
+                ctx.turn.count(done.map((i) => i.taskId));
 
-            if (done.length > 0) {
-                agentJournal.record({
-                    tool: "apply_batch",
-                    label: `apply_batch → ${done.length} task(s): ${plan.summary}`,
-                    checks: done.map((i) => ({ taskId: i.taskId, revisionAfter: taskOf(i.taskId)!.getRevision() })),
-                    restore: () => {
-                        for (const item of done)
-                            taskOf(item.taskId)?.restoreMetadataOverride(item.before, { actor: "user" });
-                    },
-                });
+                if (done.length > 0) {
+                    agentJournal.record({
+                        tool: "apply_batch",
+                        label: `apply_batch → ${done.length} task(s): ${plan.summary}`,
+                        checks: done.map((i) => ({ taskId: i.taskId, revisionAfter: taskOf(i.taskId)!.getRevision() })),
+                        restore: () => {
+                            for (const item of done)
+                                taskOf(item.taskId)?.restoreMetadataOverride(item.before, { actor: "user" });
+                        },
+                    });
+                }
+                return {
+                    applied: done.length,
+                    ...(failed.length > 0 ? { failed: failed.slice(0, 20) } : {}),
+                    ...(ctx.signal.aborted
+                        ? { stopped: true, note: "The user pressed Stop: the rest was not applied." }
+                        : {}),
+                };
+            } finally {
+                got.lease.release();
             }
-            return {
-                applied: done.length,
-                ...(failed.length > 0 ? { failed: failed.slice(0, 20) } : {}),
-                ...(ctx.signal.aborted
-                    ? { stopped: true, note: "The user pressed Stop: the rest was not applied." }
-                    : {}),
-            };
-        } finally {
-            got.lease.release();
-        }
-    },
+        }),
 });
 
 export const batchTools = [planBatch, planBulkOverride, applyBatch];

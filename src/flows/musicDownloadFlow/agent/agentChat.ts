@@ -165,7 +165,6 @@ export class AgentChat {
         this.sessionStarted = true;
         runAllowance.reset();
         this.store.restore(saved.messages);
-        this.note("Reopened the previous conversation.");
         return true;
     }
 

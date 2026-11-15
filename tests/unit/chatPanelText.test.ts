@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { parseMarkdown, stripStyle, styleInline } from "#components/ChatPanel/markdown";
-import { formatMessage, lastAnswer } from "#components/ChatPanel/formatChat";
+import { cleanText, formatMessage, lastAnswer } from "#components/ChatPanel/formatChat";
 import {
     cursorRow,
     firstVisibleRow,
@@ -31,6 +31,23 @@ describe("the rows of a message", () => {
         // The same message object at the same width is wrapped once.
         const same = message(78, "assistant", "x y z");
         expect(formatMessage(same, 40)).toBe(formatMessage(same, 40));
+    });
+});
+
+describe("text from the model is made safe to draw", () => {
+    test("escape sequences and control characters never reach a row", () => {
+        const hostile = `a${ESC}]52;c;ZXZpbA==\u0007b${ESC}[2Jc\u009b31md\r\te`;
+        expect(cleanText(hostile)).toBe("abcd    e");
+        for (const role of ["assistant", "error", "note", "tool"] as const) {
+            const rows = formatMessage({ id: 900 + role.length, role, text: hostile }, 40);
+            for (const row of rows) {
+                // eslint-disable-next-line no-control-regex
+                expect(stripStyle(row.text)).not.toMatch(/[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/);
+            }
+        }
+        // The app's own styling is added after the clean-up, so it stays.
+        const [row] = formatMessage({ id: 990, role: "assistant", text: `**bold**${ESC}[2J` }, 40);
+        expect(row.text).toBe(`${ESC}[1mbold${ESC}[22m`);
     });
 });
 

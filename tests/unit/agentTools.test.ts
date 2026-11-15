@@ -502,6 +502,28 @@ describe("batches", () => {
         expect(overrideOf(b)).toEqual({});
     });
 
+    test("apply_batch called again while its dialog is open joins the first: one dialog, applied once", async () => {
+        const plan = await callTool("plan_bulk_override", {
+            filter: { problem: "title_noise" },
+            titleCleanup: { removeNoise: true },
+        });
+        const asked: string[] = [];
+        let answer: (index: number | null) => void = () => undefined;
+        dialogBridge.setConfirmOpener((dialog, resolve) => {
+            asked.push(dialog.title);
+            answer = resolve;
+        });
+        const turn = new AgentTurn();
+        const first = callTool("apply_batch", { planId: plan.json.planId }, turn);
+        const again = callTool("apply_batch", { planId: plan.json.planId }, turn);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(asked).toHaveLength(1);
+        answer(1);
+        const [x, y] = await Promise.all([first, again]);
+        expect(x.json).toEqual({ applied: 2 });
+        expect(y.json).toEqual(x.json);
+    });
+
     test("the user can refuse, and nobody answering is a refusal too", async () => {
         const plan = await callTool("plan_bulk_override", {
             filter: { problem: "title_noise" },
@@ -718,6 +740,57 @@ describe("archive_tasks", () => {
         }
     });
 
+    test("an album or playlist with a track being processed is left out, whatever state the track is in", async () => {
+        const { CollectionTask } = await import("#flows/musicDownloadFlow/utils/collectionTask");
+        const { globalLogger } = await import("#base/logger/logger");
+        const album = new CollectionTask({
+            id: "alb8",
+            initialInput: "https://open.spotify.com/album/z",
+            attributes: {
+                kind: "collection",
+                collectionKind: "album",
+                state: "finished",
+                name: "Busy Album",
+                userInput: { type: "url", url: "https://open.spotify.com/album/z" },
+                childTaskIds: ["aaa1"],
+            },
+            logger: globalLogger,
+        });
+        TaskOrchestrator.getInstance().setTasks([album as never, a]);
+        // A part run (re-discover, download...) does not change the track's state.
+        const part = vi.spyOn(a, "partRunning", "get").mockReturnValue(true);
+        try {
+            expect((await callTool("archive_tasks", { taskIds: ["alb8"] })).text).toMatch(/being processed right now/);
+            expect((await callTool("archive_tasks", { taskIds: ["aaa1"] })).text).toMatch(/being processed right now/);
+        } finally {
+            part.mockRestore();
+        }
+    });
+
+    test("a call made again while the dialog is open joins the first: one dialog", async () => {
+        const asked: string[] = [];
+        let answer: (index: number | null) => void = () => undefined;
+        dialogBridge.setConfirmOpener((dialog, resolve) => {
+            asked.push(dialog.title);
+            answer = resolve;
+        });
+        const { SessionManager } = await import("#sessions/sessionManager");
+        const archive = vi.spyOn(SessionManager.getInstance(), "archiveTasks").mockReturnValue(1);
+        try {
+            const turn = new AgentTurn();
+            const first = callTool("archive_tasks", { taskIds: ["aaa1"] }, turn);
+            const again = callTool("archive_tasks", { taskIds: ["aaa1"] }, turn);
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            expect(asked).toHaveLength(1);
+            answer(1);
+            const [x, y] = await Promise.all([first, again]);
+            expect(x.json).toEqual(y.json);
+            expect(archive).toHaveBeenCalledTimes(1);
+        } finally {
+            archive.mockRestore();
+        }
+    });
+
     test("a declined question does not use up the turn's budget", async () => {
         answerDialogs(0);
         const turn = new AgentTurn();
@@ -779,6 +852,28 @@ describe("add_user_source and rediscover", () => {
             expect(a.partRunning).toBe(false);
         } finally {
             release();
+            discovery.mockRestore();
+        }
+    });
+
+    test("rediscover of the whole stage leaves out the last-resort services, and does not start once stopped", async () => {
+        const discovery = vi.spyOn(DownloadTask.prototype, "startMetadataDiscovering").mockResolvedValue(undefined);
+        try {
+            const turn = new AgentTurn();
+            expect((await callTool("rediscover", { taskId: "aaa1", revision: a.getRevision() }, turn)).isError).toBe(
+                false
+            );
+            expect(discovery).toHaveBeenCalledWith(expect.objectContaining({ skipLastResort: true }));
+            // The turn's signal is what ends a search that is going on.
+            expect(discovery.mock.calls[0][0]?.signal).toBe(turn.signal);
+
+            // Stopped while it waited for its turn: nothing starts.
+            discovery.mockClear();
+            const stopped = new AgentTurn();
+            stopped.stop();
+            await a.rediscoverPart(undefined, { actor: "agent", signal: stopped.signal });
+            expect(discovery).not.toHaveBeenCalled();
+        } finally {
             discovery.mockRestore();
         }
     });
@@ -916,6 +1011,20 @@ describe("run_metadata, run_download and run_task", () => {
         } finally {
             again.mockRestore();
         }
+    });
+
+    test("a start the controller refuses leaves TAG? and DL? as the user had them", async () => {
+        const mine = makeTrack("mine1", "Mine", { state: "pending", toTag: false, toDownload: true });
+        installWorld([mine]);
+        vi.mocked(runSelected).mockResolvedValueOnce("nothing can start now");
+        const result = await callTool("run_metadata", { taskIds: ["mine1"] });
+        expect(result.json.started).toEqual([]);
+        expect(mine.getAttributes()).toMatchObject({ toTag: false, toDownload: true });
+
+        runAllowance.downloads = true;
+        vi.mocked(runSelected).mockResolvedValueOnce("nothing can start now");
+        await callTool("run_task", { taskIds: ["mine1"] });
+        expect(mine.getAttributes()).toMatchObject({ toTag: false, toDownload: true });
     });
 
     test("a track that never ran is not started while a batch is going: it is reported as skipped", async () => {

@@ -9,6 +9,7 @@ import { runSelected } from "../../runController";
 import { findTask } from "../taskAccess";
 import { isTaskBusy } from "../runReport";
 import { runAllowance } from "../runAllowance";
+import { joinSameCall } from "../joinSameCall";
 import { labelOf } from "./writeTools";
 
 const logger = globalLogger.createChild({ service: "AgentRun" });
@@ -113,26 +114,6 @@ const movedOn = {
     note: "The conversation had moved on before the answer: nothing was started.",
 };
 
-// Calls that are being answered now, by what they ask. The CLI gives up on a call that takes too long and the model
-// may ask again; the second call joins the first instead of asking the user the same question twice, or starting
-// the same tracks twice. Within one message only: a call of the next message must not get the answer of a message
-// that has ended ("nothing was started").
-const inFlight = new Map<string, Promise<unknown>>();
-
-function joinSameCall<T>(
-    tool: string,
-    ctx: AgentToolContext,
-    taskIds: readonly string[],
-    work: () => Promise<T>
-): Promise<T> {
-    const key = `${ctx.turn.id}:${tool}:${[...new Set(taskIds)].sort().join(",")}`;
-    const existing = inFlight.get(key) as Promise<T> | undefined;
-    if (existing) return existing;
-    const promise = work().finally(() => inFlight.delete(key));
-    inFlight.set(key, promise);
-    return promise;
-}
-
 /**
  * Starts never-run tracks through the batch and returns the ones that really started. The run controller says no
  * (answers a reason) when it started none: those are reported as skipped instead of "started", so the model is not
@@ -150,6 +131,27 @@ async function startBatch(label: string, tasks: readonly DownloadTask[], skipped
         for (const t of tasks) skipped.push({ taskId: t.getId(), reason: "it could not be started" });
     }
     return [];
+}
+
+/** What TAG? and DL? are now: a start sets them first, and gives them back when the track was not started after all. */
+type RunFlags = { toTag?: boolean; toDownload?: boolean };
+const runFlagsOf = (task: DownloadTask): RunFlags => {
+    const a = task.getAttributes();
+    return { toTag: a?.toTag, toDownload: a?.toDownload };
+};
+
+/** Puts the flags back on tracks that did not start: the user's own choice must not be lost to a refused start. */
+function restoreFlags(before: Map<DownloadTask, RunFlags>, started: readonly DownloadTask[]): void {
+    for (const [task, flags] of before) {
+        if (started.includes(task)) continue;
+        try {
+            task.setRunFlags(flags, { actor: "agent" });
+        } catch (error) {
+            logger.warn(
+                `Could not put back the flags of ${task.getId()}: ${error instanceof Error ? error.message : String(error)}`
+            );
+        }
+    }
 }
 
 /** Starts `work` without waiting for it: the call answers at once, the run goes on in the background. */
@@ -176,8 +178,10 @@ export const runMetadata = defineAgentTool<RunInput>({
         const overBudget = ctx.turn.checkBudget([...freeBatch, ...again].map((t) => t.getId()));
         if (overBudget) throw new AgentToolError(overBudget, "budget");
         // A track that was never run goes through the normal start (queue, limits, state), with downloads off.
+        const flagsBefore = new Map(freeBatch.map((t) => [t, runFlagsOf(t)]));
         for (const task of freeBatch) task.setRunFlags({ toTag: true, toDownload: false }, { actor: "agent" });
         const fresh = await startBatch("run_metadata", freeBatch, skipped);
+        restoreFlags(flagsBefore, fresh);
         for (const task of again) inBackground("run_metadata", task.runMetadataPart({ actor: "agent" }));
         const started = [...fresh, ...again];
         if (started.length === 0) return { started: [], skipped };
@@ -266,8 +270,10 @@ export const runTask = defineAgentTool<RunInput>({
             // The answer may have taken a while (and another run may have started these tracks meanwhile).
             const freeBatch = takeFreeBatch(pickRunnable(tasks.map((t) => t.getId())).tasks.filter(isUnrun), skipped);
             if (freeBatch.length === 0) return { started: [], skipped, note: "They were started in the meantime." };
+            const flagsBefore = new Map(freeBatch.map((t) => [t, runFlagsOf(t)]));
             for (const task of freeBatch) task.setRunFlags({ toTag: true, toDownload: true }, { actor: "agent" });
             const live = await startBatch("run_task", freeBatch, skipped);
+            restoreFlags(flagsBefore, live);
             if (live.length === 0) return { started: [], skipped };
             ctx.turn.count(live.map((t) => t.getId()));
             return {

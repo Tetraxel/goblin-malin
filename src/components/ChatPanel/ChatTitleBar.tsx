@@ -31,12 +31,21 @@ export const ChatTitleBar: React.FC<{ width: number }> = ({ width }) => {
     const fill = Math.max(0, width - 2 - CHAT_TITLE.length - info.length - 1 - 1);
     return (
         <Box width={width} height={1} flexShrink={0} overflow="hidden">
-            <Text color={theme.ui.border}>{"─ "}</Text>
-            <Text bold color={CHAT_AGENT_COLOR} dimColor={!focused} wrap="truncate-end">
-                {CHAT_TITLE}
+            {/* Every fixed piece keeps its width: a bare <Text> would shrink to nothing in a narrow panel. */}
+            <Box flexShrink={0}>
+                <Text color={theme.ui.border}>{"─ "}</Text>
+            </Box>
+            <Box flexShrink={0}>
+                <Text bold color={CHAT_AGENT_COLOR} dimColor={!focused} wrap="truncate-end">
+                    {CHAT_TITLE}
+                </Text>
+            </Box>
+            <Text color={theme.text.secondary} wrap="truncate-end">
+                {info}
             </Text>
-            <Text color={theme.text.secondary}>{info}</Text>
-            <Text color={theme.ui.border}>{` ${"─".repeat(fill)}┤`}</Text>
+            <Box flexShrink={0}>
+                <Text color={theme.ui.border}>{` ${"─".repeat(fill)}┤`}</Text>
+            </Box>
         </Box>
     );
 };

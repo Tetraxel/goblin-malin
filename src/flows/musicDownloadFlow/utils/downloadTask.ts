@@ -474,9 +474,16 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
     // ── Discovery ─────────────────────────────────────────────────────────────
 
+    /**
+     * The whole discovery stage. `skipLastResort` leaves out the slow, costly last-resort services (Claude): only the
+     * user starts those. `signal` ends the stage early when it aborts, like {@link skipDiscovery} (a stage that has
+     * not started yet does not start).
+     */
     @TaskScoped()
     @SafeAction("Re-discover metadata providers")
-    async startMetadataDiscovering(): Promise<void> {
+    async startMetadataDiscovering(options?: { skipLastResort?: boolean; signal?: AbortSignal }): Promise<void> {
+        // Stopped before it began: nothing may be cleared or rebuilt.
+        if (options?.signal?.aborted) return;
         const primaryResult = this.getPrimaryMetadata();
         if (!primaryResult) throw new Error("No primary metadata source available for metadata discovering");
 
@@ -524,6 +531,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             };
         });
         this.discoveryRun = run;
+        const onAbort = () => run.skip();
+        options?.signal?.addEventListener("abort", onAbort, { once: true });
 
         const discoverEverywhere = async () => {
             // The user's own links first: they are the most reliable thing this track has, and a platform they
@@ -588,7 +597,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             // platform is still missing after everything above, and only once the user has allowed them.
             for (const [key, ctor] of this.discoveryServiceRegistry.getAllConstructors()) {
                 if (run.skipped) return;
-                if (!ctor.lastResort) continue;
+                if (!ctor.lastResort || options?.skipLastResort) continue;
                 const wanted = this.getMissingPlatforms();
                 if (wanted.length === 0) break;
                 if (!(await this.awaitDiscoveryConsent(key))) continue;
@@ -619,6 +628,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         try {
             await Promise.race([discoverEverywhere(), skippedSignal]);
         } finally {
+            options?.signal?.removeEventListener("abort", onAbort);
             if (this.discoveryRun === run) this.discoveryRun = undefined;
             this.status.setFallback("discovery", undefined);
             this.updateAttributes({ metadataDiscoveringInProgress: false });
@@ -1477,13 +1487,20 @@ export class DownloadTask extends Task<TrackDownloadTask> {
      * Looks for the track on the other platforms again: one discovery service when `provider` is given, the whole
      * stage otherwise. Counts as a run of a part (see {@link partRunning}): while it goes on, the pipeline and the
      * agent see the task as busy, because it rebuilds `metadataGroups` under whoever writes to them.
+     *
+     * Never runs a last-resort service (Claude): it is slow and spends the user's quota, so only the user starts it.
+     * `signal` (the chat turn's Stop): a run still waiting for its turn does not start, and a whole-stage search ends
+     * early. A search of one provider is a single request and finishes by itself.
      */
-    async rediscoverPart(provider?: string, options?: WriteOptions): Promise<void> {
+    async rediscoverPart(provider?: string, options?: WriteOptions & { signal?: AbortSignal }): Promise<void> {
+        const signal = options?.signal;
         return this.trackPartRun(
             () =>
-                metadataLimiter.run(() =>
-                    provider ? this.startSingleProviderDiscovery(provider) : this.startMetadataDiscovering()
-                ),
+                metadataLimiter.run(async () => {
+                    if (signal?.aborted) return;
+                    if (provider) await this.startSingleProviderDiscovery(provider);
+                    else await this.startMetadataDiscovering({ skipLastResort: true, signal });
+                }),
             options
         );
     }

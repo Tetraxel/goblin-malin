@@ -3,6 +3,7 @@ import { type JsonSchema } from "#base/agent/jsonSchema";
 import { SessionManager } from "#sessions/sessionManager";
 import { getArchivedTaskIds } from "#sessions/archive";
 import { TaskOrchestrator } from "#base/task/orchestrator";
+import { taskLocks } from "#base/task/taskLock";
 import { urlParserRegistry } from "#base/urlParser";
 import { createTasksFromUrls, importTasks } from "../../taskFactory";
 import { taskIdFromUrl } from "../../utils/taskId";
@@ -22,6 +23,7 @@ import {
     requireDownloadTask,
 } from "../taskAccess";
 import { sourceView } from "../views";
+import { joinSameCall } from "../joinSameCall";
 
 const taskIdSchema: JsonSchema = { type: "string", minLength: 1, maxLength: 200 };
 const revisionSchema: JsonSchema = {
@@ -299,7 +301,7 @@ function rediscoverableProviders(): string[] {
 export const rediscover = defineAgentTool<{ taskId: string; revision: number; provider?: string }>({
     name: "rediscover",
     summary:
-        "Looks for the track on the other platforms again: with a `provider`, only that discovery service; without, the whole discovery stage (what the search found is replaced; the user's own links and overrides are kept). Slow. Not undoable.",
+        "Looks for the track on the other platforms again: with a `provider`, only that discovery service; without, the whole discovery stage (what the search found is replaced; the user's own links and overrides are kept), except the slow, costly last-resort services, which only the user starts. Slow. Not undoable.",
     kind: "write",
     locks: "task",
     undoable: false,
@@ -341,10 +343,9 @@ export const rediscover = defineAgentTool<{ taskId: string; revision: number; pr
 
         // Through the task, not the discovery calls themselves: it counts as a run, so nothing else writes to or
         // starts the track while the groups are being rebuilt.
-        // Stop ends a whole-stage search early, keeping what it found so far (the user's "skip discovery"). A search of
-        // one provider has no such hook and finishes by itself.
-        const stop = () => task.skipDiscovery();
-        ctx.signal.addEventListener("abort", stop, { once: true });
+        // Stop (the signal) ends a whole-stage search early, keeping what it found so far (the user's "skip
+        // discovery"), and a run still waiting for its turn never starts. A search of one provider is a single
+        // request and finishes by itself. The whole stage leaves out the last-resort services (Claude).
         // The run may wait a long time for the metadata stage's turn before it even starts, and a lease that runs out
         // counts as free: the user could then edit the track while the groups are rebuilt under them. So the lease is
         // renewed for as long as the run lasts (a second lease of the same turn on the task, which shares its entry).
@@ -355,9 +356,8 @@ export const rediscover = defineAgentTool<{ taskId: string; revision: number; pr
                 : undefined;
         renewer?.unref?.();
         try {
-            await task.rediscoverPart(input.provider, { actor: "agent" });
+            await task.rediscoverPart(input.provider, { actor: "agent", signal: ctx.signal });
         } finally {
-            ctx.signal.removeEventListener("abort", stop);
             if (renewer) clearInterval(renewer);
             if ("lease" in keepHeld) keepHeld.lease.release();
         }
@@ -371,9 +371,22 @@ export const rediscover = defineAgentTool<{ taskId: string; revision: number; pr
 
 type ArchivableTask = NonNullable<ReturnType<typeof findTask>>;
 
-/** Whether the task (a track, album or playlist) is being processed: it is left out of an archive. */
-const isArchiveBusy = (task: ArchivableTask): boolean =>
-    task instanceof DownloadTask ? isTaskRunning(task) : task.running;
+/**
+ * Whether the task (a track, album or playlist) is being processed: it is left out of an archive. A track counts when
+ * the pipeline or a part run works on it, or someone else holds it; an album or playlist when it runs itself or any of
+ * its tracks is busy (the archive takes the tracks with it).
+ */
+const isTrackBusy = (track: DownloadTask): boolean => isTaskRunning(track) || taskLocks.isLocked(track.getId());
+
+const isArchiveBusy = (task: ArchivableTask): boolean => {
+    if (task instanceof DownloadTask) return isTrackBusy(task);
+    if (task.running) return true;
+    const children = (task.getAttributes() as CollectionDownloadTask | undefined)?.childTaskIds ?? [];
+    return children.some((id) => {
+        const child = findTask(id);
+        return child instanceof DownloadTask && isTrackBusy(child);
+    });
+};
 
 /** What an archive dialog calls a task: a track by its title, an album or playlist by its name. */
 function archiveLabel(task: ArchivableTask): string {
@@ -399,90 +412,91 @@ export const archiveTasks = defineAgentTool<{ taskIds: string[] }>({
     },
     example: { taskIds: ["task-1a2b3c", "task-4d5e6f"] },
     describeCall: (input) => `archive_tasks (${input.taskIds.length})`,
-    run: async ({ taskIds }, ctx) => {
-        // Tracks, albums and playlists alike (the archive takes an album's tracks with it). An id that is no task is
-        // reported and left out, like the run tools do: one bad id must not refuse the rest.
-        const tasks: ArchivableTask[] = [];
-        const unknown: { taskId: string; reason: string }[] = [];
-        const seen = new Set<string>();
-        for (const id of new Set(taskIds)) {
-            const task = findTask(id);
-            if (!task) unknown.push({ taskId: id, reason: "no task with this id" });
-            else if (!seen.has(task.getId())) {
-                seen.add(task.getId());
-                tasks.push(task);
+    run: ({ taskIds }, ctx) =>
+        joinSameCall("archive_tasks", ctx, taskIds, async () => {
+            // Tracks, albums and playlists alike (the archive takes an album's tracks with it). An id that is no task is
+            // reported and left out, like the run tools do: one bad id must not refuse the rest.
+            const tasks: ArchivableTask[] = [];
+            const unknown: { taskId: string; reason: string }[] = [];
+            const seen = new Set<string>();
+            for (const id of new Set(taskIds)) {
+                const task = findTask(id);
+                if (!task) unknown.push({ taskId: id, reason: "no task with this id" });
+                else if (!seen.has(task.getId())) {
+                    seen.add(task.getId());
+                    tasks.push(task);
+                }
             }
-        }
-        const running = tasks.filter(isArchiveBusy).map((t) => t.getId());
-        const ready = tasks.filter((t) => !isArchiveBusy(t));
-        if (ready.length === 0) {
-            throw new AgentToolError(
-                unknown.length > 0 && running.length === 0
-                    ? `None of those ids is a task: ${unknown.map((u) => u.taskId).join(", ")}. Use list_tasks to find ids.`
-                    : "Every one of those tasks is being processed right now.",
-                unknown.length > 0 && running.length === 0 ? "not-found" : "running"
-            );
-        }
+            const running = tasks.filter(isArchiveBusy).map((t) => t.getId());
+            const ready = tasks.filter((t) => !isArchiveBusy(t));
+            if (ready.length === 0) {
+                throw new AgentToolError(
+                    unknown.length > 0 && running.length === 0
+                        ? `None of those ids is a task: ${unknown.map((u) => u.taskId).join(", ")}. Use list_tasks to find ids.`
+                        : "Every one of those tasks is being processed right now.",
+                    unknown.length > 0 && running.length === 0 ? "not-found" : "running"
+                );
+            }
 
-        // Counted only once the user has said yes: a declined question changes nothing, so it costs nothing.
-        const overBudget = ctx.turn.checkBudget(ready.map((t) => t.getId()));
-        if (overBudget) throw new AgentToolError(overBudget, "budget");
+            // Counted only once the user has said yes: a declined question changes nothing, so it costs nothing.
+            const overBudget = ctx.turn.checkBudget(ready.map((t) => t.getId()));
+            if (overBudget) throw new AgentToolError(overBudget, "budget");
 
-        const answer = await ctx.confirm({
-            title: `Let Claude archive ${ready.length} ${ready.length === 1 ? "task" : "tasks"}?`,
-            message:
-                `Claude wants to move ${ready.length} ${ready.length === 1 ? "task" : "tasks"} to the archive.\n\n` +
-                ready
-                    .slice(0, 8)
-                    .map((t) => `• ${archiveLabel(t)}`)
-                    .join("\n") +
-                (ready.length > 8 ? `\n…and ${ready.length - 8} more` : "") +
-                "\n\nThey are kept there: you can restore them from the Archive window.",
-            // The safe answer first.
-            choices: [
-                { label: "Cancel", tone: "muted" },
-                { label: "Archive", tone: "primary" },
-            ],
-            accent: "#d97757",
-        });
-        // Stop was pressed (or the message ended) while the dialog was open: it was taken off the screen (answer
-        // null) and nothing is archived. Checked first, so that is not mistaken for the user saying no.
-        if (ctx.turn.isEnded || ctx.signal.aborted) {
-            return {
-                archived: 0,
-                cancelled: true,
-                note: "The conversation had moved on before the answer: nothing was archived.",
-            };
-        }
-        if (answer !== 1)
-            return {
-                archived: 0,
-                cancelled: true,
-                note: "The user did not allow it. Do not ask again unless they do.",
-            };
-        // The dialog may have stayed open a while: a task started meanwhile is left out too.
-        const startedSince = ready.filter(isArchiveBusy).map((t) => t.getId());
-        const toArchive = ready.filter((t) => !isArchiveBusy(t));
-        const leftOut = [...running, ...startedSince];
-        if (toArchive.length === 0)
-            throw new AgentToolError("Every one of those tasks is being processed right now.", "running");
+            const answer = await ctx.confirm({
+                title: `Let Claude archive ${ready.length} ${ready.length === 1 ? "task" : "tasks"}?`,
+                message:
+                    `Claude wants to move ${ready.length} ${ready.length === 1 ? "task" : "tasks"} to the archive.\n\n` +
+                    ready
+                        .slice(0, 8)
+                        .map((t) => `• ${archiveLabel(t)}`)
+                        .join("\n") +
+                    (ready.length > 8 ? `\n…and ${ready.length - 8} more` : "") +
+                    "\n\nThey are kept there: you can restore them from the Archive window.",
+                // The safe answer first.
+                choices: [
+                    { label: "Cancel", tone: "muted" },
+                    { label: "Archive", tone: "primary" },
+                ],
+                accent: "#d97757",
+            });
+            // Stop was pressed (or the message ended) while the dialog was open: it was taken off the screen (answer
+            // null) and nothing is archived. Checked first, so that is not mistaken for the user saying no.
+            if (ctx.turn.isEnded || ctx.signal.aborted) {
+                return {
+                    archived: 0,
+                    cancelled: true,
+                    note: "The conversation had moved on before the answer: nothing was archived.",
+                };
+            }
+            if (answer !== 1)
+                return {
+                    archived: 0,
+                    cancelled: true,
+                    note: "The user did not allow it. Do not ask again unless they do.",
+                };
+            // The dialog may have stayed open a while: a task started meanwhile is left out too.
+            const startedSince = ready.filter(isArchiveBusy).map((t) => t.getId());
+            const toArchive = ready.filter((t) => !isArchiveBusy(t));
+            const leftOut = [...running, ...startedSince];
+            if (toArchive.length === 0)
+                throw new AgentToolError("Every one of those tasks is being processed right now.", "running");
 
-        const got = ctx.turn.acquire(toArchive.map((t) => t.getId()));
-        if ("ended" in got) return { archived: 0, cancelled: true, note: "The turn ended: nothing was archived." };
-        if ("heldBy" in got)
-            throw new AgentToolError("Some of those tasks are being edited right now. Try again.", "locked");
-        try {
-            const archived = SessionManager.getInstance().archiveTasks(toArchive.map((t) => t.getId()));
-            ctx.turn.count(toArchive.map((t) => t.getId()));
-            return {
-                archived,
-                ...(leftOut.length > 0 ? { leftOut } : {}),
-                ...(unknown.length > 0 ? { skipped: unknown } : {}),
-            };
-        } finally {
-            got.lease.release();
-        }
-    },
+            const got = ctx.turn.acquire(toArchive.map((t) => t.getId()));
+            if ("ended" in got) return { archived: 0, cancelled: true, note: "The turn ended: nothing was archived." };
+            if ("heldBy" in got)
+                throw new AgentToolError("Some of those tasks are being edited right now. Try again.", "locked");
+            try {
+                const archived = SessionManager.getInstance().archiveTasks(toArchive.map((t) => t.getId()));
+                ctx.turn.count(toArchive.map((t) => t.getId()));
+                return {
+                    archived,
+                    ...(leftOut.length > 0 ? { leftOut } : {}),
+                    ...(unknown.length > 0 ? { skipped: unknown } : {}),
+                };
+            } finally {
+                got.lease.release();
+            }
+        }),
 });
 
 /** How many links one add_tasks call takes: a long list is better read by the user than pushed in by a loop. */

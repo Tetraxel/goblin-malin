@@ -66,8 +66,10 @@ export const ChatEmptyState: React.FC<Props> = ({ model, last, onChooseModel, on
             <ChatButton onPress={onChooseModel} mouse={mouse}>
                 {(hovered) => (
                     <>
-                        <Text color={dim}>Model </Text>
-                        <Text bold color={CHAT_AGENT_COLOR} underline={hovered}>
+                        <Box flexShrink={0}>
+                            <Text color={dim}>Model </Text>
+                        </Box>
+                        <Text bold color={CHAT_AGENT_COLOR} underline={hovered} wrap="truncate-end">
                             {model}
                         </Text>
                         <Box marginLeft={2} flexShrink={0}>

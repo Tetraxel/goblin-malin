@@ -8,7 +8,7 @@ import { setClickThroughWindow } from "#base/mouse/clickableWindows";
 import { getVisibleScreenBounds } from "#base/mouse/screenBounds";
 import { pasteRouter } from "#base/pasteRouter";
 import { type Task } from "#base/task/task";
-import { useFocusActions, useFocusChrome, useFocusTaskList } from "#contexts/FocusContext";
+import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useSettingsVersion } from "#hooks/useSettingsVersion";
 import { agentChat } from "#flows/musicDownloadFlow/agent/agentChat";
@@ -16,18 +16,18 @@ import { chatStore } from "#flows/musicDownloadFlow/agent/chatStore";
 import { chooseAgentModel } from "#flows/musicDownloadFlow/agent/chooseAgentModel";
 import { getAgentSettings } from "#flows/musicDownloadFlow/agent/agentSettings";
 import { type SavedChatSummary } from "#flows/musicDownloadFlow/agent/chatHistory";
-import { computeCompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
-import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import { Hint } from "../Hint";
 import { ChatEmptyState } from "./ChatEmptyState";
 import { ChatInput } from "./ChatInput";
 import { ChatRowView } from "./ChatRowView";
+import { ChatSelection } from "./ChatSelection";
 import { CHAT_TITLE, useChatTitleInfo } from "./ChatTitleBar";
 import { inputRowCount, sanitizeTyped } from "./inputLayout";
 import {
     CHAT_AGENT_COLOR as AGENT_COLOR,
     CHAT_PANEL_WIDTH_STEP,
     chatPanelState,
+    chatViewMemory,
     clampChatWidth,
 } from "./chatPanelState";
 import { formatChatRows, lastAnswer, maxScroll, visibleRows } from "./formatChat";
@@ -54,16 +54,6 @@ type Props = {
     terminalWidth: number;
 };
 
-/** A track's "Title – Artist" as the list shows it; an album or playlist is named by its kind. */
-function describeTask(task: Task | undefined): string {
-    const attrs = task?.getAttributes() as MusicDownloadTaskAttributes | undefined;
-    if (!attrs) return "";
-    if (attrs.kind === "collection") return attrs.collectionKind;
-    const compiled = computeCompiledMetadata(attrs.metadataGroups ?? [], attrs.metadataOverride ?? {});
-    const artist = compiled.artists[0]?.name;
-    return [compiled.trackName, artist].filter(Boolean).join(" – ");
-}
-
 /**
  * The chat with Claude: its answers, the tools it calls (live, and openable to see what was sent and received), and
  * a line to type in. Docked at the right of the task list, or a window over the screen in a narrow terminal. The
@@ -73,12 +63,16 @@ export const ChatPanel: React.FC<Props> = ({ tasks, width, height, variant, term
     const theme = useTheme();
     const { switchWindow } = useFocusActions();
     const { activeWindow } = useFocusChrome();
-    const taskList = useFocusTaskList();
     const isFocused = activeWindow === "chatPanel";
 
     const chat = useSyncExternalStore(chatStore.subscribe, chatStore.getSnapshot);
-    const [draft, setDraft] = useState("");
-    const [scroll, setScroll] = useState(0);
+    // Start from what the last panel had (see `chatViewMemory`): it is remounted by a resize across the dock width.
+    const [draft, setDraft] = useState(() => chatViewMemory.draft);
+    const [scroll, setScroll] = useState(() => chatViewMemory.scroll);
+    useEffect(() => {
+        chatViewMemory.draft = draft;
+        chatViewMemory.scroll = scroll;
+    }, [draft, scroll]);
     const [flash, setFlash] = useState<{ text: string; ok: boolean } | undefined>();
     const [last, setLast] = useState<SavedChatSummary | undefined>();
     const flashTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -89,15 +83,9 @@ export const ChatPanel: React.FC<Props> = ({ tasks, width, height, variant, term
     const model = getAgentSettings().model;
     const titleInfo = useChatTitleInfo();
 
-    // What the user has selected in the app, for the header of the next message: the ticked tasks, or the one
-    // under the cursor.
-    const selectionIds = useMemo(() => {
-        if (taskList.selectedTaskIds.size > 0) return [...taskList.selectedTaskIds];
-        const current = taskList.isHeaderFocused ? undefined : tasks[taskList.selectedTaskIndex];
-        return current ? [current.getId()] : [];
-    }, [taskList.selectedTaskIds, taskList.selectedTaskIndex, taskList.isHeaderFocused, tasks]);
-    const selectedTitle =
-        selectionIds.length === 1 ? describeTask(tasks.find((t) => t.getId() === selectionIds[0])) : "";
+    // What the user has selected in the app, for the header of the next message. Written by ChatSelection, the only
+    // part that follows the task list's cursor: the chat itself does not re-render while the cursor moves.
+    const selectionRef = useRef<string[]>([]);
 
     // The docked panel has a border on its right only (the task list's right border is its left one); a window has
     // four. Padding: three columns, so the text does not touch the frame.
@@ -138,9 +126,9 @@ export const ChatPanel: React.FC<Props> = ({ tasks, width, height, variant, term
             if (text === "" || chat.busy) return;
             setDraft("");
             setScroll(0);
-            void agentChat.send(text, selectionIds);
+            void agentChat.send(text, selectionRef.current);
         },
-        [chat.busy, selectionIds]
+        [chat.busy]
     );
 
     const close = useCallback(() => {
@@ -383,10 +371,14 @@ export const ChatPanel: React.FC<Props> = ({ tasks, width, height, variant, term
             {/* Docked, the title is on the tab line above (ChatTitleBar). */}
             {!docked && (
                 <Box height={1} flexShrink={0}>
-                    <Text bold color={AGENT_COLOR} dimColor={!isFocused}>
-                        {CHAT_TITLE}
+                    <Box flexShrink={0}>
+                        <Text bold color={AGENT_COLOR} dimColor={!isFocused}>
+                            {CHAT_TITLE}
+                        </Text>
+                    </Box>
+                    <Text color={theme.text.secondary} wrap="truncate-end">
+                        {titleInfo}
                     </Text>
-                    <Text color={theme.text.secondary}>{titleInfo}</Text>
                 </Box>
             )}
 
@@ -427,27 +419,9 @@ export const ChatPanel: React.FC<Props> = ({ tasks, width, height, variant, term
                         {/* Not animated: a spinner would repaint the whole screen several times a second for as long as Claude works. */}
                         ✻ {chat.activity || "Thinking…"}
                     </Text>
-                ) : selectionIds.length > 0 ? (
-                    // What "these" means to Claude: a chip that cannot be missed, and the track when there is just one.
-                    <>
-                        <Box flexShrink={0}>
-                            <Text backgroundColor={AGENT_COLOR} color="#000000" bold>
-                                {` ● ${selectionIds.length} task${selectionIds.length === 1 ? "" : "s"} selected `}
-                            </Text>
-                        </Box>
-                        {selectedTitle !== "" && (
-                            <Box marginLeft={2}>
-                                <Text color={theme.text.primary} wrap="truncate-end">
-                                    {selectedTitle}
-                                </Text>
-                            </Box>
-                        )}
-                    </>
-                ) : (
-                    <Text color={theme.text.secondary} wrap="truncate-end">
-                        No task selected
-                    </Text>
-                )}
+                ) : null}
+                {/* Always mounted: it keeps `selectionRef` current even while the chip is not drawn. */}
+                <ChatSelection tasks={tasks} selectionRef={selectionRef} show={offset === 0 && !flash && !chat.busy} />
             </Box>
 
             <Box height={inputRows} flexShrink={0}>

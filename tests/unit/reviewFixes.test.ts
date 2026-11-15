@@ -241,12 +241,11 @@ describe("Stop reaches the long tools", () => {
         expect(result.isError).toBe(true);
     });
 
-    test("rediscover ends a whole-stage search early when the turn is stopped", async () => {
+    test("rediscover hands the turn's signal to the search, so Stop ends it", async () => {
         const task = makeTrack("redo1", "Song");
         installWorld([task]);
-        const skip = vi.spyOn(task, "skipDiscovery");
         let release: () => void = () => undefined;
-        vi.spyOn(task, "rediscoverPart").mockImplementation(
+        const part = vi.spyOn(task, "rediscoverPart").mockImplementation(
             () =>
                 new Promise<void>((resolve) => {
                     release = resolve;
@@ -255,10 +254,31 @@ describe("Stop reaches the long tools", () => {
         const turn = new AgentTurn();
         const call = callTool("rediscover", { taskId: "redo1", revision: task.getRevision() }, turn);
         await new Promise((r) => setTimeout(r, 10));
+        const signal = part.mock.calls[0][1]?.signal;
+        expect(signal).toBe(turn.signal);
+        expect(signal?.aborted).toBe(false);
         turn.stop();
-        expect(skip).toHaveBeenCalledTimes(1);
+        expect(signal?.aborted).toBe(true);
         release();
         await call;
+    });
+
+    test("a whole-stage search ends early when its signal aborts (the real discovery, not a mock)", async () => {
+        const task = makeTrack("redo2", "Song");
+        installWorld([task]);
+        const controller = new AbortController();
+        let release: () => void = () => undefined;
+        // The first thing the stage does is apply the user's links: one that never answers keeps the stage waiting.
+        (task as unknown as { applyUserSources: () => Promise<void> }).applyUserSources = () =>
+            new Promise<void>((resolve) => {
+                release = resolve;
+            });
+        const run = task.startMetadataDiscovering({ skipLastResort: true, signal: controller.signal });
+        await new Promise((r) => setTimeout(r, 10));
+        controller.abort();
+        await run;
+        expect(task.getAttributes()?.metadataDiscoveringInProgress).toBe(false);
+        release();
     });
 });
 

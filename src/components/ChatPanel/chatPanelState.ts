@@ -54,6 +54,14 @@ function readSavedWidth(): number {
     return CHAT_PANEL_WIDTH;
 }
 
+/**
+ * What the user was doing in the panel: the half-typed message and how far back they scrolled. The panel is a
+ * different element when docked and as a window (and unmounted while closed), so a resize across the dock width, or
+ * closing and opening it, remounts it: it starts from this instead of from nothing. A plain object the panel writes to
+ * from an effect (no subscription): only the panel itself reads it, at mount.
+ */
+export const chatViewMemory = { draft: "", scroll: 0 };
+
 export const chatPanelState = {
     isOpen: (): boolean => open,
     setOpen(next: boolean): void {
@@ -94,6 +102,8 @@ export const chatPanelState = {
     /** For tests: forget the choice and the open state. */
     reset(): void {
         open = false;
+        chatViewMemory.draft = "";
+        chatViewMemory.scroll = 0;
         preferredWidth = undefined;
         clearTimeout(saveTimer);
         notify();

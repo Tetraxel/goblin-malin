@@ -469,7 +469,6 @@ describe("AgentChat", () => {
         expect(fresh.getSnapshot().messages.map((m) => `${m.role}:${m.text}`)).toEqual([
             "user:remember me",
             "assistant:Hello",
-            "note:Reopened the previous conversation.",
         ]);
         // Claude remembers it too: the next message resumes the session.
         await second.send("and now?");
