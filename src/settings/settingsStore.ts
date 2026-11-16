@@ -7,6 +7,8 @@ import { type DeepPartial } from "#utils/types";
 import { deepMerge } from "#utils/deepMerge";
 import { deepDiff } from "#utils/deepDiff";
 import { isPlainObject, loadDataFile, type Parsed, refreshBackup, runMigrations } from "#utils/dataFile";
+import { dataFileNoticeBridge } from "#base/bridges/dataFileNoticeBridge";
+import { globalLogger } from "#base/logger/logger";
 
 export const SETTINGS_PATH = path.join(DEFAULT_APP_DATA_DIR, "settings.json");
 
@@ -142,6 +144,10 @@ export class SettingsStore {
     /** The file exists but couldn't be read: never write over content we haven't seen. */
     private readOnly = false;
     private backedUp = false;
+    /** The last write failed: the memory copy is newer than the file, and the next write (or the retry) fixes that. */
+    private unsaved = false;
+    private failures = 0;
+    private retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor(private readonly filePath: string = SETTINGS_PATH) {}
 
@@ -162,16 +168,63 @@ export class SettingsStore {
         this.cache = settings;
         this.emitter.emit("change");
         if (this.readOnly) return;
+        this.saveToDisk();
+    }
 
-        fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
-        if (!this.backedUp) {
-            // The file as it was at launch is the "last good copy" the next damaged load falls back on.
-            this.backedUp = true;
-            if (this.loadedHealthy) refreshBackup(this.filePath);
+    /**
+     * Writes the cached settings. A failure (full disk, a folder that is read-only, a file locked by a sync tool) is
+     * not thrown at whoever changed a setting: the app goes on with the new value in memory, the failure is logged and
+     * shown once, and the write is retried until it works.
+     */
+    private saveToDisk(): void {
+        if (this.retryTimer) {
+            clearTimeout(this.retryTimer);
+            this.retryTimer = null;
         }
+        const settings = this.cache;
+        if (!settings) return;
         const tmp = this.filePath + ".tmp";
-        fs.writeFileSync(tmp, JSON.stringify(settings, null, 2), "utf-8");
-        fs.renameSync(tmp, this.filePath);
+        try {
+            fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
+            if (!this.backedUp) {
+                // The file as it was at launch is the "last good copy" the next damaged load falls back on.
+                this.backedUp = true;
+                if (this.loadedHealthy) refreshBackup(this.filePath);
+            }
+            fs.writeFileSync(tmp, JSON.stringify(settings, null, 2), "utf-8");
+            fs.renameSync(tmp, this.filePath);
+        } catch (error) {
+            try {
+                fs.rmSync(tmp, { force: true });
+            } catch {
+                /* the file system is already refusing us */
+            }
+            this.onWriteFailed(error);
+            return;
+        }
+        if (this.unsaved) globalLogger.info(`Settings saved again after ${this.failures} failed attempt(s)`);
+        this.unsaved = false;
+        this.failures = 0;
+    }
+
+    private onWriteFailed(error: unknown): void {
+        this.unsaved = true;
+        this.failures++;
+        const reason = error instanceof Error ? error.message : String(error);
+        globalLogger.warn(`Could not save the settings file (attempt ${this.failures}): ${reason}`);
+        // Once per streak: the next attempts only go to the log.
+        if (this.failures === 1) {
+            dataFileNoticeBridge.report({
+                title: "Your settings couldn't be saved",
+                message: `Writing ${this.filePath} failed (${reason}). The change applies until you close the app, and saving is retried, but if it keeps failing the change is lost at the next launch. Check that the disk isn't full and that no other program (antivirus, sync) is locking the file.`,
+            });
+        }
+        const delay = Math.min(5_000 * 2 ** (this.failures - 1), 60_000);
+        this.retryTimer = setTimeout(() => {
+            this.retryTimer = null;
+            this.saveToDisk();
+        }, delay);
+        this.retryTimer.unref();
     }
 
     private getCached(): StoredSettings {

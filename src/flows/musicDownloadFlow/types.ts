@@ -454,6 +454,12 @@ export type TrackDownloadSource = {
     downloadedAt: Date;
     selected: boolean;
     isRejected?: boolean;
+    /**
+     * Who this row is, for as long as it exists: set when the row is made, kept by every update, never reused. Work
+     * that outlives a change of the list (a transfer to cancel, a retry that writes its answer back) finds its row
+     * by it, because a row's position shifts when another provider is retried or more results are shown.
+     */
+    rowKey?: string;
     fileInfo?: FileInfo;
     /**
      * Never set on a row of `downloadSources`. Only the stand-in row the UI builds from the task's `savedFile`

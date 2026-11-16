@@ -4,6 +4,8 @@ import { globalLogger } from "#base/logger/logger";
 import { cleanAndTagFlac, type Metadata } from "#utils/metadata";
 import { runFfmpeg } from "./ffmpegRun";
 import { extensionOf } from "./outputFormat";
+import { addMp4Items, type Mp4Item } from "./mp4Freeform";
+import { findCover, pictureArgs, pictureBlockValue } from "./embeddedPicture";
 
 /** Several values (artists, genres) in a format with one text field per tag: shown the way the UI joins them. */
 const joinValues = (values: readonly string[]) => values.join(", ");
@@ -72,51 +74,117 @@ function ffmpegTagEntries(ext: string, metadata: Metadata): [string, string][] {
         [isMp4 ? "date" : "DATE", metadata.year],
         [isMp4 ? "track" : "TRACKNUMBER", metadata.trackNumber],
         [isMp4 ? "genre" : "GENRE", metadata.genres?.length ? joinValues(metadata.genres) : undefined],
-        ["ISRC", metadata.isrc],
-        ["BPM", metadata.bpm != null ? String(metadata.bpm) : undefined],
-        ["KEY", metadata.key],
-        ["MUSICBRAINZ_TRACKID", metadata.musicBrainzTrackId],
-        ["MUSICBRAINZ_ALBUMID", metadata.musicBrainzAlbumId],
-        ["MUSICBRAINZ_ARTISTID", metadata.musicBrainzArtistId],
-        ["MUSICBRAINZ_ALBUMARTISTID", firstAlbumArtistId(metadata)],
-        ["MUSICBRAINZ_RELEASEGROUPID", metadata.musicBrainzReleaseGroupId],
-        ["MUSICBRAINZ_RELEASETRACKID", metadata.musicBrainzReleaseTrackId],
+        // The MP4 muxer has no atom for the rest, and the switch that keeps them breaks the file for other software:
+        // for M4A they are added afterwards, as iTunes freeform items (see `m4aExtraItems`).
+        ...(isMp4
+            ? []
+            : ([
+                  ["ISRC", metadata.isrc],
+                  ["BPM", metadata.bpm != null ? String(metadata.bpm) : undefined],
+                  ["KEY", metadata.key],
+                  ["MUSICBRAINZ_TRACKID", metadata.musicBrainzTrackId],
+                  ["MUSICBRAINZ_ALBUMID", metadata.musicBrainzAlbumId],
+                  ["MUSICBRAINZ_ARTISTID", metadata.musicBrainzArtistId],
+                  ["MUSICBRAINZ_ALBUMARTISTID", firstAlbumArtistId(metadata)],
+                  ["MUSICBRAINZ_RELEASEGROUPID", metadata.musicBrainzReleaseGroupId],
+                  ["MUSICBRAINZ_RELEASETRACKID", metadata.musicBrainzReleaseTrackId],
+              ] as [string, string | undefined][])),
     ];
     return entries.filter((e): e is [string, string] => e[1] !== undefined && e[1] !== "");
 }
 
 /**
+ * What M4A files carry beyond ffmpeg's standard atoms, under the names MusicBrainz Picard writes (the ones other
+ * software looks for). The tempo goes in the `tmpo` atom, apart from these.
+ */
+function m4aExtraItems(metadata: Metadata): Mp4Item[] {
+    const items: [string, string | undefined][] = [
+        ["ISRC", metadata.isrc],
+        ["initialkey", metadata.key],
+        ["MusicBrainz Track Id", metadata.musicBrainzTrackId],
+        ["MusicBrainz Album Id", metadata.musicBrainzAlbumId],
+        ["MusicBrainz Artist Id", metadata.musicBrainzArtistId],
+        ["MusicBrainz Album Artist Id", firstAlbumArtistId(metadata)],
+        ["MusicBrainz Release Group Id", metadata.musicBrainzReleaseGroupId],
+        ["MusicBrainz Release Track Id", metadata.musicBrainzReleaseTrackId],
+    ];
+    return items.filter((i): i is [string, string] => Boolean(i[1])).map(([name, value]) => ({ name, value }));
+}
+
+/**
  * Rewrites the tags of an Ogg, Opus or M4A file by remuxing it (`-c copy`: the audio is not touched). The tags the
  * file had are replaced by the app's own set, not merged with it: for these formats the file comes from the app's
- * conversion or from yt-dlp, whose leftovers (comment, URL…) are not worth keeping.
+ * conversion or from yt-dlp, whose leftovers (comment, URL…) are not worth keeping. The cover art is not a tag: a
+ * picture the file carries is put back (when that fails, the file is tagged without it rather than not at all).
  */
 async function tagWithFfmpeg(filePath: string, metadata: Metadata): Promise<void> {
     const ext = extensionOf(filePath);
     // Not an audio extension: a leftover from a crash must not look like a track in the library. ffmpeg can no
     // longer guess the container from the name, so it is given explicitly.
     const rewritten = `${filePath}.tagging`;
-    const args = [
-        "-i",
-        filePath,
-        "-f",
-        ext === "m4a" ? "ipod" : ext,
-        "-map",
-        "0:a",
-        "-c",
-        "copy",
-        // Start from no tags, container-wide and on the audio stream: Ogg / Opus keep their comments on the stream,
-        // and where both exist the old stream value would win over the new one.
-        "-map_metadata",
-        "-1",
-        "-map_metadata:s:a",
-        "-1",
-        ...ffmpegTagEntries(ext, metadata).flatMap(([key, value]) => ["-metadata", `${key}=${value}`]),
-        // Without this the MP4 muxer silently drops every tag it has no atom for (ISRC, BPM, MusicBrainz ids).
-        ...(ext === "m4a" ? ["-movflags", "use_metadata_tags"] : []),
-        rewritten,
-    ];
+    const cover = await findCover(filePath);
+
+    const remux = async (keepCover: boolean) => {
+        let pictureCleanup: (() => Promise<void>) | undefined;
+        const coverArgs: string[] = [];
+        let mapArgs = ["-map", "0:a"];
+        if (keepCover && cover) {
+            if (ext === "m4a" && cover.kind === "stream") {
+                // An attached picture, kept as one: the MP4 muxer writes it as the `covr` atom.
+                mapArgs = ["-map", "0:a", "-map", "0:v:0"];
+                coverArgs.push("-disposition:v:0", "attached_pic");
+            } else if (ext !== "m4a") {
+                const value = await pictureBlockValue(filePath, cover);
+                if (value) {
+                    const picture = await pictureArgs(value);
+                    coverArgs.push(...picture.args);
+                    pictureCleanup = picture.cleanup;
+                }
+            }
+        }
+        const args = [
+            "-i",
+            filePath,
+            "-f",
+            ext === "m4a" ? "ipod" : ext,
+            ...mapArgs,
+            "-c",
+            "copy",
+            // Start from no tags, container-wide and on the audio stream: Ogg / Opus keep their comments on the stream,
+            // and where both exist the old stream value would win over the new one.
+            "-map_metadata",
+            "-1",
+            "-map_metadata:s:a",
+            "-1",
+            ...ffmpegTagEntries(ext, metadata).flatMap(([key, value]) => ["-metadata", `${key}=${value}`]),
+            ...coverArgs,
+            rewritten,
+        ];
+        try {
+            await runFfmpeg(args);
+        } finally {
+            await pictureCleanup?.();
+        }
+    };
+
     try {
-        await runFfmpeg(args);
+        try {
+            await remux(true);
+        } catch (error) {
+            if (!cover) throw error;
+            globalLogger.warn(
+                `${filePath}: the cover art could not be kept (${(error as Error).message}); tagging without it`
+            );
+            await remux(false);
+        }
+        if (ext === "m4a") {
+            const bpm = metadata.bpm ?? undefined;
+            if (!(await addMp4Items(rewritten, m4aExtraItems(metadata), bpm))) {
+                globalLogger.warn(
+                    `${filePath}: the MP4 layout is not one the extra tags can be added to; standard tags only`
+                );
+            }
+        }
         await fs.promises.rename(rewritten, filePath);
     } catch (error) {
         await fs.promises.rm(rewritten, { force: true });

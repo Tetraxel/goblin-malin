@@ -9,6 +9,7 @@ import { SessionStore } from "./sessionStore";
 import { globalLogger } from "#base/logger/logger";
 import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import { markMissingInAttributes, markMissingInSnapshot } from "#flows/musicDownloadFlow/utils/missingLocalFiles";
+import { withoutBusy } from "#flows/musicDownloadFlow/utils/busyTasks";
 import { tempFileStem } from "#flows/musicDownloadFlow/utils/tempDownloads";
 import type { TempUseGroup } from "#flows/musicDownloadFlow/utils/tempCleanup";
 import { type StoredSession, type SessionTaskSnapshot, type ArchivedTaskSnapshot } from "./types";
@@ -66,8 +67,27 @@ export class SessionManager {
         this.currentSessionId = null;
     }
 
+    /**
+     * Why the open task list cannot be replaced right now, or `undefined` when it can. Replacing it while work is going
+     * on would start the new session's tasks by itself (the run's pump reads the list again each time a slot frees),
+     * drop the rest of the run, and leave what is in flight running with nowhere to save its result.
+     */
+    switchRefusal(): string | undefined {
+        const orchestrator = TaskOrchestrator.getInstance();
+        const busy = orchestrator.isProcessing() || orchestrator.getTasks().some((t) => t.isBusy());
+        return busy ? "Work is in progress on this session. Stop it (or wait for it to finish) first." : undefined;
+    }
+
+    /** Whether the switch is refused (see {@link switchRefusal}); logs why. */
+    private refuseSwitch(): boolean {
+        const refusal = this.switchRefusal();
+        if (refusal) globalLogger.warn(`Session not changed: ${refusal}`);
+        return refusal !== undefined;
+    }
+
     loadSession(id: string): void {
         if (!this.store.getById(id)) return;
+        if (this.refuseSwitch()) return;
 
         // Flush any debounced write for the outgoing session first, so its latest
         // edits land on the right record before currentSessionId changes.
@@ -184,6 +204,7 @@ export class SessionManager {
     }
 
     newSession(): void {
+        if (this.refuseSwitch()) return;
         this.flushPending();
         TaskOrchestrator.getInstance().setTasks([]);
         this.currentSessionId = null;
@@ -191,6 +212,7 @@ export class SessionManager {
     }
 
     duplicateSession(id: string): void {
+        if (this.refuseSwitch()) return;
         this.flushPending();
         const session = this.store.getById(id);
         if (!session) return;
@@ -209,6 +231,8 @@ export class SessionManager {
     }
 
     deleteSession(id: string): void {
+        // Deleting the open session empties the list: same rule as opening another one.
+        if (this.currentSessionId === id && this.refuseSwitch()) return;
         // Drop a pending write for the current session before deleting it, otherwise the
         // debounced flush would re-create the record we just removed.
         if (this.currentSessionId === id) this.cancelPending();
@@ -239,9 +263,8 @@ export class SessionManager {
 
         const requested = all.filter((t) => idSet.has(t.getId()));
         // A track a part run (re-discover, download…) works on counts as running, though its state does not say so.
-        const isBusy = (t: (typeof all)[number]): boolean =>
-            t.running || Boolean((t as { partRunning?: boolean }).partRunning);
-        const toArchive = requested.filter((t) => !isBusy(t));
+        // An album, playlist or group goes whole or not at all (see `withoutBusy`).
+        const toArchive = withoutBusy(requested, (id) => all.find((t) => t.getId() === id));
         if (toArchive.length < requested.length) {
             globalLogger.warn(`Archive: skipped ${requested.length - toArchive.length} running task(s)`);
         }

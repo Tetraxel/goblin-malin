@@ -183,6 +183,9 @@ export class YtDlpService extends DownloadService {
                     audioFormat: format,
                     extractAudio: true,
                     restrictFilenames: true,
+                    // A link copied while a playlist or a mix plays carries `&list=…`: without this yt-dlp would take
+                    // the playlist's first video (into this track's file name) and then walk the whole list.
+                    noPlaylist: true,
                 };
 
                 // Add cookies if the file exists. yt-dlp rewrites the file it is given when it exits, so every run

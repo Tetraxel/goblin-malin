@@ -4,6 +4,7 @@ import { getBinDir } from "#utils/appPaths";
 import { verifyAgainstPublishedChecksums } from "#utils/checksum";
 import { downloadFile, httpsGetJson } from "#utils/http";
 import { withBinaryAlert } from "#utils/withBinaryAlert";
+import { installViaStaging, removeOldVersions } from "#utils/binaryFiles";
 import { globalLogger } from "#base/logger/logger";
 
 // Executable suffix for locally-stored binaries: ".exe" on Windows, none elsewhere.
@@ -71,24 +72,24 @@ async function setUpYtDlp(autoDownloadBinary: boolean): Promise<string> {
         // Create bin directory if it doesn't exist
         await fs.mkdir(getBinDir(), { recursive: true });
 
-        // Clean up old yt-dlp versions (optional)
-        await cleanupOldVersions("yt-dlp_", binaryName);
-
-        // Download the binary
+        // Download the binary beside its final name, check it, and only then put it in place: a download that is cut
+        // short (or a bad checksum) must never leave a file at the name the app trusts.
         const releaseUrl = `https://github.com/yt-dlp/yt-dlp/releases/download/${latestVersion}`;
-        await downloadFile(`${releaseUrl}/${ytDlpAssetName()}`, binaryPath);
-        // The release publishes SHA2-256SUMS. A missing list only logs a warning; a mismatch deletes the file and fails.
-        await verifyAgainstPublishedChecksums(
-            binaryPath,
-            `${releaseUrl}/SHA2-256SUMS`,
-            ytDlpAssetName(),
-            "Node.js yt-dlp installer"
-        );
+        await installViaStaging(binaryPath, async (staging) => {
+            await downloadFile(`${releaseUrl}/${ytDlpAssetName()}`, staging);
+            // The release publishes SHA2-256SUMS. A binary it cannot be checked against is not kept (it will be run), and
+            // neither is one that does not match.
+            await verifyAgainstPublishedChecksums(
+                staging,
+                `${releaseUrl}/SHA2-256SUMS`,
+                ytDlpAssetName(),
+                "Node.js yt-dlp installer",
+                { required: true }
+            );
+        });
 
-        // On non-Windows platforms the downloaded binary is not executable by default.
-        if (process.platform !== "win32") {
-            await fs.chmod(binaryPath, 0o755);
-        }
+        // The new version is in place: the old ones are of no use any more. (Before, they were the fallback.)
+        await removeOldVersions("yt-dlp_", binaryName);
 
         globalLogger.info(`Successfully downloaded yt-dlp ${latestVersion} to ${binaryPath}`);
         return binaryPath;
@@ -134,21 +135,4 @@ async function getLatestYtDlpVersion(): Promise<string> {
         throw new Error(`Unexpected release metadata from ${apiUrl} (no tag_name)`);
     }
     return release.tag_name;
-}
-
-// Clean up old versions to avoid accumulating binaries
-async function cleanupOldVersions(prefix: string, currentVersion: string): Promise<void> {
-    try {
-        const files = await fs.readdir(getBinDir());
-        const oldVersions = files.filter(
-            (file) => file.startsWith(prefix) && file.endsWith(binExt()) && file !== currentVersion
-        );
-
-        for (const file of oldVersions) {
-            await fs.unlink(path.join(getBinDir(), file));
-            globalLogger.info(`Cleaned up old version: ${file}`);
-        }
-    } catch (error) {
-        globalLogger.warn(`Failed to cleanup old versions: ${error}`);
-    }
 }

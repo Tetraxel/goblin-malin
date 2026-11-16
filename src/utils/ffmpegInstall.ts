@@ -22,6 +22,7 @@ export function installWin64Archive(build: FfmpegWin64Build, userAgent: string):
             userAgent,
             checksumsUrl: build.checksumsUrl,
             archiveName: build.archiveName,
+            requireChecksum: true,
         },
         [
             {

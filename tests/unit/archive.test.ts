@@ -130,6 +130,8 @@ describe("archive helpers", () => {
 
 describe("SessionManager archive", () => {
     beforeEach(() => {
+        // A previous test may leave a running task in the list, and a session is not replaced under running work.
+        m.orchestrator.setTasks([]);
         m.manager.newSession();
         for (const s of m.store.getAll()) m.store.deleteSession(s.id);
     });

@@ -11,6 +11,8 @@ import { TaskLockedError, runUserEdit, type DownloadTask } from "./utils/downloa
 import { type CollectionTask } from "./utils/collectionTask";
 import { askGroupName, groupAndName, isGroupTask, removeFromGroups, ungroup } from "./utils/groupTasks";
 import { explainRefusedRun, runSelected } from "./runController";
+import { confirmRestartCollection, confirmRestartTracks } from "./utils/confirmReset";
+import { withoutBusy } from "./utils/busyTasks";
 import { toAppUri as toOpenableUri } from "#utils/appLinks";
 import { addLinkFromClipboard } from "./utils/addLinkFromClipboard";
 import { discoveryServiceRegistry } from "./registries";
@@ -133,6 +135,15 @@ const needsStartOptions = (t: DownloadTask): boolean => {
 
 /** Starts tracks as a batch (asking first for the ones with nothing ticked), through `runSelected`. */
 function startTracks(selected: DownloadTask[]): void {
+    // Restarting a finished track rebuilds it: ask first (nothing is asked for tracks that were never run).
+    fire(
+        confirmRestartTracks(selected).then((ok) => {
+            if (ok) startConfirmedTracks(selected);
+        })
+    );
+}
+
+function startConfirmedTracks(selected: DownloadTask[]): void {
     const needing = selected.filter(needsStartOptions);
     const doRun = (tracks: DownloadTask[]) => {
         fire(runSelected(new Set(tracks.map((t) => t.getId()))).then(explainRefusedRun));
@@ -191,6 +202,22 @@ function removeFromGroupActions(selected: AnyTask[]): ContextualActions[] {
             onClickBatch: (tasks) => removeFromGroups(tasks),
         },
     ];
+}
+
+/**
+ * Remove tasks from the list for good ("Delete"). Like {@link archive}, it leaves a task that is being worked on: the
+ * orchestrator would keep its slot and the work would go on with nothing left to stop it (nothing lists the task any
+ * more), its result thrown away.
+ */
+function removeIdle(ids: string[]): void {
+    const orchestrator = TaskOrchestrator.getInstance();
+    const requested = ids.map((id) => orchestrator.getTask(id)).filter((t): t is NonNullable<typeof t> => !!t);
+    // An album, playlist or group goes whole or not at all: its idle tracks are not removed from under a running one.
+    const idle = withoutBusy(requested, (id) => orchestrator.getTask(id)).map((t) => t.getId());
+    if (idle.length < requested.length) {
+        globalLogger.warn(`Delete: skipped ${requested.length - idle.length} running task(s). Stop them first.`);
+    }
+    if (idle.length > 0) orchestrator.removeTasks(idle);
 }
 
 /** Move tasks to the archive (reversible, so no confirmation); running tasks are skipped. */
@@ -253,10 +280,25 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
     // `runSelected`, refuses it the same way). The refusal is logged, as the panels do.
     const runTask = (t: DownloadTask) => {
         if (!runUserEdit(() => t.assertWritable())) return;
-        if (t.getAttributes()?.state !== "pending" && t.getAttributes()?.state !== "stopped") {
-            fire(runWithoutCache(() => t.restart()));
+        const wasRun = t.getAttributes()?.state !== "pending" && t.getAttributes()?.state !== "stopped";
+        // With no batch going, the track runs as a batch of one: under the global cap, with the toolbar's Stop (and
+        // the session guard) knowing about it. While a batch is going, the pump would refuse a second run, so the
+        // track is started on its own, with a stop of its own that "Stop" reaches too (`Task.abortRun`).
+        const run = (): Promise<unknown> => {
+            if (!orchestrator.isProcessing()) {
+                return runSelected(new Set([t.getId()])).then(explainRefusedRun);
+            }
+            return wasRun ? t.restart() : t.start();
+        };
+        if (wasRun) {
+            // A restart rebuilds the track: the user is asked first (see `confirmRestartTracks`).
+            fire(
+                confirmRestartTracks([t]).then((ok) => {
+                    if (ok) return runWithoutCache(run);
+                })
+            );
         } else {
-            fire(t.start());
+            fire(run());
         }
     };
     const needsOptions = needsStartOptions;
@@ -290,20 +332,20 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
         onClick: () =>
             deleteConfirmBridge.request({
                 taskCount: 1,
-                apply: () => orchestrator.removeTasks([task.getId()]),
+                apply: () => removeIdle([task.getId()]),
                 archive: () => archive([task.getId()]),
             }),
         onClickBatch: (tasks) =>
             deleteConfirmBridge.request({
                 taskCount: tasks.length,
-                apply: () => orchestrator.removeTasks(tasks.map((t) => t.getId())),
+                apply: () => removeIdle(tasks.map((t) => t.getId())),
                 archive: () => archive(tasks.map((t) => t.getId())),
             }),
     });
     taskActions.push(groupAction(group), ...removeFromGroupActions(group));
     if (group.some((t) => attrsOf(t)?.primaryMetadataFetched)) {
         const refetch = (t: DownloadTask) =>
-            t.trackPartRun(() => runWithoutCache(() => t.startPrimaryMetadataFetching()));
+            t.trackPartRun((signal) => runWithoutCache(() => t.startPrimaryMetadataFetching(signal)));
         taskActions.push({
             shortcuts: [{ input: "f" }],
             label: "Re-fetch primary metadata",
@@ -318,13 +360,13 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
             shortcuts: [{ input: "d" }],
             label: "Re-discover metadata providers",
             multiSelectAllowed: true,
-            onClick: () => fire(task.trackPartRun(() => task.startMetadataDiscovering())),
+            onClick: () => fire(task.trackPartRun((signal) => task.startMetadataDiscovering({ signal }))),
             onClickBatch: (tasks) =>
                 runBatch(
                     tasks,
                     metadataLimiter,
                     (t) => Boolean(attrsOf(t)?.metadataDiscovered),
-                    (t) => t.trackPartRun(() => t.startMetadataDiscovering())
+                    (t) => t.trackPartRun((signal) => t.startMetadataDiscovering({ signal }))
                 ),
         });
     }
@@ -332,9 +374,9 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
     const eligibleDownloads = group.filter(downloadable);
     if (eligibleDownloads.length > 0) {
         const download = (t: DownloadTask) =>
-            t.trackPartRun(() => {
+            t.trackPartRun((signal) => {
                 if (!attrsOf(t)?.downloadsFetched) t.updateAttributes({ toDownload: true });
-                return t.startDownloads();
+                return t.startDownloads(signal);
             });
         taskActions.push({
             shortcuts: [{ input: "w" }],
@@ -600,10 +642,33 @@ function buildCollectionContextualActionBar(task: CollectionTask, attributes: Ba
         for (const t of tasks.filter((x) => !isGroupTask(x))) {
             const c = asCollection(t);
             const a = c.getAttributes();
-            fire(a?.state !== "pending" && a?.state !== "stopped" ? c.restart() : c.start());
+            if (a?.state === "pending" || a?.state === "stopped") {
+                fire(c.start());
+            } else {
+                fire(restartCollection(c));
+            }
         }
         const tracks = tracksOfGroups(tasks);
         if (tracks.length > 0) startTracks(tracks);
+    };
+    // A restart takes the tracks out of the list: ask first, and archive them (reversible) unless told to delete.
+    const restartCollection = async (c: CollectionTask): Promise<void> => {
+        const childIds = c.getAttributes()?.childTaskIds ?? [];
+        // The restart removes every track (and stops it): one that is still being worked on would be neither archived
+        // nor kept, so the restart waits until they are stopped.
+        const running = childIds.filter((id) => orchestrator.getTask(id)?.isBusy()).length;
+        if (running > 0) {
+            globalLogger.warn(
+                `Restart: ${running} track${running === 1 ? " is" : "s are"} still running. Stop ${running === 1 ? "it" : "them"} first.`
+            );
+            return;
+        }
+        if (childIds.length > 0) {
+            const choice = await confirmRestartCollection(c);
+            if (choice === null) return;
+            if (choice === "archive") archive([...childIds]);
+        }
+        await c.restart();
     };
     const taskActions: ContextualActions[] = [
         {
@@ -683,7 +748,7 @@ function buildCollectionContextualActionBar(task: CollectionTask, attributes: Ba
             const ids = [task.getId(), ...(attrs?.childTaskIds ?? [])];
             deleteConfirmBridge.request({
                 taskCount: ids.length,
-                apply: () => orchestrator.removeTasks(ids),
+                apply: () => removeIdle(ids),
                 archive: () => archive(ids),
             });
         },
@@ -691,7 +756,7 @@ function buildCollectionContextualActionBar(task: CollectionTask, attributes: Ba
             const ids = tasks.flatMap((t) => [t.getId(), ...(asCollection(t).getAttributes()?.childTaskIds ?? [])]);
             deleteConfirmBridge.request({
                 taskCount: ids.length,
-                apply: () => orchestrator.removeTasks(ids),
+                apply: () => removeIdle(ids),
                 archive: () => archive(ids),
             });
         },

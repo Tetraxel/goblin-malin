@@ -2,6 +2,7 @@ import { describe, test, expect } from "vitest";
 import { FileAttribute, type SearchResult } from "slsk-client";
 import {
     cleanSearchTerm,
+    relaxedTitle,
     calculateResultWeight,
     rankResults,
     parseResultsLimit,
@@ -38,6 +39,36 @@ describe("cleanSearchTerm", () => {
     test("returns empty string for undefined input", () => {
         expect(cleanSearchTerm(undefined)).toBe("");
     });
+
+    test("no word starts with '-' (that excludes the word from a Soulseek search)", () => {
+        expect(cleanSearchTerm("Artist - Title .flac")).toBe("Artist Title .flac");
+        expect(cleanSearchTerm("Artist -Title")).toBe("Artist Title");
+        expect(cleanSearchTerm("Jay-Z Song")).toBe("Jay-Z Song");
+    });
+});
+
+describe("relaxedTitle", () => {
+    test.each([
+        ["Song - 2011 Remaster", "Song"],
+        ["Song (feat. Other Artist)", "Song"],
+        ["Song - Radio Edit", "Song"],
+        ["Song (Remastered 2009) [Bonus Track]", "Song"],
+        ["Song feat. Someone", "Song"],
+        ["Song ft. Someone", "Song"],
+        ["Plain Song", "Plain Song"],
+    ])("%j is searched as %j", (title, expected) => {
+        expect(relaxedTitle(title)).toBe(expected);
+    });
+
+    test("a part that names another version stays", () => {
+        expect(relaxedTitle("Song (Club Remix)")).toBe("Song (Club Remix)");
+        expect(relaxedTitle("Song - Live at Wembley")).toBe("Song - Live at Wembley");
+        expect(relaxedTitle("Song (feat. X) (Instrumental)")).toBe("Song (Instrumental)");
+    });
+
+    test("never ends up empty", () => {
+        expect(relaxedTitle("(Intro)")).toBe("(Intro)");
+    });
 });
 
 describe("calculateResultWeight", () => {
@@ -73,10 +104,59 @@ describe("calculateResultWeight", () => {
         expect(high).toBeGreaterThan(low);
     });
 
-    test("gives a bonus to extended-mix filenames", () => {
+    test("gives a bonus to extended-mix filenames when the title asks for the extended mix", () => {
+        const wanted = { ...query, trackTitle: "Title (Extended Mix)" };
+        const plainFile = calculateResultWeight(file({ file: "@@u\\Artist - Title.flac" }), { ...wanted });
+        const extendedFile = calculateResultWeight(file({ file: "@@u\\Artist - Title (Extended Mix).flac" }), wanted);
+        // The plain file is another version for that title; only the extended one is kept.
+        expect(plainFile).toBe(-1);
+        expect(extendedFile).toBeGreaterThan(0);
+    });
+
+    test("the extended mix gets no bonus (it is refused) when the title is the plain track", () => {
         const plain = calculateResultWeight(file({ file: "@@u\\Artist - Title.flac" }), query);
-        const extended = calculateResultWeight(file({ file: "@@u\\Artist - Title (Extended Mix).flac" }), query);
-        expect(extended).toBeGreaterThan(plain);
+        expect(plain).toBeGreaterThan(0);
+        expect(calculateResultWeight(file({ file: "@@u\\Artist - Title (Extended Mix).flac" }), query)).toBe(-1);
+        expect(calculateResultWeight(file({ file: "@@u\\Artist - Title (Club Mix).flac" }), query)).toBe(-1);
+    });
+
+    test.each(["Title (Live at Wembley)", "Title (Instrumental)", "Title - Karaoke Version", "Title (A Cappella)"])(
+        "another version, %j, is not taken for the track",
+        (name) => {
+            expect(calculateResultWeight(file({ file: `@@u\\Artist - ${name}.flac` }), query)).toBe(-1);
+        }
+    );
+
+    test("a live recording is the right file when the title says live", () => {
+        const live = { ...query, trackTitle: "Title (Live)" };
+        expect(calculateResultWeight(file({ file: "@@u\\Artist - Title (Live).flac" }), live)).toBeGreaterThan(0);
+        expect(calculateResultWeight(file({ file: "@@u\\Artist - Title.flac" }), live)).toBe(-1);
+    });
+
+    test("a version word in the artist's own name is not a version", () => {
+        const band = { ...query, artistName: "Live", trackTitle: "Lightning Crashes" };
+        expect(calculateResultWeight(file({ file: "@@u\\Live - Lightning Crashes.flac" }), band)).toBeGreaterThan(0);
+        expect(calculateResultWeight(file({ file: "@@u\\Lightning Crashes.flac" }), band)).toBeGreaterThan(0);
+        // A second mention is the version.
+        expect(calculateResultWeight(file({ file: "@@u\\Live - Lightning Crashes (Live).flac" }), band)).toBe(-1);
+    });
+
+    test("a version word inside another word is not a version ('alive', 'delivery')", () => {
+        const alive = { ...query, trackTitle: "Alive" };
+        expect(calculateResultWeight(file({ file: "@@u\\Artist - Alive.flac" }), alive)).toBeGreaterThan(0);
+        expect(calculateResultWeight(file({ file: "@@u\\Artist - Delivery.flac" }), query)).toBeGreaterThan(0);
+    });
+
+    test("a peer that reports a speed of 0, or a file of size 0, is still a result", () => {
+        expect(calculateResultWeight(file({ speed: 0 }), query)).toBeGreaterThan(0);
+        expect(calculateResultWeight(file({ size: 0 }), query)).toBeGreaterThanOrEqual(0);
+        expect(rankResults([file({ speed: 0 })], query)).toHaveLength(1);
+    });
+
+    test("a faster peer still ranks above a slower one", () => {
+        expect(calculateResultWeight(file({ speed: 5000 }), query)).toBeGreaterThan(
+            calculateResultWeight(file({ speed: 5 }), query)
+        );
     });
 
     test("gives a bonus when the album name appears in the folder path", () => {

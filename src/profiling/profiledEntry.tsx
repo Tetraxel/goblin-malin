@@ -9,4 +9,6 @@ import { startLoadDriver } from "./loadDriver";
 
 redirectConsoleToLog();
 start();
+// Ink replaces the console methods when it starts; they go to the app log (see src/cli.ts).
+redirectConsoleToLog();
 startLoadDriver();

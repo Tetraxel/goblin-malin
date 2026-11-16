@@ -24,12 +24,22 @@ function truncateToBytes(value: string, maxBytes: number): string {
  * forbids (and `/`, which would make a sub-folder) become `_`, the length is capped, and trailing dots and spaces
  * are dropped (Windows silently removes them, so the name on disk would differ from this one). The extension is
  * not part of `raw`: add it afterwards.
+ *
+ * Also: the bidirectional control characters are removed (U+202E would show "gpj.exe" for "exe.jpg"), the text is put
+ * in Unicode form NFC (one spelling of "é" for every platform), and a name Windows reserves for a device (`NUL`, `CON`,
+ * `COM1`…, with or without an extension) gets a `_` in front, since `NUL.flac` is the null device there.
  */
 export function sanitizeFileNamePart(raw: string, maxBytes: number = MAX_NAME_BYTES): string {
     const cleaned = raw
         // eslint-disable-next-line no-control-regex -- control characters are exactly what is being removed
         .replace(/[\u0000-\u001f\u007f]/g, "")
+        .replace(/[‪-‮⁦-⁩]/g, "")
+        .normalize("NFC")
         .replace(/[/\\:*?"<>|]/g, "_")
         .trim();
-    return truncateToBytes(cleaned, maxBytes).replace(/[. ]+$/, "");
+    const name = truncateToBytes(cleaned, maxBytes).replace(/[. ]+$/, "");
+    return WINDOWS_DEVICE_NAME.test(name) ? `_${name}` : name;
 }
+
+/** The names Windows reserves, whatever follows the first dot (`aux.flac`, `Con.txt`). */
+const WINDOWS_DEVICE_NAME = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;

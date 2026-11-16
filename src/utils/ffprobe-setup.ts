@@ -6,6 +6,7 @@ import { getLatestWin64Build } from "./ffmpegBuilds";
 import { installWin64Archive, versionedBinaryName } from "./ffmpegInstall";
 import { httpsGetJson } from "./http";
 import { withBinaryAlert } from "./withBinaryAlert";
+import { removeOldVersions } from "./binaryFiles";
 import { globalLogger } from "#base/logger/logger";
 
 // Executable suffix for locally-stored binaries: ".exe" on Windows, none elsewhere.
@@ -54,9 +55,10 @@ async function setUpFfprobe(autoDownloadBinary: boolean): Promise<string> {
             globalLogger.info(`ffprobe ${source.versionId} not found, downloading…`);
         }
 
-        await cleanupOldVersions("ffprobe_", binaryName);
-
         await source.install(binaryPath);
+
+        // Only once the new one is in place: until then the old one is what the app falls back to.
+        await removeOldVersions("ffprobe_", binaryName);
 
         globalLogger.info(`Successfully downloaded ffprobe ${source.versionId} to ${binaryPath}`);
         return binaryPath;
@@ -145,21 +147,5 @@ async function findExistingBinary(prefix: string, suffix: string): Promise<strin
     } catch (error) {
         globalLogger.warn(`Failed to find existing binary: ${error}`);
         return null;
-    }
-}
-
-async function cleanupOldVersions(prefix: string, currentVersion: string): Promise<void> {
-    try {
-        const files = await fs.readdir(getBinDir());
-        const oldVersions = files.filter(
-            (file) => file.startsWith(prefix) && file.endsWith(binExt()) && file !== currentVersion
-        );
-
-        for (const file of oldVersions) {
-            await fs.unlink(path.join(getBinDir(), file));
-            globalLogger.info(`Cleaned up old version: ${file}`);
-        }
-    } catch (error) {
-        globalLogger.warn(`Failed to cleanup old versions: ${error}`);
     }
 }

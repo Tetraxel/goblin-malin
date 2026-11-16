@@ -21,12 +21,15 @@ export function Hint({
     shortcutId,
     shortcutIds,
     dim,
+    compact,
 }: {
     label: string;
     shortcut?: string;
     shortcutId?: string;
     shortcutIds?: string[];
     dim?: boolean;
+    /** Only the key (`[T]`), when the row has no room for the name. */
+    compact?: boolean;
 }) {
     const theme = useTheme();
     const resolved = useShortcutLiteral(shortcutIds ?? (shortcutId ? [shortcutId] : []));
@@ -36,10 +39,12 @@ export function Hint({
             <Text color={theme.text.active} dimColor={dim} bold>
                 [{display}]
             </Text>
-            <Text color={theme.text.hint} dimColor={dim}>
-                {" "}
-                {label}
-            </Text>
+            {!compact && (
+                <Text color={theme.text.hint} dimColor={dim}>
+                    {" "}
+                    {label}
+                </Text>
+            )}
         </Box>
     );
 }

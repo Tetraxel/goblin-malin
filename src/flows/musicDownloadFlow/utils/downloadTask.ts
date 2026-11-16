@@ -1,4 +1,6 @@
+import { randomUUID } from "crypto";
 import fs from "fs/promises";
+import * as path from "path";
 import { Task } from "#base/task/task";
 import { TaskOrchestrator } from "#base/task/orchestrator";
 import { TaskScoped } from "#base/task/taskContext";
@@ -10,7 +12,7 @@ import { platformRegistry } from "#base/platformRegistry";
 import { urlParserRegistry } from "#base/urlParser";
 import { type StatusAttributes, StatusType } from "#base/task/task-status";
 import { taskLocks, type LockHolder } from "#base/task/taskLock";
-import { throwIfAborted } from "#utils/errors";
+import { throwIfAborted, untilAborted } from "#utils/errors";
 import { withTimeout } from "#utils/withTimeout";
 import {
     type TrackDownloadTask,
@@ -43,7 +45,7 @@ import { extensionOf, parseOutputFormat, planSave } from "./outputFormat";
 import { isSavedFrom, releaseSavedFile } from "./savedSource";
 import { tagAudioFile } from "./tagAudioFile";
 import { createSingleFlight } from "./singleFlight";
-import { writeViaStaging } from "./writeViaStaging";
+import { acquireDestinationLock, writeViaStaging } from "./writeViaStaging";
 import { pickAutoSelectedIndex } from "./sourceSelection";
 import { computeTaskRevision, downloadSourceIds } from "./taskRevision";
 import { OverrideValidationError, checkOverrideChange } from "./overrideValidation";
@@ -141,10 +143,14 @@ export class DownloadTask extends Task<TrackDownloadTask> {
     // Download providers whose search + download is being re-run by the user right now.
     private retryingProviders = new Set<string>();
     // Cancel handle for whichever download source row is currently in flight, keyed
-    // by its index in `downloadSources` — populated from onUpdate's `abort` option
+    // by the row's `rowKey` (not its position, which shifts) — populated from onUpdate's `abort` option
     // (see DownloadUpdateOptions) and consumed by rejectDownloadSource() so rejecting
     // an actively-downloading row actually stops it instead of just hiding it.
-    private activeAbortBySourceIndex = new Map<number, () => void>();
+    private activeAbortByRowKey = new Map<string, () => void>();
+    // Temp files of download rows that were dropped to be redone (a new run, a provider retry, a restart). The rows are
+    // emptied before any provider searches again, so a provider that clears its old files first (Soulseek) could not
+    // find them from the rows any more.
+    private replacedTempFiles = new Set<string>();
     // Held for the whole of `saveTrack`, from before its first await.
     private saveGuard = createSingleFlight();
 
@@ -273,9 +279,39 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
+    /** The pipeline is processing the track, or a part of it runs (a part leaves `state` alone). */
+    public override isBusy(): boolean {
+        return super.isBusy() || this.partRunning || this.getAttributes()?.state === "running";
+    }
+
+    /** Only a track that was never run, or was stopped, is run: the state is saved, `finishedAt` is not. */
+    public override isRunnable(): boolean {
+        const state = this.getAttributes()?.state;
+        return super.isRunnable() && (state === "pending" || state === "stopped");
+    }
+
+    // The runs this task makes on its own (a start by hand, a re-fetch, a download), each with the controller that stops
+    // it: "Stop" and a removal reach them through {@link abortRun}, which the pump's signal does not.
+    private ownRuns = new Set<AbortController>();
+
+    /** A signal that aborts when `external` does, or when {@link abortRun} is called; `done` when the run is over. */
+    private beginOwnRun(external?: AbortSignal): { signal: AbortSignal; done: () => void } {
+        const own = new AbortController();
+        this.ownRuns.add(own);
+        return {
+            signal: external ? AbortSignal.any([external, own.signal]) : own.signal,
+            done: () => void this.ownRuns.delete(own),
+        };
+    }
+
+    public override abortRun(): void {
+        for (const run of [...this.ownRuns]) run.abort();
+    }
+
     @TaskScoped()
     @SafeAction("Start task")
-    async start(signal?: AbortSignal): Promise<void> {
+    async start(external?: AbortSignal): Promise<void> {
+        const { signal, done } = this.beginOwnRun(external);
         try {
             const state = this.getAttributes()?.state;
             if (state !== "pending" && state !== "stopped") {
@@ -283,12 +319,12 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 return;
             }
 
-            // Clean up partial state from a previous stopped run
+            // Clean up partial state from a previous stopped run. `metadataOverride` is what the user typed over the
+            // sources' values: it is not rebuilt, so it stays (as `userSources` does).
             if (state === "stopped") {
                 this.updateAttributes({
                     state: "pending",
                     metadataGroups: [],
-                    metadataOverride: {},
                     downloadSources: [],
                     primaryMetadataFetched: false,
                     metadataDiscovered: false,
@@ -309,10 +345,10 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                     throwIfAborted(signal);
                     // If primary metadata is not fetched -> fetch it
                     if (!this.getPrimaryMetadata()) {
-                        await this.startPrimaryMetadataFetching();
+                        await this.startPrimaryMetadataFetching(signal);
                     }
                     throwIfAborted(signal);
-                    await this.startMetadataDiscovering();
+                    await this.startMetadataDiscovering({ signal });
                 });
             }
 
@@ -332,6 +368,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             }
             this.updateAttributes({ state: "failed" });
             throw error;
+        } finally {
+            done();
         }
     }
 
@@ -339,9 +377,11 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
     @TaskScoped()
     @SafeAction("Re-fetch primary metadata")
-    async startPrimaryMetadataFetching(): Promise<void> {
+    async startPrimaryMetadataFetching(signal?: AbortSignal): Promise<void> {
         const url = this.getAttributes()?.userInput.url;
         if (!url) throw new Error("No user input URL provided");
+        // Stopped before it began: nothing may be cleared.
+        throwIfAborted(signal);
 
         this.logger.info(`Fetching primary metadata for URL: ${url}`);
 
@@ -383,11 +423,13 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 try {
                     const service = this.metadataServices.get(recognizingServiceKey);
                     this.logger.debug(`Fetching primary metadata using ${recognizingServiceKey}`);
-                    const metadata = await service.getTrackMetadata(url);
+                    const metadata = await untilAborted(service.getTrackMetadata(url), signal);
                     this.addResultToGroup(metadata, recognizingServiceKey, [], true);
                     fetchedViaService = true;
                     this.logger.info(`Successfully fetched primary metadata from ${metadata.apiProvider}`);
                 } catch (error) {
+                    // A stop is not a failed service: it must not turn into the fallback below.
+                    if (signal?.aborted) throw error;
                     this.logger.warn(`Primary fetch failed for ${recognizingServiceKey}, trying discovery fallback`, {
                         error,
                     });
@@ -408,8 +450,12 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 } as unknown as TrackMetadata;
 
                 for (const discoveryService of this.discoveryServices.getAllServices()) {
+                    throwIfAborted(signal);
                     try {
-                        const { tracks: discovered } = await discoveryService.discoverFromUri(stubMetadata);
+                        const { tracks: discovered } = await untilAborted(
+                            discoveryService.discoverFromUri(stubMetadata),
+                            signal
+                        );
                         const match = discovered.find((m) => m.platform === recognizedPlatform);
                         if (!match) continue;
 
@@ -424,14 +470,15 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                         if (this.isMetadataServiceEnabled(recognizingServiceKey) && match.url) {
                             try {
                                 const service = this.metadataServices.get(recognizingServiceKey);
-                                const enriched = await service.getTrackMetadata(match.url);
+                                const enriched = await untilAborted(service.getTrackMetadata(match.url), signal);
                                 if (gIdx >= 0 && rIdx >= 0) {
                                     this.updateResultInGroup(gIdx, rIdx, {
                                         metadata: enriched,
                                         fetchState: undefined,
                                     });
                                 }
-                            } catch {
+                            } catch (error) {
+                                if (signal?.aborted) throw error;
                                 if (gIdx >= 0 && rIdx >= 0) {
                                     this.updateResultInGroup(gIdx, rIdx, {
                                         fetchState: "error",
@@ -448,6 +495,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                         fetchedViaService = true;
                         break;
                     } catch (error) {
+                        if (signal?.aborted) throw error;
                         this.logger.warn(`Discovery fallback failed via ${discoveryService.id}`, { error });
                     }
                 }
@@ -1432,16 +1480,20 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
     // ── Misc mutations ────────────────────────────────────────────────────────
 
-    @TaskScoped()
-    @SafeAction("Restart task")
-    async restart(): Promise<void> {
+    /**
+     * Empties what a run rebuilds, so that the next one starts from scratch: the metadata and download rows, and the
+     * flags that say they were fetched. A restart does this, and so does a batch run of a track that was run before
+     * (`runSelected`). What the user made (overrides, links, groups, the saved file) stays.
+     */
+    resetForRerun(): void {
+        this.rememberReplacedTempFiles(this.getAttributes()?.downloadSources ?? []);
         // The verdict is rebuilt, but what the user decided about it (the release they picked or turned down, the
         // artists they chose) is theirs and stays: the next check applies it again.
+        // `metadataOverride` (what the user typed over the sources' values) is theirs too, and stays.
         const kept = this.getAttributes()?.musicBrainzIdentity;
         this.updateAttributes({
             state: "pending",
             metadataGroups: [],
-            metadataOverride: {},
             musicBrainzIdentity: kept?.userChoice
                 ? {
                       ...unknownIdentity("Checking again after the restart", kept),
@@ -1453,6 +1505,33 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             metadataDiscovered: false,
             downloadsFetched: false,
         });
+    }
+
+    /** Notes the temp files of rows that are about to be dropped (see {@link replacedTempFiles}). */
+    private rememberReplacedTempFiles(rows: readonly TrackDownloadSource[]): void {
+        for (const row of rows) {
+            if (row.localFile?.path) this.replacedTempFiles.add(path.resolve(row.localFile.path));
+        }
+    }
+
+    /**
+     * The temp files of this task's own download rows, current or already dropped, that a new search of a provider may
+     * delete (resolved paths). Not the one the saved file was made from: its record still points there.
+     */
+    ownTempFiles(): Set<string> {
+        const attrs = this.getAttributes();
+        const own = new Set(this.replacedTempFiles);
+        for (const row of attrs?.downloadSources ?? []) {
+            if (row.localFile?.path) own.add(path.resolve(row.localFile.path));
+        }
+        if (attrs?.savedFile?.downloadPath) own.delete(path.resolve(attrs.savedFile.downloadPath));
+        return own;
+    }
+
+    @TaskScoped()
+    @SafeAction("Restart task")
+    async restart(): Promise<void> {
+        this.resetForRerun();
         await this.start();
     }
 
@@ -1471,12 +1550,15 @@ export class DownloadTask extends Task<TrackDownloadTask> {
      * the task counts as busy until it settles. The list's own actions (re-fetch, re-discover, download) go through
      * here, so the agent never writes under them and they never start under the agent.
      */
-    async trackPartRun<T>(run: () => Promise<T>, options?: WriteOptions): Promise<T> {
+    async trackPartRun<T>(run: (signal: AbortSignal) => Promise<T>, options?: WriteOptions): Promise<T> {
         this.assertWritable(options);
         this.partRuns++;
+        // Its own stop, like a start's: "Stop" and a removal reach it (see `abortRun`).
+        const { signal, done } = this.beginOwnRun();
         try {
-            return await run();
+            return await run(signal);
         } finally {
+            done();
             this.partRuns--;
         }
     }
@@ -1496,10 +1578,11 @@ export class DownloadTask extends Task<TrackDownloadTask> {
      */
     async runMetadataPart(options?: WriteOptions): Promise<void> {
         return this.trackPartRun(
-            () =>
+            (signal) =>
                 metadataLimiter.run(async () => {
-                    if (!this.getAttributes()?.primaryMetadataFetched) await this.startPrimaryMetadataFetching();
-                    await this.startMetadataDiscovering();
+                    throwIfAborted(signal);
+                    if (!this.getAttributes()?.primaryMetadataFetched) await this.startPrimaryMetadataFetching(signal);
+                    await this.startMetadataDiscovering({ signal });
                 }),
             options
         );
@@ -1515,11 +1598,12 @@ export class DownloadTask extends Task<TrackDownloadTask> {
      * early. A search of one provider is a single request and finishes by itself.
      */
     async rediscoverPart(provider?: string, options?: WriteOptions & { signal?: AbortSignal }): Promise<void> {
-        const signal = options?.signal;
+        const external = options?.signal;
         return this.trackPartRun(
-            () =>
+            (own) =>
                 metadataLimiter.run(async () => {
-                    if (signal?.aborted) return;
+                    const signal = external ? AbortSignal.any([external, own]) : own;
+                    if (signal.aborted) return;
                     if (provider) await this.startSingleProviderDiscovery(provider);
                     else await this.startMetadataDiscovering({ skipLastResort: true, signal });
                 }),
@@ -1532,9 +1616,9 @@ export class DownloadTask extends Task<TrackDownloadTask> {
      * saved file, if there is one, stays (see `startDownloads`).
      */
     async runDownloadPart(options?: WriteOptions): Promise<void> {
-        return this.trackPartRun(() => {
+        return this.trackPartRun((signal) => {
             if (!this.getAttributes()?.downloadsFetched) this.updateAttributes({ toDownload: true });
-            return downloadLimiter.run(() => this.startDownloads());
+            return downloadLimiter.run(() => this.startDownloads(signal));
         }, options);
     }
 
@@ -1580,10 +1664,11 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         // candidate) should actually stop it, not just hide it while it keeps
         // running in the background.
         if (rejected) {
-            const abort = this.activeAbortBySourceIndex.get(index);
-            if (abort) {
+            const key = sources[index].rowKey;
+            const abort = key ? this.activeAbortByRowKey.get(key) : undefined;
+            if (key && abort) {
                 abort();
-                this.activeAbortBySourceIndex.delete(index);
+                this.activeAbortByRowKey.delete(key);
             }
         }
     }
@@ -1606,18 +1691,31 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             return;
         }
 
+        // The row is found again by its key at every update: this runs for a long time, and in the meantime another
+        // provider's retry or "show more" can change the positions (an update would land on another row).
+        const key = target.rowKey ?? randomUUID();
+        if (!target.rowKey) {
+            const rows = this.getAttributes()?.downloadSources ?? [];
+            this.updateAttributes({
+                downloadSources: rows.map((s, i) => (i === sourceIndex ? { ...s, rowKey: key } : s)),
+            });
+        }
         const patchSource = (patch: TrackDownloadSource) => {
             const current = [...(this.getAttributes()?.downloadSources ?? [])];
-            if (!current[sourceIndex]) return;
-            current[sourceIndex] = {
+            const at = current.findIndex((s) => s.rowKey === key);
+            // The row is gone (its provider was retried, the list rebuilt): there is nothing to write the answer to.
+            if (at === -1) return;
+            current[at] = {
                 ...patch,
-                selected: current[sourceIndex].selected,
-                moreCandidates: current[sourceIndex].moreCandidates,
+                rowKey: key,
+                selected: current[at].selected,
+                isRejected: current[at].isRejected,
+                moreCandidates: current[at].moreCandidates,
             };
             this.updateAttributes({ downloadSources: current });
         };
 
-        // Reuses the same activeAbortBySourceIndex map startDownloads() populates, so
+        // Reuses the same activeAbortByRowKey map startDownloads() populates, so
         // rejectDownloadSource() can cancel a manual retry exactly like any other
         // in-flight row, without needing to know which path started it.
         const retryController = new AbortController();
@@ -1627,18 +1725,18 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 target.retryPayload,
                 (source, options) => {
                     if (options?.abort) {
-                        this.activeAbortBySourceIndex.set(sourceIndex, options.abort);
+                        this.activeAbortByRowKey.set(key, options.abort);
                     } else {
-                        this.activeAbortBySourceIndex.delete(sourceIndex);
+                        this.activeAbortByRowKey.delete(key);
                     }
                     patchSource(source);
                 },
                 retryController.signal
             );
-            this.activeAbortBySourceIndex.delete(sourceIndex);
+            this.activeAbortByRowKey.delete(key);
             patchSource(result);
         } catch (error) {
-            this.activeAbortBySourceIndex.delete(sourceIndex);
+            this.activeAbortByRowKey.delete(key);
             // AbortError here means the user rejected this same row mid-retry —
             // expected, not worth an error-level log.
             if ((error as Error).name !== "AbortError") {
@@ -1807,105 +1905,119 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         const downloadPath = selectedSource?.localFile?.path;
         const plan = planSave(settings, downloadPath, sameOrigin ? saved?.path : undefined);
         const outputPath = computeOutputPath(compiled, outputDir, attrs!.outputFilenameOverride, plan.extension);
-        // Another file with this name is replaced only if the user agrees. The track's own saved file doesn't
-        // count: this one replaces it anyway.
-        if (isOutputPathTaken(outputPath, [saved?.path]) && !(await overwriteConfirmBridge.confirm(outputPath))) {
-            globalLogger.info("Save cancelled: the file name is taken and the user kept the existing file");
-            return;
-        }
-
-        this.status.update({
-            type: StatusType.Processing,
-            message: plan.convert ? `Converting to ${plan.extension.toUpperCase()}…` : "Saving…",
-        });
-
-        const existingSavedPath = saved?.path ?? null;
-        // Only a file made here is deleted when saving fails: a saved file that was merely renamed is the user's.
-        let outputCreated = false;
-
-        // A file already at the target (the user agreed to replace it): a failure after it was replaced must not
-        // delete it as a file this save created.
-        const outputExisted = await fs.access(outputPath).then(
-            () => true,
-            () => false
-        );
-
+        // Two tracks that resolve to the same file name (one song imported twice) are saved one after the other: the
+        // "name is taken?" check below must see the file the first one made, not run before it exists.
+        const releaseDestination = await acquireDestinationLock(outputPath);
         try {
-            if (plan.mode === "reuse") {
-                // Re-saving same source: re-tag the file where it is, then rename it to its new path if that changed.
-                // Tagging first means a failure leaves the file where the task still points at it.
-                if (attrs!.overwriteTags !== false) await tagAudioFile(existingSavedPath!, tags);
-                if (existingSavedPath !== outputPath) {
-                    const { moveFile } = await import("../../../utils/metadata");
-                    await moveFile(existingSavedPath!, outputPath);
-                }
-            } else {
-                // New file from the temporary download: a plain copy, or a re-encode into the chosen format. It is
-                // built and tagged beside its destination and only then renamed over it, so a failure at any step
-                // leaves no partial file and keeps the file the user agreed to replace.
-                await writeViaStaging(outputPath, async (staging) => {
-                    if (plan.convert) {
-                        await convertAudioInto(downloadPath!, staging, parseOutputFormat(plan.extension));
-                    } else {
-                        await fs.copyFile(downloadPath!, staging);
-                    }
-                    // Off: the file keeps the tags it came with (it is still copied/renamed/moved as usual).
-                    if (attrs!.overwriteTags !== false) await tagAudioFile(staging, tags);
-                });
-                // From here the file at `outputPath` is complete. If a later step fails, a file this save created
-                // is removed again; one that replaced the user's is kept (the old content is gone either way).
-                outputCreated = !outputExisted;
+            // Another file with this name is replaced only if the user agrees. The track's own saved file doesn't
+            // count: this one replaces it anyway.
+            if (isOutputPathTaken(outputPath, [saved?.path]) && !(await overwriteConfirmBridge.confirm(outputPath))) {
+                globalLogger.info("Save cancelled: the file name is taken and the user kept the existing file");
+                return;
             }
 
-            // Only now that the new file is in place is the one it replaces deleted (a file that was updated in
-            // place, or kept its name, is the new file itself).
-            if (existingSavedPath && plan.mode === "fromDownload" && !samePath(existingSavedPath, outputPath)) {
-                await fs.unlink(existingSavedPath).catch((e: NodeJS.ErrnoException) => {
-                    if (e.code !== "ENOENT") throw e;
-                });
-            }
-
-            // The temporary download no longer describes a re-encoded file: remember what was really written.
-            const reencoded = plan.mode === "fromDownload" ? plan.convert : !!saved?.converted;
-            const converted = reencoded
-                ? { format: plan.extension, sizeBytes: (await fs.stat(outputPath)).size }
-                : undefined;
-
-            // What the file was made from is kept with it: the download rows may all be replaced later.
-            this.updateAttributes({
-                savedFile: {
-                    path: outputPath,
-                    savedAt: new Date(),
-                    provider: origin.provider,
-                    track: origin.track,
-                    providerDetail: origin.providerDetail,
-                    fileInfo: origin.fileInfo,
-                    downloadPath: selectedSource ? selectedSource.localFile?.path : saved?.downloadPath,
-                    converted,
-                    // What was just written; when the file kept its own tags, what was known before.
-                    tags:
-                        attrs!.overwriteTags !== false
-                            ? compiledFieldValues(compiled)
-                            : sameOrigin
-                              ? saved?.tags
-                              : undefined,
-                },
+            this.status.update({
+                type: StatusType.Processing,
+                message: plan.convert ? `Converting to ${plan.extension.toUpperCase()}…` : "Saving…",
             });
 
-            // The file now belongs to this task: another one that saved a file under this path (and was replaced
-            // by the confirm above) must not keep treating it as its own.
-            const released = releaseSavedFile(TaskOrchestrator.getInstance().getTasks(), outputPath, this.getId());
-            if (released.length > 0) {
-                globalLogger.info(`${outputPath} replaced the saved file of ${released.length} other task(s)`);
-            }
+            const existingSavedPath = saved?.path ?? null;
+            // Only a file made here is deleted when saving fails: a saved file that was merely renamed is the user's.
+            let outputCreated = false;
 
-            this.status.set({ type: StatusType.Success, message: "Saved" });
-        } catch (err) {
-            if (outputCreated) {
-                await fs.unlink(outputPath).catch(() => {});
+            // A file already at the target (the user agreed to replace it): a failure after it was replaced must not
+            // delete it as a file this save created.
+            const outputExisted = await fs.access(outputPath).then(
+                () => true,
+                () => false
+            );
+
+            try {
+                if (plan.mode === "reuse") {
+                    // Re-saving same source: re-tag the file where it is, then rename it to its new path if that changed.
+                    // Tagging first means a failure leaves the file where the task still points at it.
+                    if (attrs!.overwriteTags !== false) {
+                        // The user's own file is not rewritten where it lies: a crash, a kill or a full disk in the
+                        // middle would leave the only copy truncated. The tags go on a copy, which replaces it once whole.
+                        await writeViaStaging(existingSavedPath!, async (staging) => {
+                            await fs.copyFile(existingSavedPath!, staging);
+                            await tagAudioFile(staging, tags);
+                        });
+                    }
+                    if (existingSavedPath !== outputPath) {
+                        const { moveFile } = await import("../../../utils/metadata");
+                        await moveFile(existingSavedPath!, outputPath);
+                    }
+                } else {
+                    // New file from the temporary download: a plain copy, or a re-encode into the chosen format. It is
+                    // built and tagged beside its destination and only then renamed over it, so a failure at any step
+                    // leaves no partial file and keeps the file the user agreed to replace.
+                    await writeViaStaging(outputPath, async (staging) => {
+                        if (plan.convert) {
+                            await convertAudioInto(downloadPath!, staging, parseOutputFormat(plan.extension));
+                        } else {
+                            await fs.copyFile(downloadPath!, staging);
+                        }
+                        // Off: the file keeps the tags it came with (it is still copied/renamed/moved as usual).
+                        if (attrs!.overwriteTags !== false) await tagAudioFile(staging, tags);
+                    });
+                    // From here the file at `outputPath` is complete. If a later step fails, a file this save created
+                    // is removed again; one that replaced the user's is kept (the old content is gone either way).
+                    outputCreated = !outputExisted;
+                }
+
+                // Only now that the new file is in place is the one it replaces deleted (a file that was updated in
+                // place, or kept its name, is the new file itself).
+                if (existingSavedPath && plan.mode === "fromDownload" && !samePath(existingSavedPath, outputPath)) {
+                    await fs.unlink(existingSavedPath).catch((e: NodeJS.ErrnoException) => {
+                        if (e.code !== "ENOENT") throw e;
+                    });
+                }
+
+                // The temporary download no longer describes a re-encoded file: remember what was really written.
+                const reencoded = plan.mode === "fromDownload" ? plan.convert : !!saved?.converted;
+                const converted = reencoded
+                    ? { format: plan.extension, sizeBytes: (await fs.stat(outputPath)).size }
+                    : undefined;
+
+                // What the file was made from is kept with it: the download rows may all be replaced later.
+                this.updateAttributes({
+                    savedFile: {
+                        path: outputPath,
+                        savedAt: new Date(),
+                        provider: origin.provider,
+                        track: origin.track,
+                        providerDetail: origin.providerDetail,
+                        fileInfo: origin.fileInfo,
+                        downloadPath: selectedSource ? selectedSource.localFile?.path : saved?.downloadPath,
+                        converted,
+                        // What was just written; when the file kept its own tags, what was known before.
+                        tags:
+                            attrs!.overwriteTags !== false
+                                ? compiledFieldValues(compiled)
+                                : sameOrigin
+                                  ? saved?.tags
+                                  : undefined,
+                    },
+                });
+
+                // The file now belongs to this task: another one that saved a file under this path (and was replaced
+                // by the confirm above) must not keep treating it as its own.
+                const released = releaseSavedFile(TaskOrchestrator.getInstance().getTasks(), outputPath, this.getId());
+                if (released.length > 0) {
+                    globalLogger.info(`${outputPath} replaced the saved file of ${released.length} other task(s)`);
+                }
+
+                this.status.set({ type: StatusType.Success, message: "Saved" });
+            } catch (err) {
+                if (outputCreated) {
+                    await fs.unlink(outputPath).catch(() => {});
+                }
+                this.status.set({ type: StatusType.Error, message: "Save failed" });
+                throw err;
             }
-            this.status.set({ type: StatusType.Error, message: "Save failed" });
-            throw err;
+        } finally {
+            releaseDestination();
         }
     }
 
@@ -1938,32 +2050,36 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         // copy would silently clobber that (e.g. a "failed" update arriving after an
         // abort would wipe the `isRejected` flag that abort was supposed to set).
         // Returns the slot index actually used (existing or newly created).
-        const applyRowUpdate = (existingSlot: number | undefined, patch: TrackDownloadSource): number => {
+        // Returns the key of the row used (existing or newly created): the row is found by it, never by position.
+        const applyRowUpdate = (existingKey: string | undefined, patch: TrackDownloadSource): string => {
             const current = [...(this.getAttributes()?.downloadSources ?? [])];
-            let slotIndex: number;
-            // A row this run created may be gone (the user removed it, or a session saved by an older version had two
-            // runs on one track). Writing at its old position would leave holes (saved as null), so it becomes a new
-            // row. Two runs at once are refused by `startDownloads`.
-            if (existingSlot === undefined || existingSlot >= current.length) {
-                slotIndex = insertAt === undefined ? current.length : insertAt + createdRows;
+            const at = existingKey === undefined ? -1 : current.findIndex((s) => s.rowKey === existingKey);
+            let key: string;
+            // A row this run created may be gone (the user removed it, or its provider was retried): the update
+            // becomes a new row. Two runs at once are refused by `startDownloads`.
+            if (at === -1) {
+                key = randomUUID();
+                const slotIndex = Math.min(
+                    insertAt === undefined ? current.length : insertAt + createdRows,
+                    current.length
+                );
                 createdRows++;
-                current.splice(slotIndex, 0, patch);
+                current.splice(slotIndex, 0, { ...patch, rowKey: key });
             } else {
-                slotIndex = existingSlot;
-                const live = current[slotIndex];
+                key = existingKey!;
+                const live = current[at];
                 // `moreCandidates` is set once, on the row that ends the listing; later updates to that
                 // row (it may be attempted too) don't repeat it, so it must survive them.
-                current[slotIndex] = live
-                    ? {
-                          ...patch,
-                          selected: live.selected,
-                          isRejected: live.isRejected,
-                          moreCandidates: patch.moreCandidates ?? live.moreCandidates,
-                      }
-                    : patch;
+                current[at] = {
+                    ...patch,
+                    rowKey: key,
+                    selected: live.selected,
+                    isRejected: live.isRejected,
+                    moreCandidates: patch.moreCandidates ?? live.moreCandidates,
+                };
             }
             this.updateAttributes({ downloadSources: current });
-            return slotIndex;
+            return key;
         };
 
         try {
@@ -2030,17 +2146,17 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             // failed/downloaded) shows as its own row instead of one shared status.
             // Services that never pass an `attemptId` (e.g. yt-dlp) keep the original
             // single-row behavior via the implicit `undefined` key.
-            const slotByAttemptId = new Map<string | undefined, number>();
+            const rowKeyByAttemptId = new Map<string | undefined, string>();
             let lastAttemptId: string | undefined;
             const onUpdate = (source: TrackDownloadSource, options?: DownloadUpdateOptions) => {
                 const attemptId = options?.attemptId;
                 lastAttemptId = attemptId;
-                const slotIndex = applyRowUpdate(slotByAttemptId.get(attemptId), source);
-                slotByAttemptId.set(attemptId, slotIndex);
+                const key = applyRowUpdate(rowKeyByAttemptId.get(attemptId), source);
+                rowKeyByAttemptId.set(attemptId, key);
                 if (options?.abort) {
-                    this.activeAbortBySourceIndex.set(slotIndex, options.abort);
+                    this.activeAbortByRowKey.set(key, options.abort);
                 } else {
-                    this.activeAbortBySourceIndex.delete(slotIndex);
+                    this.activeAbortByRowKey.delete(key);
                 }
             };
 
@@ -2051,8 +2167,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 signal,
                 options.maxDownloads !== undefined ? { maxDownloads: options.maxDownloads } : undefined
             );
-            const finalSlot = applyRowUpdate(slotByAttemptId.get(lastAttemptId), downloadSource);
-            this.activeAbortBySourceIndex.delete(finalSlot);
+            const finalKey = applyRowUpdate(rowKeyByAttemptId.get(lastAttemptId), downloadSource);
+            this.activeAbortByRowKey.delete(finalKey);
             this.logger.info(`Successfully downloaded using ${downloadService.id}`);
         } catch (error) {
             // Only a genuine task-level abort (the signal passed into the whole stage) should stop it.
@@ -2107,15 +2223,15 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
                 const firstIndex = before.findIndex((s) => s.provider === provider);
                 if (firstIndex === -1) return;
-                // A row of this provider still in flight is cancelled; the cancel handles are keyed by the
-                // very indices that are about to go away.
-                before.forEach((s, i) => {
-                    if (s.provider !== provider) return;
-                    this.activeAbortBySourceIndex.get(i)?.();
-                    this.activeAbortBySourceIndex.delete(i);
-                });
+                // A row of this provider still in flight is cancelled: it is about to go away.
+                for (const s of before) {
+                    if (s.provider !== provider || !s.rowKey) continue;
+                    this.activeAbortByRowKey.get(s.rowKey)?.();
+                    this.activeAbortByRowKey.delete(s.rowKey);
+                }
                 const hadSelected = before.some((s) => s.provider === provider && s.selected);
 
+                this.rememberReplacedTempFiles(before.filter((s) => s.provider === provider));
                 this.updateAttributes({ downloadSources: before.filter((s) => s.provider !== provider) });
                 await this.runDownloadService(service, undefined, firstIndex, {
                     maxDownloads: maxDownloadsPerProvider(
@@ -2186,7 +2302,10 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
         this.logger.info(`Starting downloads with ${metadataGroups.length} metadata groups`);
         // Only the download rows are redone: the saved file is the task's own record (`savedFile`) and stays.
+        this.rememberReplacedTempFiles(this.getAttributes()?.downloadSources ?? []);
         this.updateAttributes({ downloadSources: [], downloadsFetched: false });
+        // Whatever was in flight belonged to the rows that are gone.
+        this.activeAbortByRowKey.clear();
 
         // How many files the track downloads: see `downloadStrategy.ts`. Providers are asked in registry order.
         const strategy = parseDownloadStrategy(getMusicSettings().download.downloadStrategy);
@@ -2208,14 +2327,20 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         // applyRowUpdate does above.
         const finalSources = this.getAttributes()?.downloadSources ?? [];
         const preferLossless = getMusicSettings().download.preferLossless;
-        const autoSelectedIdx = pickAutoSelectedIndex(finalSources, preferLossless);
-        const sourcesWithSelection = finalSources.map((s, i) => ({
-            ...s,
-            selected: i === autoSelectedIdx,
-        }));
-
-        this.updateAttributes({ downloadSources: sourcesWithSelection });
-        this.updateAttributes({ downloadsFetched: true });
+        // A row the user selected while the run was going on (a finished yt-dlp file while Soulseek was still working
+        // through its candidates) is their choice: the automatic one only applies when nothing is selected.
+        const userChose = finalSources.some((s) => s.selected && s.state === "downloaded");
+        if (userChose) {
+            this.updateAttributes({ downloadsFetched: true });
+        } else {
+            const autoSelectedIdx = pickAutoSelectedIndex(finalSources, preferLossless);
+            const sourcesWithSelection = finalSources.map((s, i) => ({
+                ...s,
+                selected: i === autoSelectedIdx,
+            }));
+            this.updateAttributes({ downloadSources: sourcesWithSelection });
+            this.updateAttributes({ downloadsFetched: true });
+        }
 
         if (finalSources.length === 0) {
             this.logger.warn("No successful downloads");

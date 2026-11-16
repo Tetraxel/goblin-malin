@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { dataFileNoticeBridge, type DataFileNotice } from "#base/bridges/dataFileNoticeBridge";
 import { DEFAULT_APP_SETTINGS } from "#settings/appSettings";
 import { SettingsStore } from "#settings/settingsStore";
@@ -246,5 +246,53 @@ describe("the data folder is never stored", () => {
         store.patchMusicSettings({ download: { outputDir: "B" } });
         expect(onDisk().general).toEqual({ theme: "light" });
         expect(notices).toEqual([]);
+    });
+});
+
+describe("a write the disk refuses", () => {
+    // A directory where the temporary file should go: writing it fails, as a full or locked disk would.
+    const block = () => fs.mkdirSync(file + ".tmp");
+    const unblock = () => fs.rmdirSync(file + ".tmp");
+
+    test("does not throw at whoever changed a setting, keeps the value in memory, and tells the user once", () => {
+        block();
+        const store = new SettingsStore(file);
+
+        expect(() => store.setKeybinding("global.tab", key("y"))).not.toThrow();
+        expect(() => store.setKeybinding("global.other", key("z"))).not.toThrow();
+
+        expect(store.getAppSettings().keybindings).toEqual({ "global.tab": key("y"), "global.other": key("z") });
+        expect(fs.existsSync(file)).toBe(false);
+        expect(notices).toHaveLength(1);
+        expect(notices[0].title).toMatch(/couldn't be saved/);
+        expect(notices[0].message).toContain(file);
+    });
+
+    test("the next write that works saves everything, including the change that failed", () => {
+        block();
+        const store = new SettingsStore(file);
+        store.setKeybinding("global.tab", key("y"));
+
+        unblock();
+        store.setKeybinding("global.other", key("z"));
+
+        expect(onDisk().keybindings).toEqual({ "global.tab": key("y"), "global.other": key("z") });
+        expect(withPrefix("settings.json.tmp")).toEqual([]);
+    });
+
+    test("is retried by itself, without another change", () => {
+        vi.useFakeTimers();
+        try {
+            block();
+            const store = new SettingsStore(file);
+            store.setKeybinding("global.tab", key("y"));
+            expect(fs.existsSync(file)).toBe(false);
+
+            unblock();
+            vi.advanceTimersByTime(5_000);
+            expect(onDisk().keybindings).toEqual({ "global.tab": key("y") });
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

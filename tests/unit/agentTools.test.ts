@@ -864,8 +864,12 @@ describe("add_user_source and rediscover", () => {
                 false
             );
             expect(discovery).toHaveBeenCalledWith(expect.objectContaining({ skipLastResort: true }));
-            // The turn's signal is what ends a search that is going on.
-            expect(discovery.mock.calls[0][0]?.signal).toBe(turn.signal);
+            // The turn's Stop ends a search that is going on (the search gets a signal that follows it, and the
+            // task's own stop as well).
+            const searchSignal = discovery.mock.calls[0][0]?.signal;
+            expect(searchSignal?.aborted).toBe(false);
+            turn.stop();
+            expect(searchSignal?.aborted).toBe(true);
 
             // Stopped while it waited for its turn: nothing starts.
             discovery.mockClear();

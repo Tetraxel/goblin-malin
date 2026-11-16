@@ -105,15 +105,9 @@ export async function runSelected(
                 // CollectionTask.restart()'s job, not a batch "run selected" reset.
                 (t as unknown as CollectionTask).updateAttributes({ state: "pending", error: undefined });
             } else {
-                (t as unknown as DownloadTask).updateAttributes({
-                    state: "pending",
-                    metadataGroups: [],
-                    metadataOverride: {},
-                    downloadSources: [],
-                    primaryMetadataFetched: false,
-                    metadataDiscovered: false,
-                    downloadsFetched: false,
-                });
+                // The user's `metadataOverride` is not rebuilt by a run, so it is left as it is. The reset is the
+                // restart's own: one place says what a run rebuilds.
+                (t as unknown as DownloadTask).resetForRerun();
             }
             t.finishedAt = undefined;
             t.runnedAt = undefined;

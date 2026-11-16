@@ -6,6 +6,7 @@ import { type ParsedUrl, type CollectionExpansion } from "#base/urlParser";
 import { type Task } from "#base/task/task";
 import { CollectionAccessError } from "#base/collectionAccessError";
 import { Cached } from "#utils/cache";
+import { fetchWithTimeout } from "#utils/timeout";
 import { type Logger } from "#base/logger/logger";
 import { StatusType } from "#base/task/task-status";
 import {
@@ -176,7 +177,9 @@ export class SpotifyService extends MetadataService {
             if (mode === "official") {
                 SpotifyService.client = SpotifyApi.withClientCredentials(
                     process.env.SPOTIFY_CLIENT_ID!,
-                    process.env.SPOTIFY_CLIENT_SECRET!
+                    process.env.SPOTIFY_CLIENT_SECRET!,
+                    undefined,
+                    { fetch: fetchWithTimeout() }
                 );
             }
         });

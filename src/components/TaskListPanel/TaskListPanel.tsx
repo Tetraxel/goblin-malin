@@ -407,7 +407,7 @@ export const TaskListPanel: React.FC<{
             {isWindowActive && taskListFocus.isHeaderFocused ? (
                 <DynamicHintBar width={width - 2} isActive={true} />
             ) : (
-                <ActionBar tasks={tasks} columns={columns} />
+                <ActionBar tasks={tasks} columns={columns} width={width - 2} />
             )}
         </Box>
     );

@@ -322,7 +322,12 @@ export function runAgentCli(opts: RunAgentCliOptions): Promise<void> {
             finish(() => {
                 if (sawResult && !resultFailed) return resolve();
                 const detail = lastResultError || stderr.trim() || `exit code ${code}`;
-                reject(new ClaudeCliError(classifyFailure(detail), `Claude failed: ${detail}`.slice(0, 300)));
+                reject(
+                    new ClaudeCliError(
+                        classifyFailure(detail, lastResultError ? "cli-result" : "stderr"),
+                        `Claude failed: ${detail}`.slice(0, 300)
+                    )
+                );
             });
         });
 

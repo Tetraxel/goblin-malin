@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 const httpsGetJson = vi.hoisted(() => vi.fn());
 vi.mock("#utils/http", () => ({ httpsGetJson }));
 
-import { FFMPEG_BUILDS_REPO, getLatestWin64Build } from "#utils/ffmpegBuilds";
+import { FFMPEG_BUILDS_REPO, getLatestWin64Build, pickWin64Archive } from "#utils/ffmpegBuilds";
 
 beforeEach(() => {
     httpsGetJson.mockReset();
@@ -46,5 +46,56 @@ describe("getLatestWin64Build", () => {
             throw new Error("HTTP 403 from https://api.github.com/...");
         });
         await expect(getLatestWin64Build("test")).rejects.toThrow("HTTP 403");
+    });
+});
+
+// BIN-02: the development branch, rebuilt every night, was what everybody got.
+describe("which build is installed", () => {
+    const assets = [
+        "ffmpeg-master-latest-win64-gpl-shared.zip",
+        "ffmpeg-master-latest-win64-gpl.zip",
+        "ffmpeg-n8.1-latest-win64-gpl-8.1.zip",
+        "ffmpeg-n8.1-latest-win64-gpl-shared-8.1.zip",
+        "ffmpeg-n9.0-latest-win64-gpl-9.0.zip",
+        "ffmpeg-n9.0-latest-win64-gpl-shared-9.0.zip",
+        "ffmpeg-n10.2-latest-win64-gpl-10.2.zip",
+        "ffmpeg-n9.1-latest-win64-gpl-9.1.zip",
+        "checksums.sha256",
+    ];
+
+    test("the newest stable branch, by number (10 is after 9)", () => {
+        expect(pickWin64Archive(assets)).toEqual({ name: "ffmpeg-n10.2-latest-win64-gpl-10.2.zip", branch: "n10.2" });
+    });
+
+    test("never the shared build, nor a build of another license or platform", () => {
+        const picked = pickWin64Archive([
+            "ffmpeg-n9.0-latest-win64-gpl-shared-9.0.zip",
+            "ffmpeg-n9.0-latest-win64-lgpl-9.0.zip",
+            "ffmpeg-n9.0-latest-linux64-gpl-9.0.tar.xz",
+        ]);
+        expect(picked).toEqual({ name: "ffmpeg-master-latest-win64-gpl.zip" });
+    });
+
+    test("the development branch only when there is nothing else", () => {
+        expect(pickWin64Archive([])).toEqual({ name: "ffmpeg-master-latest-win64-gpl.zip" });
+    });
+
+    test("the cached binary is named by branch and month, so the daily rebuild does not download 200 MB again", async () => {
+        httpsGetJson.mockResolvedValue({
+            tag_name: "latest",
+            published_at: "2026-11-16T15:50:35Z",
+            assets: assets.map((name) => ({ name })),
+        });
+        const build = await getLatestWin64Build("test");
+        expect(build.versionId).toBe("n10.2-2026-11");
+        expect(build.downloadUrl).toMatch(/\/latest\/ffmpeg-n10\.2-latest-win64-gpl-10\.2\.zip$/);
+        expect(build.archiveName).toBe("ffmpeg-n10.2-latest-win64-gpl-10.2.zip");
+
+        httpsGetJson.mockResolvedValue({
+            tag_name: "latest",
+            published_at: "2026-11-30T01:00:00Z",
+            assets: assets.map((name) => ({ name })),
+        });
+        expect((await getLatestWin64Build("test")).versionId).toBe("n10.2-2026-11");
     });
 });

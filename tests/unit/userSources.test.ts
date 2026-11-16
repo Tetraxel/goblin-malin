@@ -595,3 +595,38 @@ describe("a part run started from the list", () => {
         }
     });
 });
+
+// What the user typed over the sources' values is theirs, like the links: nothing the pipeline rebuilds may reset it.
+describe("what the user typed over the metadata is never lost", () => {
+    const typed = { trackName: "My own title", artists: [{ type: "artist" as const, name: "Real Artist" }] };
+
+    test("RESTART keeps it", async () => {
+        const task = await runTask();
+        task.setMetadataOverride(typed);
+        await task.restart();
+        expect(task.getAttributes()?.metadataOverride).toMatchObject({ trackName: "My own title" });
+        expect(task.getAttributes()?.metadataOverride?.artists?.[0]?.name).toBe("Real Artist");
+    });
+
+    test("a stopped task started again keeps it", async () => {
+        const task = await runTask();
+        task.setMetadataOverride(typed);
+        task.updateAttributes({ state: "stopped" });
+        await task.start();
+        expect(task.getAttributes()?.metadataOverride).toMatchObject({ trackName: "My own title" });
+    });
+
+    test("'Run selected' on a finished track keeps it", async () => {
+        const { runSelected } = await import("#flows/musicDownloadFlow/runController");
+        const { TaskOrchestrator } = await import("#base/task/orchestrator");
+        const task = await runTask();
+        task.setMetadataOverride(typed);
+        TaskOrchestrator.getInstance().setTasks([task]);
+        try {
+            await runSelected(new Set([task.getId()]));
+            expect(task.getAttributes()?.metadataOverride).toMatchObject({ trackName: "My own title" });
+        } finally {
+            TaskOrchestrator.getInstance().setTasks([]);
+        }
+    });
+});

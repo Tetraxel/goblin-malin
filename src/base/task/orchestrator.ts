@@ -90,7 +90,10 @@ export class TaskOrchestrator {
     public removeTasks(ids: string[]): void {
         const idSet = new Set(ids);
         for (const task of this.tasks) {
-            if (idSet.has(task.getId()) && task.running) {
+            if (!idSet.has(task.getId())) continue;
+            // Nothing lists it any more, so nothing could stop it later: its work ends now.
+            task.abortRun();
+            if (task.running) {
                 // Task is mid-flight — hold its slot until the promise finishes.
                 this.removingTasks.add(task);
             }
@@ -101,7 +104,7 @@ export class TaskOrchestrator {
     }
 
     public getTasksCandidates(): Task[] {
-        return this.tasks.filter((task) => !task.running && task.finishedAt == undefined);
+        return this.tasks.filter((task) => task.isRunnable());
     }
 
     public getTasksInProgress(): Task[] {
@@ -227,6 +230,10 @@ export class TaskOrchestrator {
     }
 
     public stopProcessing(): void {
+        // Runs started by hand are not the pump's: each task stops its own.
+        for (const task of this.tasks) task.abortRun();
+        // Nothing to drain when there is no batch: "stopping" would stay on, with nothing to ever turn it off.
+        if (!this.processing) return;
         this.stopping = true;
         this.abortController?.abort();
         this.notifySubscribers();
@@ -234,7 +241,7 @@ export class TaskOrchestrator {
 
     private clearQueuedStatus(): void {
         for (const task of this.tasks) {
-            if (!task.running && task.finishedAt === undefined) {
+            if (task.isRunnable()) {
                 const s = task.getStatus().get();
                 if (s.type === StatusType.Pending) {
                     task.getStatus().clear();

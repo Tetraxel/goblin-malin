@@ -3,6 +3,7 @@ import { create } from "flat-cache";
 import * as fs from "fs";
 import { globalLogger } from "#base/logger/logger";
 import { getCacheDir } from "./appPaths";
+import { renameReplacing } from "./dataFile";
 
 const skipCacheStorage = new AsyncLocalStorage<boolean>();
 
@@ -18,6 +19,11 @@ export function withSkipCache<T>(fn: () => Promise<T>): Promise<T> {
 // Global cache instance — path captured once at startup, consistent with clearCache
 const CACHE_ID = "api-cache";
 const cacheDir = getCacheDir();
+/** The most entries kept: the least recently used go first. Albums and playlists are stored whole, so it is bounded. */
+const MAX_ENTRIES = 3000;
+/** How often changes are written to disk (in the background, see {@link saveInBackground}). */
+const SAVE_EVERY_MS = 2 * 60 * 1000;
+
 export const cache = create({
     cacheId: CACHE_ID,
     cacheDir,
@@ -25,12 +31,80 @@ export const cache = create({
     // The time to live for the cache in milliseconds. 0 means no expiration
     ttl: 90 * 24 * 60 * 60 * 1000, // 90 days
 
-    // The interval to save the data to disk. 0 means no persistence
-    persistInterval: 2 * 60 * 1000, // 2 minutes
+    // Not the library's own timer: it writes the whole file synchronously, on the thread that draws the screen.
+    persistInterval: 0,
+    lruSize: MAX_ENTRIES,
 
     // The interval to check for expired items in the cache. 0 means no expiration
     expirationInterval: 10 * 60 * 1000, // 10 minutes
 });
+
+// What flat-cache keeps to itself: how it writes its file, and whether anything changed since it last did.
+type FlatCacheInternals = { _stringify?: (items: unknown) => string; _changesSinceLastSave?: boolean };
+
+let saving = false;
+
+/**
+ * Writes the cache file without blocking the screen on the disk: the text is built, then written to a temporary file
+ * and renamed, off the main path (the library's own `save()` writes synchronously). Falls back to `save()` when the
+ * library no longer has the parts this relies on. A failure keeps the changes flagged, so the next round tries again.
+ */
+export async function saveInBackground(): Promise<void> {
+    if (saving || !cache.changesSinceLastSave) return;
+    const internals = cache as unknown as FlatCacheInternals;
+    if (!internals._stringify) {
+        cache.save();
+        return;
+    }
+    saving = true;
+    try {
+        const data = internals._stringify([...cache.items]);
+        // Anything changed from here on is flagged again and goes in the next round.
+        internals._changesSinceLastSave = false;
+        const file = cache.cacheFilePath;
+        const staging = `${file}.${process.pid}.tmp`;
+        try {
+            await fs.promises.mkdir(cache.cacheDirPath, { recursive: true });
+            await fs.promises.writeFile(staging, data);
+            await renameReplacing(staging, file);
+        } catch (error) {
+            internals._changesSinceLastSave = true;
+            await fs.promises.rm(staging, { force: true }).catch(() => undefined);
+            throw error;
+        }
+    } catch (error) {
+        globalLogger.warn("The cache could not be saved", { error });
+    } finally {
+        saving = false;
+    }
+}
+
+setInterval(() => void saveInBackground(), SAVE_EVERY_MS).unref();
+
+/**
+ * Dates come back from the cache file as text (JSON has no dates), but only after a restart: in the same session they
+ * are dates. Every field the app names `...At` that holds an ISO date text is turned back into a date, in one place,
+ * so no reader has to know which of the two it got.
+ */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
+export function reviveCachedDates<T>(value: T): T {
+    if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i++) value[i] = reviveCachedDates(value[i]);
+        return value;
+    }
+    if (value && typeof value === "object" && !(value instanceof Date)) {
+        const record = value as Record<string, unknown>;
+        for (const key of Object.keys(record)) {
+            const field = record[key];
+            if (typeof field === "string" && key.endsWith("At") && ISO_DATE.test(field)) {
+                record[key] = new Date(field);
+            } else if (field && typeof field === "object") {
+                reviveCachedDates(field);
+            }
+        }
+    }
+    return value;
+}
 
 export function clearCache(): void {
     cache.clear();
@@ -77,7 +151,7 @@ export async function cachedCall<T>(
         const cached = cache.get(cacheKey);
         if (cached !== undefined) {
             globalLogger.debug(`Cache found for ${cacheKey}`);
-            return cached as T;
+            return reviveCachedDates(cached) as T;
         }
         const pending = inFlight.get(cacheKey);
         if (pending) {

@@ -12,6 +12,7 @@ import {
 import {
     buildClaudeArgs,
     parseClaudeOutput,
+    classifyFailure,
     ClaudeCliError,
 } from "#flows/musicDownloadFlow/services/apis/claude-client";
 
@@ -110,6 +111,44 @@ describe("parseClaudeOutput", () => {
         } catch (e) {
             expect((e as ClaudeCliError).code).toBe(code);
         }
+    });
+
+    test.each([
+        ["The site I visited says: rate limit reached, try again in 10 minutes", "failed"],
+        ["I could not check the quota page; it was behind a login", "failed"],
+        ["The page returned unauthorized, so I could not read it", "failed"],
+        ["Spotify's API resets in 30 seconds", "failed"],
+        ["5-hour limit reached ∙ resets 3pm", "quota"],
+        ["API Error: 429 rate_limit_error", "quota"],
+        ["Claude usage limit reached. Your limit will reset at 3pm", "quota"],
+        ["Session limit reached ∙ resets 3pm", "quota"],
+        ["Weekly limit reached", "quota"],
+        ["You've reached your usage limit", "quota"],
+    ])("a failure that is the model's own words is not taken for the plan's limit: %j", (text, code) => {
+        try {
+            parseClaudeOutput(JSON.stringify({ is_error: true, result: text }));
+        } catch (e) {
+            expect((e as ClaudeCliError).code).toBe(code);
+        }
+    });
+
+    test("the HTTP status of the error, when the CLI gives it, decides", () => {
+        const code = (status: number, text: string) => {
+            try {
+                parseClaudeOutput(JSON.stringify({ is_error: true, api_error_status: status, result: text }));
+            } catch (e) {
+                return (e as ClaudeCliError).code;
+            }
+        };
+        expect(code(429, "anything")).toBe("quota");
+        expect(code(401, "anything")).toBe("not-logged-in");
+        expect(code(500, "rate limit quota unauthorized")).toBe("failed");
+    });
+
+    test("stderr is the process speaking: it is read whole", () => {
+        expect(classifyFailure("error: monthly quota exceeded")).toBe("quota");
+        expect(classifyFailure("401 Unauthorized")).toBe("not-logged-in");
+        expect(classifyFailure("segfault")).toBe("failed");
     });
 
     test("rejects non-JSON and answers without data", () => {

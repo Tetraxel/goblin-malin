@@ -54,7 +54,11 @@ function reviveCollectionDates(attrs: CollectionDownloadTask): CollectionDownloa
 
 // Callers must normalize legacy snapshots (predating the `kind` discriminant) to
 // `kind: "track"` before calling this — see taskFactory.createTasksFromSnapshots.
-export function reviveTaskDates(attrs: MusicDownloadTaskAttributes): MusicDownloadTaskAttributes {
+export function reviveTaskDates(saved: MusicDownloadTaskAttributes): MusicDownloadTaskAttributes {
+    // Nothing is running in a task that was just loaded: a saved "running" state is a run that was cut off (the app was
+    // closed or killed). Left as it is, the task would be "busy" for ever: it could not be archived or deleted, and
+    // it would stop sessions from being switched.
+    const attrs: MusicDownloadTaskAttributes = saved.state === "running" ? { ...saved, state: "stopped" } : saved;
     if (attrs.kind === "collection") return reviveCollectionDates(attrs);
     return reviveTrackDates(attrs);
 }

@@ -75,6 +75,25 @@ describe("listTempFilesWithStem — missing folder", () => {
     });
 });
 
+describe("deleteExistingTempFiles — only what the caller owns", () => {
+    it("leaves the track's other files alone when it is given the paths it owns", async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gm-temp-"));
+        try {
+            const mine = path.join(dir, `Soulseek YOUTUBE-TRACK-abc ${UUID}.flac`);
+            const theirs = path.join(dir, `Soulseek YOUTUBE-TRACK-abc 11111111-1111-1111-1111-111111111111.flac`);
+            fs.writeFileSync(mine, "x");
+            fs.writeFileSync(theirs, "x");
+            await deleteExistingTempFiles("Soulseek", metadata, "flac", dir, new Set([path.resolve(mine)]));
+            expect(fs.existsSync(mine)).toBe(false);
+            expect(fs.existsSync(theirs)).toBe(true);
+            await deleteExistingTempFiles("Soulseek", metadata, "flac", dir, new Set());
+            expect(fs.existsSync(theirs)).toBe(true);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+});
+
 describe("deleteExistingTempFiles", () => {
     it("removes this track's files of that format only, and copes with a missing folder", async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gm-temp-"));

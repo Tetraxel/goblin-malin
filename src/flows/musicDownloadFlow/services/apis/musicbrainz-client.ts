@@ -1,11 +1,18 @@
 import { MusicBrainzApi, MusicBrainzApiError, type IRecording } from "musicbrainz-api";
 import { APP_VERSION } from "#constants";
+import { withTimeouts } from "#utils/timeout";
 import { SEARCH_LIMIT } from "../../musicbrainz/thresholds";
 import { toMbArtist, toMbRecording, toMbRelease } from "../../musicbrainz/mapMusicBrainz";
 import { type MbArtistRef, type MbRecording, type MbRelease, type MbSearchRelease } from "../../musicbrainz/types";
 
 /** Most releases / recordings fetched in full for one lookup (a URL or an ISRC shared by many entries is not worth the requests). */
 const MAX_FETCHED = 3;
+
+/**
+ * One MusicBrainz call, waiting its turn in the client's own rate limit included (a few requests per second, shared
+ * by every task), so longer than the other providers'.
+ */
+const MUSICBRAINZ_TIMEOUT_MS = 2 * 60_000;
 
 const MUSICBRAINZ_APP_NAME = "goblin-malin";
 const MUSICBRAINZ_APP_CONTACT = "https://github.com/Tetraxel/goblin-malin";
@@ -50,11 +57,15 @@ export class MusicBrainzClient {
 
     private getApi(): MusicBrainzApi {
         if (!MusicBrainzClient.api) {
-            MusicBrainzClient.api = new MusicBrainzApi({
-                appName: MUSICBRAINZ_APP_NAME,
-                appVersion: APP_VERSION,
-                appContactInfo: MUSICBRAINZ_APP_CONTACT,
-            });
+            MusicBrainzClient.api = withTimeouts(
+                new MusicBrainzApi({
+                    appName: MUSICBRAINZ_APP_NAME,
+                    appVersion: APP_VERSION,
+                    appContactInfo: MUSICBRAINZ_APP_CONTACT,
+                }),
+                MUSICBRAINZ_TIMEOUT_MS,
+                "MusicBrainz"
+            );
         }
         return MusicBrainzClient.api;
     }

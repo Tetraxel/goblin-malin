@@ -82,6 +82,30 @@ export class Task<TTaskAttributes = TaskAttributes> {
         });
     }
 
+    /**
+     * Whether a batch run has anything to do with this task: it is not running and has not finished. `finishedAt` is not
+     * saved with a session, so a flow whose attributes say more (a state) overrides this: a reopened session would
+     * otherwise offer every finished task to "Run all".
+     */
+    public isRunnable(): boolean {
+        return !this.running && this.finishedAt == undefined;
+    }
+
+    /**
+     * Whether something is working on this task right now. Wider than `running` (the pump's flag): a flow adds the
+     * work that does not go through the pump. A busy task is not archived, deleted or swapped out of the list.
+     */
+    public isBusy(): boolean {
+        return this.running;
+    }
+
+    /**
+     * Stops whatever this task is running on its own, outside the orchestrator's pump (a run started by hand from the
+     * list, a re-fetch). The pump's runs are stopped through the pump's signal; this is for the others, so that "Stop"
+     * and a removal reach them too. Nothing to do for a task that has no such runs.
+     */
+    public abortRun(): void {}
+
     public get(): TaskSnapshot<TTaskAttributes> {
         if (this._snapshotCache) return this._snapshotCache;
         this._snapshotCache = {

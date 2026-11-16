@@ -16,10 +16,31 @@ export const MAX_HIDDEN_RESULTS = 100;
 /** Sent to Soulseek peers as the search query — special characters confuse matching. */
 export function cleanSearchTerm(term: string | undefined): string {
     if (!term) return "";
-    return term
-        .replace(/[:"/\\|?*()<>]/g, " ")
-        .replace(/\s+/g, " ")
+    return (
+        term
+            .replace(/[:"/\\|?*()<>]/g, " ")
+            // A word that starts with "-" is an exclusion in a Soulseek search ("Artist - Title" would exclude "Title").
+            .replace(/(^|\s)-+/g, "$1")
+            .replace(/\s+/g, " ")
+            .trim()
+    );
+}
+
+/** Words that make a recording another version: a search must keep them, and a file must agree with the title on them. */
+const VERSION_WORDS = /remix|live|instrumental|karaoke|a ?cappella|acoustic|extended|club mix/i;
+
+/**
+ * The title as a looser search would write it: streaming titles carry words that files rarely have ("(feat. X)",
+ * "- 2011 Remaster", "- Radio Edit"), and Soulseek wants every word. Parts that name another version (a remix, a live
+ * take) stay. Returns the title as it was when there is nothing to take off.
+ */
+export function relaxedTitle(title: string): string {
+    const relaxed = title
+        .replace(/\s*[([][^)\]]*[)\]]/g, (group) => (VERSION_WORDS.test(group) ? group : ""))
+        .replace(/\s+-\s+.*$/, (suffix) => (VERSION_WORDS.test(suffix) ? suffix : ""))
+        .replace(/\s+(feat\.?|ft\.?|featuring)\s.*$/i, "")
         .trim();
+    return relaxed || title;
 }
 
 // Soulseek file paths always use Windows-style backslash separators (the
@@ -36,6 +57,31 @@ function parseFilePath(filePath: string) {
 function contains(haystack: string, needle: string): boolean {
     if (!needle) return false;
     return haystack.toLowerCase().includes(needle.toLowerCase());
+}
+
+/** Whether `text` has `word` as a whole word (not "live" in "alive"). Letters and digits of any script are word characters. */
+function hasWord(text: string, word: string): boolean {
+    const spaced = word.replace(/ /g, "\\s+");
+    return new RegExp(`(^|[^\\p{L}\\p{N}])${spaced}($|[^\\p{L}\\p{N}])`, "iu").test(text);
+}
+
+const PARITY_WORDS = ["live", "instrumental", "karaoke", "acapella", "a cappella", "acoustic", "extended", "club mix"];
+
+/** `text` without the first occurrence of `part` (case-insensitive), or as it is when `part` is not in it. */
+function withoutFirst(text: string, part: string): string {
+    return text.replace(new RegExp(part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu"), " ");
+}
+
+/**
+ * A file and the wanted title disagree on whether this is the live / instrumental / karaoke… version. The file name
+ * usually starts with the artist: when a version word is part of the artist's own name (the band Live, Acoustic
+ * Alchemy), that one mention is the artist, not the version, so it is not counted.
+ */
+function disagreesOnVersion(fileName: string, trackTitle: string, artistName: string): boolean {
+    return PARITY_WORDS.some((word) => {
+        const name = artistName && hasWord(artistName, word) ? withoutFirst(fileName, artistName) : fileName;
+        return hasWord(name, word) !== hasWord(trackTitle, word);
+    });
 }
 
 export type RankingQuery = {
@@ -88,6 +134,8 @@ export function calculateResultWeight(result: SearchResult, query: RankingQuery)
 
     if (fileExtension !== query.extension) return -1;
     if (contains(fileName, "remix") !== contains(query.trackTitle, "remix")) return -1;
+    // The other versions a title names (live, instrumental, karaoke…) must be the file's too, both ways.
+    if (disagreesOnVersion(fileName, query.trackTitle, query.artistName)) return -1;
     // Not worth downloading only to measure it and throw it away.
     if (
         query.durationMs != null &&
@@ -100,13 +148,17 @@ export function calculateResultWeight(result: SearchResult, query: RankingQuery)
     const sizeInMB = result.size / (1024 * 1024);
     let score =
         sizeInMB > MAX_PREFERRED_SIZE_MB
-            ? Math.log(result.size) / 10 - (sizeInMB - MAX_PREFERRED_SIZE_MB) / 10
-            : Math.log(result.size) / 10;
+            ? Math.log1p(result.size) / 10 - (sizeInMB - MAX_PREFERRED_SIZE_MB) / 10
+            : Math.log1p(Math.max(0, result.size)) / 10;
     score += audio.bitrateKbps ? audio.bitrateKbps / 2000 : 0;
-    score += Math.log(result.speed) / 20;
+    // log1p: a peer that reports a speed of 0 (many do until they have uploaded something), or a file of size 0, scores
+    // low instead of -Infinity, which would drop it from the results altogether.
+    score += Math.log1p(Math.max(0, result.speed)) / 20;
 
-    if (contains(fileName, "extended")) score *= 3.0;
-    if (contains(fileName, "club mix")) score *= 2.0;
+    // The extended and club versions are a bonus only for a title that asks for them (the parity check above already
+    // rules out a file that has them when the title does not).
+    if (hasWord(query.trackTitle, "extended") && hasWord(fileName, "extended")) score *= 3.0;
+    if (hasWord(query.trackTitle, "club mix") && hasWord(fileName, "club mix")) score *= 2.0;
     if (contains(fileName, query.trackTitle)) score *= 1.3;
     if (query.albumName && contains(folderPath, query.albumName)) score *= 1.3;
     // Below CD quality, the file was downsampled somewhere along the way; 24-bit is a real hi-res master.

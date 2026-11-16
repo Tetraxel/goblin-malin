@@ -98,17 +98,46 @@ interface CliEnvelope {
     is_error?: boolean;
     subtype?: string;
     result?: string;
+    /** The HTTP status of an API error, on the versions of the CLI that report it. */
+    api_error_status?: number | null;
     structured_output?: unknown;
     duration_ms?: number;
     num_turns?: number;
     total_cost_usd?: number;
 }
 
-export function classifyFailure(text: string): ClaudeErrorCode {
-    if (/not logged in|please run \/login|invalid api key|authentication|unauthori[sz]ed|credit balance/i.test(text)) {
-        return "not-logged-in";
+/**
+ * Where a failure text came from. The `result` of the CLI's JSON envelope can be the model's own words (a page it read
+ * that mentions a "rate limit", an answer with the word "quota" in it), so only a text that *starts* like one of the
+ * CLI's own errors counts. Stderr is the process speaking, and is searched whole.
+ */
+export type FailureSource = "cli-result" | "stderr";
+
+const AUTH_AT_START =
+    /^\W*(?:not logged in|please run \/login|invalid api key|credit balance|api error:?\s*40[13]|authentication[_ ]error|unauthori[sz]ed)/i;
+const QUOTA_AT_START =
+    /^\W*(?:(?:claude(?: ai)?\s+)?(?:usage|session|weekly|daily|monthly|opus|sonnet|\d+-hour)\s+limit|limit reached|quota (?:exceeded|reached)|api error:?\s*429|rate[_ ]limit|too many requests|you(?:'ve| have) (?:hit|reached) your)/i;
+const AUTH_ANYWHERE = /not logged in|please run \/login|invalid api key|authentication|unauthori[sz]ed|credit balance/i;
+const QUOTA_ANYWHERE = /usage limit|limit reached|rate limit|quota|too many requests|resets? (at|in)/i;
+
+/**
+ * What kind of failure this is. `status` is the HTTP status the CLI reports for an API error when it does (structured,
+ * so it wins over any text); without it the text is read as described at {@link FailureSource}.
+ */
+export function classifyFailure(
+    text: string,
+    source: FailureSource = "stderr",
+    status?: number | null
+): ClaudeErrorCode {
+    if (typeof status === "number") {
+        if (status === 401 || status === 403) return "not-logged-in";
+        if (status === 429) return "quota";
+        return "failed";
     }
-    if (/usage limit|limit reached|rate limit|quota|too many requests|resets? (at|in)/i.test(text)) return "quota";
+    const auth = source === "stderr" ? AUTH_ANYWHERE : AUTH_AT_START;
+    const quota = source === "stderr" ? QUOTA_ANYWHERE : QUOTA_AT_START;
+    if (auth.test(text)) return "not-logged-in";
+    if (quota.test(text)) return "quota";
     return "failed";
 }
 
@@ -123,7 +152,10 @@ export function parseClaudeOutput<T>(stdout: string): ClaudeRunResult<T> {
 
     if (envelope.is_error || (envelope.subtype && envelope.subtype !== "success")) {
         const text = envelope.result ?? envelope.subtype ?? "unknown error";
-        throw new ClaudeCliError(classifyFailure(text), `Claude failed: ${text}`.slice(0, 300));
+        throw new ClaudeCliError(
+            classifyFailure(text, "cli-result", envelope.api_error_status),
+            `Claude failed: ${text}`.slice(0, 300)
+        );
     }
 
     let data: unknown = envelope.structured_output;

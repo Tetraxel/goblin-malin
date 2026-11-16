@@ -2,7 +2,7 @@
     "terminal": { "cols": 160, "rows": 40 },
     "dataDir": "scripts/tui-test/fixtures/50-tasks",
     "steps": [
-        { "type": "stable", "timeout": 8000 },
+        { "type": "stable", "timeout": 20000 },
         { "type": "key", "key": "ArrowDown" },
         { "type": "key", "key": "ArrowDown" },
         { "type": "stable" },

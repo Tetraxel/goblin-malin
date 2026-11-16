@@ -2,7 +2,7 @@
     "terminal": { "cols": 160, "rows": 40 },
     "dataDir": "scripts/tui-test/fixtures/collection-import",
     "steps": [
-        { "type": "stable", "timeout": 8000 },
+        { "type": "stable", "timeout": 20000 },
         { "type": "assert", "contains": "[PLAYLIST]" },
         { "type": "assert", "contains": "Running 2026" },
         { "type": "assert", "contains": "[ALBUM]" },

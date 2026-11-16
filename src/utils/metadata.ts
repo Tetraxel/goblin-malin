@@ -53,6 +53,23 @@ export function buildFlacTagMap(metadata: Metadata): FlacTagMap {
     };
 }
 
+/** Whether the file starts with an ID3v2 header, or ends with an ID3v1 tag: the only places a stray one can be. */
+async function hasId3Tag(filePath: string): Promise<boolean> {
+    const handle = await fs.promises.open(filePath, "r");
+    try {
+        const head = Buffer.alloc(3);
+        const { bytesRead } = await handle.read(head, 0, 3, 0);
+        if (bytesRead === 3 && head.toString("latin1") === "ID3") return true;
+        const { size } = await handle.stat();
+        if (size < 128) return false;
+        const tail = Buffer.alloc(3);
+        await handle.read(tail, 0, 3, size - 128);
+        return tail.toString("latin1") === "TAG";
+    } finally {
+        await handle.close();
+    }
+}
+
 /**
  * Strips stray ID3 tags from a FLAC file, then writes `metadata` as Vorbis comments. Any failure is logged and
  * rethrown: the caller must not report a save whose tags were never written.
@@ -61,8 +78,10 @@ export async function cleanAndTagFlac(filePath: string, metadata: Metadata): Pro
     // --- STEP 1: CLEAN THE FILE ---
     globalLogger.info(`--- Step 1: Cleaning invalid ID3 tags from ${filePath} ---`);
     try {
-        const success = NodeId3.removeTags(filePath);
-        if (success) {
+        // Asynchronous, and only when there is a tag to remove: the library reads the whole file and writes it back, which
+        // on a big file froze the screen for the length of the disk's work for nothing (most files have no ID3 tag).
+        if (await hasId3Tag(filePath)) {
+            await NodeId3.Promise.removeTags(filePath);
             globalLogger.info("Successfully removed invalid ID3 tags. ✅");
         } else {
             globalLogger.info("File did not contain any ID3 tags to remove.");

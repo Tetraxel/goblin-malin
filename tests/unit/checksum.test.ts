@@ -9,7 +9,13 @@ vi.mock("#base/logger/logger", () => ({
     globalLogger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { ChecksumMismatchError, parseChecksums, sha256File, verifyAgainstPublishedChecksums } from "#utils/checksum";
+import {
+    ChecksumMismatchError,
+    ChecksumUnavailableError,
+    parseChecksums,
+    sha256File,
+    verifyAgainstPublishedChecksums,
+} from "#utils/checksum";
 
 // sha256("hello")
 const HELLO = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
@@ -69,5 +75,33 @@ describe("verifyAgainstPublishedChecksums", () => {
     test("a list that does not mention the asset is not fatal either", async () => {
         httpsGetText.mockResolvedValue(`${HELLO}  something-else.zip\n`);
         await expect(verifyAgainstPublishedChecksums(file, "u", "yt-dlp.exe", "ua")).resolves.toBe("unverified");
+    });
+
+    describe("when the checksum is required (an executable that will be run)", () => {
+        const required = { required: true };
+
+        test("an unreachable list refuses the file, and deletes it", async () => {
+            httpsGetText.mockRejectedValue(new Error("HTTP 404 from u"));
+            await expect(
+                verifyAgainstPublishedChecksums(file, "u", "yt-dlp.exe", "ua", required)
+            ).rejects.toBeInstanceOf(ChecksumUnavailableError);
+            await expect(fs.access(file)).rejects.toThrow();
+        });
+
+        test("a list that does not mention the asset refuses it too", async () => {
+            httpsGetText.mockResolvedValue(`${HELLO}  something-else.zip
+`);
+            await expect(verifyAgainstPublishedChecksums(file, "u", "yt-dlp.exe", "ua", required)).rejects.toThrow(
+                /could not be verified/
+            );
+        });
+
+        test("a matching file is accepted as before", async () => {
+            httpsGetText.mockResolvedValue(`${HELLO}  yt-dlp.exe
+`);
+            await expect(verifyAgainstPublishedChecksums(file, "u", "yt-dlp.exe", "ua", required)).resolves.toBe(
+                "verified"
+            );
+        });
     });
 });

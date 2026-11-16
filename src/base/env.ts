@@ -4,6 +4,19 @@ import { EnvironmentError } from "#exceptions/EnvironmentError";
 import { type SetupWizardConfig } from "./setupWizard";
 import { saveEnvVar, saveEnvVarsGroup } from "#utils/envFile";
 import { SettingsStore } from "#settings/settingsStore";
+import { dialogBridge } from "./bridges/dialogBridge";
+
+/** How long a closed setup wizard is remembered, so a batch of tracks is not asked track by track. */
+const CLOSED_SETUP_MEMORY_MS = 10 * 60_000;
+/** Providers whose wizard was closed, with what the user was asked about it. Keyed `<type>:<provider>`. */
+const closedSetups = new Map<string, { at: number; error: unknown; answered: Promise<void> }>();
+/** The wizard open now for a provider, shared by every task that needs it. */
+const wizardsInFlight = new Map<string, Promise<Record<string, string>>>();
+
+/** Forgets which setup wizards were closed (for tests: the memory is per run of the app). */
+export function forgetClosedSetups(): void {
+    closedSetups.clear();
+}
 
 export class Env {
     protected task: Task;
@@ -65,13 +78,7 @@ export class Env {
             }
 
             // Show wizard
-            let values: Record<string, string>;
-            try {
-                values = await this.task.getPrompt().askSetupWizard(config);
-            } catch (error) {
-                this.persistProviderDisabled(config);
-                throw error;
-            }
+            const values = await this.askWizard(config);
 
             // Persist modeEnvVar + mode fields
             const nonEmpty = Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim()));
@@ -98,13 +105,7 @@ export class Env {
         const missing = config.fields.filter((f) => !process.env[f.envVar]);
 
         if (missing.length > 0) {
-            let values: Record<string, string>;
-            try {
-                values = await this.task.getPrompt().askSetupWizard(config);
-            } catch (error) {
-                this.persistProviderDisabled(config);
-                throw error;
-            }
+            const values = await this.askWizard(config);
 
             const nonEmpty = Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim()));
             try {
@@ -129,8 +130,61 @@ export class Env {
         return Object.fromEntries(config.fields.map((f) => [f.envVar, process.env[f.envVar]!]));
     }
 
-    private persistProviderDisabled(config: SetupWizardConfig): void {
+    /**
+     * Shows the setup wizard for a provider, once for everyone who needs it: tracks that need the same provider's
+     * credentials while it is open share its answer, and after it was closed they fail at once instead of opening it
+     * again (and asking to turn the provider off again) for each of them. The memory lasts
+     * {@link CLOSED_SETUP_MEMORY_MS}, so a later try, by hand, offers the wizard again.
+     */
+    private async askWizard(config: SetupWizardConfig): Promise<Record<string, string>> {
+        const key =
+            config.providerKey && config.providerType ? `${config.providerType}:${config.providerKey}` : undefined;
+        if (!key) return this.showWizard(config);
+
+        const closed = closedSetups.get(key);
+        if (closed && Date.now() - closed.at < CLOSED_SETUP_MEMORY_MS) {
+            await closed.answered;
+            throw closed.error;
+        }
+        let run = wizardsInFlight.get(key);
+        if (!run) {
+            run = this.showWizard(config, key).finally(() => wizardsInFlight.delete(key));
+            wizardsInFlight.set(key, run);
+        }
+        return run;
+    }
+
+    private async showWizard(config: SetupWizardConfig, key?: string): Promise<Record<string, string>> {
+        try {
+            return await this.task.getPrompt().askSetupWizard(config);
+        } catch (error) {
+            const answered = this.offerToDisableProvider(config).catch((offerError) => {
+                this.logger.warn("Could not turn the provider off", { error: offerError });
+            });
+            if (key) closedSetups.set(key, { at: Date.now(), error, answered });
+            await answered;
+            throw error;
+        }
+    }
+
+    /**
+     * The setup was closed without being filled in: this track's step fails, and the provider stays on. Closing a
+     * window is not a decision to switch a provider off for good (a slip of Esc used to do it, silently: no wizard was
+     * ever offered again), so that is asked, with "keep it on" as the first button.
+     */
+    private async offerToDisableProvider(config: SetupWizardConfig): Promise<void> {
         if (!config.providerKey || !config.providerType) return;
+        const answer = await dialogBridge.confirm({
+            title: `Turn off ${config.title}?`,
+            message:
+                "The setup was closed without credentials, so this track could not use it. " +
+                "Turn it off in Settings so it is not asked again? You can turn it back on there at any time.",
+            choices: [
+                { label: "Keep it on", tone: "primary" },
+                { label: "Turn it off", tone: "danger" },
+            ],
+        });
+        if (answer !== 1) return;
         SettingsStore.getInstance().patchMusicSettings({
             [config.providerType]: { providers: { [config.providerKey]: { enabled: false } } },
         });

@@ -159,8 +159,9 @@ describe("shortcutRegistry.dispatch", () => {
         expect(shortcutRegistry.hasContext("gone")).toBe(false);
     });
 
-    test("a handler that throws is reported and does not break the dispatch", () => {
-        const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    test("a handler that throws is reported and does not break the dispatch", async () => {
+        const { globalLogger } = await import("#base/logger/logger");
+        const errors = vi.spyOn(globalLogger, "error").mockImplementation((() => globalLogger) as never);
         const fired: string[] = [];
         register("bad", [
             entry("bad.x", { input: "x" }, () => {
@@ -344,5 +345,37 @@ describe("shortcutRegistry.subscribe", () => {
         unsubscribe();
         shortcutRegistry.update("sub", [e], [], true);
         expect(listener).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe("a handler that fails", () => {
+    const press = (input: string) => shortcutRegistry.dispatch(input, makeKey());
+
+    // The report goes to the app log directly: Ink replaces `console` once the UI is up, so a console message is lost.
+    test("is written to the log, whether it throws or rejects, and the app goes on", async () => {
+        const { globalLogger } = await import("#base/logger/logger");
+        const logged = vi.spyOn(globalLogger, "error").mockImplementation((() => globalLogger) as never);
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        try {
+            register("failing", [
+                entry("boom", { input: "x" }, () => {
+                    throw new Error("sync failure");
+                }),
+                entry("later", { input: "y" }, async () => {
+                    throw new Error("async failure");
+                }),
+            ]);
+            press("x");
+            press("y");
+            await new Promise((resolve) => setTimeout(resolve, 0));
+
+            const messages = logged.mock.calls.map((call) => String(call[0]));
+            expect(messages.some((m) => m.includes("failing.boom") && m.includes("sync failure"))).toBe(true);
+            expect(messages.some((m) => m.includes("failing.later") && m.includes("async failure"))).toBe(true);
+            expect(consoleError).not.toHaveBeenCalled();
+        } finally {
+            logged.mockRestore();
+            consoleError.mockRestore();
+        }
     });
 });

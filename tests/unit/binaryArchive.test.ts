@@ -87,3 +87,86 @@ describe("installFromZip (DL-01)", () => {
         expect(await fs.readdir(binDir)).toEqual(["ffmpeg_1.exe", "ffprobe_1.exe"]);
     });
 });
+
+describe("an archive that must be checked (BIN-02)", () => {
+    test("an unreachable checksum list refuses the install, and leaves nothing behind", async () => {
+        await expect(
+            installFromZip(
+                source({ checksumsUrl: `${base}/missing`, archiveName: "a.zip", requireChecksum: true }),
+                targets()
+            )
+        ).rejects.toThrow(/could not be verified/);
+        expect(await fs.readdir(binDir)).toEqual([]);
+    });
+
+    test("so does an archive with no checksum list at all", async () => {
+        await expect(installFromZip(source({ requireChecksum: true }), targets())).rejects.toThrow(/unverified/);
+        expect(await fs.readdir(binDir)).toEqual([]);
+    });
+
+    test("a verified archive installs", async () => {
+        const { createHash } = await import("crypto");
+        checksumLine = `${createHash("sha256").update(zipBuffer).digest("hex")}  a.zip
+`;
+        await installFromZip(
+            source({ checksumsUrl: `${base}/sums`, archiveName: "a.zip", requireChecksum: true }),
+            targets()
+        );
+        expect(await fs.readdir(binDir)).toEqual(["ffmpeg_1.exe", "ffprobe_1.exe"]);
+    });
+});
+
+describe("extraction (BIN-03)", () => {
+    test("is done by the bundled 7-Zip, not in this process", async () => {
+        const { globalLogger } = await import("#base/logger/logger");
+        vi.mocked(globalLogger.warn).mockClear();
+        await installFromZip(source(), targets());
+        // The in-process way logs this warning when it has to take over.
+        expect(globalLogger.warn).not.toHaveBeenCalled();
+    });
+
+    test("a file in the bin folder that is called like the entry is neither used nor overwritten", async () => {
+        await fs.writeFile(path.join(binDir, "ffmpeg.exe"), "THE USER'S OWN");
+        await installFromZip(source(), targets());
+        expect(await fs.readFile(path.join(binDir, "ffmpeg.exe"), "utf8")).toBe("THE USER'S OWN");
+        expect(await fs.readFile(path.join(binDir, "ffmpeg_1.exe"), "utf8")).toBe("FFMPEG");
+    });
+
+    test("no extraction folder is left behind, on success or on failure", async () => {
+        await installFromZip(source(), targets());
+        await expect(
+            installFromZip(source(), [{ entrySuffix: "bin/nope.exe", destPath: path.join(binDir, "nope_1.exe") }])
+        ).rejects.toThrow();
+        expect((await fs.readdir(binDir)).filter((n) => n.startsWith(".extract-"))).toEqual([]);
+    });
+
+    test("an executable that is already there is left alone", async () => {
+        await fs.writeFile(path.join(binDir, "ffmpeg_1.exe"), "RUNNING");
+        await installFromZip(source(), targets());
+        expect(await fs.readFile(path.join(binDir, "ffmpeg_1.exe"), "utf8")).toBe("RUNNING");
+        expect(await fs.readFile(path.join(binDir, "ffprobe_1.exe"), "utf8")).toBe("FFPROBE");
+    });
+});
+
+describe("parseSevenZipListing", () => {
+    test("reads the entries and skips the archive itself", async () => {
+        const { parseSevenZipListing } = await import("#utils/binaryArchive");
+        const listing = [
+            "7-Zip (a) 23.01",
+            "",
+            "Path = C:/tmp/a.zip",
+            "Type = zip",
+            "",
+            "----------",
+            "Path = ffmpeg-master/bin/ffmpeg.exe",
+            "Size = 10",
+            "",
+            "Path = ffmpeg-master/bin/ffprobe.exe",
+            "",
+        ].join("\r\n");
+        expect(parseSevenZipListing(listing)).toEqual([
+            "ffmpeg-master/bin/ffmpeg.exe",
+            "ffmpeg-master/bin/ffprobe.exe",
+        ]);
+    });
+});

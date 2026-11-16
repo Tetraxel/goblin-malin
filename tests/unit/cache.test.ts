@@ -114,3 +114,63 @@ describe("discoveryResultTtl", () => {
         expect(discovery.discoveryResultTtl({ tracks: [{}], anchor: { state: "found" } })).toBeUndefined();
     });
 });
+
+describe("what comes out of the cache", () => {
+    test("a value that was read cannot be changed under the next reader", async () => {
+        await mod.cachedCall("t:shared", async () => ({ nested: { n: 1 } }));
+        const first = await mod.cachedCall("t:shared", async () => ({ nested: { n: 99 } }));
+        first.nested.n = 2;
+        expect((await mod.cachedCall("t:shared", async () => ({ nested: { n: 99 } }))).nested.n).toBe(1);
+    });
+
+    test("dates are dates, also when the file has them as text (after a restart)", () => {
+        const loaded = {
+            fetchedAt: "2026-11-16T10:20:30.000Z",
+            title: "2026-11-16T10:20:30.000Z",
+            tracks: [{ downloadedAt: "2026-01-02T03:04:05Z", name: "a" }],
+            already: new Date(0),
+        };
+        const revived = mod.reviveCachedDates(loaded);
+        expect(revived.fetchedAt).toBeInstanceOf(Date);
+        expect((revived.fetchedAt as unknown as Date).getTime()).toBe(Date.parse("2026-11-16T10:20:30.000Z"));
+        // Only the fields the app names `...At` are dates: a title that looks like one stays text.
+        expect(revived.title).toBe("2026-11-16T10:20:30.000Z");
+        expect(revived.tracks[0].downloadedAt).toBeInstanceOf(Date);
+        expect(revived.already).toBeInstanceOf(Date);
+    });
+
+    test("a value that went through the file comes back with real dates", async () => {
+        mod.cache.set("t:dates", { fetchedAt: "2026-11-16T10:20:30.000Z" });
+        const hit = await mod.cachedCall("t:dates", async () => ({ fetchedAt: new Date() }));
+        expect(hit.fetchedAt).toBeInstanceOf(Date);
+    });
+});
+
+describe("saving the cache", () => {
+    test("is written in the background, atomically, and only when something changed", async () => {
+        mod.cache.set("t:persist", { n: 1 });
+        expect(mod.cache.changesSinceLastSave).toBe(true);
+
+        await mod.saveInBackground();
+
+        expect(mod.cache.changesSinceLastSave).toBe(false);
+        expect(fs.existsSync(mod.cache.cacheFilePath)).toBe(true);
+        expect(fs.readdirSync(mod.cache.cacheDirPath).filter((n) => n.endsWith(".tmp"))).toEqual([]);
+
+        const before = fs.statSync(mod.cache.cacheFilePath).mtimeMs;
+        await new Promise((r) => setTimeout(r, 20));
+        await mod.saveInBackground();
+        expect(fs.statSync(mod.cache.cacheFilePath).mtimeMs).toBe(before);
+    });
+
+    test("what was saved is what a fresh start loads", async () => {
+        mod.cache.set("t:reload", { fetchedAt: new Date("2026-05-05T05:05:05Z"), n: 7 });
+        await mod.saveInBackground();
+
+        const { create } = await import("flat-cache");
+        const fresh = create({ cacheId: "api-cache", cacheDir: mod.cache.cacheDirPath });
+        const loaded = fresh.get("t:reload") as { fetchedAt: unknown; n: number };
+        expect(loaded.n).toBe(7);
+        expect(mod.reviveCachedDates(loaded).fetchedAt).toBeInstanceOf(Date);
+    });
+});

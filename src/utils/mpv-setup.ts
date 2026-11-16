@@ -81,7 +81,6 @@ async function locateMpv(): Promise<string> {
         }
 
         await fs.mkdir(getBinDir(), { recursive: true });
-        await cleanupOldVersions("mpv_", binaryName);
 
         const arch = archName();
         const asset = release.assets.find(
@@ -103,6 +102,8 @@ async function locateMpv(): Promise<string> {
 
         await fs.rename(path.join(getBinDir(), "mpv.exe"), binaryPath);
         await fs.unlink(archivePath);
+        // Only now that the new one is in place: until then the old one is what the app falls back to.
+        await cleanupOldVersions("mpv_", binaryName);
 
         globalLogger.info(`mpv ${version} installed at ${binaryPath}`);
         return binaryPath;

@@ -1,0 +1,20 @@
+{
+    "terminal": { "cols": 160, "rows": 40 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "steps": [
+        { "type": "stable", "timeout": 20000 },
+        { "type": "key", "key": "Tab" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "Hooked" },
+        { "type": "assert", "contains": "[R] Restart" },
+        { "type": "snapshot", "name": "before" },
+
+        { "type": "key", "key": "r" },
+        { "type": "waitForContent", "text": "Restart this track?" },
+        { "type": "snapshot", "name": "asked" },
+
+        { "type": "key", "key": "Escape" },
+        { "type": "stable" },
+        { "type": "snapshot", "name": "cancelled" }
+    ]
+}

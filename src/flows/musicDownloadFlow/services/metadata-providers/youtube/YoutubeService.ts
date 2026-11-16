@@ -17,6 +17,7 @@ import {
 import { computeConfidenceScore, MIN_SEARCH_CONFIDENCE } from "#flows/musicDownloadFlow/utils/confidence";
 import { splitArtistAndTitle } from "#flows/musicDownloadFlow/utils/splitArtistAndTitle";
 import { Cached } from "#utils/cache";
+import { PROVIDER_TIMEOUT_MS, withTimeouts } from "#utils/timeout";
 import { YoutubeCell } from "./YoutubeCell";
 import { MetadataService } from "../../../metadataService";
 
@@ -86,7 +87,7 @@ export class YoutubeService extends MetadataService {
                 const { default: YTMusicClient } = await import("ytmusic-api");
                 const ytMusic = new YTMusicClient();
                 await ytMusic.initialize();
-                YoutubeService.client = ytMusic;
+                YoutubeService.client = withTimeouts(ytMusic, PROVIDER_TIMEOUT_MS, "YouTube Music");
             }
             return YoutubeService.client;
         });
@@ -314,7 +315,9 @@ export class YoutubeService extends MetadataService {
             trackName: song.name,
             duration: song.duration ? song.duration * 1000 : undefined, // Convert to ms
             trackNumber: undefined,
-            url,
+            // The video's own page, not the link as pasted: that one may carry a playlist (`&list=…&index=7`) and is
+            // what the downloader is handed.
+            url: YoutubeService.trackUrl(song.videoId),
             uri: `https://www.youtube.com/watch?v=${song.videoId}`,
             album: undefined, // YouTube API doesn't provide album info in SongFull
             artists: song.artist

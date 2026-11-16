@@ -26,6 +26,17 @@ export function parseChecksums(text: string): Map<string, string> {
     return out;
 }
 
+/** The vendor's checksum could not be had, and the caller does not accept a download it cannot check. */
+export class ChecksumUnavailableError extends Error {
+    constructor(
+        readonly assetName: string,
+        reason: string
+    ) {
+        super(`${assetName} was downloaded but could not be verified: ${reason}`);
+        this.name = "ChecksumUnavailableError";
+    }
+}
+
 export function sha256File(file: string): Promise<string> {
     return new Promise((resolve, reject) => {
         const hash = createHash("sha256");
@@ -39,30 +50,34 @@ export function sha256File(file: string): Promise<string> {
 /**
  * Check `file` against the checksum list the vendor publishes at `checksumsUrl`.
  *
- * Best effort by design: if the list can't be fetched or doesn't mention `assetName`, we say so in
- * the log and carry on (`"unverified"`) — an unreachable checksum file must not stop the app from
- * working, and the download itself already came over https. A checksum that *is* published and
- * doesn't match is different: the file is deleted and a `ChecksumMismatchError` is thrown.
+ * By default best effort: if the list can't be fetched or doesn't mention `assetName`, we say so in the log
+ * and carry on (`"unverified"`). With `required`, that is a failure instead (the file is deleted and a
+ * `ChecksumUnavailableError` thrown): an executable that is going to be run must not be taken on trust. A
+ * checksum that *is* published and doesn't match always deletes the file and throws a `ChecksumMismatchError`.
  */
 export async function verifyAgainstPublishedChecksums(
     file: string,
     checksumsUrl: string,
     assetName: string,
-    userAgent: string
+    userAgent: string,
+    options: { required?: boolean } = {}
 ): Promise<"verified" | "unverified"> {
+    const unverified = async (reason: string): Promise<"unverified"> => {
+        if (options.required) {
+            await fs.unlink(file).catch(() => {});
+            throw new ChecksumUnavailableError(assetName, reason);
+        }
+        globalLogger.warn(`${assetName} is not verified: ${reason}`);
+        return "unverified";
+    };
+
     let expected: string | undefined;
     try {
         expected = parseChecksums(await httpsGetText(checksumsUrl, { userAgent })).get(assetName);
     } catch (error) {
-        globalLogger.warn(
-            `Could not fetch checksums for ${assetName}, so it is not verified: ${error instanceof Error ? error.message : error}`
-        );
-        return "unverified";
+        return unverified(`the checksums could not be fetched (${error instanceof Error ? error.message : error})`);
     }
-    if (!expected) {
-        globalLogger.warn(`No published checksum for ${assetName} in ${checksumsUrl}; not verified`);
-        return "unverified";
-    }
+    if (!expected) return unverified(`no published checksum for it in ${checksumsUrl}`);
 
     const actual = await sha256File(file);
     if (actual !== expected) {

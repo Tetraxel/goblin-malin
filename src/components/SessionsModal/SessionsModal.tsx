@@ -38,6 +38,8 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
 
     const [renamingId, setRenamingId] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState("");
+    // Why a switch was refused (a run is going on); shown in the footer until the next key that works.
+    const [notice, setNotice] = useState<string | undefined>(undefined);
 
     const store = SessionStore.getInstance();
     const manager = SessionManager.getInstance();
@@ -58,10 +60,19 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
             setSelectedIndex(0);
             setRenamingId(null);
             setRenameValue("");
+            setNotice(undefined);
         }
     }
 
+    /** True (and says why) when the open list cannot be replaced right now: see `SessionManager.switchRefusal`. */
+    function refusedSwitch(): boolean {
+        const refusal = manager.switchRefusal();
+        setNotice(refusal);
+        return refusal !== undefined;
+    }
+
     function doLoad(session: StoredSession) {
+        if (refusedSwitch()) return;
         manager.loadSession(session.id);
         clearSelection();
         switchBack();
@@ -96,6 +107,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
             accentColor: theme.status.error,
             onConfirm: (i) => {
                 if (i === 0) {
+                    if (session.id === currentSessionId && refusedSwitch()) return;
                     manager.deleteSession(session.id);
                     clearSelection();
                     setSelectedIndex(0);
@@ -218,7 +230,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
                 defaultShortcut: { input: "n", ctrl: true },
                 label: "New session",
                 handler: () => {
-                    if (renamingId) return;
+                    if (renamingId || refusedSwitch()) return;
                     manager.newSession();
                     clearSelection();
                     switchBack();
@@ -231,6 +243,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
                 handler: () => {
                     if (renamingId || modalFocus !== "list") return;
                     if (selectedSession) {
+                        if (refusedSwitch()) return;
                         manager.duplicateSession(selectedSession.id);
                         clearSelection();
                         switchBack();
@@ -427,6 +440,12 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
                         );
                     })}
                 </Box>
+
+                {notice && (
+                    <Box marginTop={1} flexShrink={0}>
+                        <Text color={theme.status.error}>{notice}</Text>
+                    </Box>
+                )}
 
                 {/* Footer hints */}
                 <Box marginTop={1} flexDirection="row" flexWrap="wrap" flexShrink={0}>

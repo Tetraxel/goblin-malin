@@ -51,6 +51,16 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
         if (attributes?.collectionKind === "group") this.finishedAt = new Date();
     }
 
+    public override isBusy(): boolean {
+        return super.isBusy() || this.fetching || this.getAttributes()?.state === "running";
+    }
+
+    /** Only a collection that was never fetched, or was stopped, is run: the state is saved, `finishedAt` is not. */
+    public override isRunnable(): boolean {
+        const state = this.getAttributes()?.state;
+        return super.isRunnable() && (state === "pending" || state === "stopped");
+    }
+
     public override getLogLabel(): string | undefined {
         const attrs = this.getAttributes();
         return attrs?.name ?? attrs?.userInput.url ?? this.getInitialInput();

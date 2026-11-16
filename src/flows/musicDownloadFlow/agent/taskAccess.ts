@@ -56,7 +56,7 @@ export const agentJournal = new AgentJournal(revisionOfTask, isTaskBusyForUndo);
  * A part run again on a finished track (`runMetadataPart` / `runDownloadPart`) counts: it does not change `state`.
  */
 export function isTaskRunning(task: DownloadTask): boolean {
-    return task.running || task.partRunning || task.getAttributes()?.state === "running";
+    return task.isBusy();
 }
 
 /**

@@ -89,18 +89,23 @@ export async function listTempFilesWithStem(dir: string, stem: string): Promise<
  * over time (e.g. Soulseek — available peers/files change), reusing an old temp
  * file would silently skip a fresh attempt; call this instead before searching
  * again, so retries don't just pile up unused files in the temp dir either.
+ *
+ * The match is by track, not by task: another session, an archived task or a duplicated session may point at the same
+ * file. `only` limits the deletion to the files the caller owns (the paths of its own rows, compared resolved).
  */
 export async function deleteExistingTempFiles(
     providerLabel: string,
     metadata: TrackMetadata,
     format: string,
-    dir: string
+    dir: string,
+    only?: ReadonlySet<string>
 ): Promise<void> {
     if (!metadata.uri) return;
     const prefix = getTempFilePrefix(providerLabel, metadata);
     for (const file of await listDir(dir)) {
-        if (file.startsWith(prefix) && file.endsWith(`.${format}`)) {
-            await fs.promises.rm(path.join(dir, file), { force: true });
-        }
+        if (!file.startsWith(prefix) || !file.endsWith(`.${format}`)) continue;
+        const full = path.join(dir, file);
+        if (only && !only.has(path.resolve(full))) continue;
+        await fs.promises.rm(full, { force: true });
     }
 }

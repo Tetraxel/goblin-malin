@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { fetchWithTimeout } from "#utils/timeout";
 
 // Local type definitions for spotify-url-info (v3.3.0)
 // The package ships CJS with a callable module.exports; the type declaration
@@ -41,7 +42,7 @@ interface SpotifyUrlInfoApi {
 const require = createRequire(import.meta.url);
 const createSpotifyUrlInfo = require("spotify-url-info") as (fetch: typeof globalThis.fetch) => SpotifyUrlInfoApi;
 
-const api: SpotifyUrlInfoApi = createSpotifyUrlInfo(fetch);
+const api: SpotifyUrlInfoApi = createSpotifyUrlInfo(fetchWithTimeout());
 
 export function getSpotifyEmbedDetails(url: string): Promise<Details> {
     return api.getDetails(url);

@@ -12,11 +12,35 @@ if (process.env.NODE_ENV === undefined) {
     process.env.NODE_ENV = "production";
 }
 
+// Answered before anything is loaded: `--version` and `--help` must not open the interface.
+const args = process.argv.slice(2);
+if (args.includes("--version") || args.includes("-v")) {
+    const { APP_VERSION } = await import("./constants");
+    process.stdout.write(`${APP_VERSION}\n`);
+    process.exit(0);
+}
+if (args.includes("--help") || args.includes("-h")) {
+    process.stdout.write(
+        "Goblin Malin: a terminal app to download and tag music tracks.\n\n" +
+            "Usage: goblin-malin [--version] [--help]\n" +
+            "Run it with no argument, in a terminal, to start. Set GOBLIN_DATA_DIR to keep its data in another folder.\n"
+    );
+    process.exit(0);
+}
+// The interface needs a terminal to draw in and read keys from. Started from a pipe, a service or a script it would
+// only fail with an internal error and never exit.
+if (!process.stdout.isTTY || !process.stdin.isTTY) {
+    process.stderr.write("Goblin Malin needs an interactive terminal (stdin and stdout must be a TTY).\n");
+    process.exit(1);
+}
+
 // Thin entry point with a shebang used by the bin field so `npx goblin-malin` works.
 const { start } = await import("./index");
 const { redirectConsoleToLog } = await import("./base/logger/redirectConsole");
 redirectConsoleToLog();
 start();
+// Ink replaces the console methods when it starts (to print above the UI); the app log is where they must go.
+redirectConsoleToLog();
 
 // Marks this file as an ES module so the top-level `await` above is allowed.
 export {};

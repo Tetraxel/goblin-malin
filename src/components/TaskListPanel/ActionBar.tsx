@@ -10,11 +10,29 @@ import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types
 import type { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import type { CollectionTask } from "#flows/musicDownloadFlow/utils/collectionTask";
 import { Hint } from "../Hint";
+import { shortcutRegistry } from "#base/shortcuts/ShortcutRegistry";
+import { SettingsStore } from "#settings/settingsStore";
+import { getShortcutLiteral } from "#types/actions";
+import { fitActions } from "./fitActions";
+
+/** The key(s) of an action as the hint shows them (the live binding), to know how much room the hint takes. */
+function literalOf(ids: string[]): string {
+    const keybindings = SettingsStore.getInstance().getAppSettings().keybindings;
+    return ids
+        .map((id) => {
+            const resolved = keybindings[id] ?? shortcutRegistry.getDefaultShortcut(id);
+            return resolved ? getShortcutLiteral([resolved]) : "";
+        })
+        .filter(Boolean)
+        .join("/");
+}
 
 export const ActionBar: React.FC<{
     tasks: Task[];
     columns: ColumnDefinition<MusicDownloadTaskAttributes>[];
-}> = ({ tasks, columns }) => {
+    /** Columns the bar may use: a row longer than that is shortened, not cut in the middle of a hint. */
+    width: number;
+}> = ({ tasks, columns, width }) => {
     const theme = useTheme();
     const { activeWindow } = useFocusChrome();
     const taskList = useFocusTaskList();
@@ -67,6 +85,16 @@ export const ActionBar: React.FC<{
             {bar ? (
                 bar.rows.map((row, i) => {
                     const visible = filterRow(row);
+                    // The row's own label and the "›" take room before the first hint.
+                    const prefix = (row.text ? [...row.text].length + 1 : 0) + 2;
+                    const fitted = fitActions(
+                        visible.map((action) => ({
+                            label: action.label,
+                            literal: literalOf(getContextualShortcutIds(action)),
+                        })),
+                        // paddingX of the bar, and the prefix
+                        width - 2 - prefix
+                    );
                     return (
                         <Box key={i} height={1} flexDirection="row" alignItems="flex-start" flexShrink={0}>
                             {row.text && (
@@ -80,9 +108,21 @@ export const ActionBar: React.FC<{
                                 <Text color={theme.text.hint}>›</Text>
                             </Box>
                             {visible.length > 0 ? (
-                                visible.map((action, j) => (
-                                    <Hint key={j} label={action.label} shortcutIds={getContextualShortcutIds(action)} />
-                                ))
+                                <>
+                                    {fitted.hints.map(({ index, compact }) => (
+                                        <Hint
+                                            key={index}
+                                            label={visible[index].label}
+                                            shortcutIds={getContextualShortcutIds(visible[index])}
+                                            compact={compact}
+                                        />
+                                    ))}
+                                    {fitted.more && (
+                                        <Box flexShrink={0}>
+                                            <Text color={theme.text.hint}>…</Text>
+                                        </Box>
+                                    )}
+                                </>
                             ) : (
                                 <Text color={theme.text.hint} italic>
                                     —

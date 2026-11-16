@@ -3,6 +3,7 @@ import { getCacheDir } from "#utils/appPaths";
 import { globalLogger } from "#base/logger/logger";
 import { loadJsonFile, saveJsonFile } from "../metadata-providers/songlink/json";
 import { sleep } from "#utils/sleep";
+import { PROVIDER_TIMEOUT_MS } from "#utils/timeout";
 
 const SONGLINK_API_BASE_URL = "https://api.song.link/v1-alpha.1/links";
 const SONGLINK_RATE_PATH = path.join(getCacheDir(), "songlink_rate.json");
@@ -148,7 +149,7 @@ export class SonglinkClient {
 
             let response: Response;
             try {
-                response = await fetch(fullUrl);
+                response = await fetch(fullUrl, { signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) });
             } catch (error) {
                 // Transient network error → retry with backoff.
                 if (attempt < SONGLINK_MAX_ATTEMPTS) {

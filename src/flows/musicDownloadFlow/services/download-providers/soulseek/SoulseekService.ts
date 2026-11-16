@@ -25,6 +25,7 @@ import { getTempDownloadDir, getDownloadProviderSettings } from "../../../saveSe
 import { generateTempFilename, deleteExistingTempFiles } from "#flows/musicDownloadFlow/utils/tempFile";
 import {
     cleanSearchTerm,
+    relaxedTitle,
     rankResults,
     parseResultsLimit,
     remoteFileName,
@@ -180,28 +181,49 @@ export class SoulseekService extends DownloadService {
         SoulseekService.client = null;
     }
 
-    /** One automatic reconnect-and-retry if the shared connection looks dead. */
+    /**
+     * One automatic reconnect-and-retry if the shared connection looks dead. The connection is shared by every task:
+     * while a transfer is running on it, it is not torn down because one search failed (that would fail the
+     * transfers of unrelated tracks); the search's own error is passed on instead.
+     */
     private async withReconnect<T>(fn: (client: SlskClient) => Promise<T>): Promise<T> {
         const client = await this.getClient();
         try {
             return await fn(client);
         } catch (error) {
+            if (error instanceof Error && error.name === "AbortError") throw error;
+            if (client.downloads.length > 0) {
+                this.logger.warn("Soulseek operation failed; transfers are running, so the connection is kept", {
+                    error,
+                });
+                throw error;
+            }
             this.logger.warn(`Soulseek operation failed, reconnecting once`, { error });
-            this.reconnect();
+            // Only if nobody has replaced it meanwhile (another task may have reconnected already).
+            if (SoulseekService.client === client) this.reconnect();
             const retriedClient = await this.getClient();
             return fn(retriedClient);
         }
     }
 
+    /**
+     * The temporary files of this task's own download rows, which a new search replaces (resolved paths), including the
+     * rows the task dropped just before this search ran. The match on the provider's file-name prefix does the rest.
+     */
+    private ownTempFiles(): Set<string> {
+        return (this.task as unknown as DownloadTask).ownTempFiles();
+    }
+
     /** The exact text sent to Soulseek's search for one format: artist, title, then the `.ext` filter. */
-    private searchQuery(trackMetadata: TrackMetadata, extension: Extension): string {
+    private searchQuery(trackMetadata: TrackMetadata, extension: Extension, relaxed = false): string {
         const artistName = trackMetadata.artists?.[0]?.name ?? "";
-        return cleanSearchTerm(`${artistName} ${trackMetadata.trackName} .${extension}`);
+        const title = relaxed ? relaxedTitle(trackMetadata.trackName) : trackMetadata.trackName;
+        return cleanSearchTerm(`${artistName} ${title} .${extension}`);
     }
 
     /** What every row found by that search records as its query: the one search box, as sent. */
-    private queryFields(trackMetadata: TrackMetadata, extension: Extension): DownloadQueryField[] {
-        return [{ label: "Search", value: this.searchQuery(trackMetadata, extension) }];
+    private queryFields(trackMetadata: TrackMetadata, extension: Extension, relaxed = false): DownloadQueryField[] {
+        return [{ label: "Search", value: this.searchQuery(trackMetadata, extension, relaxed) }];
     }
 
     /** What a row (or a not-yet-listed result) records about the remote file and its peer. */
@@ -222,8 +244,21 @@ export class SoulseekService extends DownloadService {
         };
     }
 
-    private searchOnce(query: string, timeoutMs: number): Promise<SearchResult[]> {
-        return this.withReconnect((client) => client.search({ req: query, timeout: timeoutMs }));
+    /**
+     * One search. The client cannot be told to stop one, so a stopped task simply stops waiting for it (the search
+     * ends by itself at its timeout).
+     */
+    private searchOnce(query: string, timeoutMs: number, signal?: AbortSignal): Promise<SearchResult[]> {
+        const search = this.withReconnect((client) => client.search({ req: query, timeout: timeoutMs }));
+        if (!signal) return search;
+        return new Promise<SearchResult[]>((resolve, reject) => {
+            const onAbort = () => reject(makeAbortError());
+            if (signal.aborted) return onAbort();
+            signal.addEventListener("abort", onAbort, { once: true });
+            search.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+            // The abandoned search may still fail later: that must not become an unhandled rejection.
+            search.catch(() => undefined);
+        });
     }
 
     /**
@@ -334,22 +369,50 @@ export class SoulseekService extends DownloadService {
                 // multi-candidate view down to whatever was cached before. Always
                 // search fresh, clearing out any leftover file from a previous attempt
                 // first so retries don't just pile up unused files in the temp dir.
-                await deleteExistingTempFiles(SoulseekService.display.label, trackMetadata, extension, tempDir);
+                // Only this task's own rows are cleared: another session, an archived task or the saved file's record
+                // may point at the other files of the same track.
+                await deleteExistingTempFiles(
+                    SoulseekService.display.label,
+                    trackMetadata,
+                    extension,
+                    tempDir,
+                    this.ownTempFiles()
+                );
 
-                const query = this.searchQuery(trackMetadata, extension);
-                const queryFields = this.queryFields(trackMetadata, extension);
+                let query = this.searchQuery(trackMetadata, extension);
+                let queryFields = this.queryFields(trackMetadata, extension);
                 lastQuery = queryFields;
                 this.status.update({ progress: 10 });
-                const results = await this.searchOnce(query, searchTimeoutMs);
-                this.status.update({ progress: 30 });
-
                 // Every usable result, best first (free-slot peers before queued ones). Only the
                 // top `resultsLimit` become rows; a bounded remainder is kept behind a "show more" row.
-                const ranked = rankResults(
-                    results,
-                    { artistName, trackTitle, albumName, extension, durationMs: trackMetadata.duration ?? undefined },
+                const rankingQuery = {
+                    artistName,
+                    trackTitle,
+                    albumName,
+                    extension,
+                    durationMs: trackMetadata.duration ?? undefined,
+                };
+                let ranked = rankResults(
+                    await this.searchOnce(query, searchTimeoutMs, signal),
+                    rankingQuery,
                     resultsLimit + MAX_HIDDEN_RESULTS
                 );
+                // Soulseek wants every word of the query in the file's path, and streaming titles carry words files
+                // rarely have ("- 2011 Remaster", "(feat. X)"): when nothing came back, ask again with a shorter title.
+                const relaxedQuery = this.searchQuery(trackMetadata, extension, true);
+                if (ranked.length === 0 && relaxedQuery !== query) {
+                    this.logger.info(`No usable Soulseek results for "${query}", trying "${relaxedQuery}"`);
+                    throwIfAborted(signal);
+                    query = relaxedQuery;
+                    queryFields = this.queryFields(trackMetadata, extension, true);
+                    lastQuery = queryFields;
+                    ranked = rankResults(
+                        await this.searchOnce(query, searchTimeoutMs, signal),
+                        rankingQuery,
+                        resultsLimit + MAX_HIDDEN_RESULTS
+                    );
+                }
+                this.status.update({ progress: 30 });
                 if (ranked.length === 0) {
                     this.logger.info(`No ranked Soulseek candidates for "${extension}"`);
                     continue;

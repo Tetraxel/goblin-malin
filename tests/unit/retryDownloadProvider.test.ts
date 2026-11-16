@@ -160,6 +160,32 @@ describe("retryDownloadProvider", () => {
         expect(sources.every((s, i) => i === 0 || s.provider === "soulseek")).toBe(true);
     });
 
+    test("the temp files of the rows that were replaced are still the task's own while the provider searches again", async () => {
+        soulseekOutcome = "failed";
+        const oldFile = path.join(dataDir, "old.flac");
+        const keptFile = path.join(dataDir, "kept.flac");
+        const localFile = (p: string): TrackDownloadSource["localFile"] => ({
+            state: "found",
+            path: p,
+            name: path.basename(p),
+            extension: "flac",
+        });
+        const task = m.makeTask([row("soulseek", "failed", { localFile: localFile(oldFile) })], {
+            savedFile: { downloadPath: keptFile, path: keptFile } as never,
+        });
+        // The row of the file the saved file was made from is not the task's to delete.
+        task.updateAttributes({
+            downloadSources: [...sourcesOf(task), row("ytdlp", "downloaded", { localFile: localFile(keptFile) })],
+        });
+
+        await task.retryDownloadProvider("soulseek");
+
+        // The rows are gone by the time a provider searches, but what it has to clear is still known.
+        expect(sourcesOf(task).some((s) => s.localFile?.path === oldFile)).toBe(false);
+        expect(task.ownTempFiles().has(path.resolve(oldFile))).toBe(true);
+        expect(task.ownTempFiles().has(path.resolve(keptFile))).toBe(false);
+    });
+
     test("a provider listed first keeps its place when its rows are replaced", async () => {
         soulseekRuns = 0;
         ytdlpRuns = 0;

@@ -2,6 +2,7 @@ import React from "react";
 import { type Key } from "ink";
 import { type Shortcut, matchesShortcut, getShortcutLiteral } from "#types/actions";
 import { cache } from "#utils/cache";
+import { globalLogger } from "#base/logger/logger";
 import { type LastPress, isDoubleTap } from "./doubleTap";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -188,10 +189,23 @@ class ShortcutRegistryClass {
     }
 
     private runHandler(ctx: ContextRegistration, entry: ShortcutEntry): void {
+        this.invoke(ctx, entry);
+    }
+
+    /**
+     * Runs a handler, and reports a failure (thrown, or the rejection of an async handler) to the log directly: the
+     * console is replaced by Ink once the UI is up, so `console.error` here would be lost.
+     */
+    private invoke(ctx: ContextRegistration, entry: ShortcutEntry): void {
+        const report = (err: unknown) =>
+            globalLogger.error(
+                `[shortcuts] unhandled error in ${ctx.contextId}.${entry.id}: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`
+            );
         try {
-            void entry.handler();
+            const result = entry.handler() as unknown;
+            if (result instanceof Promise) result.catch(report);
         } catch (err) {
-            console.error(`[shortcuts] unhandled error in ${ctx.contextId}.${entry.id}:`, err);
+            report(err);
         }
     }
 
@@ -210,11 +224,7 @@ class ShortcutRegistryClass {
         for (const ctx of sorted) {
             for (const entry of ctx.shortcuts) {
                 if (entry.shortcut.funcKey === funcKeyNum) {
-                    try {
-                        void entry.handler();
-                    } catch (err) {
-                        console.error(`[shortcuts] unhandled error in ${ctx.contextId}.${entry.id}:`, err);
-                    }
+                    this.invoke(ctx, entry);
                     return;
                 }
             }

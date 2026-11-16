@@ -11,14 +11,16 @@ export type AudioProbeResult = {
     durationMs: number;
 };
 
-interface FfprobeStream {
+export interface FfprobeStream {
     codec_type?: string;
     codec_name?: string;
+    width?: number;
+    height?: number;
     bit_rate?: string;
     tags?: Record<string, string>;
 }
 
-interface FfprobeOutput {
+export interface FfprobeOutput {
     streams?: FfprobeStream[];
     format?: {
         bit_rate?: string;
@@ -40,22 +42,34 @@ function getFfprobePath(): Promise<string> {
     return ffprobePathPromise;
 }
 
-async function runFfprobe(filePath: string): Promise<FfprobeOutput> {
+const FFPROBE_TIMEOUT_MS = 60_000;
+
+/** What ffprobe says about the file: its streams (with their tags) and its container. */
+export async function runFfprobe(filePath: string): Promise<FfprobeOutput> {
     const ffprobePath = await getFfprobePath();
-    const { stdout } = await execFileAsync(ffprobePath, [
-        "-v",
-        "quiet",
-        "-print_format",
-        "json",
-        "-show_format",
-        "-show_streams",
-        filePath,
-    ]);
+    // A damaged file can make ffprobe hang: the track's step must end, with an error, instead of waiting for ever.
+    const { stdout } = await execFileAsync(
+        ffprobePath,
+        ["-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", filePath],
+        { timeout: FFPROBE_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024 }
+    );
     return JSON.parse(stdout) as FfprobeOutput;
 }
 
 /** ffmpeg's names for tags that the app (and the FLAC / Vorbis convention) spells differently. */
-const TAG_ALIASES: Record<string, string> = { ALBUM_ARTIST: "ALBUMARTIST", TRACK: "TRACKNUMBER" };
+const TAG_ALIASES: Record<string, string> = {
+    ALBUM_ARTIST: "ALBUMARTIST",
+    TRACK: "TRACKNUMBER",
+    // The iTunes freeform names MusicBrainz Picard writes in M4A files, in the Vorbis spelling.
+    INITIALKEY: "KEY",
+    TEMPO: "BPM",
+    "MUSICBRAINZ TRACK ID": "MUSICBRAINZ_TRACKID",
+    "MUSICBRAINZ ALBUM ID": "MUSICBRAINZ_ALBUMID",
+    "MUSICBRAINZ ARTIST ID": "MUSICBRAINZ_ARTISTID",
+    "MUSICBRAINZ ALBUM ARTIST ID": "MUSICBRAINZ_ALBUMARTISTID",
+    "MUSICBRAINZ RELEASE GROUP ID": "MUSICBRAINZ_RELEASEGROUPID",
+    "MUSICBRAINZ RELEASE TRACK ID": "MUSICBRAINZ_RELEASETRACKID",
+};
 
 /**
  * The tags stored in a file, as read by ffprobe: names upper-cased, in the FLAC / Vorbis-comment spelling the
