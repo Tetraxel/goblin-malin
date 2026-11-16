@@ -32,6 +32,9 @@ type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> =
     platformAliases?: readonly string[];
     // Canonical URL of one of this service's tracks, given its platform id.
     trackUrl?: (id: string) => string;
+    // The lossy codec every stream of this platform is in, when it is always the same ("Opus"). Read through
+    // `platformRegistry.upstreamCodec()`; leave it out when the platform serves several.
+    upstreamCodec?: string;
     // The address that opens one of this service's links (as `parseUrl` read it) in its desktop app, when it has one
     // (`spotify:track:<id>`). Read through `platformRegistry.openUri()`.
     openUri?: (parsed: ParsedUrl) => string | undefined;
@@ -75,6 +78,7 @@ export class ServiceRegistry<TTask extends Task<any> = Task, TService extends Se
             if (ctor.display) providerDisplayRegistry.register(name, ctor.display);
             if (ctor.platformAliases) platformRegistry.registerAliases(name, ctor.platformAliases);
             if (ctor.trackUrl) platformRegistry.registerTrackUrl(name, ctor.trackUrl);
+            if (ctor.upstreamCodec) platformRegistry.registerUpstreamCodec(name, ctor.upstreamCodec);
             if (ctor.openUri) platformRegistry.registerOpenUri(name, ctor.openUri);
             if (ctor.parseUrl) urlParserRegistry.register(ctor.parseUrl);
             if (ctor.findLinks) urlParserRegistry.registerNormalizer(ctor.findLinks);

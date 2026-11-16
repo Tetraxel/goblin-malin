@@ -6,8 +6,19 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **SoundCloud**: paste a `soundcloud.com/<artist>/<track>` link (or an `on.soundcloud.com` short link) and the track is read like a Spotify or YouTube one, with its own column in the list. While discovering, the app also searches SoundCloud for tracks from other platforms and proposes the uploads that really look like the track (a slowed edit or an unrelated upload is left out). **yt-dlp downloads from SoundCloud**: when a SoundCloud link is the best source, it shows as a yt-dlp download source. Playlists (`/sets/`) are not imported yet. SoundCloud can be switched off in Settings → Metadata.
 - **Groups** (`Ctrl+G`): put the selected tracks (or the focused one) together under a name you choose, like an imported album or playlist: a `[GROUP]` row with its tracks under it, foldable (`C`), with its own TAG? / DL? boxes, count and Start (`R` starts its tracks). `Enter` on the group's name renames it, `U` dissolves the group (its tracks stay) or, on a track, takes it out of its group. A track grouped again moves to the new group; a group left empty goes away. Archive / Delete on a group takes its tracks along, and groups are saved with the session.
+- **Metadata Sources shows why a source was found** (`E`, "Toggle search details"), like Download Sources shows its query: under each "found by" line, what the service was actually asked (Spotify / YouTube / SoundCloud: the search text and what it kept of the answer; Songlink: the link and its page; MusicBrainz: the ISRC, the search and the recording; Claude: the search, the platforms wanted and the model), and under the result how its confidence adds up (`Title +40 · Artist 0 (different artists) · Duration 0 (3.1% apart)…`), so a 0% source can be explained. Results found before this update show only what they used to.
 - The harness (`scripts/tui-test`) knows `Ctrl+G` and `Ctrl+Shift+↑/↓`; `examples/group-tasks.json` walks the whole flow.
+
+### Changed
+
+- **Spotify and YouTube searches no longer take the first hit unchecked.** When looking for a track on another platform, the app now scores the top 8 hits against the track and proposes the best one only if it reaches 50% (the same bar SoundCloud already used). Before, a search for "Song (Some Remix) Artist" could lead with another song sharing only the remixer's name and show up as a 0% source; now the real track is picked when it is further down the list, and nothing is proposed when it is not there at all.
+- **YouTube: video uploads are found too, after the songs.** YouTube Music's "Songs" search only lists catalogue tracks, so a remix that only exists as someone's upload (a DJ's channel, a re-upload) was never found. The app now also searches YouTube's videos, reads the artist and title out of the video's title ("AutoReverse - Reflections (She Said Disco Remix)" → artist AutoReverse, not the channel), and proposes up to two uploads that look like the track. They are listed **after** the songs, so they are only the download source when no song qualified, and they need 60% instead of 50% (an upload of the original mix must not pass for the remix). A failed video search never loses the songs. Tracks found this way (and every SoundCloud track) are marked as uploads. **Claude's chat finds them too**: `search_music` lists a few videos after the songs, each with `upload: true`, and its description tells Claude to check an upload's title and duration and to prefer a catalogue track when both fit.
+
+### Fixed
+
+- **Ctrl+V in Claude's message line.** In a terminal that delivers Ctrl+V as a key (instead of typing the clipboard into the app), nothing was pasted into the chat. The chat now has its own `Ctrl+V` (rebindable, "Paste the clipboard into the message"): it reads the clipboard and puts it in at the cursor as one line. Terminals that already type the pasted text in keep working as before.
 
 ## [0.2.3] — 2026-11-16
 

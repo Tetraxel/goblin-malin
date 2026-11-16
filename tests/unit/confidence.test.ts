@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { computeConfidenceScore } from "#flows/musicDownloadFlow/utils/confidence";
+import { computeConfidenceBreakdown, computeConfidenceScore } from "#flows/musicDownloadFlow/utils/confidence";
 import type { TrackMetadata } from "#flows/musicDownloadFlow/types";
 
 function track(
@@ -132,5 +132,43 @@ describe("computeConfidenceScore — 'Artist - Title' uploads", () => {
         const upload = track("A - Some Song", "Xyz Ltd", { duration: 200000 });
         const other = track("Some Song", "A", { duration: 200000 });
         expect(computeConfidenceScore(other, upload)).toBe(45);
+    });
+});
+
+describe("computeConfidenceBreakdown", () => {
+    const primary = track("Get Lucky", "Daft Punk", { duration: 240_000, year: "2013" });
+
+    test("says how the score adds up, and the parts add up to it", () => {
+        const source = track("Get Lucky (Radio Edit)", "Daft Punk", { duration: 245_000, year: "2013" });
+        const { score, parts } = computeConfidenceBreakdown(source, primary);
+        expect(score).toBe(computeConfidenceScore(source, primary));
+        expect(parts.map((p) => [p.label, p.points])).toEqual([
+            ["Title", 25],
+            ["Artist", 30],
+            ["Duration", 10],
+            ["Year", 10],
+        ]);
+        expect(parts.reduce((sum, p) => sum + p.points, 0)).toBe(score);
+    });
+
+    test("a part that gave nothing says why", () => {
+        const { score, parts } = computeConfidenceBreakdown(track("Something Else", "Someone", {}), primary);
+        expect(score).toBe(0);
+        expect(Object.fromEntries(parts.map((p) => [p.label, p.detail]))).toEqual({
+            Title: "different titles",
+            Artist: "different artists",
+            Duration: "a duration is missing",
+            Year: "a year is missing",
+        });
+    });
+
+    test("a version penalty and an ISRC match are parts of their own", () => {
+        const live = track("Get Lucky (Live)", "Daft Punk", { duration: 240_000, year: "2013" });
+        const version = computeConfidenceBreakdown(live, primary).parts.find((p) => p.label === "Version");
+        expect(version).toMatchObject({ points: -15, detail: "only one is live" });
+
+        const withIsrc = computeConfidenceBreakdown(track("A", "B", { isrc: "X1" }), track("C", "D", { isrc: "X1" }));
+        expect(withIsrc.score).toBe(100);
+        expect(withIsrc.parts).toEqual([{ label: "ISRC", points: 100, detail: "same ISRC X1" }]);
     });
 });

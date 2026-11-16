@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { textInputFocus } from "#base/textInputFocus";
 import { MAX_INPUT_ROWS, layoutInput, sanitizeTyped } from "./inputLayout";
@@ -18,6 +18,12 @@ type Props = {
     color?: string;
 };
 
+/** What the panel can ask of the line besides typing in it. */
+export type ChatInputHandle = {
+    /** Puts text (a pasted clipboard) at the cursor, as one line: line breaks become spaces. */
+    insert: (text: string) => void;
+};
+
 type Editing = { value: string; cursor: number };
 
 /**
@@ -30,16 +36,10 @@ type Editing = { value: string; cursor: number };
  * to the shortcut registry. Editing keys: ← → move, Ctrl+A / Home start, Ctrl+E / End end, Ctrl+U clears what is
  * before the cursor, Backspace deletes.
  */
-export const ChatInput: React.FC<Props> = ({
-    value,
-    onChange,
-    onSubmit,
-    focus,
-    placeholder = "",
-    width,
-    maxRows = MAX_INPUT_ROWS,
-    color,
-}) => {
+export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput(
+    { value, onChange, onSubmit, focus, placeholder = "", width, maxRows = MAX_INPUT_ROWS, color },
+    handle
+) {
     const [editing, setEditing] = useState<Editing>({ value, cursor: Array.from(value).length });
     // The newest state, for keys that arrive before the next render.
     const latest = useRef(editing);
@@ -53,6 +53,27 @@ export const ChatInput: React.FC<Props> = ({
     }
 
     useEffect(() => (focus ? textInputFocus.acquire() : undefined), [focus]);
+
+    // A terminal that delivers Ctrl+V as a key (instead of typing the clipboard in) has the panel read the clipboard
+    // and hand it here: it goes in at the cursor, like typed text.
+    useImperativeHandle(
+        handle,
+        () => ({
+            insert: (text: string) => {
+                const typed = sanitizeTyped(text);
+                if (typed === "") return;
+                const cur = latest.current;
+                const chars = Array.from(cur.value);
+                const added = Array.from(typed);
+                chars.splice(cur.cursor, 0, ...added);
+                const next = { value: chars.join(""), cursor: cur.cursor + added.length };
+                latest.current = next;
+                setEditing(next);
+                onChange(next.value);
+            },
+        }),
+        [onChange]
+    );
 
     useInput(
         (input, key) => {
@@ -129,4 +150,4 @@ export const ChatInput: React.FC<Props> = ({
             ))}
         </Box>
     );
-};
+});

@@ -4,8 +4,8 @@
 
 **Three of the five release blockers in TODO.md are onboarding problems**, and they share one root cause: the app depends on external state (binaries, cookies, credentials, paths) that it neither verifies nor helps the user establish.
 
-- **Cookies**: [YtDlpService](../../../src/flows/musicDownloadFlow/services/download-providers/ytdlp/YtDlpService.ts) looks for `bin/cookies.txt` and, if missing, logs `"No cookies file found, proceeding without cookies"` — then YouTube's bot-check ("Sign in to confirm you're not a bot") fails the download with a raw error the user can't interpret. Blocker: *"Easier cookies.txt extraction for yt-dlp"*.
-- **Paths**: settings rows for directories/binaries are raw text inputs. Blocker: *"Better way to select the app path in settings"*.
+- **Cookies**: [YtDlpService](../../../src/flows/musicDownloadFlow/services/download-providers/ytdlp/YtDlpService.ts) looks for `bin/cookies.txt` and, if missing, logs `"No cookies file found, proceeding without cookies"` — then YouTube's bot-check ("Sign in to confirm you're not a bot") fails the download with a raw error the user can't interpret. Blocker: _"Easier cookies.txt extraction for yt-dlp"_.
+- **Paths**: settings rows for directories/binaries are raw text inputs. Blocker: _"Better way to select the app path in settings"_.
 - **Dependencies**: FLAC conversion needs ffmpeg; audio preview needs mpv ([mpv-setup.ts](../../../src/utils/mpv-setup.ts)); nothing checks any of it until a task fails mid-run.
 
 The wizard infrastructure ([setupWizard.ts](../../../src/base/setupWizard.ts): modes, content blocks, env-var fields, links; rendered by `SetupWizardModal`) is solid — what's missing is (a) a **diagnostic layer** that tells the user what's broken and (b) two wizard-shaped gaps: cookies and path picking. For a pre-release product, "installable by a stranger without reading the source" is the highest-value improvement there is.
@@ -20,17 +20,17 @@ The wizard infrastructure ([setupWizard.ts](../../../src/base/setupWizard.ts): m
 
 ```typescript
 interface DoctorCheck {
-    id: string;                        // "ytdlp-binary", "cookies", …
+    id: string; // "ytdlp-binary", "cookies", …
     label: string;
     severity: "required" | "recommended";
     run(): Promise<CheckResult>;
 }
 type CheckResult =
-    | { status: "ok"; detail?: string }          // "yt-dlp 2026.06.10"
+    | { status: "ok"; detail?: string } // "yt-dlp 2026.06.10"
     | { status: "warn" | "fail"; detail: string; fix?: FixAction };
 type FixAction =
     | { kind: "wizard"; config: SetupWizardConfig }
-    | { kind: "action"; label: string; run(): Promise<void> }   // e.g. auto-download binary
+    | { kind: "action"; label: string; run(): Promise<void> } // e.g. auto-download binary
     | { kind: "link"; label: string; url: string };
 ```
 
@@ -80,12 +80,12 @@ _Depends on: nothing_
 
 `src/flows/musicDownloadFlow/services/download-providers/ytdlp/errorMap.ts` — match known yt-dlp stderr patterns to user-facing status + fix hint:
 
-| Pattern (stderr contains)                     | Status message                          | Hint / fix                     |
-| --------------------------------------------- | --------------------------------------- | ------------------------------ |
-| `Sign in to confirm you're not a bot`          | "YouTube bot-check — cookies needed"    | deep-link cookies wizard       |
-| `age`-restriction phrasing                     | "Age-restricted — cookies needed"       | deep-link cookies wizard       |
-| `Video unavailable` / `has been removed`       | "Video removed"                          | suggest re-search (`s` action) |
-| `HTTP Error 403`                               | "Blocked (403) — retry or update yt-dlp"| doctor binary check            |
+| Pattern (stderr contains)                | Status message                           | Hint / fix                     |
+| ---------------------------------------- | ---------------------------------------- | ------------------------------ |
+| `Sign in to confirm you're not a bot`    | "YouTube bot-check — cookies needed"     | deep-link cookies wizard       |
+| `age`-restriction phrasing               | "Age-restricted — cookies needed"        | deep-link cookies wizard       |
+| `Video unavailable` / `has been removed` | "Video removed"                          | suggest re-search (`s` action) |
+| `HTTP Error 403`                         | "Blocked (403) — retry or update yt-dlp" | doctor binary check            |
 
 The mapped `fix` surfaces in the task's status message and in the download panel detail; the raw stderr stays in the logs (P16 already renders rich per-task logs).
 
@@ -112,12 +112,12 @@ _Depends on: T24.1–T24.5_
 
 ## Summary
 
-| Task  | What                                                      | Depends on  |
-| ----- | ---------------------------------------------------------- | ----------- |
-| T24.1 | Doctor check engine + provider-contributed checks          | —           |
-| T24.2 | Doctor modal + first-run auto-open                         | T24.1       |
-| T24.3 | Cookies wizard: browser mode + validated file mode         | —           |
-| T24.4 | `PathPickerModal` + `"path"` settings kind                 | —           |
-| T24.5 | yt-dlp error → actionable status mapping                   | T24.1, T24.3|
-| T24.6 | Headless `--doctor` CLI flag                               | T24.1       |
-| T24.7 | Unit + TUI-harness coverage                                | T24.1–T24.5 |
+| Task  | What                                               | Depends on   |
+| ----- | -------------------------------------------------- | ------------ |
+| T24.1 | Doctor check engine + provider-contributed checks  | —            |
+| T24.2 | Doctor modal + first-run auto-open                 | T24.1        |
+| T24.3 | Cookies wizard: browser mode + validated file mode | —            |
+| T24.4 | `PathPickerModal` + `"path"` settings kind         | —            |
+| T24.5 | yt-dlp error → actionable status mapping           | T24.1, T24.3 |
+| T24.6 | Headless `--doctor` CLI flag                       | T24.1        |
+| T24.7 | Unit + TUI-harness coverage                        | T24.1–T24.5  |

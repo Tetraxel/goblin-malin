@@ -17,7 +17,7 @@ This project:
 - Source label shown in the `Uri` and group header: **"Spotify Web"** (provider key `spotifyUrlInfo`).
 - The existing group-header note (`fetchedBy !== apiProvider`) is **kept as-is** — for a `spotify-url-info` result it reads _"Spotify is not available but rudimentary metadata were fetched from Spotify Web"_.
 - The wizard mode chooser is added to the **generic** wizard config (data-driven, reusable by any future provider — consistent with the provider-extensibility philosophy).
-- **No change to `downloadTask.ts`**: its existing primary-fetch `try/catch` + discovery fallback stays as an outer safety net (only triggers if *both* official and scrape fail, because the fallback now lives inside `getTrackMetadata`).
+- **No change to `downloadTask.ts`**: its existing primary-fetch `try/catch` + discovery fallback stays as an outer safety net (only triggers if _both_ official and scrape fail, because the fallback now lives inside `getTrackMetadata`).
 
 ---
 
@@ -25,21 +25,21 @@ This project:
 
 ```typescript
 export interface WizardMode {
-  id: string; // "official" | "scrape"
-  label: string; // shown in the chooser
-  description?: string; // one helper line under the chooser
-  fields: WizardField[]; // mode-specific fields (scrape → [])
+    id: string; // "official" | "scrape"
+    label: string; // shown in the chooser
+    description?: string; // one helper line under the chooser
+    fields: WizardField[]; // mode-specific fields (scrape → [])
 }
 
 export interface SetupWizardConfig {
-  title: string;
-  providerKey?: string;
-  providerType?: "metadata" | "download";
-  description: WizardContentBlock[];
-  fields: WizardField[]; // used only when `modes` is absent (back-compat)
-  modeEnvVar?: string; // e.g. "SPOTIFY_AUTH_MODE" — where the chosen mode id is persisted
-  modes?: WizardMode[]; // if present → wizard shows a mode chooser
-  envSection?: { name: string; url?: string };
+    title: string;
+    providerKey?: string;
+    providerType?: "metadata" | "download";
+    description: WizardContentBlock[];
+    fields: WizardField[]; // used only when `modes` is absent (back-compat)
+    modeEnvVar?: string; // e.g. "SPOTIFY_AUTH_MODE" — where the chosen mode id is persisted
+    modes?: WizardMode[]; // if present → wizard shows a mode chooser
+    envSection?: { name: string; url?: string };
 }
 ```
 
@@ -135,7 +135,7 @@ import createSpotifyUrlInfo, { type Details } from "spotify-url-info";
 const api = createSpotifyUrlInfo(fetch); // Node 18+ global fetch — no auth
 
 export function getSpotifyEmbedDetails(url: string): Promise<Details> {
-  return api.getDetails(url); // one call → { preview, tracks }
+    return api.getDetails(url); // one call → { preview, tracks }
 }
 ```
 
@@ -151,19 +151,19 @@ export function getSpotifyEmbedDetails(url: string): Promise<Details> {
 
 Mirror [convertSonglinkToTrack.ts](../../../src/flows/musicDownloadFlow/services/metadata-providers/songlink/convertSonglinkToTrack.ts) (including its `parseArtistNames` split). Map `Details` → `TrackMetadata`:
 
-| Field                  | Source                                                                |
-| ---------------------- | --------------------------------------------------------------------- |
-| `id`                   | parsed `trackId`                                                      |
-| `trackName`            | `tracks[0].name`                                                      |
-| `artists`              | `parseArtistNames(tracks[0].artist)` → `{ type: "artist", name }[]`   |
+| Field                 | Source                                                                  |
+| --------------------- | ----------------------------------------------------------------------- |
+| `id`                  | parsed `trackId`                                                        |
+| `trackName`           | `tracks[0].name`                                                        |
+| `artists`             | `parseArtistNames(tracks[0].artist)` → `{ type: "artist", name }[]`     |
 | `duration`            | `tracks[0].duration` (already **ms** — verified: a 3:40 track → 220166) |
-| `url`                  | original url                                                          |
-| `uri`                  | `` `SPOTIFY::TRACK::${id}` ``                                         |
-| `nativeAppUriDesktop`  | `` `spotify:track:${id}` ``                                          |
-| `platform`            | `"spotify"`                                                           |
-| `apiProvider`         | `"spotify"`                                                           |
-| `fetchedBy`           | `"spotifyUrlInfo"`                                                    |
-| `fetchedAt` / `type`  | `new Date()` / `"track"`                                              |
+| `url`                 | original url                                                            |
+| `uri`                 | `` `SPOTIFY::TRACK::${id}` ``                                           |
+| `nativeAppUriDesktop` | `` `spotify:track:${id}` ``                                             |
+| `platform`            | `"spotify"`                                                             |
+| `apiProvider`         | `"spotify"`                                                             |
+| `fetchedBy`           | `"spotifyUrlInfo"`                                                      |
+| `fetchedAt` / `type`  | `new Date()` / `"track"`                                                |
 
 Album / ISRC / track number are not available from the embed page → omitted (all optional on `BaseTrackMetadata`).
 
@@ -180,9 +180,9 @@ Album / ISRC / track number are not available from the embed page → omitted (a
 - Replace the `setupWizard` static with the **modes** form: `modeEnvVar: "SPOTIFY_AUTH_MODE"`, keeping `envSection`; mode `official` carries the current `CLIENT_ID` / `CLIENT_SECRET` fields + description, mode `scrape` has `fields: []` and helper text noting limited metadata + possible breakage.
 - Add `private async resolveAuth()` using `runExclusive("init", …)` → calls `this.env.getVariablesWithWizard(SpotifyService.setupWizard)`, reads `process.env.SPOTIFY_AUTH_MODE` (default `"official"`). `getClient()` builds the official client from the returned creds (official mode only).
 - `getTrackMetadata(url)`:
-  - parse `trackId` (existing);
-  - `mode === "scrape"` → `return this.fetchViaUrlInfo(url, trackId)`;
-  - `mode === "official"` → `try` the existing official path; `catch` → `logger.warn(...)` + `return this.fetchViaUrlInfo(url, trackId)`.
+    - parse `trackId` (existing);
+    - `mode === "scrape"` → `return this.fetchViaUrlInfo(url, trackId)`;
+    - `mode === "official"` → `try` the existing official path; `catch` → `logger.warn(...)` + `return this.fetchViaUrlInfo(url, trackId)`.
 - Add `private async fetchViaUrlInfo(url, trackId)` using T14.5 client + T14.6 converter.
 - `searchTrack`: in scrape mode `spotify-url-info` cannot search — throw a clear error (already caught by the discovery flow; acceptable degradation). Official mode unchanged.
 
@@ -225,14 +225,16 @@ Add the `P14` row pointing at `p14/tasks.md`.
 
 ## Verification
 
-| Check                          | Action                                                                                                                |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| Types & lint                   | `yarn type-check` and `yarn lint` clean                                                                               |
-| Wizard shows mode chooser      | `yarn dev` → paste a Spotify track URL with no creds → wizard shows the official/spotify-url-info chooser             |
-| Scrape mode works              | Pick **spotify-url-info** → primary metadata appears, URI tagged **(Spotify Web)**                                    |
-| Choice is persisted            | `.env` gains `SPOTIFY_AUTH_MODE=scrape` under `# SPOTIFY`; re-running / new URL does not re-prompt                    |
-| Official fallback works        | Switch to **official** with deliberately bad creds → API fails → auto-falls back to **(Spotify Web)** (no prompt)    |
-| Official happy path unaffected | Official with valid creds → normal Spotify metadata, **no** `(Spotify Web)` tag                                       |
-| Package sanity                 | `node scripts/spotify-url-info-test.mjs <url>` still returns preview/tracks                                           |
+| Check                          | Action                                                                                                            |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| Types & lint                   | `yarn type-check` and `yarn lint` clean                                                                           |
+| Wizard shows mode chooser      | `yarn dev` → paste a Spotify track URL with no creds → wizard shows the official/spotify-url-info chooser         |
+| Scrape mode works              | Pick **spotify-url-info** → primary metadata appears, URI tagged **(Spotify Web)**                                |
+| Choice is persisted            | `.env` gains `SPOTIFY_AUTH_MODE=scrape` under `# SPOTIFY`; re-running / new URL does not re-prompt                |
+| Official fallback works        | Switch to **official** with deliberately bad creds → API fails → auto-falls back to **(Spotify Web)** (no prompt) |
+| Official happy path unaffected | Official with valid creds → normal Spotify metadata, **no** `(Spotify Web)` tag                                   |
+| Package sanity                 | `node scripts/spotify-url-info-test.mjs <url>` still returns preview/tracks                                       |
+
 ```
 
+```

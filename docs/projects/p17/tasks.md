@@ -46,9 +46,9 @@ Add to `scripts`:
 
 Note: `node-pty` is a native addon and requires build tools (`windows-build-tools` or Visual Studio Build Tools on Windows). Its native binary is version-pinned to the current Node.js ABI; if Node.js is upgraded, run `npm rebuild node-pty`.
 
-| Status    |
-| --------- |
-| ✅ Done   |
+| Status  |
+| ------- |
+| ✅ Done |
 
 ---
 
@@ -98,9 +98,9 @@ export type RunOptions = { onEvent?: (event: HarnessEvent) => void };
 
 Beyond the original plan: added `waitForContent`, `assert`, and the three `screenshot*` step types; added `minBytes` to `stable`; added `dataDir` to `Scenario`; added `ansi` to `Snapshot`; metrics values are `number | boolean` (booleans mark timeout flags); added `HarnessEvent` and `RunOptions` for the live `--pretty` CLI mode.
 
-| Status    |
-| --------- |
-| ✅ Done   |
+| Status  |
+| ------- |
+| ✅ Done |
 
 ---
 
@@ -110,31 +110,31 @@ Beyond the original plan: added `waitForContent`, `assert`, and the three `scree
 
 Maps human-readable key names (as used in scenario JSON) to the ANSI/VT100 byte sequences that `node-pty` expects. Single characters (letters, digits, punctuation) pass through as-is via the fallback.
 
-| Name | Sequence |
-|---|---|
-| `Enter` / `Return` | `\r` |
-| `Escape` / `Esc` | `\x1b` |
-| `Tab` | `\t` |
-| `Shift+Tab` | `\x1b[Z` |
-| `Space` | `" "` |
-| `Backspace` | `\x7f` |
-| `Delete` / `Del` | `\x1b[3~` |
-| `ArrowUp` / `Up` / `↑` | `\x1b[A` |
-| `ArrowDown` / `Down` / `↓` | `\x1b[B` |
-| `ArrowRight` / `Right` / `→` | `\x1b[C` |
-| `ArrowLeft` / `Left` / `←` | `\x1b[D` |
-| `Shift+ArrowUp` / `Shift+↑` | `\x1b[1;2A` |
-| `Shift+ArrowDown` / `Shift+↓` | `\x1b[1;2B` |
-| `Shift+ArrowRight` / `Shift+→` | `\x1b[1;2C` |
-| `Shift+ArrowLeft` / `Shift+←` | `\x1b[1;2D` |
-| `Ctrl+A` … `Ctrl+V` | `\x01` … `\x16` |
+| Name                                   | Sequence           |
+| -------------------------------------- | ------------------ |
+| `Enter` / `Return`                     | `\r`               |
+| `Escape` / `Esc`                       | `\x1b`             |
+| `Tab`                                  | `\t`               |
+| `Shift+Tab`                            | `\x1b[Z`           |
+| `Space`                                | `" "`              |
+| `Backspace`                            | `\x7f`             |
+| `Delete` / `Del`                       | `\x1b[3~`          |
+| `ArrowUp` / `Up` / `↑`                 | `\x1b[A`           |
+| `ArrowDown` / `Down` / `↓`             | `\x1b[B`           |
+| `ArrowRight` / `Right` / `→`           | `\x1b[C`           |
+| `ArrowLeft` / `Left` / `←`             | `\x1b[D`           |
+| `Shift+ArrowUp` / `Shift+↑`            | `\x1b[1;2A`        |
+| `Shift+ArrowDown` / `Shift+↓`          | `\x1b[1;2B`        |
+| `Shift+ArrowRight` / `Shift+→`         | `\x1b[1;2C`        |
+| `Shift+ArrowLeft` / `Shift+←`          | `\x1b[1;2D`        |
+| `Ctrl+A` … `Ctrl+V`                    | `\x01` … `\x16`    |
 | `Home` / `End` / `PageUp` / `PageDown` | standard sequences |
 
 `resolveKey(name: string): string` — looks up the name; returns the raw string unchanged if not found.
 
-| Status    |
-| --------- |
-| ✅ Done   |
+| Status  |
+| ------- |
+| ✅ Done |
 
 ---
 
@@ -151,9 +151,9 @@ Maps human-readable key names (as used in scenario JSON) to the ANSI/VT100 byte 
 
 The xterm terminal is constructed with the same `cols`/`rows` declared in the scenario.
 
-| Status    |
-| --------- |
-| ✅ Done   |
+| Status  |
+| ------- |
+| ✅ Done |
 
 ---
 
@@ -170,22 +170,22 @@ Lifecycle:
 2. **Quiescence detection.** `waitForStable({ timeout?, quiescenceMs?, minBytes? })` polls until no new data has arrived for `quiescenceMs` (default 300 ms) AND at least `minBytes` (default 1000) have been received total. Returns `true` if timed out, `false` if stable. A timeout does not abort the run — it captures a snapshot and records `stable_N_timed_out: true` in metrics.
 
 3. **Step execution.** Steps run in sequence:
-   - `key` → `pty.write(resolveKey(step.key))`
-   - `type` → `pty.write(step.text)`
-   - `wait` → fixed sleep
-   - `stable` → `waitForStable(step)`
-   - `waitForContent` → polls `termEmulator.readScreen()` until the text is found or timeout
-   - `assert` → checks screen immediately; throws if not found (records snapshot for debugging)
-   - `snapshot` → `{ raw, plain, ansi }` captured into results
-   - `screenshot` → renders via the built-in emulator → PNG saved to temp dir
-   - `screenshot-browser` → renders via headless Edge + xterm.js → PNG (deprecated)
-   - `screenshot-powershell` → renders via a real Windows Terminal window → PNG (preferred)
+    - `key` → `pty.write(resolveKey(step.key))`
+    - `type` → `pty.write(step.text)`
+    - `wait` → fixed sleep
+    - `stable` → `waitForStable(step)`
+    - `waitForContent` → polls `termEmulator.readScreen()` until the text is found or timeout
+    - `assert` → checks screen immediately; throws if not found (records snapshot for debugging)
+    - `snapshot` → `{ raw, plain, ansi }` captured into results
+    - `screenshot` → renders via the built-in emulator → PNG saved to temp dir
+    - `screenshot-browser` → renders via headless Edge + xterm.js → PNG (deprecated)
+    - `screenshot-powershell` → renders via a real Windows Terminal window → PNG (preferred)
 
 4. **Teardown.** Kills the PTY process after all steps complete (wrapped in try/catch to suppress ConPTY's `AttachConsole` error on Windows). Returns `HarnessResult`.
 
-| Status    |
-| --------- |
-| ✅ Done   |
+| Status  |
+| ------- |
+| ✅ Done |
 
 ---
 
@@ -202,9 +202,9 @@ tsx scripts/tui-test/cli.ts <scenario.json> [--pretty]
 
 This is the interface for agents: write a scenario file → run the CLI → parse JSON from stdout.
 
-| Status    |
-| --------- |
-| ✅ Done   |
+| Status  |
+| ------- |
+| ✅ Done |
 
 ---
 
@@ -220,9 +220,9 @@ Configure Vitest to:
 
 The `tests/` directory sits at the repo root. Integration tests import directly from `scripts/tui-test/runner.ts`.
 
-| Status    |
-| --------- |
-| ✅ Done   |
+| Status  |
+| ------- |
+| ✅ Done |
 
 ---
 
@@ -232,9 +232,9 @@ The `tests/` directory sits at the repo root. Integration tests import directly 
 
 Validates that the harness itself works end-to-end: spawns the app, waits for it to render, asserts the initial screen contains recognizable content.
 
-| Status    |
-| --------- |
-| ✅ Done   |
+| Status  |
+| ------- |
+| ✅ Done |
 
 ---
 
@@ -251,9 +251,9 @@ A worked example scenario that an agent can read and adapt. Uses `cols: 128, row
 - Closing the modal (`Escape`)
 - Capturing text snapshots and a `screenshot-powershell` for visual validation
 
-| Status    |
-| --------- |
-| ✅ Done   |
+| Status  |
+| ------- |
+| ✅ Done |
 
 ---
 
@@ -266,9 +266,9 @@ Not in the original plan. Two additional backends for visual PNG output beyond t
 - **`screenshotPowerShell`** — spawns a hidden PowerShell script inside a new Windows Terminal window, writes ANSI content with absolute cursor positioning, finds the window by title via Win32 `EnumWindows`, crops the WT tab strip via a pixel scan, and saves the result with `CopyFromScreen`. Requires the user to configure a small enough font size in WT Settings → Profiles → Defaults so all rows fit on screen.
 - **`screenshotBrowser`** — renders via headless Chromium/Edge using xterm.js. Deprecated in favour of `screenshotPowerShell` on Windows.
 
-| Status    |
-| --------- |
-| ✅ Done   |
+| Status  |
+| ------- |
+| ✅ Done |
 
 ---
 
@@ -281,9 +281,9 @@ Not in the original plan.
 - **`fixtures/empty/`** — blank data directory (`sessions.json`, `settings.json`, `cache/api-cache`) for starting the app in a known clean state via `"dataDir"`.
 - **`tsconfig.json`** — TypeScript config scoped to the harness directory so `tsx` resolves types correctly without polluting the main project config.
 
-| Status    |
-| --------- |
-| ✅ Done   |
+| Status  |
+| ------- |
+| ✅ Done |
 
 ---
 
@@ -293,9 +293,9 @@ Not in the original plan.
 
 Not in the original plan. Full reference documentation for the harness in `scripts/tui-test/README.md` (step types, key reference, typical patterns, fixtures). `CLAUDE.md` has a short pointer so agents load it on demand rather than always in context.
 
-| Status    |
-| --------- |
-| ✅ Done   |
+| Status  |
+| ------- |
+| ✅ Done |
 
 ---
 
@@ -305,22 +305,22 @@ Not in the original plan. Full reference documentation for the harness in `scrip
 
 Add the `P17` row to the project index.
 
-| Status    |
-| --------- |
-| ✅ Done   |
+| Status  |
+| ------- |
+| ✅ Done |
 
 ---
 
 ## Verification
 
-| Check | Action |
-|---|---|
-| Types | `yarn type-check` clean (harness + test files) |
-| Lint | `yarn lint` clean |
-| PTY spawn | `yarn tsx scripts/tui-test/cli.ts scripts/tui-test/examples/navigate-settings.json --pretty` — live events stream, metrics printed at end |
-| Snapshot readability | `initial` snapshot plain text contains recognizable app content |
-| Key navigation | `settings-open` snapshot contains "Settings" modal content; `settings-closed` does not |
-| Metrics | All `stable_*_ms` values are positive numbers; timeout steps record `stable_N_timed_out: true` |
-| Smoke test | `yarn test` passes — `smoke.test.ts` green |
-| Screenshot | `screenshot-powershell` step produces a PNG with all rows visible (requires WT font size small enough in user settings) |
-| ConPTY (Windows) | Plain snapshot text is free of raw escape sequences — `@xterm/headless` absorbed them |
+| Check                | Action                                                                                                                                    |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Types                | `yarn type-check` clean (harness + test files)                                                                                            |
+| Lint                 | `yarn lint` clean                                                                                                                         |
+| PTY spawn            | `yarn tsx scripts/tui-test/cli.ts scripts/tui-test/examples/navigate-settings.json --pretty` — live events stream, metrics printed at end |
+| Snapshot readability | `initial` snapshot plain text contains recognizable app content                                                                           |
+| Key navigation       | `settings-open` snapshot contains "Settings" modal content; `settings-closed` does not                                                    |
+| Metrics              | All `stable_*_ms` values are positive numbers; timeout steps record `stable_N_timed_out: true`                                            |
+| Smoke test           | `yarn test` passes — `smoke.test.ts` green                                                                                                |
+| Screenshot           | `screenshot-powershell` step produces a PNG with all rows visible (requires WT font size small enough in user settings)                   |
+| ConPTY (Windows)     | Plain snapshot text is free of raw escape sequences — `@xterm/headless` absorbed them                                                     |

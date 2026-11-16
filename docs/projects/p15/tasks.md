@@ -4,7 +4,7 @@
 
 A track's `uri` (e.g. `SPOTIFY::TRACK::123`) used to be produced only **after** the
 primary source was fetched, inside `startPrimaryMetadataFetching()`. That method
-also re-discovered *which* service recognized the URL by looping over every
+also re-discovered _which_ service recognized the URL by looping over every
 registered metadata service and calling its static `parseUrl` ("if/if/if").
 Unrecognized URLs were silently dropped at the `detectUrls` stage and never became
 tasks.
@@ -187,10 +187,10 @@ Add the `P15` row and this task breakdown.
 
 | Check                     | Action                                                                                                       |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Types & lint              | `yarn type-check` and `yarn lint` clean                                                                       |
-| URI shown before fetch    | `yarn dev` → paste a Spotify track URL → URL column shows `SPOTIFY::TRACK::…` immediately, badge `[SPOTIFY]`  |
-| YouTube Music platform    | Paste `music.youtube.com/watch?v=…` → shows `YOUTUBEMUSIC::TRACK::…`                                          |
-| Unknown URLs become tasks | Paste a Deezer/Apple/Tidal/SoundCloud or random URL → modal `[UNKNOWN]`, task created, URL column `Unknown`   |
-| Recognized fetch works    | Run a recognized task with "Fetch Metadata" → primary fetch works (driven by stored `recognizedServiceKey`)   |
-| Unknown fetch fails clean  | Run an Unknown task with "Fetch Metadata" → fails "Primary metadata unavailable" (unchanged behavior)         |
+| Types & lint              | `yarn type-check` and `yarn lint` clean                                                                      |
+| URI shown before fetch    | `yarn dev` → paste a Spotify track URL → URL column shows `SPOTIFY::TRACK::…` immediately, badge `[SPOTIFY]` |
+| YouTube Music platform    | Paste `music.youtube.com/watch?v=…` → shows `YOUTUBEMUSIC::TRACK::…`                                         |
+| Unknown URLs become tasks | Paste a Deezer/Apple/Tidal/SoundCloud or random URL → modal `[UNKNOWN]`, task created, URL column `Unknown`  |
+| Recognized fetch works    | Run a recognized task with "Fetch Metadata" → primary fetch works (driven by stored `recognizedServiceKey`)  |
+| Unknown fetch fails clean | Run an Unknown task with "Fetch Metadata" → fails "Primary metadata unavailable" (unchanged behavior)        |
 | Snapshot round-trip       | Save a session and reload → `uri` / `recognizedServiceKey` survive                                           |

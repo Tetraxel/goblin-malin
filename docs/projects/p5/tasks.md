@@ -10,12 +10,12 @@
 
 ```typescript
 type TrackDownloadSource = {
-  state: "pending" | "searching" | "downloading" | "downloaded" | "failed";
-  provider: "ytdlp" | "soulseek";
-  track: TrackMetadata; // the metadata source used to find this download
-  localFile?: LocalFile; // { state: 'found'|'not_found', path, name, extension, sourceUrl }
-  downloadedAt: Date;
-  selected: boolean; // exists but all sources are set to true — no exclusive selection
+    state: "pending" | "searching" | "downloading" | "downloaded" | "failed";
+    provider: "ytdlp" | "soulseek";
+    track: TrackMetadata; // the metadata source used to find this download
+    localFile?: LocalFile; // { state: 'found'|'not_found', path, name, extension, sourceUrl }
+    downloadedAt: Date;
+    selected: boolean; // exists but all sources are set to true — no exclusive selection
 };
 ```
 
@@ -43,21 +43,21 @@ Two new optional fields in `types.ts`:
 
 ```typescript
 type FileInfo = {
-  format: "flac" | "mp3" | "ogg";
-  sizeBytes: number;
-  durationMs: number;
-  embeddedTags: Record<string, string | string[]>; // raw Vorbis Comment / ID3 tags
+    format: "flac" | "mp3" | "ogg";
+    sizeBytes: number;
+    durationMs: number;
+    embeddedTags: Record<string, string | string[]>; // raw Vorbis Comment / ID3 tags
 };
 
 type SavedFile = {
-  path: string; // final on-disk path (output directory, not temp)
-  savedAt: Date;
+    path: string; // final on-disk path (output directory, not temp)
+    savedAt: Date;
 };
 
 type TrackDownloadSource = {
-  // ... existing fields ...
-  fileInfo?: FileInfo; // populated after download completes
-  savedFile?: SavedFile; // populated after the user saves via P6
+    // ... existing fields ...
+    fileInfo?: FileInfo; // populated after download completes
+    savedFile?: SavedFile; // populated after the user saves via P6
 };
 ```
 
@@ -106,6 +106,7 @@ _Depends on: T5.1_
 `sound-play` was not used. Playback is handled by `MpvPlayer` (see [play-music-audit.md](play-music-audit.md#what-was-actually-built)) — a custom direct-IPC mpv client that provides real pause/resume and seek, not just play/stop.
 
 **Controls (in `DownloadSourceDetail` when detail pane is active):**
+
 - `[Space]` — play if stopped, toggle pause/resume if already playing
 - `[Shift+←]` / `[Shift+→]` — seek −5 s / +5 s (added beyond original spec)
 
@@ -201,14 +202,14 @@ _Depends on: T5.3, T5.4, T5.5, T5.6, T5.7, T5.8, P2/T2.9, P1/T1.2_
 
 ## Summary
 
-| Task | What                                                                    | Depends on                   | Status |
-| ---- | ----------------------------------------------------------------------- | ---------------------------- | ------ |
-| T5.1 | Add `fileInfo` and `savedFile` to `TrackDownloadSource`                 | —                            | ✅     |
-| T5.2 | Populate `fileInfo` from FLAC file after download in `YtDlpService`     | T5.1                         | ✅     |
-| T5.3 | `DownloadSourceTree` — grouped tree with state badges                   | T5.1                         | ✅     |
-| T5.4 | `DownloadSourceDetail` — file info, embedded tags, saved/missing states | T5.1                         | ✅     |
-| T5.5 | Audio playback with `[Space]`, seek `[Shift+←/→]`, live progress bar   | T5.1, T5.4                   | ✅     |
-| T5.6 | Exclusive source selection via `[Enter]` in the tree                    | T5.1, T5.3                   | ✅     |
-| T5.7 | Diff view when switching source after a file is already saved           | T5.4, T5.6                   | ✅     |
-| T5.8 | `[Ctrl+F]` file relocation via `TaskPrompt`                             | T5.1, T5.4, P1/T1.5          | ✅     |
+| Task | What                                                                    | Depends on                  | Status |
+| ---- | ----------------------------------------------------------------------- | --------------------------- | ------ |
+| T5.1 | Add `fileInfo` and `savedFile` to `TrackDownloadSource`                 | —                           | ✅     |
+| T5.2 | Populate `fileInfo` from FLAC file after download in `YtDlpService`     | T5.1                        | ✅     |
+| T5.3 | `DownloadSourceTree` — grouped tree with state badges                   | T5.1                        | ✅     |
+| T5.4 | `DownloadSourceDetail` — file info, embedded tags, saved/missing states | T5.1                        | ✅     |
+| T5.5 | Audio playback with `[Space]`, seek `[Shift+←/→]`, live progress bar    | T5.1, T5.4                  | ✅     |
+| T5.6 | Exclusive source selection via `[Enter]` in the tree                    | T5.1, T5.3                  | ✅     |
+| T5.7 | Diff view when switching source after a file is already saved           | T5.4, T5.6                  | ✅     |
+| T5.8 | `[Ctrl+F]` file relocation via `TaskPrompt`                             | T5.1, T5.4, P1/T1.5         | ✅     |
 | T5.9 | Wire `DownloadPanel` into `SecondaryPanel` + focus state                | T5.3–T5.8, P2/T2.9, P1/T1.2 | ✅     |

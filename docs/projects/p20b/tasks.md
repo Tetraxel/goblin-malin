@@ -16,20 +16,20 @@ The "flow" concept (`FlowBase` + `FlowOrchestrator`'s flow registry + `MusicDown
 
 **The "weird useEffect/state" tax** (the actual pain this project removes):
 
-- [App.tsx](../../../src/components/App.tsx): `activeFlowId` is a `useState` **that can never change** (initialized to the only flow; the only setter path is the dead FlowSelector) — and flow registration happens as a *side effect inside the useState initializer*. `filteredTasks` re-filters by `task.getFlowId() === activeFlowId` on every task change — always a no-op copy.
+- [App.tsx](../../../src/components/App.tsx): `activeFlowId` is a `useState` **that can never change** (initialized to the only flow; the only setter path is the dead FlowSelector) — and flow registration happens as a _side effect inside the useState initializer_. `filteredTasks` re-filters by `task.getFlowId() === activeFlowId` on every task change — always a no-op copy.
 - App.tsx's flow-subscription effect mirrors `getToolbarButtons()`/`getColumns()` into React state, with a hand-rolled structural-equality check to avoid breaking `React.memo` — class pub-sub re-imported into React through the back door.
-- **Display mode lives in two stores at once**: `MusicDownloadFlow.displayMode` (class field, notifies flow subscribers → App recomputes columns) *and* `FocusContext.primaryMode` (drives SecondaryPanel). Every `1`/`2` keypress writes both: `switchMode(flow, "1"); setPrimaryMode("metadata")` ([InputRouter.tsx](../../../src/components/InputRouter.tsx)).
+- **Display mode lives in two stores at once**: `MusicDownloadFlow.displayMode` (class field, notifies flow subscribers → App recomputes columns) _and_ `FocusContext.primaryMode` (drives SecondaryPanel). Every `1`/`2` keypress writes both: `switchMode(flow, "1"); setPrimaryMode("metadata")` ([InputRouter.tsx](../../../src/components/InputRouter.tsx)).
 - Defensive optional-member dances everywhere the "generic" flow is consumed: `currentFlow?.getFlowSettings?.()` / `currentFlow?.buildFlowSettingsItems?.(…)` ([SettingsModal.tsx](../../../src/components/SettingsModal/SettingsModal.tsx)), `typeof flow.switchMode !== "function"` ([useFocusManager.ts](../../../src/hooks/useFocusManager.ts)), `if (flow.createTasksFromSnapshots)` ([sessionManager.ts](../../../src/sessions/sessionManager.ts)), `flow: FlowBase | undefined` props forcing `currentFlow && …` guards through [AppInner.tsx](../../../src/components/AppInner.tsx).
 - The abstraction already leaks its single-flow reality: `sessionManager.ts:120` hardcodes `flowId: "music-downloader"`; `useRunAllButton` filters `t.getFlowId() === flow.id` — always true; `Task.flowId` is threaded through every constructor to feed those no-op checks.
 
 ### What stays (the real extensibility axes)
 
-| Keep | Why |
-| ---- | --- |
-| `FlowOrchestrator`'s task engine (pump, concurrency, abort, subscribe) | Post-P20 it's an excellent, flow-agnostic scheduler. Only its flow-registry surface goes. |
-| `Task` / `TaskStatus` / `TaskSnapshot` | The orchestrator's unit of work — generic and load-bearing (sessions, P25). Only `flowId` goes. |
-| The three **service registries** + provider registration | This is the product's actual extensibility axis (CLAUDE.md philosophy) — untouched. |
-| **Dynamic** columns / contextual actions / toolbar buttons | Stay dynamic (registry-driven lists), but become plain module functions instead of class methods reached through subscriptions. |
+| Keep                                                                   | Why                                                                                                                             |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `FlowOrchestrator`'s task engine (pump, concurrency, abort, subscribe) | Post-P20 it's an excellent, flow-agnostic scheduler. Only its flow-registry surface goes.                                       |
+| `Task` / `TaskStatus` / `TaskSnapshot`                                 | The orchestrator's unit of work — generic and load-bearing (sessions, P25). Only `flowId` goes.                                 |
+| The three **service registries** + provider registration               | This is the product's actual extensibility axis (CLAUDE.md philosophy) — untouched.                                             |
+| **Dynamic** columns / contextual actions / toolbar buttons             | Stay dynamic (registry-driven lists), but become plain module functions instead of class methods reached through subscriptions. |
 
 If a second "flow" ever really materializes, nothing here forecloses it: the engine, Task, and registry patterns remain generic, and the right shape can be chosen then (separate entry point, top-level mode, or reintroducing a seam) with real requirements instead of speculative ones.
 
@@ -53,7 +53,7 @@ _Depends on: nothing_
 Replace App.tsx's flow-subscription → `setState` mirroring:
 
 - `const TOOLBAR_BUTTONS = [useRunAllButton, useSessionsButton, useSettingsButton, useExitButton]` — a module constant (the flow's contribution was always exactly `[useRunAllButton]`). No state, no effect.
-- `const columns = useMemo(() => computeColumns(primaryMode), [primaryMode, settingsVersion])` — with a small new `useSettingsVersion()` hook (subscribe to `SettingsStore.onSettingsChanged`, bump a counter). This replaces the flow pub-sub channel *and* the structural-equality workaround: memoization now comes from honest `useMemo` inputs. Column-ratio saves (`setColumnRatios`) already go through the settings store, so they retrigger the memo naturally.
+- `const columns = useMemo(() => computeColumns(primaryMode), [primaryMode, settingsVersion])` — with a small new `useSettingsVersion()` hook (subscribe to `SettingsStore.onSettingsChanged`, bump a counter). This replaces the flow pub-sub channel _and_ the structural-equality workaround: memoization now comes from honest `useMemo` inputs. Column-ratio saves (`setColumnRatios`) already go through the settings store, so they retrigger the memo naturally.
 - Delete `FlowBase.subscribe`/`notifyTaskSubscribers` and App's `toolbarButtons`/`columns` state + effect.
 
 _Depends on: T20b.1, T20b.3 (the `computeColumns` module)_
@@ -64,15 +64,15 @@ _Depends on: T20b.1, T20b.3 (the `computeColumns` module)_
 
 Split the 689-line god class (`musicDownloadFlow.ts`) by responsibility — same folder, no behavior change:
 
-| New module | Contents (moved, not rewritten) |
-| ---------- | ------------------------------- |
-| `registries.ts` | The three `ServiceRegistry` instances as module singletons + all `.register(…)` calls. **Adding a provider stays a one-line change here.** |
-| `taskFactory.ts` | `createTasksFromUrls`, `createTasksFromSnapshots`, and the dedup logic currently in `FlowBase.importTasks` (the one real method the base class had). |
-| `runController.ts` | `runAll`, `runSelected`, `stopAll`, `restartTask` — thin functions over the orchestrator. |
-| `columns.tsx` | `getColumns()` → `computeColumns(mode)` (pure: mode + settings in, `ColumnDefinition[]` out) + `saveColumnRatios()`. |
-| `contextualActions.ts` | `getContextualActionBar` → `buildContextualActionBar(task, ctx)` + the two private builder helpers. |
-| `settings.ts` | Flow-settings accessors as plain functions over `SettingsStore` with a module constant key; delete the `FlowSettings` wrapper class (`flow-settings.ts`). |
-| `init.ts` | `initMusicApp(orchestrator)`: provider registration + `applyConcurrencySettings` + the settings-change subscription. Called **once, explicitly, from the entry point** (`cli.ts`/`index.tsx`) — replacing the side-effectful `useState` initializer in App.tsx. |
+| New module             | Contents (moved, not rewritten)                                                                                                                                                                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `registries.ts`        | The three `ServiceRegistry` instances as module singletons + all `.register(…)` calls. **Adding a provider stays a one-line change here.**                                                                                                                      |
+| `taskFactory.ts`       | `createTasksFromUrls`, `createTasksFromSnapshots`, and the dedup logic currently in `FlowBase.importTasks` (the one real method the base class had).                                                                                                            |
+| `runController.ts`     | `runAll`, `runSelected`, `stopAll`, `restartTask` — thin functions over the orchestrator.                                                                                                                                                                       |
+| `columns.tsx`          | `getColumns()` → `computeColumns(mode)` (pure: mode + settings in, `ColumnDefinition[]` out) + `saveColumnRatios()`.                                                                                                                                            |
+| `contextualActions.ts` | `getContextualActionBar` → `buildContextualActionBar(task, ctx)` + the two private builder helpers.                                                                                                                                                             |
+| `settings.ts`          | Flow-settings accessors as plain functions over `SettingsStore` with a module constant key; delete the `FlowSettings` wrapper class (`flow-settings.ts`).                                                                                                       |
+| `init.ts`              | `initMusicApp(orchestrator)`: provider registration + `applyConcurrencySettings` + the settings-change subscription. Called **once, explicitly, from the entry point** (`cli.ts`/`index.tsx`) — replacing the side-effectful `useState` initializer in App.tsx. |
 
 Singleton state the class carried (`instance`, `tasks` mirror, `maxConcurrentTasks` — declared but ignored since P20) is deleted; the orchestrator already owns the task list.
 
@@ -134,18 +134,18 @@ _Depends on: T20b.1–T20b.7_
 
 ## Summary
 
-| Task  | What                                                             | Depends on    |
-| ----- | ----------------------------------------------------------------- | ------------- |
-| T20b.1 | `primaryMode` becomes the only display-mode state                 | —             |
-| T20b.2 | Columns/toolbar as `useMemo` derivations; delete flow pub-sub     | T20b.1, T20b.3  |
-| T20b.3 | Split `MusicDownloadFlow` into plain modules + explicit `init`    | T20b.1         |
-| T20b.4 | `TaskOrchestrator` (engine only); delete `flow-base.ts`           | T20b.2, T20b.3  |
-| T20b.5 | Remove flow props/guards from the component tree; delete dead code| T20b.3, T20b.4  |
-| T20b.6 | Drop `Task.flowId`; settings/sessions key migration               | T20b.5         |
-| T20b.7 | Relocate bridges; optional folder rename (+ docs sweep)           | T20b.4, T20b.5  |
-| T20b.8 | Per-step verification, behavior checklist, grep gate              | T20b.1–T20b.7   |
+| Task   | What                                                               | Depends on     |
+| ------ | ------------------------------------------------------------------ | -------------- |
+| T20b.1 | `primaryMode` becomes the only display-mode state                  | —              |
+| T20b.2 | Columns/toolbar as `useMemo` derivations; delete flow pub-sub      | T20b.1, T20b.3 |
+| T20b.3 | Split `MusicDownloadFlow` into plain modules + explicit `init`     | T20b.1         |
+| T20b.4 | `TaskOrchestrator` (engine only); delete `flow-base.ts`            | T20b.2, T20b.3 |
+| T20b.5 | Remove flow props/guards from the component tree; delete dead code | T20b.3, T20b.4 |
+| T20b.6 | Drop `Task.flowId`; settings/sessions key migration                | T20b.5         |
+| T20b.7 | Relocate bridges; optional folder rename (+ docs sweep)            | T20b.4, T20b.5 |
+| T20b.8 | Per-step verification, behavior checklist, grep gate               | T20b.1–T20b.7  |
 
-**Sequencing note:** if adopted, do P20b *before* implementing P21–P28 — they touch the same seams (`createTasksFromUrls`, contextual actions, settings items), and building them on the de-classed modules avoids refactoring each one twice. The P21–P28 docs' file references stay greppable either way.
+**Sequencing note:** if adopted, do P20b _before_ implementing P21–P28 — they touch the same seams (`createTasksFromUrls`, contextual actions, settings items), and building them on the de-classed modules avoids refactoring each one twice. The P21–P28 docs' file references stay greppable either way.
 
 ---
 

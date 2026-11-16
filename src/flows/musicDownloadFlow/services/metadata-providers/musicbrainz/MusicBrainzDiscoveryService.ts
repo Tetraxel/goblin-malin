@@ -3,7 +3,7 @@ import { type ProviderDisplay } from "#base/providerDisplay";
 import { type ProviderSettingsSchema } from "#base/providerSettings";
 import { StatusType } from "#base/task/task-status";
 import { Cached } from "#utils/cache";
-import type { TrackMetadata, DiscoveryResult } from "#flows/musicDownloadFlow/types";
+import type { TrackMetadata, DiscoveryResult, QueryField } from "#flows/musicDownloadFlow/types";
 import { DiscoveryMetadataService } from "#flows/musicDownloadFlow/discoveryMetadataService";
 import { type DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { MusicBrainzClient } from "../../apis/musicbrainz-client";
@@ -80,8 +80,23 @@ export class MusicBrainzDiscoveryService extends DiscoveryMetadataService {
 
             const recordingUrl = `https://musicbrainz.org/recording/${recordingId}`;
 
+            // What was asked, in the order the client tries it (the ISRC first, then the names).
+            const query: QueryField[] = [
+                ...(isrc ? [{ label: "ISRC", value: isrc }] : []),
+                ...(trackName
+                    ? [
+                          {
+                              label: "Search",
+                              value: `recording:${trackName}${artistName ? ` artist:${artistName}` : ""}`,
+                          },
+                      ]
+                    : []),
+                { label: "Recording", value: recordingUrl },
+            ];
+
             return {
                 tracks,
+                query,
                 anchor: {
                     state: "found",
                     url: recordingUrl,

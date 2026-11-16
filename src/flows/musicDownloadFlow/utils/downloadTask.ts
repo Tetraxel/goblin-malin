@@ -30,7 +30,7 @@ import { runWithoutCache, isCacheSkipped } from "#utils/cache";
 import { overwriteConfirmBridge } from "#base/bridges/overwriteConfirmBridge";
 import { SafeAction } from "#utils/decorators";
 import { metadataLimiter, downloadLimiter } from "./stageLimiters";
-import { computeConfidenceScore } from "./confidence";
+import { computeConfidenceBreakdown, computeConfidenceScore, MIN_SEARCH_CONFIDENCE } from "./confidence";
 import { resolveTrackRecognition } from "./resolveTrackRecognition";
 import { formatTrackUri, parseTrackUri } from "./trackUri";
 import { ensureDiscoveryConsent, getUnansweredConsentKeys } from "./discoveryConsent";
@@ -69,8 +69,7 @@ function normalizeDiscoveryResult(raw: unknown): DiscoveryResult {
 
 // A last-resort service (an AI guessing links) only gets a result into the list if, once the platform
 // has returned the real metadata, it scores at least this well against the primary track (0–100).
-// Title alone is worth 40, so a same-title cover by someone else does not pass.
-const LAST_RESORT_MIN_CONFIDENCE = 50;
+const LAST_RESORT_MIN_CONFIDENCE = MIN_SEARCH_CONFIDENCE;
 
 // Handle on the discovery stage currently running, so the user can cut it short.
 interface DiscoveryRun {
@@ -239,8 +238,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             };
         } else {
             const primaryMeta = this.getPrimaryMetadata()?.metadata;
-            const confidence =
-                isPrimaryInput || !primaryMeta ? undefined : computeConfidenceScore(metadata, primaryMeta);
+            const breakdown =
+                isPrimaryInput || !primaryMeta ? undefined : computeConfidenceBreakdown(metadata, primaryMeta);
 
             const newResult: MetadataResultState = {
                 metadata,
@@ -248,7 +247,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 isFavorited: false,
                 isRejected: false,
                 rank: group.results.length,
-                confidence,
+                confidence: breakdown?.score,
+                confidenceParts: breakdown?.parts,
                 discoverySources,
                 fetchState,
                 fetchError,
@@ -573,6 +573,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                                 discoveredBy: serviceKey,
                                 fromUri: primaryUri,
                                 searchKeys: result.searchKeys,
+                                ...(result.query ? { query: result.query } : {}),
                             },
                         ]);
                     }
@@ -682,6 +683,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 tracks: allDiscovered,
                 anchor,
                 searchKeys,
+                query,
                 explanations,
                 summaries,
             } = normalizeDiscoveryResult(await (bypassCache ? runWithoutCache(discover) : discover()));
@@ -726,6 +728,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                     discoveredBy: rudimentary.fetchedBy,
                     fromUri: primaryUri,
                     searchKeys: searchKeys ?? ["url"],
+                    ...(query && query.length > 0 ? { query } : {}),
                     ...(rudimentary.uri && explanations?.[rudimentary.uri]
                         ? { explanation: explanations[rudimentary.uri] }
                         : {}),
@@ -1018,7 +1021,12 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             const results = await service.searchTrack(primaryMetadata!);
             for (const result of results) {
                 this.addResultToGroup(result.metadata, serviceKey, [
-                    { discoveredBy: serviceKey, fromUri: primaryUri, searchKeys: result.searchKeys },
+                    {
+                        discoveredBy: serviceKey,
+                        fromUri: primaryUri,
+                        searchKeys: result.searchKeys,
+                        ...(result.query ? { query: result.query } : {}),
+                    },
                 ]);
             }
             this.logger.info(`Re-search completed for ${serviceKey}`);
@@ -1292,6 +1300,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 rank: r.rank + 1,
                 isFavorited: fetchState ? r.isFavorited : false,
             }));
+            const breakdown = !fetchState && primary ? computeConfidenceBreakdown(metadata, primary) : undefined;
             group.results = [
                 {
                     metadata,
@@ -1299,7 +1308,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                     isFavorited: !fetchState,
                     isRejected: false,
                     rank: 0,
-                    confidence: !fetchState && primary ? computeConfidenceScore(metadata, primary) : undefined,
+                    confidence: breakdown?.score,
+                    confidenceParts: breakdown?.parts,
                     discoverySources: [source],
                     addedByUser: true,
                     fetchState,

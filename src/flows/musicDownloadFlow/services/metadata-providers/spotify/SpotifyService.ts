@@ -15,6 +15,7 @@ import {
     type SearchTrackResult,
 } from "#flows/musicDownloadFlow/types";
 import { type DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { computeConfidenceScore, MIN_SEARCH_CONFIDENCE } from "#flows/musicDownloadFlow/utils/confidence";
 import { type ProviderAlbum } from "#flows/musicDownloadFlow/musicbrainz/types";
 import { SpotifyCell } from "./SpotifyCell";
 import { MetadataService } from "../../../metadataService";
@@ -22,6 +23,9 @@ import { getSpotifyEmbedDetails } from "../../apis/spotify-url-info-client";
 import { convertSpotifyUrlInfoToTrack } from "./convertSpotifyUrlInfoToTrack";
 import { getMetadataProviderSettings } from "../../../saveSettings";
 import { resolveSpotifyMarket } from "./spotifyMarket";
+
+/** How many of Spotify's top hits `searchTrack` scores before choosing one. */
+const SEARCH_CANDIDATES = 8;
 
 export type SpotifyTokenResponse = {
     access_token: string;
@@ -578,31 +582,52 @@ export class SpotifyService extends MetadataService {
                 query,
                 ["track"],
                 resolveSpotifyMarket(getMetadataProviderSettings("spotify").market),
-                1
+                SEARCH_CANDIDATES as Parameters<typeof client.search>[3]
             );
 
             if (!searchResults.tracks?.items || searchResults.tracks.items.length === 0) {
                 throw new Error(`No Spotify results found for: ${query}`);
             }
 
-            const spotifyTrack = searchResults.tracks.items[0];
-            const spotifyUrl = spotifyTrack.external_urls?.spotify || "";
-            const standardTrack = this.convertSpotifyTrack(spotifyTrack, spotifyUrl);
-
-            const metadata: TrackMetadata = {
-                ...standardTrack,
-                platform: "spotify",
-                apiProvider: "spotify",
-                uri: `SPOTIFY::TRACK::${spotifyTrack.id}` as TrackUri<"spotify">,
-                fetchedAt: new Date(),
-                type: "track",
-            };
-
+            // Spotify's first hit is only the one it ranks first for the words: score the top few against the track
+            // and keep the best, if it is good enough.
+            const candidates = searchResults.tracks.items
+                .map((spotifyTrack, index) => {
+                    const standardTrack = this.convertSpotifyTrack(
+                        spotifyTrack,
+                        spotifyTrack.external_urls?.spotify || ""
+                    );
+                    const metadata: TrackMetadata = {
+                        ...standardTrack,
+                        platform: "spotify",
+                        apiProvider: "spotify",
+                        uri: `SPOTIFY::TRACK::${spotifyTrack.id}` as TrackUri<"spotify">,
+                        fetchedAt: new Date(),
+                        type: "track",
+                    };
+                    return { metadata, rank: index + 1, score: computeConfidenceScore(metadata, sourceTrackMetadata) };
+                })
+                .sort((a, b) => b.score - a.score);
+            const best = candidates[0];
             this.status.clear();
+            if (best.score < MIN_SEARCH_CONFIDENCE) {
+                this.logger.info(
+                    `Spotify: none of the top ${candidates.length} hits looks like the track (best ${best.score}%: "${best.metadata.trackName}")`
+                );
+                return [];
+            }
+
             return [
                 {
-                    metadata,
+                    metadata: best.metadata,
                     searchKeys: hasIsrc ? ["trackName+artistName+isrc"] : ["trackName+artistName"],
+                    query: [
+                        { label: "Search", value: query },
+                        {
+                            label: "Kept",
+                            value: `the best of the top ${candidates.length} tracks (hit ${best.rank}, ${best.score}% as listed; at least ${MIN_SEARCH_CONFIDENCE}% needed)`,
+                        },
+                    ],
                 },
             ];
         } catch (error) {

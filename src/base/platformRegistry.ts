@@ -9,8 +9,10 @@ import { type ParsedUrl } from "./urlParser";
  *   links are YouTube videos: `youtubeMusic` is an alias of `youtube`).
  * - `trackUrl(id)` — the canonical URL of a track on the service's own platform.
  * - `openUri(parsed)` — the address that opens one of its links in the platform's desktop app.
+ * - `upstreamCodec` — the lossy codec the platform always serves ("Opus" for YouTube), when it is always the same.
  */
 class PlatformRegistry {
+    private upstreamCodecs = new Map<string, string>();
     private aliases = new Map<string, string>();
     private trackUrls = new Map<string, (id: string) => string>();
     private openUris = new Map<string, (parsed: ParsedUrl) => string | undefined>();
@@ -25,6 +27,18 @@ class PlatformRegistry {
 
     registerOpenUri(platform: string, openUri: (parsed: ParsedUrl) => string | undefined): void {
         this.openUris.set(platform, openUri);
+    }
+
+    registerUpstreamCodec(platform: string, codec: string): void {
+        this.upstreamCodecs.set(platform, codec);
+    }
+
+    /**
+     * The codec every stream of the platform is in, or `undefined` when its service did not declare one (a platform
+     * that serves several codecs, or none known).
+     */
+    upstreamCodec(platform: string): string | undefined {
+        return this.upstreamCodecs.get(this.canonical(platform));
     }
 
     /** The platform key a service is registered under for `platform` (itself unless it is an alias). */

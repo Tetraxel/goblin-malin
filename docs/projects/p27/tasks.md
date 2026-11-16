@@ -6,8 +6,8 @@
 
 Current blind spots:
 
-- `readFileInfo` ([readFileInfo.ts](../../../src/flows/musicDownloadFlow/utils/readFileInfo.ts)) can't read the real duration from FLAC (`flac-tagger` limitation, documented P5/T5.2 deviation) — it stores the *metadata* duration as `durationMs`. The one signal that would catch most wrong matches is currently faked to always agree.
-- Release blocker (TODO.md): *"Set MusicBrainzReleaseId"* — MB release IDs are missing from tags when discovery didn't resolve them; fingerprinting resolves recordings even when text search fails.
+- `readFileInfo` ([readFileInfo.ts](../../../src/flows/musicDownloadFlow/utils/readFileInfo.ts)) can't read the real duration from FLAC (`flac-tagger` limitation, documented P5/T5.2 deviation) — it stores the _metadata_ duration as `durationMs`. The one signal that would catch most wrong matches is currently faked to always agree.
+- Release blocker (TODO.md): _"Set MusicBrainzReleaseId"_ — MB release IDs are missing from tags when discovery didn't resolve them; fingerprinting resolves recordings even when text search fails.
 
 This project adds a verification verdict per download source — cheap duration check always, opt-in acoustic fingerprint (AcoustID/Chromaprint) for certainty — and uses the fingerprint result to complete missing MusicBrainz IDs.
 
@@ -47,7 +47,7 @@ _Depends on: T27.1_
 
 - `fpcalc` (Chromaprint's CLI) becomes an **optional** managed binary: a doctor check (P24) with an auto-download fix, and a `verification.fingerprintEnabled` setting (default off until the binary is present — enabling it from settings triggers the doctor fix).
 - `src/flows/musicDownloadFlow/utils/fingerprint.ts`: run `fpcalc -json` on the downloaded file → fingerprint + duration → query the AcoustID API (free API key, stored as `ACOUSTID_API_KEY` via a minimal wizard; the app can ship a registered application key as default) → MusicBrainz recording IDs with match scores.
-- Verdict upgrade: recording ID matches the one discovery found (or the ISRC-linked recording) → `verified (fingerprint)` — certainty even when durations coincidentally agree; a confident *different* recording → `mismatch` with both titles shown in the detail panel.
+- Verdict upgrade: recording ID matches the one discovery found (or the ISRC-linked recording) → `verified (fingerprint)` — certainty even when durations coincidentally agree; a confident _different_ recording → `mismatch` with both titles shown in the detail panel.
 - Runs post-download through its own small semaphore (CPU-bound), status via the service status (P25) when available.
 
 _Depends on: T27.1; coordinates with P24 (doctor), P25 (status)_
@@ -56,7 +56,7 @@ _Depends on: T27.1; coordinates with P24 (doctor), P25 (status)_
 
 ### T27.4 — MusicBrainz release-ID completion (release blocker)
 
-> **Superseded by [P30](../p30/tasks.md).** The "earliest official release" heuristic below picks *a* release, not necessarily the user's edition; P30 matches the release by barcode / streaming link / ISRC and asks when unsure. The fingerprint (T27.3) can still feed P30 as one more piece of evidence.
+> **Superseded by [P30](../p30/tasks.md).** The "earliest official release" heuristic below picks _a_ release, not necessarily the user's edition; P30 matches the release by barcode / streaming link / ISRC and asks when unsure. The fingerprint (T27.3) can still feed P30 as one more piece of evidence.
 
 When a recording ID is known (from fingerprint T27.3, or from the existing MusicBrainz discovery/ISRC path) but release-level IDs are missing from compiled metadata:
 
@@ -86,11 +86,11 @@ _Depends on: T27.2–T27.5_
 
 ## Summary
 
-| Task  | What                                                        | Depends on |
-| ----- | ------------------------------------------------------------ | ---------- |
-| T27.1 | Real ffprobe duration/codec (fixes P5 deviation)             | —          |
-| T27.2 | Duration verdict + glyphs + auto-select guard                | T27.1      |
-| T27.3 | Opt-in Chromaprint/AcoustID fingerprint verification         | T27.1      |
-| T27.4 | Fill missing MB release IDs (release blocker)                | T27.3      |
-| T27.5 | Confirm-gate on saving unverified audio                      | T27.2      |
-| T27.6 | Threshold/heuristic tests + TUI scenario                     | T27.2–T27.5|
+| Task  | What                                                 | Depends on  |
+| ----- | ---------------------------------------------------- | ----------- |
+| T27.1 | Real ffprobe duration/codec (fixes P5 deviation)     | —           |
+| T27.2 | Duration verdict + glyphs + auto-select guard        | T27.1       |
+| T27.3 | Opt-in Chromaprint/AcoustID fingerprint verification | T27.1       |
+| T27.4 | Fill missing MB release IDs (release blocker)        | T27.3       |
+| T27.5 | Confirm-gate on saving unverified audio              | T27.2       |
+| T27.6 | Threshold/heuristic tests + TUI scenario             | T27.2–T27.5 |

@@ -4,6 +4,7 @@ import { type DiscoverySource, type SearchKey } from "#flows/musicDownloadFlow/t
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
 import { Uri } from "./Uri";
+import { QueryLines } from "#components/SecondaryPanel/DownloadPanel/DownloadSourceTree/QueryLines";
 import { wrapText } from "#utils/wrapText";
 import { clipText, firstSentence } from "#utils/textSummary";
 
@@ -89,6 +90,9 @@ export const DiscoverySourceLine: React.FC<DiscoverySourceLineProps> = ({ source
                     </Text>
                 </Box>
             </Box>
+            {source.query && source.query.length > 0 && (
+                <QueryLines query={source.query} indent={LINE_INDENT + 3} truncate dimmed={dimmed} />
+            )}
             {whyLines.length > 0 && (
                 <Box marginLeft={LINE_INDENT + 3} flexDirection="row" flexShrink={0}>
                     <Box flexShrink={0}>

@@ -7,6 +7,7 @@ import { useTheme } from "#base/themeContext";
 import { type Theme } from "#base/theme";
 import { Uri } from "./Uri";
 import { DiscoverySourceLine } from "./DiscoverySourceLine";
+import { ConfidenceLine } from "./ConfidenceLine";
 
 function formatDuration(ms: number | undefined): string {
     if (!ms) return "";
@@ -149,6 +150,15 @@ export const MetadataResultRow = React.memo(function MetadataResultRow({
             {sourceLines.map((src, i) => (
                 <DiscoverySourceLine key={i} source={src} dimmed={isDimmed} width={width} />
             ))}
+            {/* How the confidence badge adds up (not for the primary input or a link the user pasted: nothing to score) */}
+            {sourceLines.length > 0 && result.confidenceParts && !result.isPrimaryInput && !result.addedByUser && (
+                <ConfidenceLine
+                    parts={result.confidenceParts}
+                    score={result.confidence}
+                    dimmed={isDimmed}
+                    width={width}
+                />
+            )}
         </Box>
     );
 });

@@ -17,26 +17,24 @@ This project adds a **Setup Wizard** system:
 
 ```typescript
 export type WizardContentBlock =
-  | { type: "paragraph"; text: string }
-  | { type: "note"; text: string } // renders as a [!NOTE] admonition box
-  | { type: "orderedList"; items: WizardListItem[] };
+    | { type: "paragraph"; text: string }
+    | { type: "note"; text: string } // renders as a [!NOTE] admonition box
+    | { type: "orderedList"; items: WizardListItem[] };
 
-export type WizardListItem =
-  | { type: "text"; text: string }
-  | { type: "link"; text: string; url: string }; // Enter to open in default browser
+export type WizardListItem = { type: "text"; text: string } | { type: "link"; text: string; url: string }; // Enter to open in default browser
 
 export interface WizardField {
-  envVar: string; // e.g. 'SPOTIFY_CLIENT_ID'
-  label: string; // e.g. 'CLIENT_ID'  (shown left of the input)
-  hint?: string; // placeholder when empty
-  required?: boolean; // default true — blocks submit if empty
+    envVar: string; // e.g. 'SPOTIFY_CLIENT_ID'
+    label: string; // e.g. 'CLIENT_ID'  (shown left of the input)
+    hint?: string; // placeholder when empty
+    required?: boolean; // default true — blocks submit if empty
 }
 
 export interface SetupWizardConfig {
-  title: string; // e.g. 'Spotify Setup Wizard'
-  providerKey?: string; // used to color the modal border via providerDisplayRegistry
-  description: WizardContentBlock[];
-  fields: WizardField[];
+    title: string; // e.g. 'Spotify Setup Wizard'
+    providerKey?: string; // used to color the modal border via providerDisplayRegistry
+    description: WizardContentBlock[];
+    fields: WizardField[];
 }
 ```
 
@@ -154,13 +152,13 @@ private async getClient(): Promise<SpotifyApi> {
 import { exec } from "child_process";
 
 export function openUrl(url: string): void {
-  const cmd =
-    process.platform === "win32"
-      ? `start "" "${url}"`
-      : process.platform === "darwin"
-        ? `open "${url}"`
-        : `xdg-open "${url}"`;
-  exec(cmd);
+    const cmd =
+        process.platform === "win32"
+            ? `start "" "${url}"`
+            : process.platform === "darwin"
+              ? `open "${url}"`
+              : `xdg-open "${url}"`;
+    exec(cmd);
 }
 ```
 
@@ -325,10 +323,10 @@ Update `providerItems()` to accept a new `onOpenWizard: (config: SetupWizardConf
 
 ```typescript
 items.push({
-  kind: "action",
-  indent: 4,
-  label: "⚙  Setup Wizard",
-  run: () => onOpenWizard(ctor.setupWizard!),
+    kind: "action",
+    indent: 4,
+    label: "⚙  Setup Wizard",
+    run: () => onOpenWizard(ctor.setupWizard!),
 });
 ```
 
@@ -359,11 +357,7 @@ Read `openWizard` from `useFocusContext()`. Pass it as `onOpenWizard` to `buildF
 Add alongside the existing modals:
 
 ```tsx
-<SetupWizardModal
-  tasks={tasks}
-  terminalHeight={terminalHeight}
-  terminalWidth={terminalWidth}
-/>
+<SetupWizardModal tasks={tasks} terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
 ```
 
 | Status  |

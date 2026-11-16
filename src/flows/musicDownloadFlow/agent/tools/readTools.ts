@@ -313,7 +313,7 @@ type SearchInput = { query: string; platforms?: string[]; limit?: number };
 export const searchMusic = defineAgentTool<SearchInput>({
     name: "search_music",
     summary:
-        'Searches music by free text on the streaming platforms the app reads (the search box of each one): a title, an artist, "Title - Artist remix", "Artist live"… Returns tracks with their link, title, artists, album and duration. Nothing is added to the user\'s tasks: to add what you found, pass the links to add_tasks. One request per platform, so search once with a good query and only vary it if the results are poor.',
+        'Searches music by free text on the streaming platforms the app reads (the search box of each one): a title, an artist, "Title - Artist remix", "Artist live"… Returns tracks with their link, title, artists, album and duration. A result with `upload: true` is a video or upload anyone can post (YouTube videos, SoundCloud): often the only place a remix exists, but also where re-uploads, covers and wrong versions are, so check its title and duration and prefer a result without the flag when both fit. Nothing is added to the user\'s tasks: to add what you found, pass the links to add_tasks. One request per platform, so search once with a good query and only vary it if the results are poor.',
     kind: "read",
     locks: "none",
     undoable: false,
@@ -360,6 +360,8 @@ export const searchMusic = defineAgentTool<SearchInput>({
                     durationMs: track.duration,
                     isrc: track.isrc,
                     url: track.url,
+                    // Only when true: a video / upload anyone can post, not a catalogue release.
+                    ...(track.isUpload ? { upload: true } : {}),
                 })),
             })),
         };

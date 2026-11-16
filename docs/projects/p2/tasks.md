@@ -27,12 +27,12 @@
 
 **Key mapping (implemented):**
 
-| Key   | Effect                                                                                                           |
-| ----- | ---------------------------------------------------------------------------------------------------------------- |
-| `[1]` | Primary mode → Metadata: task list shows metadata columns, `setPrimaryMode("metadata")`                         |
-| `[2]` | Primary mode → Download: task list shows download columns, `setPrimaryMode("download")`                         |
-| `[3]` | Secondary panel → context-aware sources tab (`setSecondaryTab("sources")`)                                      |
-| `[4]` | Secondary panel → Logs (`setSecondaryTab("logs")`)                                                              |
+| Key   | Effect                                                                                  |
+| ----- | --------------------------------------------------------------------------------------- |
+| `[1]` | Primary mode → Metadata: task list shows metadata columns, `setPrimaryMode("metadata")` |
+| `[2]` | Primary mode → Download: task list shows download columns, `setPrimaryMode("download")` |
+| `[3]` | Secondary panel → context-aware sources tab (`setSecondaryTab("sources")`)              |
+| `[4]` | Secondary panel → Logs (`setSecondaryTab("logs")`)                                      |
 
 > **Deviation from plan:** `[1]`/`[2]` do **not** reset the secondary tab to `"sources"` — the plan called for `setSecondaryTab("sources")` alongside `setPrimaryMode(...)`. Currently they only switch the primary mode.
 
@@ -43,11 +43,13 @@
 ### T2.1 — Remove dev artifacts from `App.tsx` — ⚠️ PARTIAL
 
 Done:
+
 - ✅ BigText `<BigText text="Goblin Malin" />` and its import removed (was already commented out, dead code removed)
 - ✅ Color swatch `<Text>` debug blocks removed
 - ✅ Hardcoded absolute sound path `C:\Users\axel7\...\init.wav` replaced with a `import.meta.url`-relative resolve
 
 **Not done per plan:**
+
 - ❌ `soundPlay.play(...)` `useEffect` kept (path was fixed rather than removed)
 - ❌ `soundPlay`, `fileURLToPath`, `path` imports kept
 
@@ -141,10 +143,10 @@ A shared `TabBar` component (`src/components/TabBar.tsx`) was extracted to unify
 
 ```typescript
 interface TabBarProps {
-  width: number;
-  tabs: TabDef[];        // [{ key, label }]
-  activeTabKey: string;
-  splitPos?: number;     // if set, inserts ┴ junction at this x position
+    width: number;
+    tabs: TabDef[]; // [{ key, label }]
+    activeTabKey: string;
+    splitPos?: number; // if set, inserts ┴ junction at this x position
 }
 ```
 
@@ -154,15 +156,15 @@ interface TabBarProps {
 
 ## Summary
 
-| Task | What                                                        | Status            |
-| ---- | ----------------------------------------------------------- | ----------------- |
-| T2.1 | Remove dev artifacts from `App.tsx`                         | ⚠️ Partial — sound path fixed, not removed |
-| T2.2 | Replace hardcoded layout constants                          | ✅ Done           |
-| T2.3 | Add panel dimension state to `FocusState`                   | ✅ Done           |
-| T2.4 | Replace `LogPanel` with `SecondaryPanel` in `App.tsx`       | ✅ Done           |
-| T2.5 | Create `SecondaryPanel` scaffold with tab bar               | ✅ Done           |
-| T2.6 | Move `LogPanel` into `SecondaryPanel`                       | ✅ Done           |
-| T2.7 | Wire `[1]–[4]` to the two-level mode system                 | ✅ Done (tab not reset on [1]/[2]) |
-| T2.8 | Implement panel height resizing                             | ✅ Done           |
-| T2.9 | Create `SourcesPanel` with inner split layout               | ✅ Done           |
-| —    | `TabBar` shared component                                   | ✅ Extra           |
+| Task | What                                                  | Status                                     |
+| ---- | ----------------------------------------------------- | ------------------------------------------ |
+| T2.1 | Remove dev artifacts from `App.tsx`                   | ⚠️ Partial — sound path fixed, not removed |
+| T2.2 | Replace hardcoded layout constants                    | ✅ Done                                    |
+| T2.3 | Add panel dimension state to `FocusState`             | ✅ Done                                    |
+| T2.4 | Replace `LogPanel` with `SecondaryPanel` in `App.tsx` | ✅ Done                                    |
+| T2.5 | Create `SecondaryPanel` scaffold with tab bar         | ✅ Done                                    |
+| T2.6 | Move `LogPanel` into `SecondaryPanel`                 | ✅ Done                                    |
+| T2.7 | Wire `[1]–[4]` to the two-level mode system           | ✅ Done (tab not reset on [1]/[2])         |
+| T2.8 | Implement panel height resizing                       | ✅ Done                                    |
+| T2.9 | Create `SourcesPanel` with inner split layout         | ✅ Done                                    |
+| —    | `TabBar` shared component                             | ✅ Extra                                   |

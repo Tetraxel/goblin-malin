@@ -6,6 +6,7 @@ import { liveRefreshScheduler } from "./utils/liveRefreshScheduler";
 import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
 import { SpotifyService } from "./services/metadata-providers/spotify/SpotifyService";
 import { YoutubeService } from "./services/metadata-providers/youtube/YoutubeService";
+import { SoundCloudService } from "./services/metadata-providers/soundcloud/SoundCloudService";
 import { SonglinkService } from "./services/metadata-providers/songlink/SonglinkService";
 import { MusicBrainzDiscoveryService } from "./services/metadata-providers/musicbrainz/MusicBrainzDiscoveryService";
 import { ClaudeDiscoveryService } from "./services/metadata-providers/claude/ClaudeDiscoveryService";
@@ -30,6 +31,7 @@ export function initMusicApp(): void {
     // Register all available providers. Add new providers here.
     metadataServiceRegistry.register("spotify", SpotifyService);
     metadataServiceRegistry.register("youtube", YoutubeService);
+    metadataServiceRegistry.register("soundcloud", SoundCloudService);
     // metadataServiceRegistry.register('musicbrainz', MusicBrainzService);
 
     discoveryServiceRegistry.register("songlink", SonglinkService);

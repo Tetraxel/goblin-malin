@@ -72,14 +72,14 @@ Extend `FileInfo` ([types.ts](../../../src/flows/musicDownloadFlow/types.ts)):
 ```typescript
 type FileInfo = {
     // …existing…
-    codec?: string;                 // "flac", "mp3", "opus"
-    bitrateKbps?: number;           // real, probed
+    codec?: string; // "flac", "mp3", "opus"
+    bitrateKbps?: number; // real, probed
     provenance?: "lossless" | "lossy-transcode" | "lossy";
 };
 ```
 
 - Probe with ffprobe (ships alongside the ffmpeg that yt-dlp conversion already requires) in `readFileInfo` — real codec, bitrate, and duration (also fixes the P5/T5.2 duration-fallback deviation; shared with P27/T27.1).
-- **yt-dlp sources are hard-marked `lossy-transcode`** (we *know* YouTube's source is Opus regardless of the FLAC container). Soulseek FLACs are `lossless`; MP3s are `lossy` with the probed bitrate.
+- **yt-dlp sources are hard-marked `lossy-transcode`** (we _know_ YouTube's source is Opus regardless of the FLAC container). Soulseek FLACs are `lossless`; MP3s are `lossy` with the probed bitrate.
 - Display: `SourceFileRow` badge (`FLAC` green for lossless, `FLAC*` yellow for transcode, `MP3 320` for lossy) and a `DownloadSourceDetail` line — "FLAC (transcoded from Opus ~130 kbps)". Colors via theme tokens, labels via a single formatter (no per-component logic).
 
 _Depends on: T22.1_

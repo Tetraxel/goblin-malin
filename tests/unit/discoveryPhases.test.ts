@@ -189,6 +189,41 @@ describe("last-resort discovery (Phase C)", () => {
         ]);
     });
 
+    test("what the service was asked travels to the source, and the score's parts to the result", async () => {
+        const url = "https://youtube.test/yt1";
+        catalog[url] = meta("youtube", "yt1", "Get Lucky", "Daft Punk");
+        lastResortResult = {
+            tracks: [claudeFound(url)],
+            query: [{ label: "Search", value: '"Get Lucky" by Daft Punk' }],
+        };
+
+        const task = await makeTask();
+        await task.startMetadataDiscovering();
+
+        const [result] = youtubeResults(task);
+        expect(result.discoverySources[0].query).toEqual([{ label: "Search", value: '"Get Lucky" by Daft Punk' }]);
+        expect(result.confidenceParts?.map((p) => p.label)).toEqual(["Title", "Artist", "Duration", "Year"]);
+        expect(result.confidenceParts?.reduce((sum, p) => sum + p.points, 0)).toBe(result.confidence);
+    });
+
+    test("a search service's query travels to the source its result becomes (Phase A)", async () => {
+        youtubeSearch = [
+            {
+                metadata: meta("youtube", "found", "Get Lucky", "Daft Punk"),
+                searchKeys: ["trackName+artistName"],
+                query: [{ label: "Search", value: "Get Lucky Daft Punk" }],
+            },
+        ];
+
+        const task = await makeTask();
+        await task.startMetadataDiscovering();
+
+        expect(youtubeResults(task)[0].discoverySources[0]).toMatchObject({
+            discoveredBy: "youtube",
+            query: [{ label: "Search", value: "Get Lucky Daft Punk" }],
+        });
+    });
+
     test("the explanation Claude gave travels to the source the result becomes", async () => {
         const url = "https://youtube.test/yt1";
         catalog[url] = meta("youtube", "yt1", "Get Lucky", "Daft Punk");

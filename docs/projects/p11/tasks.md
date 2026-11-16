@@ -34,12 +34,7 @@ Add `"songlink"` to the `APIProvider` union.
 ```typescript
 // Which fields of the source metadata were used to find this result
 export type SearchKey =
-    | "url"
-    | "isrc"
-    | "trackName"
-    | "artistName"
-    | "trackName+artistName"
-    | "trackName+artistName+isrc";
+    "url" | "isrc" | "trackName" | "artistName" | "trackName+artistName" | "trackName+artistName+isrc";
 // Display labels: "url"→"URL", "isrc"→"ISRC", "trackName"→"Title",
 //                 "artistName"→"Artist Name", combined keys expand naturally
 

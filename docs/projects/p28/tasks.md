@@ -2,10 +2,10 @@
 
 ## Context
 
-The target README promises imports from *"Spotify, SoundCloud, YouTube, YouTube Music, Deezer, Apple Music, Tidal"* — today only Spotify and YouTube are registered. This project adds the two providers with the best effort-to-value ratio, and doubles as the **first real test of the extensibility philosophy** ("a new provider = one service class + one `.register()` call") by someone-shaped-like-a-contributor:
+The target README promises imports from _"Spotify, SoundCloud, YouTube, YouTube Music, Deezer, Apple Music, Tidal"_ — today only Spotify and YouTube are registered. This project adds the two providers with the best effort-to-value ratio, and doubles as the **first real test of the extensibility philosophy** ("a new provider = one service class + one `.register()` call") by someone-shaped-like-a-contributor:
 
 - **Deezer** has a free, keyless public API (`api.deezer.com`): track by ID, text search, and — uniquely — **lookup by ISRC** (`/track/isrc:{isrc}`) plus **BPM and gain fields** in track responses. The metadata screen already displays BPM/Key columns that are chronically empty; Deezer fills them for free. No wizard, no auth, no rate-limit drama at this app's volumes.
-- **SoundCloud** link handling is a TODO release-backlog item. SoundCloud closed public API signups, but yt-dlp extracts SoundCloud metadata *and* audio natively — and SoundCloud is the one mainstream platform where some artists offer **original-quality lossless** downloads, which P22's provenance layer can label honestly.
+- **SoundCloud** link handling is a TODO release-backlog item. SoundCloud closed public API signups, but yt-dlp extracts SoundCloud metadata _and_ audio natively — and SoundCloud is the one mainstream platform where some artists offer **original-quality lossless** downloads, which P22's provenance layer can label honestly.
 - `providerDisplay.ts` already ships built-in display defaults for `deezer` and `soundcloud` (colors/acronyms), so cross-referenced results from these platforms already render — registration makes them first-class.
 
 Apple Music/Tidal are intentionally out of scope (no viable free API; revisit on demand).
@@ -47,6 +47,12 @@ _Depends on: T28.1 (shares the API client)_
 - `getTrackMetadata(url)`: `yt-dlp -J <url>` via `ytdlp-nodejs` (no API key needed; yt-dlp's SoundCloud extractor is maintained) → map title/uploader/duration/artwork/genre. Parse `Artist - Title` out of the SoundCloud title when the uploader is a label/channel — reuse the P26/T26.2 line parser if it has landed, else a minimal local split.
 - `searchTrack(seed)`: `yt-dlp -J "scsearch5:{artist} {title}"` → ranked results. Both calls run under the metadata stage limiter and `@Cached()`.
 
+**Done.** `SoundCloudService` reads the page through yt-dlp's SoundCloud extractor (`getInfoAsync`, the app's shared client in `services/apis/ytdlp-client.ts`). Differences from the plan above:
+
+- The track id is the permalink (`<user>/<track>`), as MusicBrainz's SoundCloud links already use it, and `trackUrl(id)` rebuilds the page from it. A short link keeps `on.soundcloud.com/<code>` as its id until the page is read.
+- `searchTrack` uses one flat `scsearch8:` listing (it already carries title, uploader, duration and page, so there is no request per result) and only proposes up to 3 uploads with a confidence of 50 or more: SoundCloud search is open to bootlegs and slowed edits. Spotify and YouTube now do the same with their top 8 hits (the best at 50 or more); YouTube also proposes up to 2 video uploads, after the songs, at 60 or more.
+- "Artist - Title" is split out of the title only when the upload declares no artist (`convertSoundCloudToTrack.ts`).
+
 _Depends on: nothing (better with P26/T26.2)_
 
 ---
@@ -56,13 +62,15 @@ _Depends on: nothing (better with P26/T26.2)_
 - Add `"soundcloud"` to [YtDlpService](../../../src/flows/musicDownloadFlow/services/download-providers/ytdlp/YtDlpService.ts).`compatibleMetadataProviders` and teach `downloadTrack` to download the metadata source's own URL directly when its platform is SoundCloud (instead of running a YouTube search for a track that already has a direct source).
 - Format honesty (with P22/T22.5): request best audio; when SoundCloud serves original lossless (some artists enable it) the probe labels it `lossless` — otherwise the transcode is labeled like YouTube's. Without P22, keep current FLAC behavior; the probe work is not duplicated here.
 
+**Done.** `"soundcloud"` was already in `compatibleMetadataProviders`, and yt-dlp downloads the page URL the same way for any site, so no special path was needed: the download stage picks the first compatible metadata by group rank, so a SoundCloud primary is downloaded from SoundCloud, and for a track imported elsewhere SoundCloud is used when no better-ranked YouTube result exists (reject it, or the YouTube row, to choose). The FLAC wrapper's "transcoded from …" detail names a codec only where the site always serves one (`UPSTREAM_CODEC` in `YtDlpService`): SoundCloud serves MP3, AAC or Opus. Original-quality lossless uploads are not requested separately.
+
 _Depends on: T28.3; provenance labels need P22/T22.5_
 
 ---
 
 ### T28.5 — Extensibility audit write-up
 
-After T28.1–T28.4, record in this folder (`extensibility-report.md`) every file that had to change beyond *service class + register line*, and fix the generic path where feasible (e.g. if column min-widths, URI parsing, or contextual actions needed provider-specific edits). This is the cheapest moment to harden the plugin story the CLAUDE.md philosophy demands — with two fresh data points instead of zero.
+After T28.1–T28.4, record in this folder (`extensibility-report.md`) every file that had to change beyond _service class + register line_, and fix the generic path where feasible (e.g. if column min-widths, URI parsing, or contextual actions needed provider-specific edits). This is the cheapest moment to harden the plugin story the CLAUDE.md philosophy demands — with two fresh data points instead of zero.
 
 _Depends on: T28.1–T28.4_
 
@@ -79,11 +87,11 @@ _Depends on: T28.1–T28.4_
 
 ## Summary
 
-| Task  | What                                                       | Depends on      |
-| ----- | ----------------------------------------------------------- | --------------- |
-| T28.1 | `DeezerService` metadata provider (keyless API, BPM/ISRC)   | —               |
-| T28.2 | Deezer discovery via ISRC fast path → BPM enrichment        | T28.1           |
-| T28.3 | `SoundCloudService` metadata via yt-dlp extraction          | —               |
-| T28.4 | Direct SoundCloud downloads through `YtDlpService`          | T28.3           |
-| T28.5 | Extensibility audit + registry hardening                    | T28.1–T28.4     |
-| T28.6 | Fixture-based unit tests + TUI scenarios                    | T28.1–T28.4     |
+| Task  | What                                                      | Depends on  |
+| ----- | --------------------------------------------------------- | ----------- |
+| T28.1 | `DeezerService` metadata provider (keyless API, BPM/ISRC) | —           |
+| T28.2 | Deezer discovery via ISRC fast path → BPM enrichment      | T28.1       |
+| T28.3 | `SoundCloudService` metadata via yt-dlp extraction        | —           |
+| T28.4 | Direct SoundCloud downloads through `YtDlpService`        | T28.3       |
+| T28.5 | Extensibility audit + registry hardening                  | T28.1–T28.4 |
+| T28.6 | Fixture-based unit tests + TUI scenarios                  | T28.1–T28.4 |

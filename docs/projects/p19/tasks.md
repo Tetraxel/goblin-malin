@@ -13,11 +13,11 @@ smoothly regardless of how much metadata each task carries.
 Measured on the `50-tasks-with-metadata` fixture, one `ArrowDown` in steady-state
 scroll cost roughly:
 
-| Axis | Cost / keystroke |
-| ---- | ---------------- |
-| React render | ~24 ms |
-| Ink output (Yoga layout + ANSI diff) | ~33 ms |
-| **Total** | **~57 ms → ~17 fps** |
+| Axis                                 | Cost / keystroke     |
+| ------------------------------------ | -------------------- |
+| React render                         | ~24 ms               |
+| Ink output (Yoga layout + ANSI diff) | ~33 ms               |
+| **Total**                            | **~57 ms → ~17 fps** |
 
 Three structural causes, in order of impact:
 
@@ -55,7 +55,7 @@ Three structural causes, in order of impact:
   panel required removing `useFocusContext` from **both** `MetadataPanel` and
   `MetadataDetailPanel` and passing their inputs as referentially-stable props.
 - **Split `FocusContext` by change frequency, not by feature.** On a task-list scroll
-  the *only* slice that changes is `focusState.taskList`. So the split is: stable
+  the _only_ slice that changes is `focusState.taskList`. So the split is: stable
   **actions**, a **chrome** slice (everything stable during scroll), and the **taskList**
   slice. Chrome-only consumers stop re-rendering on scroll entirely. A back-compat
   `useFocusContext()` aggregator is kept for the handful of consumers that genuinely
@@ -78,8 +78,8 @@ Three structural causes, in order of impact:
 `ColumnComponent` widened to `React.ComponentType` so memo-wrapped cells satisfy it.
 All cell components and `Uri` wrapped in `React.memo`.
 
-| Status |
-| --------- |
+| Status  |
+| ------- |
 | ✅ Done |
 
 ### T19.2 — Defer the secondary panel during scroll
@@ -95,8 +95,8 @@ context-free, and memoizes `computeCompiledMetadata`; `MetadataDetailPanel` drop
 `useFocusContext` and takes `setIsEditingField` as a prop. Verified: at a diagnostic
 1000 ms debounce, `MetadataPanel` mounts once and bails for the whole burst.
 
-| Status |
-| --------- |
+| Status  |
+| ------- |
 | ✅ Done |
 
 ### T19.3 — Harness: simulate held-key scroll
@@ -108,8 +108,8 @@ context-free, and memoizes `computeCompiledMetadata`; `MetadataDetailPanel` drop
 `key` steps gain optional `delayMs` (gap after each press, default 100 ms) and `repeat`
 (send N times). The fast scenario presses `ArrowDown ×30` at 35 ms to emulate autorepeat.
 
-| Status |
-| --------- |
+| Status  |
+| ------- |
 | ✅ Done |
 
 ### T19.4 — Split FocusContext into slices
@@ -131,13 +131,13 @@ the toolbar buttons (Settings/Sessions/UpdateBadge), and useRunAllButton.
 Still on the aggregator (must re-render on scroll, by design): TaskListPanel, ActionBar,
 SecondaryPanel, LogPanel, and the taskList branch of useKeyHandlers.
 
-| Status |
-| --------- |
+| Status  |
+| ------- |
 | ✅ Done |
 
 ### T19.6 — In-panel navigation (metadata fields + shortcut list)
 
-The same two-front problem showed up when navigating *within* a panel:
+The same two-front problem showed up when navigating _within_ a panel:
 
 **Metadata detail fields** — `selectedFieldIndex`/`cursor` live in `secondaryPanel`,
 which was bundled into the chrome slice, so every field move churned the whole chrome
@@ -169,52 +169,52 @@ the metadata panel + row components, `src/components/SettingsModal/ShortcutsTab.
 `src/components/Toolbar/Toolbar.tsx`, `src/components/SecondaryPanel/DownloadPanel/DownloadPanel.tsx`.
 New scenarios: `scroll-metadata-fields.json`, `scroll-shortcut-list.json`.
 
-| Status |
-| --------- |
+| Status  |
+| ------- |
 | ✅ Done |
 
 ### T19.5 — Docs
 
 **Files:** `docs/projects/README.md`, this file.
 
-| Status |
-| --------- |
+| Status  |
+| ------- |
 | ✅ Done |
 
 ---
 
 ## Verification
 
-| Check | Action |
-|---|---|
-| Types | `yarn type-check` and `yarn type-check:tui` clean |
-| Lint | `yarn lint` — no new warnings from changed files |
+| Check                      | Action                                                                                                                                         |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Types                      | `yarn type-check` and `yarn type-check:tui` clean                                                                                              |
+| Lint                       | `yarn lint` — no new warnings from changed files                                                                                               |
 | Chrome off the scroll path | `--profile` on `scroll-task-list-fast.json`: Toolbar, Footer, PrimaryModeTabBar, AppInner, and every modal appear **0×** across scroll commits |
-| Wasted renders | per-keystroke `wasted` dropped from 4–5 to **0** |
-| Panel deferral | `MetadataPanel` bails during a scroll burst (mount once, then absent from commits) |
-| Behaviour intact | snapshots in the scroll scenarios still show the correct selected-task metadata after settling |
+| Wasted renders             | per-keystroke `wasted` dropped from 4–5 to **0**                                                                                               |
+| Panel deferral             | `MetadataPanel` bails during a scroll burst (mount once, then absent from commits)                                                             |
+| Behaviour intact           | snapshots in the scroll scenarios still show the correct selected-task metadata after settling                                                 |
 
 ### Results
 
 Task-list scroll (fast-scroll scenario, `50-tasks-with-metadata`):
 
-| Metric | Before | After |
-|---|---|---|
-| Wasted renders / keystroke | 4–5 | **0** |
-| Chrome components rendering on scroll | all | **none** |
-| Ink frames over the burst | 70 | 33 |
-| React / keystroke when coalesced | ~24 ms | down to **~4 ms** |
+| Metric                                | Before | After             |
+| ------------------------------------- | ------ | ----------------- |
+| Wasted renders / keystroke            | 4–5    | **0**             |
+| Chrome components rendering on scroll | all    | **none**          |
+| Ink frames over the burst             | 70     | 33                |
+| React / keystroke when coalesced      | ~24 ms | down to **~4 ms** |
 
 In-panel navigation (`scroll-metadata-fields.json`, `scroll-shortcut-list.json`):
 
-| Metric | Before | After |
-|---|---|---|
-| Metadata field move — React / keystroke | ~9–21 ms | **~4–5 ms** |
-| Metadata field move — `FieldRow` re-renders | 10 (all) | **1** |
-| Metadata field move — chrome + task list | re-render | **0** |
-| Shortcut-list scroll — React / keystroke | — | **~3.5 ms** |
-| Shortcut-list scroll — rows re-rendered | all visible | **2** |
-| Shortcut-list scroll — registry rebuild/sort | every key | **only on search/rebind** |
+| Metric                                       | Before      | After                     |
+| -------------------------------------------- | ----------- | ------------------------- |
+| Metadata field move — React / keystroke      | ~9–21 ms    | **~4–5 ms**               |
+| Metadata field move — `FieldRow` re-renders  | 10 (all)    | **1**                     |
+| Metadata field move — chrome + task list     | re-render   | **0**                     |
+| Shortcut-list scroll — React / keystroke     | —           | **~3.5 ms**               |
+| Shortcut-list scroll — rows re-rendered      | all visible | **2**                     |
+| Shortcut-list scroll — registry rebuild/sort | every key   | **only on search/rebind** |
 
 ## Limitations / future work
 

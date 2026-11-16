@@ -22,7 +22,7 @@ So the app's fluidity is governed by one number:
 
 A keystroke that arrives while a repaint is in flight waits. Latency therefore isn't
 caused by input handling (dispatch is synchronous and cheap) — it's caused by
-*background commit pressure*. Today that pressure comes from three sources: download
+_background commit pressure_. Today that pressure comes from three sources: download
 progress events, spinner animations, and log traffic. All three grow linearly with
 task/download count, which is exactly the scaling axis the product wants to grow on.
 
@@ -49,6 +49,7 @@ Compounding it, `TaskStatus.update()` ([task-status.ts](../../../src/base/task/t
 42.35 % renders identically (the cell shows an integer) but still costs a full commit.
 
 **Fix (cheap, huge win):**
+
 - Quantize progress to integer percent and bail in `TaskStatus.update()` when the
   merged attributes are shallow-equal to the previous ones.
 - Coalesce `onUpdate` attribute writes per task through a ~100 ms trailing throttle
@@ -57,7 +58,7 @@ Compounding it, `TaskStatus.update()` ([task-status.ts](../../../src/base/task/t
   or drop it to a level the InkTransport doesn't subscribe to.
 
 Expected result: progress commit pressure drops from O(events) to ≤10 commits/s
-*total* regardless of download count. This single finding is most of "the app is
+_total_ regardless of download count. This single finding is most of "the app is
 slow while downloading".
 
 ### F2 — Spinners force a permanent repaint loop 🔴
@@ -72,6 +73,7 @@ anything is running — before a single progress event. This is the idle-cost fl
 users feel as "the app is kind of slow".
 
 **Fix:**
+
 - One shared animation cadence (250 ms is plenty for terminal spinners): make
   `useGlobalTicker` snap all intervals to multiples of one base timer so all
   spinner updates land in the **same** React batch → 4 commits/s total.
@@ -95,6 +97,7 @@ Winston also writes every debug line to `app.log` — fine on its own, but F1 ma
 it fire per progress event.
 
 **Fix:**
+
 - Enforce a ring buffer (e.g. 1 000 entries) in `InkTransport`; same cap in LogPanel
   state.
 - Batch transport notifications on a ~100 ms tick instead of per-entry.
@@ -116,6 +119,7 @@ starve for the whole run, then land one big synchronous write. Two problems in o
 no durability during the run, and a stall when it finally fires.
 
 **Fix:**
+
 - One file per session (write only the dirty one), compact JSON, async
   `fs.promises.writeFile` + atomic rename.
 - Add a max-wait to the debounce (flush at least every ~5 s of sustained activity).
@@ -125,6 +129,7 @@ no durability during the run, and a stall when it finally fires.
 ### F5 — The orchestrator polls and scans 🟠
 
 `flow-orchestrator.ts`:
+
 - `processTasks()` wakes every **100 ms** and calls `notifySubscribers()` at least
   twice per iteration whether or not anything changed — a permanent 10–20
   notifications/s heartbeat into React and into the `App.tsx` persist subscriber
@@ -138,10 +143,11 @@ no durability during the run, and a stall when it finally fires.
 - ~350 lines of the file are commented-out dead code — worth deleting on touch.
 
 **Fix — event-driven scheduler (no behavior change to flows):**
+
 - Replace the polling loop with completion-driven dispatch: when a task settles,
   fill free slots immediately. Zero wakeups when idle, zero no-op notifications.
 - `Map<string, Task>` for identity; O(1) add/remove.
-- Per-flow *and* per-stage concurrency budgets (e.g. `metadata: 4`, `download: N`
+- Per-flow _and_ per-stage concurrency budgets (e.g. `metadata: 4`, `download: N`
   user-configurable) with the global cap on top. This is the piece that actually
   unlocks "more platforms, more parallel downloads" — network-bound downloads can
   scale to dozens while CPU-bound stages stay bounded.
@@ -177,7 +183,7 @@ tsup (or set it at the top of `cli.ts` before importing React), keep dev mode fo
 
 ### F8 — Ink's full-tree repaint is the final floor 🟡
 
-After F1–F7, the cost of *one* commit (~13 ms dev / less in prod) is the ceiling on
+After F1–F7, the cost of _one_ commit (~13 ms dev / less in prod) is the ceiling on
 fluidity. Levers, in escalating order of effort:
 
 1. **Node-count reduction** (already flagged in P19): flatten per-row Box nesting,
@@ -192,12 +198,12 @@ fluidity. Levers, in escalating order of effort:
    and receives coalesced deltas over IPC at a capped rate. GC pauses, JSON
    serialization (F4), tagging/FS work can never again block a keystroke; the engine
    can run hundreds of tasks. This is the right long-term shape for the scalability
-   target — and it's *also* the feature that later enables a detached daemon
+   target — and it's _also_ the feature that later enables a detached daemon
    (downloads keep running when the TUI closes) — but it's a multi-week
    restructuring. Do it only after F1–F6, measured, still isn't enough.
 4. **Radical — leave Ink** (custom ANSI renderer, or notcurses/ratatui-style core):
    only worth discussing if a profiler shows Yoga+diff still dominating after node
-   reduction *and* the engine split. The whole component library, focus system, and
+   reduction _and_ the engine split. The whole component library, focus system, and
    test harness are Ink-shaped; this is a rewrite, not an optimization. Not
    recommended on current evidence.
 
@@ -220,12 +226,12 @@ fluidity. Levers, in escalating order of effort:
 
 ## Prioritized plan
 
-| Phase | Items | Effort | Expected effect |
-| ----- | ----- | ------ | --------------- |
-| **P0 — stop the bleeding** | F1 (throttle+dedupe progress), F2 (shared 250 ms tick), F3 (ring buffer + batched log notify), F7 (prod NODE_ENV) | ~1–2 days | Background commits drop from ~20–50/s to ≤5/s while downloading; each commit ~1.5–2× cheaper for end users. This is most of the perceived latency. |
-| **P1 — structural correctness** ✅ | F6 (notification scheduler → 1 commit/frame), F5 (event-driven orchestrator + per-stage concurrency), F4 (async coalesced writes + max-wait) | ~1 week | O(1) commits per frame regardless of parallelism; no polling heartbeat; no sync-write stalls; concurrency is a user setting. Unlocks the scale target. **Done — see "P1 implementation status" below.** |
-| **P2 — lower the floor** | F8.1 (node-count reduction), F3 row cache, F8.2 (adaptive maxFps) | ~1 week, incremental | Halves the per-commit cost; keeps worst case bounded. |
-| **P3 — radical, evidence-gated** | F8.3 engine/UI process split; (F8.4 renderer swap only if proven necessary) | multi-week | Hard guarantee: UI thread never blocked by engine work; hundreds of parallel tasks; enables detached daemon mode. |
+| Phase                              | Items                                                                                                                                        | Effort               | Expected effect                                                                                                                                                                                         |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P0 — stop the bleeding**         | F1 (throttle+dedupe progress), F2 (shared 250 ms tick), F3 (ring buffer + batched log notify), F7 (prod NODE_ENV)                            | ~1–2 days            | Background commits drop from ~20–50/s to ≤5/s while downloading; each commit ~1.5–2× cheaper for end users. This is most of the perceived latency.                                                      |
+| **P1 — structural correctness** ✅ | F6 (notification scheduler → 1 commit/frame), F5 (event-driven orchestrator + per-stage concurrency), F4 (async coalesced writes + max-wait) | ~1 week              | O(1) commits per frame regardless of parallelism; no polling heartbeat; no sync-write stalls; concurrency is a user setting. Unlocks the scale target. **Done — see "P1 implementation status" below.** |
+| **P2 — lower the floor**           | F8.1 (node-count reduction), F3 row cache, F8.2 (adaptive maxFps)                                                                            | ~1 week, incremental | Halves the per-commit cost; keeps worst case bounded.                                                                                                                                                   |
+| **P3 — radical, evidence-gated**   | F8.3 engine/UI process split; (F8.4 renderer swap only if proven necessary)                                                                  | multi-week           | Hard guarantee: UI thread never blocked by engine work; hundreds of parallel tasks; enables detached daemon mode.                                                                                       |
 
 ## P1 — implementation status (done)
 
@@ -233,7 +239,7 @@ Landed as commit "P1 structural correctness". Scope notes and where each lever l
 
 **F6 — Notification scheduler** ✅ `src/base/notificationScheduler.ts` (new). `Task`,
 `TaskStatus`, `FlowBase` and `FlowOrchestrator` now mark themselves dirty via a stable
-bound `emitToSubscribers` and the scheduler flushes every dirty source *once* per
+bound `emitToSubscribers` and the scheduler flushes every dirty source _once_ per
 ~16 ms frame. Data mutation stays synchronous (e.g. `Task._snapshotCache` is still
 invalidated at mutation time, so `get()` and P19's `React.memo` bail are unaffected);
 only the render fan-out defers. `setSyncMode(true)` for tests. Result: N concurrent
@@ -257,7 +263,7 @@ change.
 thread and never runs two at once) with compact JSON — this removes the input-thread
 stall, the actual latency bug. `sessionManager.ts` debounce gained a 5 s max-wait so a
 busy run persists periodically instead of starving then landing one giant write.
-*Scoped:* kept the single-file format (async write already removes the stall); the
+_Scoped:_ kept the single-file format (async write already removes the stall); the
 per-session-file / SQLite split for write-amplification at large session counts is
 deferred to P2/P3 and noted below.
 
@@ -268,7 +274,7 @@ re-schedule, sync mode, throwing-subscriber isolation), and `flow-orchestrator` 
 real parallelism timing, abort drain-without-leak, no-candidate resolve, duplicate-id
 reject, duplicate-call ignore). Full suite green (17 tests incl. e2e smoke + profile).
 
-**Deferred from F5/F4 (follow-ups):** per-*flow* concurrency caps are intentionally not
+**Deferred from F5/F4 (follow-ups):** per-_flow_ concurrency caps are intentionally not
 enforced (they'd fight the scale goal — the global cap + per-stage limiters shape it
 instead); concurrency settings have no Settings-UI row yet (file-configurable only);
 per-session files / SQLite for session write-amplification.

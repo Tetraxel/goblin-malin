@@ -1,15 +1,15 @@
 ﻿import fs from "fs";
 import path from "path";
-import { type FormatOptions, type QualityOptions, YtDlp } from "ytdlp-nodejs";
+import { type FormatOptions, type QualityOptions, type YtDlp } from "ytdlp-nodejs";
 import stripAnsi from "strip-ansi";
 import { DownloadService, type DownloadUpdateCallback } from "../../../downloadService";
 import { type ProviderDisplay } from "#base/providerDisplay";
 import { type ProviderSettingsSchema } from "#base/providerSettings";
 import { StatusType } from "#base/task/task-status";
 import { type Logger } from "#base/logger/logger";
+import { platformRegistry } from "#base/platformRegistry";
 import { getBinDir } from "#utils/appPaths";
 import { makeAbortError } from "#utils/errors";
-import { ensureFfmpeg } from "#utils/ffmpeg-setup";
 import {
     type APIProvider,
     type TrackMetadata,
@@ -21,10 +21,10 @@ import {
 } from "#flows/musicDownloadFlow/types";
 import { type DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { readFileInfo } from "#flows/musicDownloadFlow/utils/readFileInfo";
-import { ensureYtDlpSetup } from "./ytdlp-setup";
 import { copyCookiesForRun, type CookiesCopy } from "./cookiesCopy";
 import { YtDlpCell } from "./YtDlpCell";
-import { getTempDownloadDir, getDownloadProviderSettings, getSaveSettings } from "../../../saveSettings";
+import { getYtDlpClient } from "../../apis/ytdlp-client";
+import { getTempDownloadDir, getSaveSettings } from "../../../saveSettings";
 import { generateTempStem, findExistingTempFile, listTempFilesWithStem } from "#flows/musicDownloadFlow/utils/tempFile";
 import { extensionOf, parseOutputFormat } from "#flows/musicDownloadFlow/utils/outputFormat";
 
@@ -55,28 +55,15 @@ export class YtDlpService extends DownloadService {
     static readonly cellComponent = YtDlpCell;
 
     public compatibleMetadataProviders: APIProvider[] = ["youtube", "soundcloud"];
-    private static client: YtDlp;
 
     constructor(task: DownloadTask, logger: Logger) {
         super("YtDlpService", task, logger);
     }
 
-    private async getClient(): Promise<YtDlp> {
-        return this.runExclusive("init", async () => {
-            if (!YtDlpService.client) {
-                // Only update the binaries to the latest release when the user
-                // opted in; an absent binary is always downloaded regardless.
-                const autoDownloadBinary = getDownloadProviderSettings("ytdlp").autoDownloadBinary !== false;
-                const ytDlpBinaryPath = await ensureYtDlpSetup(autoDownloadBinary);
-                const ffmpefBinaryPath = await ensureFfmpeg(autoDownloadBinary);
-                const ytDlpClient = new YtDlp({
-                    binaryPath: ytDlpBinaryPath,
-                    ffmpegPath: ffmpefBinaryPath,
-                });
-                YtDlpService.client = ytDlpClient;
-            }
-            return YtDlpService.client;
-        });
+    /** The app's shared yt-dlp (the metadata services that read a site through yt-dlp use the same one). */
+    private getClient(): Promise<YtDlp> {
+        // A download the user asked for tries the set-up again even right after a failed one.
+        return getYtDlpClient({ retryNow: true });
     }
 
     async downloadTrack(
@@ -315,7 +302,9 @@ export class YtDlpService extends DownloadService {
                     fullPath,
                     trackMetadata.duration ?? 0,
                     isFlacWrapper ? "lossy-transcode" : "lossy",
-                    isFlacWrapper ? "Opus" : undefined
+                    // The codec the site always serves, if its service says so (a site with several, like SoundCloud,
+                    // declares none, and the badge then says "transcoded" without naming a wrong one).
+                    isFlacWrapper ? platformRegistry.upstreamCodec(trackMetadata.apiProvider) : undefined
                 );
             } catch (err) {
                 this.logger.warn(`Failed to read file info for ${path.basename(fullPath)}`, { error: err });

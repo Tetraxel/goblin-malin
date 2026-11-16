@@ -8,7 +8,7 @@
 - There is no answer to "have I already saved this?" or "where did it go on disk?" without grepping folders.
 - The target README promises **auto-relocation of missing files**; TODO.md wants **"Open all tracks in MB Picard"** — both need a persistent index to operate on.
 
-Sessions are not a library: sessions are *working batches* (P13); a library is the *cumulative output*. This project adds the missing index — deliberately small (a store, a hook, a dedupe check, a modal), not a media-manager rewrite.
+Sessions are not a library: sessions are _working batches_ (P13); a library is the _cumulative output_. This project adds the missing index — deliberately small (a store, a hook, a dedupe check, a modal), not a media-manager rewrite.
 
 ---
 
@@ -20,18 +20,18 @@ Sessions are not a library: sessions are *working batches* (P13); a library is t
 
 ```typescript
 interface LibraryEntry {
-    id: string;                  // uuid
-    isrc?: string;               // primary dedupe key when present
-    uri?: string;                // TrackUriParts of the primary source
+    id: string; // uuid
+    isrc?: string; // primary dedupe key when present
+    uri?: string; // TrackUriParts of the primary source
     artists: string[];
     title: string;
     album?: string;
-    filePath: string;            // final on-disk path
-    format: string;              // "flac" | "mp3" …
-    provenance?: string;         // from P22/T22.5 when available
-    sourceProvider: string;      // "ytdlp" | "soulseek"
-    savedAt: string;             // ISO
-    fileMissing?: boolean;       // set lazily by T23.4, never blocks
+    filePath: string; // final on-disk path
+    format: string; // "flac" | "mp3" …
+    provenance?: string; // from P22/T22.5 when available
+    sourceProvider: string; // "ytdlp" | "soulseek"
+    savedAt: string; // ISO
+    fileMissing?: boolean; // set lazily by T23.4, never blocks
 }
 ```
 
@@ -53,7 +53,7 @@ _Depends on: T23.1_
 
 ### T23.3 — Duplicate detection at import & in the task list
 
-- **Import modal**: each detected URL row checks the library (URI match at detect time; ISRC match can only fire post-fetch). Matched rows show `✓ in library — saved 2026-05-01` and default to *import anyway* with a `[Space]`-toggleable "skip duplicates" batch switch in the modal footer.
+- **Import modal**: each detected URL row checks the library (URI match at detect time; ISRC match can only fire post-fetch). Matched rows show `✓ in library — saved 2026-05-01` and default to _import anyway_ with a `[Space]`-toggleable "skip duplicates" batch switch in the modal footer.
 - **Task list**: after primary metadata fetch, tasks whose ISRC/normalized key hits the library get a subtle `◆ saved` indicator next to the status and a contextual action "Open saved file location". This catches the cross-platform duplicate (Spotify import of a track previously saved from YouTube) that URL matching can't.
 
 _Depends on: T23.1, T23.2_
@@ -100,12 +100,12 @@ _Depends on: T23.1–T23.6_
 
 ## Summary
 
-| Task  | What                                                        | Depends on   |
-| ----- | ----------------------------------------------------------- | ------------ |
-| T23.1 | `libraryStore` + normalized-key indexes                     | —            |
-| T23.2 | `saveTrack()` upsert hook                                   | T23.1        |
-| T23.3 | Import-modal + task-list duplicate detection                | T23.1, T23.2 |
-| T23.4 | Missing-file flags, relocate integration, auto-relocation   | T23.1, T23.2 |
-| T23.5 | Searchable library modal with file actions                  | T23.1, T23.4 |
-| T23.6 | Batch "Open in Picard"                                      | T23.2, T23.5 |
-| T23.7 | Unit + TUI-harness coverage                                 | T23.1–T23.6  |
+| Task  | What                                                      | Depends on   |
+| ----- | --------------------------------------------------------- | ------------ |
+| T23.1 | `libraryStore` + normalized-key indexes                   | —            |
+| T23.2 | `saveTrack()` upsert hook                                 | T23.1        |
+| T23.3 | Import-modal + task-list duplicate detection              | T23.1, T23.2 |
+| T23.4 | Missing-file flags, relocate integration, auto-relocation | T23.1, T23.2 |
+| T23.5 | Searchable library modal with file actions                | T23.1, T23.4 |
+| T23.6 | Batch "Open in Picard"                                    | T23.2, T23.5 |
+| T23.7 | Unit + TUI-harness coverage                               | T23.1–T23.6  |

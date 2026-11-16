@@ -2,11 +2,11 @@
 
 ## Context
 
-**Release blocker**: *"Status per service (Spotify, Ytdlp, etc…) instead of per task"* (TODO.md).
+**Release blocker**: _"Status per service (Spotify, Ytdlp, etc…) instead of per task"_ (TODO.md).
 
-The root cause is one line: `ServiceBase` wires every service to the **same** status object — `this.status = this.task.getStatus()` ([service-base.ts](../../../src/base/service-base.ts):26). When a task runs Spotify fetch, Songlink discovery, MusicBrainz discovery, and a yt-dlp download (some concurrently under the P20 stage limiters), they all write to one `TaskStatus` — the STATUS column shows whichever service wrote last, and a failed provider's error is overwritten by the next provider's progress. The user cannot answer "which provider failed?" or "what is *this* provider doing?" without opening the logs.
+The root cause is one line: `ServiceBase` wires every service to the **same** status object — `this.status = this.task.getStatus()` ([service-base.ts](../../../src/base/service-base.ts):26). When a task runs Spotify fetch, Songlink discovery, MusicBrainz discovery, and a yt-dlp download (some concurrently under the P20 stage limiters), they all write to one `TaskStatus` — the STATUS column shows whichever service wrote last, and a failed provider's error is overwritten by the next provider's progress. The user cannot answer "which provider failed?" or "what is _this_ provider doing?" without opening the logs.
 
-The plumbing is favorable: `TaskStatus` ([task-status.ts](../../../src/base/task/task-status.ts)) is already a self-contained observable with the P20 equality-bail and scheduler batching, and every provider already has its own column cell. What's missing is one status instance *per service* and an aggregate for the task level.
+The plumbing is favorable: `TaskStatus` ([task-status.ts](../../../src/base/task/task-status.ts)) is already a self-contained observable with the P20 equality-bail and scheduler batching, and every provider already has its own column cell. What's missing is one status instance _per service_ and an aggregate for the task level.
 
 ---
 
@@ -36,7 +36,7 @@ _Depends on: T25.1_
 
 ### T25.3 — Snapshots & session revival
 
-- `TaskSnapshot` gains `serviceStatuses?: Record<string, StatusSnapshot>`; `Task.get()` includes it (respecting the `_snapshotCache` invalidation pattern) and the constructor accepts it — so a reopened session (P13) shows *which provider* had failed, not just "Error".
+- `TaskSnapshot` gains `serviceStatuses?: Record<string, StatusSnapshot>`; `Task.get()` includes it (respecting the `_snapshotCache` invalidation pattern) and the constructor accepts it — so a reopened session (P13) shows _which provider_ had failed, not just "Error".
 - `reviveTaskDates` untouched (statuses carry no Dates today; if `timeTracking` timestamps serialize, revive them here).
 
 _Depends on: T25.1_
@@ -72,10 +72,10 @@ _Depends on: T25.1–T25.5_
 ## Summary
 
 | Task  | What                                                       | Depends on   |
-| ----- | ----------------------------------------------------------- | ------------ |
-| T25.1 | `getServiceStatus()` per key; ServiceBase uses its own      | —            |
-| T25.2 | Derived task-level aggregate (keeps all consumers working)  | T25.1        |
-| T25.3 | Service statuses in snapshots + session revival             | T25.1        |
-| T25.4 | `useServiceStatus` hook + glyphs in provider cells          | T25.1        |
-| T25.5 | Tally StatusCell + panel-header error surfacing             | T25.2, T25.4 |
-| T25.6 | Aggregation tests + commit-pressure guard                   | T25.1–T25.5  |
+| ----- | ---------------------------------------------------------- | ------------ |
+| T25.1 | `getServiceStatus()` per key; ServiceBase uses its own     | —            |
+| T25.2 | Derived task-level aggregate (keeps all consumers working) | T25.1        |
+| T25.3 | Service statuses in snapshots + session revival            | T25.1        |
+| T25.4 | `useServiceStatus` hook + glyphs in provider cells         | T25.1        |
+| T25.5 | Tally StatusCell + panel-header error surfacing            | T25.2, T25.4 |
+| T25.6 | Aggregation tests + commit-pressure guard                  | T25.1–T25.5  |

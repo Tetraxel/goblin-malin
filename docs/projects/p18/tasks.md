@@ -36,8 +36,8 @@ A component can be cheap to render but expensive to lay out. Both are captured.
 
 `install.ts` sets `DEV=true`, installs the global devtools hook, and on each `onCommitFiberRoot` walks the fiber tree: resolves component names (function/class/memo/forwardRef), detects renders via `PerformedWork`, computes self time (`actualDuration − Σ children`), classifies mount/update, and diffs `memoizedProps`/hook state for the "why". `recorder.ts` is the durable JSONL writer. `profiledEntry.tsx` imports `install` (side effect) then boots the app.
 
-| Status |
-| --------- |
+| Status  |
+| ------- |
 | ✅ Done |
 
 ### T18.2 — App wiring
@@ -46,8 +46,8 @@ A component can be cheap to render but expensive to lay out. Both are captured.
 
 When `globalThis.__GOBLIN_PROFILE__` is set, wrap the app in one `<Profiler>` and pass Ink's `onRender` for axis-E frame timing. Production (global unset) is untouched.
 
-| Status |
-| --------- |
+| Status  |
+| ------- |
 | ✅ Done |
 
 ### T18.3 — Harness analysis
@@ -56,8 +56,8 @@ When `globalThis.__GOBLIN_PROFILE__` is set, wrap the app in one `<Profiler>` an
 
 Read the JSONL, bucket by interaction marks, aggregate per-component stats (renders, self total/max/p95, wasted), per-interaction stats (commits, React ms, Ink ms, app-wasted, top components), detect anomalies, and compare/update baselines. `format.ts` renders the `--pretty` section.
 
-| Status |
-| --------- |
+| Status  |
+| ------- |
 | ✅ Done |
 
 ### T18.4 — Harness integration
@@ -66,8 +66,8 @@ Read the JSONL, bucket by interaction marks, aggregate per-component stats (rend
 
 Profile mode spawns `profiledEntry.tsx` with `DEV=true` + `GOBLIN_PROFILE_OUT`, records timestamped interaction marks per `key`/`type` step, and runs the analyzer after teardown into `HarnessResult.profile`. CLI gains `--profile` and `--update-baseline`; scenarios gain `name` and `profile`.
 
-| Status |
-| --------- |
+| Status  |
+| ------- |
 | ✅ Done |
 
 ### T18.5 — Example scenario + regression test
@@ -76,32 +76,32 @@ Profile mode spawns `profiledEntry.tsx` with `DEV=true` + `GOBLIN_PROFILE_OUT`, 
 
 A worked profiling scenario and a vitest test that fails only on `error`-severity anomalies (baseline-independent — no `name` set).
 
-| Status |
-| --------- |
+| Status  |
+| ------- |
 | ✅ Done |
 
 ### T18.6 — Docs
 
 **Files:** `scripts/tui-test/README.md`, `CLAUDE.md`, `docs/projects/README.md`, this file
 
-| Status |
-| --------- |
+| Status  |
+| ------- |
 | ✅ Done |
 
 ---
 
 ## Verification
 
-| Check | Action |
-|---|---|
-| Types | `yarn type-check` and `yarn type-check:tui` clean |
-| Lint | `yarn lint` — profiling files add no warnings |
-| End-to-end | `yarn tsx scripts/tui-test/cli.ts scripts/tui-test/examples/profile-navigate.json --pretty` prints a profile section with per-component table, per-interaction breakdown, and anomalies |
-| Hook fires | All commits report `durationMs > 0` (ProfileMode active via the `<Profiler>`) |
-| Attribution | Commits bucket into `boot` + one slice per keystroke |
-| Anomalies | No `error`-severity anomalies on the clean app; ms `warn`s surface (e.g. Toolbar BigText) |
-| CI | `yarn test` — `render profile` test green |
-| Baseline | `--update-baseline` writes `profiling/baselines/<name>.json`; a re-run compares against it |
+| Check       | Action                                                                                                                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Types       | `yarn type-check` and `yarn type-check:tui` clean                                                                                                                                       |
+| Lint        | `yarn lint` — profiling files add no warnings                                                                                                                                           |
+| End-to-end  | `yarn tsx scripts/tui-test/cli.ts scripts/tui-test/examples/profile-navigate.json --pretty` prints a profile section with per-component table, per-interaction breakdown, and anomalies |
+| Hook fires  | All commits report `durationMs > 0` (ProfileMode active via the `<Profiler>`)                                                                                                           |
+| Attribution | Commits bucket into `boot` + one slice per keystroke                                                                                                                                    |
+| Anomalies   | No `error`-severity anomalies on the clean app; ms `warn`s surface (e.g. Toolbar BigText)                                                                                               |
+| CI          | `yarn test` — `render profile` test green                                                                                                                                               |
+| Baseline    | `--update-baseline` writes `profiling/baselines/<name>.json`; a re-run compares against it                                                                                              |
 
 ## Limitations / future work
 

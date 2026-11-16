@@ -4,11 +4,11 @@
 
 **Import currently requires a URL — but users start from a song name at least as often as from a link.** `detectUrls()` ([detectUrls.ts](../../../src/components/ImportModal/detectUrls.ts)) extracts `https?://` matches and discards everything else. That excludes three big real-world inputs:
 
-1. "I know the song": *Petit Biscuit — Sunset Lover* — no URL at hand.
+1. "I know the song": _Petit Biscuit — Sunset Lover_ — no URL at hand.
 2. **Text tracklists**: pasted from a DJ set description, a forum post, a label's release notes (`01. Artist - Title`).
 3. **Playlist exports**: M3U/M3U8 files, rekordbox/Serato CSV exports — the bridge from existing DJ libraries into this app.
 
-The search capability largely exists: every `MetadataService` implements `searchTrack(sourceTrackMetadata)` ([metadataService.ts](../../../src/flows/musicDownloadFlow/metadataService.ts):25) for discovery — what's missing is a text entry point and an import-modal picker. This project turns the import modal into "paste *anything*".
+The search capability largely exists: every `MetadataService` implements `searchTrack(sourceTrackMetadata)` ([metadataService.ts](../../../src/flows/musicDownloadFlow/metadataService.ts):25) for discovery — what's missing is a text entry point and an import-modal picker. This project turns the import modal into "paste _anything_".
 
 ---
 
@@ -51,7 +51,7 @@ _Depends on: nothing_
 Extend [ImportModal](../../../src/components/ImportModal/ImportModal.tsx) / [useImportFlow.ts](../../../src/components/ImportModal/useImportFlow.ts):
 
 - Pasted content is split into URL rows (existing path, incl. P21 collections) and **search rows** (`? Petit Biscuit — Sunset Lover`).
-- `[Enter]` on a search row opens an inline picker: top N results across *enabled* metadata providers, each row showing provider acronym (colored via `providerDisplayRegistry`), title, artist, duration, and a `Δ duration` marker when the parsed line had one. `↑/↓` select, `[Enter]` confirm → the row becomes a normal import row carrying the result's URL/URI (task creation is unchanged — it goes through `createTasksFromUrls`).
+- `[Enter]` on a search row opens an inline picker: top N results across _enabled_ metadata providers, each row showing provider acronym (colored via `providerDisplayRegistry`), title, artist, duration, and a `Δ duration` marker when the parsed line had one. `↑/↓` select, `[Enter]` confirm → the row becomes a normal import row carrying the result's URL/URI (task creation is unchanged — it goes through `createTasksFromUrls`).
 - Searches run through the metadata stage limiter; per-row spinner on the shared cadence.
 
 _Depends on: T26.1, T26.2_
@@ -88,11 +88,11 @@ _Depends on: T26.1–T26.4_
 
 ## Summary
 
-| Task  | What                                                     | Depends on   |
-| ----- | --------------------------------------------------------- | ------------ |
-| T26.1 | `searchByText()` base impl + Spotify/YouTube overrides    | —            |
-| T26.2 | Tracklist / M3U / CSV line parser                         | —            |
-| T26.3 | Search rows + inline result picker in the import modal    | T26.1, T26.2 |
-| T26.4 | Confidence-gated batch auto-match                         | T26.3        |
-| T26.5 | "Add track by search" manual entry point                  | T26.3        |
-| T26.6 | Parser fixtures + TUI-harness scenarios                   | T26.1–T26.4  |
+| Task  | What                                                   | Depends on   |
+| ----- | ------------------------------------------------------ | ------------ |
+| T26.1 | `searchByText()` base impl + Spotify/YouTube overrides | —            |
+| T26.2 | Tracklist / M3U / CSV line parser                      | —            |
+| T26.3 | Search rows + inline result picker in the import modal | T26.1, T26.2 |
+| T26.4 | Confidence-gated batch auto-match                      | T26.3        |
+| T26.5 | "Add track by search" manual entry point               | T26.3        |
+| T26.6 | Parser fixtures + TUI-harness scenarios                | T26.1–T26.4  |

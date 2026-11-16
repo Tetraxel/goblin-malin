@@ -39,17 +39,17 @@
 **Implemented:** `src/flows/musicDownloadFlow/utils/taskId.ts`
 
 ```typescript
-import { createHash } from 'crypto';
+import { createHash } from "crypto";
 
 export function taskIdFromUrl(url: string): string {
-  return 'task:' + createHash('sha1').update(url).digest('hex').slice(0, 12);
+    return "task:" + createHash("sha1").update(url).digest("hex").slice(0, 12);
 }
 ```
 
 Used in `MusicDownloadFlow.createTasksFromUrls()`. Same URL always produces the same ID,
 enabling reliable duplicate detection across re-imports.
 
-*Depends on: nothing*
+_Depends on: nothing_
 
 ---
 
@@ -58,7 +58,7 @@ enabling reliable duplicate detection across re-imports.
 **Implemented:** `src/utils/clipboard.ts`
 
 ```typescript
-export async function readClipboard(): Promise<string>
+export async function readClipboard(): Promise<string>;
 ```
 
 Platform-aware (`win32` → `powershell Get-Clipboard`, `darwin` → `pbpaste`,
@@ -68,7 +68,7 @@ Linux → `xclip`). Catches all errors and returns `''`.
 text as raw stdin before the keystroke ever reaches the app. `readClipboard()` is
 the fallback for terminals that do forward the keystroke.
 
-*Depends on: nothing*
+_Depends on: nothing_
 
 ---
 
@@ -78,23 +78,22 @@ the fallback for terminals that do forward the keystroke.
 
 ```typescript
 export type SupportedPlatform =
-  | 'spotify' | 'youtube' | 'youtubeMusic'
-  | 'soundcloud' | 'deezer' | 'appleMusic' | 'tidal';
+    "spotify" | "youtube" | "youtubeMusic" | "soundcloud" | "deezer" | "appleMusic" | "tidal";
 
 export type DetectedUrl = {
-  raw: string;
-  platform: SupportedPlatform;
-  type: 'track' | 'album' | 'playlist' | 'unknown';
+    raw: string;
+    platform: SupportedPlatform;
+    type: "track" | "album" | "playlist" | "unknown";
 };
 
-export function detectUrls(text: string): DetectedUrl[]
+export function detectUrls(text: string): DetectedUrl[];
 ```
 
 Extracts all URLs with `/https?:\/\/[^\s"'<>]+/gi`, then classifies each via `classify()`.
 Unknown URLs (no matching platform) are excluded. Spotify album/playlist paths are
 classified accordingly; SoundCloud homepage is excluded.
 
-*Depends on: nothing*
+_Depends on: nothing_
 
 ---
 
@@ -106,11 +105,12 @@ classified accordingly; SoundCloud homepage is excluded.
 are not aware of `PendingImport`.
 
 **`PendingImport` type** (in `src/components/ImportModal.tsx`):
+
 ```typescript
 type PendingImport = {
-  urls: DetectedUrl[];
-  fetchMetadata: boolean;
-  download: boolean;
+    urls: DetectedUrl[];
+    fetchMetadata: boolean;
+    download: boolean;
 };
 ```
 
@@ -119,10 +119,10 @@ checks both the orchestrator's existing task IDs and a within-batch `seen` set.
 
 **Continuous link handling (post-P3 addition):** When the modal is already open, additional
 pastes merge new URLs into the existing list instead of being dropped. Deduplication is by
-raw URL string. The stdin paste check in `InputRouter` runs *before* the modal guard so it
+raw URL string. The stdin paste check in `InputRouter` runs _before_ the modal guard so it
 fires even when the modal has focus.
 
-*Depends on: T3.1, T3.3*
+_Depends on: T3.1, T3.3_
 
 ---
 
@@ -143,6 +143,7 @@ a 3-option radio selector navigated by `[↑↓]` / `[Tab]`:
 `{ fetchMetadata, download }` passed to `onConfirm`.
 
 **URL list limits (post-P3 addition):**
+
 - Maximum 32 URLs displayed; excess shown as `and N other URLs...`
 - If the list would overflow the terminal height, it is trimmed earlier (before the 32nd),
   always reserving one row for the overflow line
@@ -150,7 +151,7 @@ a 3-option radio selector navigated by `[↑↓]` / `[Tab]`:
 **Focus management:** `switchWindow('importModal')` on mount, `switchBack()` on unmount,
 via `useFocusContext()`. `useInput` is gated with `{ isActive }`.
 
-*Depends on: T3.3, T3.4, P1/T1.2*
+_Depends on: T3.3, T3.4, P1/T1.2_
 
 ---
 
@@ -161,25 +162,26 @@ via `useFocusContext()`. `useInput` is gated with `{ isActive }`.
 Two detection paths in `InputRouter.useInput`:
 
 1. **stdin paste** (checked first, before the modal guard so it works while modal is open):
-   ```typescript
-   if (input.length > 8 && /https?:\/\//i.test(input)) {
-     openImportFlow(input);
-     return;
-   }
-   ```
+
+    ```typescript
+    if (input.length > 8 && /https?:\/\//i.test(input)) {
+        openImportFlow(input);
+        return;
+    }
+    ```
 
 2. **Ctrl+V keystroke** (fallback, blocked by modal guard):
-   ```typescript
-   if ((key.ctrl && (input === 'v' || input === 'V')) || input === '\x16') {
-     openImportFlow();
-     return;
-   }
-   ```
+    ```typescript
+    if ((key.ctrl && (input === "v" || input === "V")) || input === "\x16") {
+        openImportFlow();
+        return;
+    }
+    ```
 
 `openImportFlow(text?)` in `useImportFlow`: if `text` is provided, skips clipboard read;
 otherwise calls `readClipboard()`. Guards: no-op if `focusState.activeWindow === 'prompt'`.
 
-*Depends on: T3.2, T3.3, T3.4, T3.5*
+_Depends on: T3.2, T3.3, T3.4, T3.5_
 
 ---
 
@@ -201,7 +203,7 @@ export const useImportButton: ToolbarButtonHook<FlowBase> = () => {
 `ImportActionsProvider` wraps `AppInner` and passes `openImportFlow` down via context,
 avoiding prop-drilling through the toolbar stack.
 
-*Depends on: T3.6*
+_Depends on: T3.6_
 
 ---
 
@@ -219,32 +221,34 @@ avoiding prop-drilling through the toolbar stack.
   handles deduplication and `orchestrator.addTasks()`. No override needed in `MusicDownloadFlow`
 
 `useImportFlow.handleImportConfirm` calls both in sequence:
+
 ```typescript
 const tasks = currentFlow.createTasksFromUrls(urls, { toTag: fetchMetadata, toDownload: download });
 currentFlow.importTasks(tasks);
 ```
 
 **Also removed:**
+
 - `src/flows/musicDownloadFlow/utils/input-loader.ts` — deleted
 - `InputLoader` import and `static inputLoader` field from `MusicDownloadFlow`
 
 `inputs.txt` is kept in the repo root as a local dev reference but is no longer read by the app.
 
-*Depends on: T3.7*
+_Depends on: T3.7_
 
 ---
 
 ## Summary
 
-| Task | What | Status |
-|------|------|--------|
-| T3.1 | URL-based task IDs (`task:<sha1[:12]>`) | ✅ Done |
-| T3.2 | `readClipboard()` utility | ✅ Done |
-| T3.3 | `detectUrls()` with platform classification | ✅ Done |
-| T3.4 | Import state in `useImportFlow` hook + dedup | ✅ Done |
-| T3.5 | `ImportModal` with 3-option radio selector | ✅ Done |
-| T3.6 | `Ctrl+V` + stdin paste detection in `InputRouter` | ✅ Done |
-| T3.7 | Import toolbar button via `ImportActionsContext` | ✅ Done |
+| Task | What                                                   | Status  |
+| ---- | ------------------------------------------------------ | ------- |
+| T3.1 | URL-based task IDs (`task:<sha1[:12]>`)                | ✅ Done |
+| T3.2 | `readClipboard()` utility                              | ✅ Done |
+| T3.3 | `detectUrls()` with platform classification            | ✅ Done |
+| T3.4 | Import state in `useImportFlow` hook + dedup           | ✅ Done |
+| T3.5 | `ImportModal` with 3-option radio selector             | ✅ Done |
+| T3.6 | `Ctrl+V` + stdin paste detection in `InputRouter`      | ✅ Done |
+| T3.7 | Import toolbar button via `ImportActionsContext`       | ✅ Done |
 | T3.8 | Removed `inputs.txt` path; split `FlowBase` import API | ✅ Done |
-| —    | Continuous link handling (append to open modal) | ✅ Done |
-| —    | URL list display limit (32 + overflow line) | ✅ Done |
+| —    | Continuous link handling (append to open modal)        | ✅ Done |
+| —    | URL list display limit (32 + overflow line)            | ✅ Done |

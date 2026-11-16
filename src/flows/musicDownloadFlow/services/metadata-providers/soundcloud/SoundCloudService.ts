@@ -1,0 +1,164 @@
+import { type Logger } from "#base/logger/logger";
+import { type ParsedUrl } from "#base/urlParser";
+import { StatusType } from "#base/task/task-status";
+import { type ProviderDisplay } from "#base/providerDisplay";
+import { type ProviderSettingsSchema } from "#base/providerSettings";
+import { type DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { computeConfidenceScore, MIN_SEARCH_CONFIDENCE } from "#flows/musicDownloadFlow/utils/confidence";
+import { type TrackMetadata, type SearchTrackResult } from "#flows/musicDownloadFlow/types";
+import { Cached, NEGATIVE_RESULT_TTL_MS } from "#utils/cache";
+import { MetadataService } from "../../../metadataService";
+import { isYtDlpEnabled, readYtDlpInfo } from "../../apis/ytdlp-client";
+import { SoundCloudCell } from "./SoundCloudCell";
+import { convertSoundCloudToTrack, slimSoundCloudInfo, type SoundCloudInfo } from "./convertSoundCloudToTrack";
+import { parseSoundCloudUrl, soundcloudTrackUrl } from "./soundcloudUrl";
+
+/** yt-dlp is a process that talks to SoundCloud: a hung one must not hold the whole metadata stage. */
+const YTDLP_TIMEOUT_MS = 60_000;
+/** How many search results `searchTrack` asks SoundCloud for before judging them. */
+const SEARCH_CANDIDATES = 8;
+/** How many of the matches that pass the gate are kept. Several uploads of a song are common on SoundCloud. */
+const MAX_MATCHES = 3;
+/**
+ * SoundCloud search is open to anyone's upload: bootlegs, slowed edits and reposts rank next to the real track. Unlike
+ * the other services (whose first hit is trusted), a result must look like the track (see `computeConfidenceScore`)
+ * to be proposed. Same bar as every other service's search (`MIN_SEARCH_CONFIDENCE`).
+ */
+const MIN_CONFIDENCE = MIN_SEARCH_CONFIDENCE;
+
+type FlatSearch = { entries?: SoundCloudInfo[] };
+
+/**
+ * SoundCloud, read through yt-dlp's own SoundCloud extractor: no API key (SoundCloud has closed new API
+ * registrations) and no setup beyond the yt-dlp binary the app already downloads. The same binary downloads the audio
+ * (`YtDlpService` lists `soundcloud` among the metadata it can download), so a track found here becomes a download
+ * source with no other code.
+ */
+export class SoundCloudService extends MetadataService {
+    static readonly display: ProviderDisplay = {
+        label: "SoundCloud",
+        acronym: "SC",
+        color: "#ff5510",
+        colorSubtle: "#7a2500",
+        colorBright: "#ff5500",
+    };
+    static readonly defaultSettings: ProviderSettingsSchema = {
+        enabled: { label: "Enable", defaultValue: true, kind: "checkbox" },
+    };
+    static readonly cellComponent = SoundCloudCell;
+    static readonly trackUrl = soundcloudTrackUrl;
+
+    constructor(task: DownloadTask, logger: Logger) {
+        super("SoundCloudService", task, logger);
+    }
+
+    static parseUrl(url: string): ParsedUrl | null {
+        return parseSoundCloudUrl(url);
+    }
+
+    /** yt-dlp's JSON for one track page. Cached as the raw JSON: it is plain data, and dates are made fresh when mapped. */
+    @Cached()
+    private async getTrackInfo(url: string): Promise<SoundCloudInfo> {
+        this.logger.info(`Reading SoundCloud track: ${url}`);
+        const info = await readYtDlpInfo<SoundCloudInfo>(url, {
+            timeoutMs: YTDLP_TIMEOUT_MS,
+            timeoutMessage: "SoundCloud took too long to answer",
+        });
+        // A short link can lead to a playlist or a profile: this service only reads tracks.
+        if (info._type === "playlist") throw new Error(`Not a SoundCloud track: ${url}`);
+        return slimSoundCloudInfo(info);
+    }
+
+    /** The entries of a SoundCloud search: yt-dlp's flat listing already carries title, uploader, duration and page. */
+    @Cached({ ttl: (result) => (Array.isArray(result) && result.length === 0 ? NEGATIVE_RESULT_TTL_MS : undefined) })
+    private async searchEntries(query: string, count: number): Promise<SoundCloudInfo[]> {
+        this.logger.debug(`Searching SoundCloud: ${query}`);
+        const listing = await readYtDlpInfo<FlatSearch>(`scsearch${count}:${query}`, {
+            timeoutMs: YTDLP_TIMEOUT_MS,
+            timeoutMessage: "SoundCloud took too long to answer",
+        });
+        return (listing.entries ?? []).map(slimSoundCloudInfo);
+    }
+
+    async getTrackMetadata(url: string): Promise<TrackMetadata> {
+        const parsed = parseSoundCloudUrl(url);
+        if (!parsed?.id) throw new Error(`Invalid SoundCloud track URL: ${url}`);
+
+        this.status.set({
+            type: StatusType.Processing,
+            message: "Fetching SoundCloud track",
+            timeTracking: true,
+            progress: 0,
+        });
+        try {
+            const info = await this.getTrackInfo(soundcloudTrackUrl(parsed.id));
+            // The track keeps the id the link was read as, even when SoundCloud's own page address differs (a short
+            // link, a renamed permalink): the link the user pasted is stored under that id and must find its row again.
+            const metadata = convertSoundCloudToTrack(info, parsed.id);
+            if (!metadata) throw new Error(`SoundCloud gave no usable data for ${url}`);
+            this.status.clear();
+            return metadata;
+        } catch (error) {
+            this.logger.error("Error getting SoundCloud track:", { error });
+            this.status.set({ type: StatusType.Error, message: "Error fetching SoundCloud track" });
+            throw error;
+        }
+    }
+
+    async searchTracks(query: string, limit: number): Promise<TrackMetadata[]> {
+        const count = Math.max(1, limit);
+        const entries = await this.searchEntries(query.trim(), count);
+        return entries
+            .map((entry) => convertSoundCloudToTrack(entry))
+            .filter((track): track is TrackMetadata => track !== null)
+            .slice(0, count);
+    }
+
+    async searchTrack(sourceTrackMetadata: TrackMetadata): Promise<SearchTrackResult[]> {
+        const artist = sourceTrackMetadata.artists?.[0]?.name;
+        const trackName = sourceTrackMetadata.trackName;
+        if (!artist || !trackName) {
+            throw new Error("Artist name and track name are required for search");
+        }
+        // The same yt-dlp downloads these tracks. With it switched off, reading SoundCloud would only start the
+        // binary download for a user who chose not to use yt-dlp, and propose tracks nothing could download.
+        if (!isYtDlpEnabled()) {
+            this.logger.debug("yt-dlp is switched off: not searching SoundCloud");
+            return [];
+        }
+
+        this.status.set({
+            type: StatusType.Processing,
+            message: "Searching SoundCloud",
+            timeTracking: true,
+            progress: 0,
+        });
+        try {
+            const searchText = `${artist} ${trackName}`;
+            const entries = await this.searchEntries(searchText, SEARCH_CANDIDATES);
+            const matches = entries
+                .map((entry) => convertSoundCloudToTrack(entry))
+                .filter((track): track is TrackMetadata => track !== null)
+                .map((metadata) => ({ metadata, score: computeConfidenceScore(metadata, sourceTrackMetadata) }))
+                .filter(({ score }) => score >= MIN_CONFIDENCE)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, MAX_MATCHES);
+
+            this.logger.info(`SoundCloud: ${matches.length} of ${entries.length} result(s) look like the track`);
+            this.status.clear();
+            // What SoundCloud was asked, and how many of its answers were kept: the same for every result.
+            const query = [
+                { label: "Search", value: `scsearch${SEARCH_CANDIDATES}:${searchText}` },
+                {
+                    label: "Kept",
+                    value: `${matches.length} of ${entries.length} result(s) scoring at least ${MIN_CONFIDENCE}%`,
+                },
+            ];
+            return matches.map(({ metadata }) => ({ metadata, searchKeys: ["trackName+artistName"], query }));
+        } catch (error) {
+            this.logger.error(`Error searching SoundCloud for: ${trackName}`, { error });
+            this.status.set({ type: StatusType.Error, message: "Error searching SoundCloud" });
+            throw error;
+        }
+    }
+}

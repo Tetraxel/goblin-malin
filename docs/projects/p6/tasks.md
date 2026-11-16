@@ -58,20 +58,20 @@ All `globalLogger.info/error/warn` calls in the file already reference `globalLo
 
 ```typescript
 type Metadata = {
-  trackTitle: string;
-  artists: string[]; // replaces single artistName
-  albumArtists?: string[];
-  albumName?: string;
-  year?: string;
-  trackNumber?: string;
-  isrc?: string;
-  genres?: string[];
-  bpm?: number;
-  key?: string;
-  musicBrainzTrackId?: string;
-  musicBrainzAlbumId?: string;
-  musicBrainzArtistId?: string;
-  musicBrainzReleaseGroupId?: string;
+    trackTitle: string;
+    artists: string[]; // replaces single artistName
+    albumArtists?: string[];
+    albumName?: string;
+    year?: string;
+    trackNumber?: string;
+    isrc?: string;
+    genres?: string[];
+    bpm?: number;
+    key?: string;
+    musicBrainzTrackId?: string;
+    musicBrainzAlbumId?: string;
+    musicBrainzArtistId?: string;
+    musicBrainzReleaseGroupId?: string;
 };
 ```
 
@@ -79,29 +79,21 @@ Update the `FlacTagMap` construction in `cleanAndTagFlac()` to write all fields:
 
 ```typescript
 const newTags: FlacTagMap = {
-  ...currentTags.tagMap,
-  TITLE: metadata.trackTitle,
-  ARTIST: metadata.artists,
-  ALBUMARTIST: metadata.albumArtists ?? metadata.artists,
-  ...(metadata.albumName ? { ALBUM: metadata.albumName } : {}),
-  ...(metadata.year ? { YEAR: metadata.year, DATE: metadata.year } : {}),
-  ...(metadata.trackNumber ? { TRACKNUMBER: metadata.trackNumber } : {}),
-  ...(metadata.isrc ? { ISRC: metadata.isrc } : {}),
-  ...(metadata.genres?.length ? { GENRE: metadata.genres } : {}),
-  ...(metadata.bpm != null ? { BPM: String(metadata.bpm) } : {}),
-  ...(metadata.key ? { KEY: metadata.key } : {}),
-  ...(metadata.musicBrainzTrackId
-    ? { MUSICBRAINZ_TRACKID: metadata.musicBrainzTrackId }
-    : {}),
-  ...(metadata.musicBrainzAlbumId
-    ? { MUSICBRAINZ_ALBUMID: metadata.musicBrainzAlbumId }
-    : {}),
-  ...(metadata.musicBrainzArtistId
-    ? { MUSICBRAINZ_ARTISTID: metadata.musicBrainzArtistId }
-    : {}),
-  ...(metadata.musicBrainzReleaseGroupId
-    ? { MUSICBRAINZ_RELEASEGROUPID: metadata.musicBrainzReleaseGroupId }
-    : {}),
+    ...currentTags.tagMap,
+    TITLE: metadata.trackTitle,
+    ARTIST: metadata.artists,
+    ALBUMARTIST: metadata.albumArtists ?? metadata.artists,
+    ...(metadata.albumName ? { ALBUM: metadata.albumName } : {}),
+    ...(metadata.year ? { YEAR: metadata.year, DATE: metadata.year } : {}),
+    ...(metadata.trackNumber ? { TRACKNUMBER: metadata.trackNumber } : {}),
+    ...(metadata.isrc ? { ISRC: metadata.isrc } : {}),
+    ...(metadata.genres?.length ? { GENRE: metadata.genres } : {}),
+    ...(metadata.bpm != null ? { BPM: String(metadata.bpm) } : {}),
+    ...(metadata.key ? { KEY: metadata.key } : {}),
+    ...(metadata.musicBrainzTrackId ? { MUSICBRAINZ_TRACKID: metadata.musicBrainzTrackId } : {}),
+    ...(metadata.musicBrainzAlbumId ? { MUSICBRAINZ_ALBUMID: metadata.musicBrainzAlbumId } : {}),
+    ...(metadata.musicBrainzArtistId ? { MUSICBRAINZ_ARTISTID: metadata.musicBrainzArtistId } : {}),
+    ...(metadata.musicBrainzReleaseGroupId ? { MUSICBRAINZ_RELEASEGROUPID: metadata.musicBrainzReleaseGroupId } : {}),
 };
 ```
 
@@ -110,22 +102,19 @@ const newTags: FlacTagMap = {
 `renameFile()` rejects cross-directory moves. Replace it entirely:
 
 ```typescript
-export async function moveFile(
-  srcPath: string,
-  destPath: string,
-): Promise<void> {
-  await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
-  try {
-    await fs.promises.rename(srcPath, destPath);
-  } catch (err: any) {
-    if (err.code === "EXDEV") {
-      // Cross-device / cross-partition: fall back to copy + delete
-      await fs.promises.copyFile(srcPath, destPath);
-      await fs.promises.unlink(srcPath);
-    } else {
-      throw err;
+export async function moveFile(srcPath: string, destPath: string): Promise<void> {
+    await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
+    try {
+        await fs.promises.rename(srcPath, destPath);
+    } catch (err: any) {
+        if (err.code === "EXDEV") {
+            // Cross-device / cross-partition: fall back to copy + delete
+            await fs.promises.copyFile(srcPath, destPath);
+            await fs.promises.unlink(srcPath);
+        } else {
+            throw err;
+        }
     }
-  }
 }
 ```
 
@@ -146,34 +135,30 @@ import { CompiledMetadata } from "./compiledMetadata";
 import { Metadata } from "../../../utils/metadata";
 
 export interface TagOptions {
-  includeMusicBrainzTags: boolean;
+    includeMusicBrainzTags: boolean;
 }
 
-export function compiledMetadataToTags(
-  compiled: CompiledMetadata,
-  options: TagOptions,
-): Metadata {
-  return {
-    trackTitle: compiled.trackName,
-    artists: compiled.artists.map((a) => a.name),
-    albumArtists: compiled.album?.artists?.map((a) => a.name),
-    albumName: compiled.album?.albumName,
-    year: compiled.year != null ? String(compiled.year) : undefined,
-    trackNumber:
-      compiled.trackNumber != null ? String(compiled.trackNumber) : undefined,
-    isrc: compiled.isrc,
-    genres: compiled.genres,
-    bpm: compiled.bpm,
-    key: compiled.key,
-    ...(options.includeMusicBrainzTags
-      ? {
-          musicBrainzTrackId: compiled.musicBrainzIds?.recording,
-          musicBrainzAlbumId: compiled.musicBrainzIds?.release,
-          musicBrainzArtistId: compiled.musicBrainzIds?.artist,
-          musicBrainzReleaseGroupId: compiled.musicBrainzIds?.releaseGroup,
-        }
-      : {}),
-  };
+export function compiledMetadataToTags(compiled: CompiledMetadata, options: TagOptions): Metadata {
+    return {
+        trackTitle: compiled.trackName,
+        artists: compiled.artists.map((a) => a.name),
+        albumArtists: compiled.album?.artists?.map((a) => a.name),
+        albumName: compiled.album?.albumName,
+        year: compiled.year != null ? String(compiled.year) : undefined,
+        trackNumber: compiled.trackNumber != null ? String(compiled.trackNumber) : undefined,
+        isrc: compiled.isrc,
+        genres: compiled.genres,
+        bpm: compiled.bpm,
+        key: compiled.key,
+        ...(options.includeMusicBrainzTags
+            ? {
+                  musicBrainzTrackId: compiled.musicBrainzIds?.recording,
+                  musicBrainzAlbumId: compiled.musicBrainzIds?.release,
+                  musicBrainzArtistId: compiled.musicBrainzIds?.artist,
+                  musicBrainzReleaseGroupId: compiled.musicBrainzIds?.releaseGroup,
+              }
+            : {}),
+    };
 }
 ```
 
@@ -190,15 +175,12 @@ Create `src/flows/musicDownloadFlow/utils/computeOutputPath.ts`.
 Derives the final destination filename from compiled metadata and the output directory:
 
 ```typescript
-export function computeOutputPath(
-  compiled: CompiledMetadata,
-  outputDir: string,
-): string {
-  const artist = compiled.artists[0]?.name ?? "Unknown Artist";
-  const title = compiled.trackName || "Unknown Title";
-  const raw = `${artist} - ${title}.flac`;
-  const safe = raw.replace(/[/\\:*?"<>|]/g, "_");
-  return path.join(outputDir, safe);
+export function computeOutputPath(compiled: CompiledMetadata, outputDir: string): string {
+    const artist = compiled.artists[0]?.name ?? "Unknown Artist";
+    const title = compiled.trackName || "Unknown Title";
+    const raw = `${artist} - ${title}.flac`;
+    const safe = raw.replace(/[/\\:*?"<>|]/g, "_");
+    return path.join(outputDir, safe);
 }
 ```
 
@@ -208,10 +190,10 @@ export function computeOutputPath(
 let dest = basePath;
 let counter = 2;
 while (fs.existsSync(dest)) {
-  const ext = path.extname(basePath);
-  const base = path.basename(basePath, ext);
-  dest = path.join(outputDir, `${base} (${counter})${ext}`);
-  counter++;
+    const ext = path.extname(basePath);
+    const base = path.basename(basePath, ext);
+    dest = path.join(outputDir, `${base} (${counter})${ext}`);
+    counter++;
 }
 return dest;
 ```
@@ -226,20 +208,20 @@ Create `src/flows/musicDownloadFlow/saveSettings.ts`. P7 will fill this with rea
 
 ```typescript
 export interface SaveSettings {
-  outputDir: string;
-  includeMusicBrainzTags: boolean;
+    outputDir: string;
+    includeMusicBrainzTags: boolean;
 }
 
 export function getDefaultSaveSettings(): SaveSettings {
-  return {
-    outputDir: process.env.OUTPUT_DIR ?? path.join(os.homedir(), "Music"),
-    includeMusicBrainzTags: false,
-  };
+    return {
+        outputDir: process.env.OUTPUT_DIR ?? path.join(os.homedir(), "Music"),
+        includeMusicBrainzTags: false,
+    };
 }
 
 // P7 will replace this with a real reader:
 export function getSaveSettings(): SaveSettings {
-  return getDefaultSaveSettings();
+    return getDefaultSaveSettings();
 }
 ```
 
@@ -283,11 +265,9 @@ await fs.promises.copyFile(localFile.path, outputPath);
 
 ```typescript
 this.updateAttributes({
-  downloadSources: sources.map((s) =>
-    s === selectedSource
-      ? { ...s, savedFile: { path: outputPath, savedAt: new Date() } }
-      : s,
-  ),
+    downloadSources: sources.map((s) =>
+        s === selectedSource ? { ...s, savedFile: { path: outputPath, savedAt: new Date() } } : s
+    ),
 });
 ```
 
@@ -332,11 +312,11 @@ When `saveTrack()` is called and `selectedSource.savedFile` already exists (the 
 
 ```typescript
 if (selectedSource.savedFile) {
-  try {
-    await fs.promises.unlink(selectedSource.savedFile.path);
-  } catch (err: any) {
-    if (err.code !== "ENOENT") throw err; // ignore if already gone
-  }
+    try {
+        await fs.promises.unlink(selectedSource.savedFile.path);
+    } catch (err: any) {
+        if (err.code !== "ENOENT") throw err; // ignore if already gone
+    }
 }
 ```
 
@@ -360,14 +340,10 @@ _Depends on: T6.5, P5/T5.7_
 ```typescript
 const saved = downloadSource?.savedFile;
 const display = saved
-  ? path.basename(saved.path) // show final filename
-  : (downloadSource?.localFile?.name ?? downloadSource?.state ?? "");
+    ? path.basename(saved.path) // show final filename
+    : (downloadSource?.localFile?.name ?? downloadSource?.state ?? "");
 
-const color = saved
-  ? "cyan"
-  : downloadSource?.state === "downloaded"
-    ? "green"
-    : "white";
+const color = saved ? "cyan" : downloadSource?.state === "downloaded" ? "green" : "white";
 ```
 
 This gives the task table a clear visual indicator: cyan = saved, green = downloaded but not yet saved, white = in progress.

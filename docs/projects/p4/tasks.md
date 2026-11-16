@@ -14,20 +14,20 @@ metadataSources: TrackMetadata[];
 
 ```typescript
 type BaseTrackMetadata = {
-  id;
-  isrc;
-  trackName;
-  duration;
-  trackNumber;
-  url;
-  uri;
-  artists;
-  album;
-  platform;
-  apiProvider;
-  isPrimarySource?: boolean;
-  fetchedAt;
-  type: "track";
+    id;
+    isrc;
+    trackName;
+    duration;
+    trackNumber;
+    url;
+    uri;
+    artists;
+    album;
+    platform;
+    apiProvider;
+    isPrimarySource?: boolean;
+    fetchedAt;
+    type: "track";
 };
 ```
 
@@ -55,10 +55,10 @@ P2/T2.9 creates the `SourcesPanel` scaffold with an inner left/right split. P4 f
 
 ```typescript
 type BaseTrackMetadata = {
-  // ... existing fields ...
-  bpm?: number;
-  key?: string; // e.g. "Am", "F#"
-  genres?: string[];
+    // ... existing fields ...
+    bpm?: number;
+    key?: string; // e.g. "Am", "F#"
+    genres?: string[];
 };
 ```
 
@@ -68,11 +68,11 @@ These are optional on all platform types. Only services that actually return the
 
 ```typescript
 export type MetadataSourceState = {
-  metadata: TrackMetadata;
-  rank: number; // 0 = highest priority; lower = considered first
-  isFavorited: boolean; // pinned as preferred for this provider (max one per provider)
-  isRejected: boolean; // user marked as wrong match; excluded from compiled output
-  confidence?: number; // 0–100 match score vs. primary; added in T4.13
+    metadata: TrackMetadata;
+    rank: number; // 0 = highest priority; lower = considered first
+    isFavorited: boolean; // pinned as preferred for this provider (max one per provider)
+    isRejected: boolean; // user marked as wrong match; excluded from compiled output
+    confidence?: number; // 0–100 match score vs. primary; added in T4.13
 };
 ```
 
@@ -80,25 +80,25 @@ export type MetadataSourceState = {
 
 ```typescript
 export type MetadataOverrides = Partial<{
-  trackName: string;
-  artists: StandardArtist[];
-  isrc: string;
-  album: StandardAlbum;
-  year: number;
-  trackNumber: number;
-  bpm: number;
-  key: string;
-  genres: string[];
+    trackName: string;
+    artists: StandardArtist[];
+    isrc: string;
+    album: StandardAlbum;
+    year: number;
+    trackNumber: number;
+    bpm: number;
+    key: string;
+    genres: string[];
 }>;
 
 export type TrackDownloadTask = {
-  toTag?: boolean;
-  toDownload?: boolean;
-  userInput: UserInput;
-  metadataSources: MetadataSourceState[]; // was TrackMetadata[]
-  metadataOverride: MetadataOverrides; // new
-  downloadSources: TrackDownloadSource[];
-  parentAlbumDownloadTask?: AlbumDownloadTask;
+    toTag?: boolean;
+    toDownload?: boolean;
+    userInput: UserInput;
+    metadataSources: MetadataSourceState[]; // was TrackMetadata[]
+    metadataOverride: MetadataOverrides; // new
+    downloadSources: TrackDownloadSource[];
+    parentAlbumDownloadTask?: AlbumDownloadTask;
 };
 ```
 
@@ -155,38 +155,26 @@ Create `src/flows/musicDownloadFlow/utils/compiledMetadata.ts`.
 export type FieldAttribution = Platform | "manual" | "none";
 
 export type CompiledMetadata = {
-  trackName: string;
-  artists: StandardArtist[];
-  duration?: number;
-  isrc?: string;
-  album?: StandardAlbum;
-  year?: number;
-  trackNumber?: number;
-  bpm?: number;
-  key?: string;
-  genres?: string[];
-  // which source provided each field (for display in the detail panel)
-  attribution: Partial<
-    Record<
-      | "trackName"
-      | "artists"
-      | "duration"
-      | "isrc"
-      | "album"
-      | "year"
-      | "trackNumber"
-      | "bpm"
-      | "key"
-      | "genres",
-      FieldAttribution
-    >
-  >;
+    trackName: string;
+    artists: StandardArtist[];
+    duration?: number;
+    isrc?: string;
+    album?: StandardAlbum;
+    year?: number;
+    trackNumber?: number;
+    bpm?: number;
+    key?: string;
+    genres?: string[];
+    // which source provided each field (for display in the detail panel)
+    attribution: Partial<
+        Record<
+            "trackName" | "artists" | "duration" | "isrc" | "album" | "year" | "trackNumber" | "bpm" | "key" | "genres",
+            FieldAttribution
+        >
+    >;
 };
 
-export function computeCompiledMetadata(
-  sources: MetadataSourceState[],
-  overrides: MetadataOverrides,
-): CompiledMetadata;
+export function computeCompiledMetadata(sources: MetadataSourceState[], overrides: MetadataOverrides): CompiledMetadata;
 ```
 
 **Algorithm:**
@@ -211,12 +199,12 @@ Create `src/components/SecondaryPanel/MetadataPanel/MetadataSourceList.tsx`.
 
 ```typescript
 interface MetadataSourceListProps {
-  sources: MetadataSourceState[];
-  compiled: CompiledMetadata; // pre-computed, passed in from SourcesPanel
-  selectedIndex: number; // -1 = compiled row selected, 0+ = source index
-  isActive: boolean;
-  width: number;
-  height: number;
+    sources: MetadataSourceState[];
+    compiled: CompiledMetadata; // pre-computed, passed in from SourcesPanel
+    selectedIndex: number; // -1 = compiled row selected, 0+ = source index
+    isActive: boolean;
+    width: number;
+    height: number;
 }
 ```
 
@@ -252,13 +240,13 @@ Create `src/components/SecondaryPanel/MetadataPanel/MetadataDetailPanel.tsx`.
 
 ```typescript
 interface MetadataDetailPanelProps {
-  source: MetadataSourceState | "compiled";
-  compiled: CompiledMetadata;
-  overrides: MetadataOverrides;
-  selectedFieldIndex: number; // only relevant when source === 'compiled' and detail panel is focused
-  isActive: boolean;
-  width: number;
-  height: number;
+    source: MetadataSourceState | "compiled";
+    compiled: CompiledMetadata;
+    overrides: MetadataOverrides;
+    selectedFieldIndex: number; // only relevant when source === 'compiled' and detail panel is focused
+    isActive: boolean;
+    width: number;
+    height: number;
 }
 ```
 
@@ -437,10 +425,10 @@ _Depends on: T4.8_
 
 ```typescript
 if (key.upArrow) {
-  if (key.shift) {
-    /* reorder up */ return;
-  }
-  /* normal navigation up */
+    if (key.shift) {
+        /* reorder up */ return;
+    }
+    /* normal navigation up */
 }
 ```
 

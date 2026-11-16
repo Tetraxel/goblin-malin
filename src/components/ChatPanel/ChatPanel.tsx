@@ -18,7 +18,8 @@ import { getAgentSettings } from "#flows/musicDownloadFlow/agent/agentSettings";
 import { type SavedChatSummary } from "#flows/musicDownloadFlow/agent/chatHistory";
 import { Hint } from "../Hint";
 import { ChatEmptyState } from "./ChatEmptyState";
-import { ChatInput } from "./ChatInput";
+import { ChatInput, type ChatInputHandle } from "./ChatInput";
+import { readClipboard } from "#components/ImportModal/clipboard";
 import { ChatRowView } from "./ChatRowView";
 import { ChatSelection } from "./ChatSelection";
 import { CHAT_TITLE, useChatTitleInfo } from "./ChatTitleBar";
@@ -77,6 +78,7 @@ export const ChatPanel: React.FC<Props> = ({ tasks, width, height, variant, term
     const [last, setLast] = useState<SavedChatSummary | undefined>();
     const flashTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const ref = useRef<DOMElement>(null);
+    const inputRef = useRef<ChatInputHandle>(null);
     const bodyRef = useRef<DOMElement>(null);
 
     useSettingsVersion();
@@ -157,6 +159,24 @@ export const ChatPanel: React.FC<Props> = ({ tasks, width, height, variant, term
         );
     }, [showFlash]);
 
+    // Ctrl+V, for the terminals that deliver the key instead of typing the clipboard into the app (the others never
+    // get here: what they paste arrives as text, straight into the line). The line is one row of text: the clipboard
+    // goes in at the cursor, without the line break a copied line usually ends with.
+    const paste = useCallback(() => {
+        readClipboard().then(
+            (raw) => {
+                const text = raw.replace(/[\r\n]+$/, "");
+                if (text.trim() === "") {
+                    showFlash("The clipboard is empty", false);
+                    return;
+                }
+                if (inputRef.current) inputRef.current.insert(text);
+                else setDraft((d) => d + sanitizeTyped(text));
+            },
+            () => showFlash("Could not read the clipboard", false)
+        );
+    }, [showFlash]);
+
     // The model is Claude Code's choice per session: it can be changed until the first message is sent.
     const chooseModel = useCallback(() => {
         const snapshot = chatStore.getSnapshot();
@@ -218,6 +238,12 @@ export const ChatPanel: React.FC<Props> = ({ tasks, width, height, variant, term
                 defaultShortcut: { input: "z", ctrl: true },
                 label: "Undo Claude's last action",
                 handler: () => void agentChat.undo(),
+            },
+            {
+                id: "chat.paste",
+                defaultShortcut: { input: "v", ctrl: true },
+                label: "Paste the clipboard into the message",
+                handler: paste,
             },
             {
                 id: "chat.copy",
@@ -429,6 +455,7 @@ export const ChatPanel: React.FC<Props> = ({ tasks, width, height, variant, term
                     <Text color={isFocused ? AGENT_COLOR : theme.text.secondary}>{chat.busy ? "…" : "›"}</Text>
                 </Box>
                 <ChatInput
+                    ref={inputRef}
                     value={draft}
                     onChange={setDraft}
                     onSubmit={submit}
@@ -447,6 +474,7 @@ export const ChatPanel: React.FC<Props> = ({ tasks, width, height, variant, term
                 <Hint label={chat.busy ? "Stop" : variant === "modal" ? "Close" : "Tasks"} shortcutId="chat.escape" />
                 <Hint label="Scroll" shortcutIds={["chat.scrollUp", "chat.scrollDown"]} />
                 <Hint label="Details" shortcutId="chat.details" />
+                <Hint label="Paste" shortcutId="chat.paste" />
                 <Hint label="Copy" shortcutId="chat.copy" />
                 {fresh && <Hint label="Model" shortcutId="chat.model" />}
                 {variant === "docked" && <Hint label="Width" shortcutIds={["chat.widen", "chat.narrow"]} />}

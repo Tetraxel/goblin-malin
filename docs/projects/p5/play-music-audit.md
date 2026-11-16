@@ -23,15 +23,15 @@
 6. **audify is healthy but not actually a media player.** Active, prebuilt N‑API binaries for Node 12+ / Electron 8+, MIT, used by VS Code extensions. But it is RtAudio (low‑level PCM I/O) plus Opus encode/decode only — no MP3/FLAC. It would only help you as the output sink in a custom decode pipeline, not as a player.
 
 7. **miniaudio bindings for Node exist but are immature.** miniaudio (the C library) decodes WAV/MP3/FLAC natively and has a high‑level engine API with pause/seek/volume/spatial. Node bindings are fragmented:
-   - `@thesusheer/node-miniaudio` — single `playAudio(path, callback)` function only; no pause/seek; targeted at notification sounds.
-   - `YXL76/neon-miniaudio` — has `load/play/pause/stop/volume/isPlaying`, no seek API exposed; ~5 yrs since last meaningful update.
-   - `audio-speaker` (audiojs) — uses miniaudio as one of several backends but is a PCM sink, not a player.
-     None expose miniaudio's `ma_sound_seek_to_pcm_frame`, so you'd be writing your own bindings to get true seek.
+    - `@thesusheer/node-miniaudio` — single `playAudio(path, callback)` function only; no pause/seek; targeted at notification sounds.
+    - `YXL76/neon-miniaudio` — has `load/play/pause/stop/volume/isPlaying`, no seek API exposed; ~5 yrs since last meaningful update.
+    - `audio-speaker` (audiojs) — uses miniaudio as one of several backends but is a PCM sink, not a player.
+      None expose miniaudio's `ma_sound_seek_to_pcm_frame`, so you'd be writing your own bindings to get true seek.
 
 8. **Web Audio API in Node is now real.** Two options:
-   - **`web-audio-api` (audiojs)** — **pure JS**, no native deps, 100% WPT conformance, last published 8 days before this report (1.3.2). Decodes MP3/FLAC/OGG/AAC via `audio-decode`. Caveat: pause/seek on `AudioBufferSourceNode` follow the W3C contract, so you implement seek by `stop()` + creating a new source at the desired offset (a few ms of work). DSP is 2–4× slower than native for heavy effects but trivially fast enough for plain playback.
-   - **`node-web-audio-api` (ircam-ismm)** — Rust napi bindings to a real Web‑Audio implementation, prebuilt binaries for major platforms; needs `libasound2-dev` to build from source on Linux. Same seek caveat.
-     Both are a clean path if you want zero external binaries and don't mind writing a tiny "PlaybackSession" wrapper that tracks the current offset.
+    - **`web-audio-api` (audiojs)** — **pure JS**, no native deps, 100% WPT conformance, last published 8 days before this report (1.3.2). Decodes MP3/FLAC/OGG/AAC via `audio-decode`. Caveat: pause/seek on `AudioBufferSourceNode` follow the W3C contract, so you implement seek by `stop()` + creating a new source at the desired offset (a few ms of work). DSP is 2–4× slower than native for heavy effects but trivially fast enough for plain playback.
+    - **`node-web-audio-api` (ircam-ismm)** — Rust napi bindings to a real Web‑Audio implementation, prebuilt binaries for major platforms; needs `libasound2-dev` to build from source on Linux. Same seek caveat.
+      Both are a clean path if you want zero external binaries and don't mind writing a tiny "PlaybackSession" wrapper that tracks the current offset.
 
 9. **ffplay as a long‑running process is a dead end for programmatic control.** Its keyboard interface (space, arrow keys, mouse click‑to‑seek) is interactive‑terminal‑bound; there is no JSON or stdin command protocol. You can technically inject keypresses, but it's brittle and there is no event channel back. ffmpeg itself is a transcoder, not a player; using it as a persistent decoder piped into node-speaker is _possible_, and it is in fact what some Discord music bots do for streaming, but it's a worse engineering trade than just using mpv.
 

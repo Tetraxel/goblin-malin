@@ -27,6 +27,7 @@ Optional static capabilities a service class can declare (all read generically �
 - `static consent: { title, message }` — the provider sends data to a third party or spends the user's quota, so it is **off until the user allows it, once** (a confirm dialog shown on first use; `utils/discoveryConsent.ts`). Its `enabled` default must be `false`. Used by Songlink and Claude.
 - `static lastResort = true` (discovery services) — slow/costly; only runs when a platform is still missing after all regular discovery, and its results must pass the platform's own metadata fetch + a confidence check. Used by Claude.
 - `static platformAliases = ["youtubeMusic"]` (metadata services) — other platform keys whose tracks the service handles; read through `platformRegistry.canonical()` (`src/base/platformRegistry.ts`). Never compare a platform to `"youtubeMusic"` in core code.
+- `static upstreamCodec = "Opus"` (metadata services) — the lossy codec every stream of the platform is in, when it is always the same (what a yt-dlp FLAC was transcoded from); leave it out when the platform serves several. Read through `platformRegistry.upstreamCodec()`.
 - `static trackUrl = (id) => url` (metadata services) — canonical URL of one of the service's tracks; read through `platformRegistry.trackUrl()`.
 - `static openUri = (parsed) => uri | undefined` (metadata services) — the address that opens one of the service's links in its desktop app (`spotify:track:<id>`). A link a registered service reads takes its name, colors and app address from that service (`src/utils/appLinks.ts` asks `urlParserRegistry` first); the regex/site table there is only the fallback for sites no service reads.
 - `static columnActions = (task) => ContextualActions[]` (any service) — extra actions for the service's column in the task list (MusicBrainz: review a match, add a missing release); read by `contextualActions.ts` through the registry, shown before the generic copy/open actions. Never branch on a provider key.
@@ -84,7 +85,7 @@ How it fits together:
 
 ## Active vs. disabled code
 
-Registered metadata services: `spotify`, `youtube`. Discovery services: `songlink` (opt-in), `musicBrainz`, `claude` (opt-in, last resort — see [docs/projects/p29/tasks.md](docs/projects/p29/tasks.md)). Download services: `ytdlp`, `soulseek`.
+Registered metadata services: `spotify`, `youtube`, `soundcloud`. Discovery services: `songlink` (opt-in), `musicBrainz`, `claude` (opt-in, last resort — see [docs/projects/p29/tasks.md](docs/projects/p29/tasks.md)). Download services: `ytdlp`, `soulseek`.
 
 ## Dev commands
 

@@ -19,14 +19,14 @@ The original version of this plan expanded a playlist/album to its full track li
 - **Parent tasks can be collapsed** to hide their children.
 - **Playlists support LIVE refresh**: periodic polling re-fetch (no Spotify push/webhook API exists for this), one **global** interval setting, a "fetched N ago" indicator, and a **per-playlist** on/off toggle (default on).
 
-**Revised again, after trying the "pending only" behavior**: newly-discovered child tracks (fresh expand or a live-refresh tick) are now auto-started immediately — sitting idle until a manual "Run All" felt wrong for tracks the user didn't explicitly paste in. `CollectionTask.fetchAndSpawn()` calls `orchestrator.processTasks(new Set(newChildIds))` right after `addTasks()`, scoped to just the newly-created ids so it doesn't touch unrelated pending tasks elsewhere in the list. They still carry `toTag`/`toDownload` inherited from the parent's own flags (same Import-modal choice as today: Fetch Metadata & Download / Fetch Metadata / Do nothing) — those booleans govern *what* the auto-started run does, not *whether* it starts.
+**Revised again, after trying the "pending only" behavior**: newly-discovered child tracks (fresh expand or a live-refresh tick) are now auto-started immediately — sitting idle until a manual "Run All" felt wrong for tracks the user didn't explicitly paste in. `CollectionTask.fetchAndSpawn()` calls `orchestrator.processTasks(new Set(newChildIds))` right after `addTasks()`, scoped to just the newly-created ids so it doesn't touch unrelated pending tasks elsewhere in the list. They still carry `toTag`/`toDownload` inherited from the parent's own flags (same Import-modal choice as today: Fetch Metadata & Download / Fetch Metadata / Do nothing) — those booleans govern _what_ the auto-started run does, not _whether_ it starts.
 
 ---
 
 ## Architecture decisions
 
 1. **Two task shapes, one union.** `MusicDownloadTaskAttributes` becomes `TrackDownloadTask | CollectionDownloadTask` ([types.ts](../../../src/flows/musicDownloadFlow/types.ts)), discriminated by `kind: "track" | "collection"`. `TrackDownloadTask` gains `parentTaskId?: string`. This replaces the pre-existing dead scaffolding in `types.ts` (`AlbumDownloadTask`/`TracksDownloadTask`/commented `PlaylistDownloadTask` — unused anywhere in the codebase).
-2. **A new `CollectionTask` class**, not a `DownloadTask` — it fetches a *listing*, not track metadata, and spawns real `DownloadTask` children tagged with `parentTaskId`. `DownloadTask` itself stays untouched (`Task<TrackDownloadTask>`), no collection concerns threaded through its metadata/discovery/download service scopes.
+2. **A new `CollectionTask` class**, not a `DownloadTask` — it fetches a _listing_, not track metadata, and spawns real `DownloadTask` children tagged with `parentTaskId`. `DownloadTask` itself stays untouched (`Task<TrackDownloadTask>`), no collection concerns threaded through its metadata/discovery/download service scopes.
 3. **Grouping/collapse is a pure display-order function, not an orchestrator feature.** The orchestrator stays a flat, content-agnostic task list (per P20b's philosophy — the engine knows nothing about task content). A new `buildVisibleTaskOrder(tasks)` reorders the flat list so each parent is immediately followed by its children (wherever they actually sit in the array — they're appended at the end when created), then drops children whose parent is collapsed. Used once, in `App.tsx`, to build the array handed down to rendering; session persistence keeps reading the orchestrator's raw flat list.
 4. **Collapse and live-enabled state live on the task's own attributes** (`collapsed?`, `live?.enabled`) — like `toTag`/`toDownload` today, this persists for free through the existing session snapshot/restore, no new storage layer.
 5. **Live refresh is a polling singleton**, not per-row timers: `liveRefreshScheduler` checks every 5s, scans the orchestrator's tasks for due, non-running, live-enabled playlist tasks, calls `.refetch()`. One global interval setting (in seconds); per-playlist state is just enabled/disabled.
@@ -123,14 +123,14 @@ _Depends on: T21.1–T21.8_
 
 ## Summary
 
-| Task  | What                                                              | Depends on   |
-| ----- | ------------------------------------------------------------------ | ------------ |
-| T21.1 | Types (`kind` union, `CollectionDownloadTask`, `parentTaskId`) + `resolveCollectionRecognition` | — |
-| T21.2 | `CollectionTask` engine (start/restart/refetch/collapse/live) + `taskFactory` refactor | T21.1 |
-| T21.3 | Spotify `expandCollection` (API + scrape fallback)                | T21.1        |
-| T21.4 | YouTube playlist `parseUrl` + `expandCollection`                  | T21.1        |
-| T21.5 | Parent/child grouping+collapse rendering, collection-aware cells  | T21.1, T21.2 |
-| T21.6 | Collection contextual actions (start/restart/refetch/collapse/live/delete/select) | T21.2 |
-| T21.7 | Live refresh scheduler + global/per-playlist settings             | T21.2        |
-| T21.8 | Session naming/search for collections                             | T21.1        |
-| T21.9 | Unit + TUI-harness coverage                                       | T21.1–T21.8  |
+| Task  | What                                                                                            | Depends on   |
+| ----- | ----------------------------------------------------------------------------------------------- | ------------ |
+| T21.1 | Types (`kind` union, `CollectionDownloadTask`, `parentTaskId`) + `resolveCollectionRecognition` | —            |
+| T21.2 | `CollectionTask` engine (start/restart/refetch/collapse/live) + `taskFactory` refactor          | T21.1        |
+| T21.3 | Spotify `expandCollection` (API + scrape fallback)                                              | T21.1        |
+| T21.4 | YouTube playlist `parseUrl` + `expandCollection`                                                | T21.1        |
+| T21.5 | Parent/child grouping+collapse rendering, collection-aware cells                                | T21.1, T21.2 |
+| T21.6 | Collection contextual actions (start/restart/refetch/collapse/live/delete/select)               | T21.2        |
+| T21.7 | Live refresh scheduler + global/per-playlist settings                                           | T21.2        |
+| T21.8 | Session naming/search for collections                                                           | T21.1        |
+| T21.9 | Unit + TUI-harness coverage                                                                     | T21.1–T21.8  |

@@ -49,12 +49,12 @@ Add to `FocusState`:
 
 ```typescript
 secondaryPanel: {
-  mode: "metadataSources" | "download" | "logs";
-  selectedRowIndex: number;
-  scrollOffset: number;
+    mode: "metadataSources" | "download" | "logs";
+    selectedRowIndex: number;
+    scrollOffset: number;
 }
 modal: {
-  type: "settings" | "import" | null;
+    type: "settings" | "import" | null;
 }
 ```
 
@@ -72,22 +72,22 @@ Replace the four separate `useInput` hooks with a single one in `App.tsx` (or a 
 
 ```typescript
 const handlers: Record<FocusableWindow, KeyHandler> = {
-  toolbar: toolbarHandler,
-  taskList: taskListHandler,
-  secondaryPanel: rightPanelHandler,
-  prompt: promptHandler,
-  // ...
+    toolbar: toolbarHandler,
+    taskList: taskListHandler,
+    secondaryPanel: rightPanelHandler,
+    prompt: promptHandler,
+    // ...
 };
 
 useInput((input, key) => {
-  // Global shortcuts first (Tab, Esc to close modal, etc.)
-  if (key.tab) {
-    focusManager.handleTabPress();
-    return;
-  }
+    // Global shortcuts first (Tab, Esc to close modal, etc.)
+    if (key.tab) {
+        focusManager.handleTabPress();
+        return;
+    }
 
-  // Delegate to active window
-  handlers[focusState.activeWindow]?.(input, key);
+    // Delegate to active window
+    handlers[focusState.activeWindow]?.(input, key);
 });
 ```
 
@@ -125,8 +125,8 @@ The `Shortcut` type in `src/components/TaskListPanel.tsx`:
 
 ```typescript
 export type Shortcut = {
-  key?: keyof Key;
-  input?: string;
+    key?: keyof Key;
+    input?: string;
 };
 ```
 
@@ -136,11 +136,11 @@ Update `Shortcut`:
 
 ```typescript
 export type Shortcut = {
-  key?: keyof Key;
-  input?: string;
-  ctrl?: boolean;
-  shift?: boolean;
-  meta?: boolean;
+    key?: keyof Key;
+    input?: string;
+    ctrl?: boolean;
+    shift?: boolean;
+    meta?: boolean;
 };
 ```
 
@@ -210,10 +210,10 @@ Users need to select multiple tasks at once to perform batch operations (e.g., "
 
 ```typescript
 taskList: {
-  selectedTaskIndex: number; // cursor position (unchanged)
-  selectedColumnIndex: number; // unchanged
-  selectedTaskIds: Set<string>; // NEW — the multi-select set
-  // ...
+    selectedTaskIndex: number; // cursor position (unchanged)
+    selectedColumnIndex: number; // unchanged
+    selectedTaskIds: Set<string>; // NEW — the multi-select set
+    // ...
 }
 ```
 

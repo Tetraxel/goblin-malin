@@ -922,6 +922,26 @@ describe("search_music", () => {
         }
     });
 
+    test("marks the uploads (videos), and only them, so Claude can tell them from catalogue tracks", async () => {
+        const spy = vi.spyOn(DownloadTask.prototype, "searchCatalog").mockResolvedValue([
+            {
+                platform: "youtube",
+                results: [
+                    meta("song1", "Reflections", "Paradisco"),
+                    { ...meta("vid1", "Reflections (She Said Disco Remix)", "AutoReverse"), isUpload: true },
+                ],
+            },
+        ]);
+        try {
+            const result = await callTool("search_music", { query: "Reflections She Said Disco Remix" });
+            const [song, video] = result.json.platforms[0].results;
+            expect(song).not.toHaveProperty("upload");
+            expect(video).toMatchObject({ title: "Reflections (She Said Disco Remix)", upload: true });
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
     test("says so when no platform can search, and refuses an empty query", async () => {
         const spy = vi.spyOn(DownloadTask.prototype, "searchCatalog").mockResolvedValue([]);
         try {

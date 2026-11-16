@@ -57,7 +57,7 @@ Three registries, defined in [registries.ts](../src/flows/musicDownloadFlow/regi
 
 | Registry                   | Base class                                                                             | Registered today                                                   |
 | -------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `metadataServiceRegistry`  | [MetadataService](../src/flows/musicDownloadFlow/metadataService.ts)                   | `spotify`, `youtube`                                               |
+| `metadataServiceRegistry`  | [MetadataService](../src/flows/musicDownloadFlow/metadataService.ts)                   | `spotify`, `youtube`, `soundcloud`                                 |
 | `discoveryServiceRegistry` | [DiscoveryMetadataService](../src/flows/musicDownloadFlow/discoveryMetadataService.ts) | `songlink` (opt-in), `musicBrainz`, `claude` (opt-in, last resort) |
 | `downloadServiceRegistry`  | [DownloadService](../src/flows/musicDownloadFlow/downloadService.ts)                   | `ytdlp`, `soulseek`                                                |
 

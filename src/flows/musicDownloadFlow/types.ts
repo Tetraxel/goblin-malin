@@ -135,6 +135,11 @@ export type BaseTrackMetadata = {
     uri?: TrackUri; // "SPOTIFY::TRACK::4rye8ZgoRgbQPfgBqxjfqG"
     nativeAppUriDesktop?: string; // "spotify:track:4rye8ZgoRgbQPfgBqxjfqG"
     nativeAppUriMobile?: string;
+    /**
+     * Published by anyone, not a release a label delivered to the platform: a YouTube video, a SoundCloud upload. Often
+     * the only place a remix exists, and also where re-uploads and wrong versions are. Absent for a catalogue track.
+     */
+    isUpload?: boolean;
     artists: StandardArtist[];
     album?: StandardAlbum;
     platform: Platform;
@@ -215,6 +220,22 @@ export type TrackMetadata =
 export type SearchKey =
     "url" | "isrc" | "trackName" | "artistName" | "trackName+artistName" | "trackName+artistName+isrc";
 
+/** One input a provider was given to find something: the raw text of a search box, a URL, an ISRC… */
+export type QueryField = {
+    /** What the input is (e.g. "Search", "URL", "ISRC"). */
+    label: string;
+    /** Exactly what was sent, with no cleanup for display. */
+    value: string;
+};
+
+/** One line of a confidence score: what was compared and the points it gave (negative for a penalty). */
+export type ConfidencePart = {
+    label: string;
+    points: number;
+    /** What was compared, when it helps to see why the points are what they are ("Flume ≠ Kai"). */
+    detail?: string;
+};
+
 // One path that led to a given URI being discovered
 export type DiscoverySource = {
     discoveredBy: string; // service key: "spotify", "songlink", "youtube"
@@ -224,6 +245,12 @@ export type DiscoverySource = {
     explanation?: string;
     /** The same, as one short line written for the Metadata Sources panel (`explanation` is for the log). */
     summary?: string;
+    /**
+     * What the service was actually asked, one entry per input (the search text as sent, a URL, an ISRC), and what it
+     * did with the answer. Not the metadata it was derived from: the real thing sent. Unset on sources saved before
+     * this was recorded, and for a link the user pasted.
+     */
+    query?: QueryField[];
 };
 
 // One result within a platform group
@@ -239,6 +266,8 @@ export type MetadataResultState = {
      */
     addedByUser?: boolean;
     confidence?: number; // 0–100 vs primary input metadata
+    /** How `confidence` adds up (title, artist, duration…), as it was when the result was added. */
+    confidenceParts?: ConfidencePart[];
     discoverySources: DiscoverySource[]; // empty for the primary input result
     fetchState?: "loading" | "error";
     fetchError?: string;
@@ -256,6 +285,8 @@ export type MetadataGroupState = {
 export type SearchTrackResult = {
     metadata: TrackMetadata;
     searchKeys: SearchKey[]; // which fields of the source metadata drove this search
+    /** What the service was actually asked (see `DiscoverySource.query`). */
+    query?: QueryField[];
 };
 
 export type DiscoveryAnchor = {
@@ -274,6 +305,8 @@ export type DiscoveryResult = {
     // Which fields of the source metadata drove the lookup. Defaults to ["url"] (a lookup by the
     // source URL, like Songlink); a text-based lookup reports the fields it actually searched on.
     searchKeys?: SearchKey[];
+    /** What the service was actually asked (see `DiscoverySource.query`); the same for every result it found. */
+    query?: QueryField[];
     /** Why each result was chosen, by the result's uri — shown under the result's "found by" line. */
     explanations?: Record<string, string>;
     /** One short line per result (by uri) for the Metadata Sources panel. */
@@ -381,12 +414,7 @@ export type DownloadProgressInfo = {
 };
 
 /** One input a download provider was given to find a source — e.g. the raw text of a search box, or a URL. */
-export type DownloadQueryField = {
-    /** What the input is (e.g. "Search", "URL"). */
-    label: string;
-    /** Exactly what was sent, with no cleanup for display. */
-    value: string;
-};
+export type DownloadQueryField = QueryField;
 
 /** What a provider found for a row that is not downloaded (yet): the remote file, as listed by its search. */
 export type SourceCandidate = {

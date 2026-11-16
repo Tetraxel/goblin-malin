@@ -101,6 +101,10 @@ export class SonglinkService extends DiscoveryMetadataService {
 
             return {
                 tracks,
+                query: [
+                    { label: "URL", value: url },
+                    { label: "Page", value: data.pageUrl },
+                ],
                 anchor: {
                     state: "found",
                     url: data.pageUrl,

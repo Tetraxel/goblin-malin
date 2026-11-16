@@ -1,4 +1,4 @@
-﻿import { type TrackMetadata } from "#flows/musicDownloadFlow/types";
+﻿import { type ConfidencePart, type TrackMetadata } from "#flows/musicDownloadFlow/types";
 
 /**
  * Unicode-aware normalisation: lowercases, strips diacritics (`Beyoncé` → `beyonce`),
@@ -28,6 +28,14 @@ const VERSION_MARKERS = [
     "sped",
     "tribute",
 ];
+/**
+ * The bar a search hit must clear (0–100, see `computeConfidenceScore`) for a metadata service to propose it. A
+ * platform's search is open: its first hit can share only a remixer's name with the track, so a service scores its
+ * candidates against the track and keeps the best one at or above this. Title alone is worth 40, so a same-title cover
+ * by someone else does not pass.
+ */
+export const MIN_SEARCH_CONFIDENCE = 50;
+
 const VERSION_PENALTY = 15;
 const MAX_VERSION_PENALTY = 30;
 
@@ -71,8 +79,17 @@ function artistInOtherTitle(source: TrackMetadata, primary: TrackMetadata): bool
     return inTitle(source.artists, primary.trackName) || inTitle(primary.artists, source.trackName);
 }
 
+/** The versions markers (live, remix…) that exactly one of the two tracks carries, for the breakdown. */
+function differingMarkers(source: TrackMetadata, primary: TrackMetadata): string[] {
+    const src = versionMarkers(source.trackName ?? "", source.album?.albumName ?? "");
+    const prim = versionMarkers(primary.trackName ?? "", primary.album?.albumName ?? "");
+    return VERSION_MARKERS.filter((m) => src.has(m) !== prim.has(m));
+}
+
+export type ConfidenceBreakdown = { score: number; parts: ConfidencePart[] };
+
 /**
- * Scores how well `source` matches `primary` on a 0–100 scale.
+ * Scores how well `source` matches `primary` on a 0–100 scale, and says how the score adds up.
  * Primary source always returns 100. ISRC match short-circuits to 100.
  *
  * Breakdown:
@@ -84,51 +101,94 @@ function artistInOtherTitle(source: TrackMetadata, primary: TrackMetadata): bool
  *
  * A name that normalises to nothing counts as "no information" (0 pts), never as equal.
  */
-export function computeConfidenceScore(source: TrackMetadata, primary: TrackMetadata): number {
+export function computeConfidenceBreakdown(source: TrackMetadata, primary: TrackMetadata): ConfidenceBreakdown {
     // ISRC exact match is a definitive identifier
-    if (source.isrc && primary.isrc && source.isrc === primary.isrc) return 100;
+    if (source.isrc && primary.isrc && source.isrc === primary.isrc) {
+        return { score: 100, parts: [{ label: "ISRC", points: 100, detail: `same ISRC ${source.isrc}` }] };
+    }
 
+    const parts: ConfidencePart[] = [];
     let score = 0;
 
     // Track name (40 pts)
     const srcName = normalize(source.trackName ?? "");
     const primName = normalize(primary.trackName ?? "");
+    let titlePoints = 0;
+    let titleDetail = "no title to compare";
     if (srcName && primName) {
         if (srcName === primName) {
-            score += 40;
+            titlePoints = 40;
+            titleDetail = "same title";
         } else if (srcName.includes(primName) || primName.includes(srcName)) {
-            score += 25;
+            titlePoints = 25;
+            titleDetail = "one title holds the other";
+        } else {
+            titleDetail = "different titles";
         }
     }
+    score += titlePoints;
+    parts.push({ label: "Title", points: titlePoints, detail: titleDetail });
 
     // First artist name (30 pts)
     const srcArtist = normalize(source.artists[0]?.name ?? "");
     const primArtist = normalize(primary.artists[0]?.name ?? "");
+    let artistPoints = 0;
+    let artistDetail = "no artist to compare";
     if (srcArtist && primArtist) {
         if (srcArtist === primArtist) {
-            score += 30;
+            artistPoints = 30;
+            artistDetail = "same artist";
         } else if (srcArtist.includes(primArtist) || primArtist.includes(srcArtist)) {
-            score += 15;
+            artistPoints = 15;
+            artistDetail = "one artist name holds the other";
         } else if (artistInOtherTitle(source, primary)) {
-            score += 15;
+            artistPoints = 15;
+            artistDetail = "the artist is in the other title";
+        } else {
+            artistDetail = "different artists";
         }
     }
+    score += artistPoints;
+    parts.push({ label: "Artist", points: artistPoints, detail: artistDetail });
 
     // Duration (20 pts)
+    let durationPoints = 0;
+    let durationDetail = "a duration is missing";
     if (source.duration && primary.duration) {
         const diff = Math.abs(source.duration - primary.duration) / primary.duration;
-        if (diff <= 0.02) score += 20;
-        else if (diff <= 0.05) score += 10;
+        durationDetail = `${(diff * 100).toFixed(1)}% apart`;
+        if (diff <= 0.02) durationPoints = 20;
+        else if (diff <= 0.05) durationPoints = 10;
     }
+    score += durationPoints;
+    parts.push({ label: "Duration", points: durationPoints, detail: durationDetail });
 
     // Release year (10 pts)
     const srcYear = extractYear(source.album?.releaseDate);
     const primYear = extractYear(primary.album?.releaseDate);
-    if (srcYear && primYear && srcYear === primYear) {
-        score += 10;
+    let yearPoints = 0;
+    let yearDetail = "a year is missing";
+    if (srcYear && primYear) {
+        yearPoints = srcYear === primYear ? 10 : 0;
+        yearDetail = srcYear === primYear ? `both ${srcYear}` : `${srcYear} vs ${primYear}`;
+    }
+    score += yearPoints;
+    parts.push({ label: "Year", points: yearPoints, detail: yearDetail });
+
+    const penalty = versionPenalty(source, primary);
+    if (penalty > 0) {
+        score -= penalty;
+        parts.push({
+            label: "Version",
+            points: -penalty,
+            detail: `only one is ${differingMarkers(source, primary).join(", ")}`,
+        });
     }
 
-    score -= versionPenalty(source, primary);
+    return { score: Math.max(0, Math.min(99, score)), parts };
+}
 
-    return Math.max(0, Math.min(99, score));
+/** The 0–100 score alone (see `computeConfidenceBreakdown`). */
+export function computeConfidenceScore(source: TrackMetadata, primary: TrackMetadata): number {
+    return computeConfidenceBreakdown(source, primary).score;
 }

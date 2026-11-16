@@ -25,7 +25,7 @@
 
 - [ ] Embed cover art — `PROD-04`
 - [ ] Temp downloads: move the default out of the Music library (with a one-time migration of the old folder), clean unselected candidates after a save
-- [ ] Handling of **SoundCloud** links
+- [ ] SoundCloud **playlists** (`/sets/`) as collections (tracks are read and downloaded already)
 - [ ] Add a button `Open all tracks in MB Picard`
 
 **Housekeeping**
@@ -39,7 +39,7 @@
 
 Decide per release whether each is wanted.
 
-- [ ] Import from **Deezer, Apple Music, Tidal** (and SoundCloud) + matching provider toggles in Settings — `P28`
+- [ ] Import from **Deezer, Apple Music, Tidal** + matching provider toggles in Settings — `P28`
 - [ ] MusicBrainz options: "import files into Picard on save"; `Ctrl+M` opens the saved file in Picard
 - [ ] Auto-save to the output folder; auto-relocate missing files + a "Lost the link to the file" warning (relocation exists as `Ctrl+F` only) — `P23/T23.4`
 - [ ] `[K]` keep this download and delete the others; `[Ctrl+R]` relaunch downloading + a "Source metadata have changed" banner

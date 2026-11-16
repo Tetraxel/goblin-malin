@@ -16,7 +16,9 @@ const TEMP_NAME_PART_BYTES = 60;
 
 function getTempFilePrefix(providerLabel: string, metadata: TrackMetadata): string {
     if (metadata.uri) {
-        const uriSlug = metadata.uri.replace(/::/g, "-");
+        // An id can hold characters a file name cannot (SoundCloud's is `<user>/<track>`): a `/` would make yt-dlp
+        // write into a sub-folder that the lookups below never list.
+        const uriSlug = metadata.uri.replace(/::/g, "-").replace(/[\\/:*?"<>|]/g, "_");
         return `${providerLabel} ${uriSlug}`;
     }
     // The names are the provider's own text: a `/` in "AC/DC" must not become a folder. They are capped so that the

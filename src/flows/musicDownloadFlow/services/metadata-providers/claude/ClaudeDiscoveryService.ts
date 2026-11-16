@@ -103,6 +103,11 @@ export class ClaudeDiscoveryService extends DiscoveryMetadataService {
         return {
             tracks,
             searchKeys,
+            query: [
+                { label: "Search", value: `"${query.trackName}" by ${query.artists.join(", ")}` },
+                { label: "Wanted", value: wanted.join(", ") },
+                { label: "Model", value: model },
+            ],
             ...(Object.keys(explanations).length > 0 ? { explanations } : {}),
             ...(Object.keys(summaries).length > 0 ? { summaries } : {}),
             anchor: { state: tracks.length > 0 ? "found" : "notFound", count: tracks.length },

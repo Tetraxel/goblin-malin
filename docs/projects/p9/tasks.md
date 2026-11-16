@@ -18,89 +18,89 @@ Provider/service brand colors (`src/base/providerDisplay.ts`, `BUILTIN_PROVIDERS
 
 ```typescript
 export interface ThemePalette {
-  blue: string; // accent / link blue
-  cyan: string; // teal / cyan
-  red: string; // red / rose
-  green: string; // green / emerald
-  yellow: string; // amber / yellow
-  orange: string; // orange
-  purple: string; // purple / violet
-  pink: string; // pink / magenta
-  white: string; // near-white foreground
-  gray: string; // mid gray
-  grayDark: string; // dark gray
+    blue: string; // accent / link blue
+    cyan: string; // teal / cyan
+    red: string; // red / rose
+    green: string; // green / emerald
+    yellow: string; // amber / yellow
+    orange: string; // orange
+    purple: string; // purple / violet
+    pink: string; // pink / magenta
+    white: string; // near-white foreground
+    gray: string; // mid gray
+    grayDark: string; // dark gray
 }
 
 export interface Theme {
-  palette: ThemePalette;
+    palette: ThemePalette;
 
-  // ── Structural UI elements ───────────────────────────────────────────
-  ui: {
-    border: string; // box/panel outer borders          (was "cyan")
-    separator: string; // ─── horizontal rule lines        (was "cyan")
-    selection: string; // ☛ cursor & selection highlight   (was "cyan")
-    tabActive: string; // active tab color indicator        (was "cyan")
-    tabInactive: string; // inactive tab text                 (was "gray")
-    panelTitle: string; // panel/section header label        (was "cyan" or "white")
-    progressFill: string; // filled portion of progress bar   (was "green")
-    progressEmpty: string; // empty portion of progress bar    (was "gray")
-    modalBorder: string; // modal overlay border color        (was "cyan")
-    focusIndicator: string; // ☛ arrow / focus cursor           (was "cyan"/"white")
-    dimText: string; // heavily dimmed text               (was "gray"+dimColor)
-  };
+    // ── Structural UI elements ───────────────────────────────────────────
+    ui: {
+        border: string; // box/panel outer borders          (was "cyan")
+        separator: string; // ─── horizontal rule lines        (was "cyan")
+        selection: string; // ☛ cursor & selection highlight   (was "cyan")
+        tabActive: string; // active tab color indicator        (was "cyan")
+        tabInactive: string; // inactive tab text                 (was "gray")
+        panelTitle: string; // panel/section header label        (was "cyan" or "white")
+        progressFill: string; // filled portion of progress bar   (was "green")
+        progressEmpty: string; // empty portion of progress bar    (was "gray")
+        modalBorder: string; // modal overlay border color        (was "cyan")
+        focusIndicator: string; // ☛ arrow / focus cursor           (was "cyan"/"white")
+        dimText: string; // heavily dimmed text               (was "gray"+dimColor)
+    };
 
-  // ── Text hierarchy ────────────────────────────────────────────────────
-  text: {
-    primary: string; // main content text                     (was "white")
-    secondary: string; // labels, metadata, subtitles           (was "gray")
-    muted: string; // very dim, disabled, filler            (was "gray"+dimColor)
-    hint: string; // action bar hints, footer shortcuts    (was "gray")
-    active: string; // focused / actively-edited label       (was "white")
-    heading: string; // section/modal titles                  (was "white" bold)
-  };
+    // ── Text hierarchy ────────────────────────────────────────────────────
+    text: {
+        primary: string; // main content text                     (was "white")
+        secondary: string; // labels, metadata, subtitles           (was "gray")
+        muted: string; // very dim, disabled, filler            (was "gray"+dimColor)
+        hint: string; // action bar hints, footer shortcuts    (was "gray")
+        active: string; // focused / actively-edited label       (was "white")
+        heading: string; // section/modal titles                  (was "white" bold)
+    };
 
-  // ── Task / download status states ─────────────────────────────────────
-  status: {
-    processing: string; // task currently running              (was "blue")
-    pending: string; // waiting for user action             (was "white")
-    success: string; // completed successfully              (was "green")
-    warning: string; // in-progress or degraded             (was "yellow")
-    error: string; // failed                              (was "red")
-    skipped: string; // skipped / neutral                   (was "gray")
-    locked: string; // saved / write-locked                (was "whiteBright")
-    downloading: string; // actively downloading                (was "yellow")
-  };
+    // ── Task / download status states ─────────────────────────────────────
+    status: {
+        processing: string; // task currently running              (was "blue")
+        pending: string; // waiting for user action             (was "white")
+        success: string; // completed successfully              (was "green")
+        warning: string; // in-progress or degraded             (was "yellow")
+        error: string; // failed                              (was "red")
+        skipped: string; // skipped / neutral                   (was "gray")
+        locked: string; // saved / write-locked                (was "whiteBright")
+        downloading: string; // actively downloading                (was "yellow")
+    };
 
-  // ── Metadata field states (FieldRow, MetadataCompiledRow) ─────────────
-  field: {
-    normal: string; // standard field value                 (was "white")
-    overridden: string; // manually overridden / edited         (was "yellow")
-    missing: string; // empty / not populated                (was "gray")
-    selected: string; // selected for inline editing          (was "green")
-    error: string; // validation error on field            (was "red")
-  };
+    // ── Metadata field states (FieldRow, MetadataCompiledRow) ─────────────
+    field: {
+        normal: string; // standard field value                 (was "white")
+        overridden: string; // manually overridden / edited         (was "yellow")
+        missing: string; // empty / not populated                (was "gray")
+        selected: string; // selected for inline editing          (was "green")
+        error: string; // validation error on field            (was "red")
+    };
 
-  // ── Confidence badges (MetadataSourceRow) ─────────────────────────────
-  confidence: {
-    high: string; // ≥ 90 %                                  (was "green")
-    medium: string; // ≥ 70 %                                  (was "yellow")
-    low: string; // ≥ 50 %                                  (was "gray")
-    veryLow: string; // < 50 %                                  (was "red")
-  };
+    // ── Confidence badges (MetadataSourceRow) ─────────────────────────────
+    confidence: {
+        high: string; // ≥ 90 %                                  (was "green")
+        medium: string; // ≥ 70 %                                  (was "yellow")
+        low: string; // ≥ 50 %                                  (was "gray")
+        veryLow: string; // < 50 %                                  (was "red")
+    };
 
-  // ── Diff view (DiffRow, DiffView) ──────────────────────────────────────
-  diff: {
-    base: string; // old / base-side text                   (was "gray")
-    changed: string; // new / changed-side text                (was "cyan")
-    modified: string; // change indicator glyph/arrow           (was "yellow")
-  };
+    // ── Diff view (DiffRow, DiffView) ──────────────────────────────────────
+    diff: {
+        base: string; // old / base-side text                   (was "gray")
+        changed: string; // new / changed-side text                (was "cyan")
+        modified: string; // change indicator glyph/arrow           (was "yellow")
+    };
 
-  // ── Toolbar action buttons ─────────────────────────────────────────────
-  action: {
-    primary: string; // main call-to-action (import, run-all)  (was "yellow")
-    destructive: string; // irreversible action (exit, delete)      (was "red")
-    neutral: string; // settings, info                          (was "gray"/"#a0a0a0")
-  };
+    // ── Toolbar action buttons ─────────────────────────────────────────────
+    action: {
+        primary: string; // main call-to-action (import, run-all)  (was "yellow")
+        destructive: string; // irreversible action (exit, delete)      (was "red")
+        neutral: string; // settings, info                          (was "gray"/"#a0a0a0")
+    };
 }
 
 export const THEME_KEYS = ["dark", "light"] as const;
@@ -166,73 +166,73 @@ export function loadTheme(key: string): Theme;
 
 ```json
 {
-  "palette": {
-    "blue": "#58a6ff",
-    "cyan": "#39c5cf",
-    "red": "#ff7b72",
-    "green": "#56d364",
-    "yellow": "#e3b341",
-    "orange": "#f0883e",
-    "purple": "#d2a8ff",
-    "pink": "#f778ba",
-    "white": "#e6edf3",
-    "gray": "#8b949e",
-    "grayDark": "#484f58"
-  },
-  "ui": {
-    "border": "#39c5cf",
-    "separator": "#39c5cf",
-    "selection": "#58a6ff",
-    "tabActive": "#58a6ff",
-    "tabInactive": "#8b949e",
-    "panelTitle": "#e6edf3",
-    "progressFill": "#56d364",
-    "progressEmpty": "#484f58",
-    "modalBorder": "#39c5cf",
-    "focusIndicator": "#58a6ff",
-    "dimText": "#484f58"
-  },
-  "text": {
-    "primary": "#e6edf3",
-    "secondary": "#8b949e",
-    "muted": "#484f58",
-    "hint": "#8b949e",
-    "active": "#e6edf3",
-    "heading": "#e6edf3"
-  },
-  "status": {
-    "processing": "#388bfd",
-    "pending": "#e6edf3",
-    "success": "#56d364",
-    "warning": "#e3b341",
-    "error": "#ff7b72",
-    "skipped": "#8b949e",
-    "locked": "#e6edf3",
-    "downloading": "#e3b341"
-  },
-  "field": {
-    "normal": "#e6edf3",
-    "overridden": "#e3b341",
-    "missing": "#8b949e",
-    "selected": "#56d364",
-    "error": "#ff7b72"
-  },
-  "confidence": {
-    "high": "#56d364",
-    "medium": "#e3b341",
-    "low": "#8b949e",
-    "veryLow": "#ff7b72"
-  },
-  "diff": {
-    "base": "#8b949e",
-    "changed": "#39c5cf",
-    "modified": "#e3b341"
-  },
-  "action": {
-    "primary": "#e3b341",
-    "destructive": "#ff7b72",
-    "neutral": "#8b949e"
-  }
+    "palette": {
+        "blue": "#58a6ff",
+        "cyan": "#39c5cf",
+        "red": "#ff7b72",
+        "green": "#56d364",
+        "yellow": "#e3b341",
+        "orange": "#f0883e",
+        "purple": "#d2a8ff",
+        "pink": "#f778ba",
+        "white": "#e6edf3",
+        "gray": "#8b949e",
+        "grayDark": "#484f58"
+    },
+    "ui": {
+        "border": "#39c5cf",
+        "separator": "#39c5cf",
+        "selection": "#58a6ff",
+        "tabActive": "#58a6ff",
+        "tabInactive": "#8b949e",
+        "panelTitle": "#e6edf3",
+        "progressFill": "#56d364",
+        "progressEmpty": "#484f58",
+        "modalBorder": "#39c5cf",
+        "focusIndicator": "#58a6ff",
+        "dimText": "#484f58"
+    },
+    "text": {
+        "primary": "#e6edf3",
+        "secondary": "#8b949e",
+        "muted": "#484f58",
+        "hint": "#8b949e",
+        "active": "#e6edf3",
+        "heading": "#e6edf3"
+    },
+    "status": {
+        "processing": "#388bfd",
+        "pending": "#e6edf3",
+        "success": "#56d364",
+        "warning": "#e3b341",
+        "error": "#ff7b72",
+        "skipped": "#8b949e",
+        "locked": "#e6edf3",
+        "downloading": "#e3b341"
+    },
+    "field": {
+        "normal": "#e6edf3",
+        "overridden": "#e3b341",
+        "missing": "#8b949e",
+        "selected": "#56d364",
+        "error": "#ff7b72"
+    },
+    "confidence": {
+        "high": "#56d364",
+        "medium": "#e3b341",
+        "low": "#8b949e",
+        "veryLow": "#ff7b72"
+    },
+    "diff": {
+        "base": "#8b949e",
+        "changed": "#39c5cf",
+        "modified": "#e3b341"
+    },
+    "action": {
+        "primary": "#e3b341",
+        "destructive": "#ff7b72",
+        "neutral": "#8b949e"
+    }
 }
 ```
 
@@ -240,73 +240,73 @@ export function loadTheme(key: string): Theme;
 
 ```json
 {
-  "palette": {
-    "blue": "#0969da",
-    "cyan": "#1b7c83",
-    "red": "#cf222e",
-    "green": "#1a7f37",
-    "yellow": "#9a6700",
-    "orange": "#bc4c00",
-    "purple": "#8250df",
-    "pink": "#bf3989",
-    "white": "#ffffff",
-    "gray": "#57606a",
-    "grayDark": "#24292f"
-  },
-  "ui": {
-    "border": "#1b7c83",
-    "separator": "#1b7c83",
-    "selection": "#0969da",
-    "tabActive": "#0969da",
-    "tabInactive": "#57606a",
-    "panelTitle": "#24292f",
-    "progressFill": "#1a7f37",
-    "progressEmpty": "#d0d7de",
-    "modalBorder": "#1b7c83",
-    "focusIndicator": "#0969da",
-    "dimText": "#d0d7de"
-  },
-  "text": {
-    "primary": "#24292f",
-    "secondary": "#57606a",
-    "muted": "#d0d7de",
-    "hint": "#57606a",
-    "active": "#24292f",
-    "heading": "#24292f"
-  },
-  "status": {
-    "processing": "#0550ae",
-    "pending": "#24292f",
-    "success": "#1a7f37",
-    "warning": "#9a6700",
-    "error": "#cf222e",
-    "skipped": "#57606a",
-    "locked": "#24292f",
-    "downloading": "#9a6700"
-  },
-  "field": {
-    "normal": "#24292f",
-    "overridden": "#9a6700",
-    "missing": "#57606a",
-    "selected": "#1a7f37",
-    "error": "#cf222e"
-  },
-  "confidence": {
-    "high": "#1a7f37",
-    "medium": "#9a6700",
-    "low": "#57606a",
-    "veryLow": "#cf222e"
-  },
-  "diff": {
-    "base": "#57606a",
-    "changed": "#1b7c83",
-    "modified": "#9a6700"
-  },
-  "action": {
-    "primary": "#9a6700",
-    "destructive": "#cf222e",
-    "neutral": "#57606a"
-  }
+    "palette": {
+        "blue": "#0969da",
+        "cyan": "#1b7c83",
+        "red": "#cf222e",
+        "green": "#1a7f37",
+        "yellow": "#9a6700",
+        "orange": "#bc4c00",
+        "purple": "#8250df",
+        "pink": "#bf3989",
+        "white": "#ffffff",
+        "gray": "#57606a",
+        "grayDark": "#24292f"
+    },
+    "ui": {
+        "border": "#1b7c83",
+        "separator": "#1b7c83",
+        "selection": "#0969da",
+        "tabActive": "#0969da",
+        "tabInactive": "#57606a",
+        "panelTitle": "#24292f",
+        "progressFill": "#1a7f37",
+        "progressEmpty": "#d0d7de",
+        "modalBorder": "#1b7c83",
+        "focusIndicator": "#0969da",
+        "dimText": "#d0d7de"
+    },
+    "text": {
+        "primary": "#24292f",
+        "secondary": "#57606a",
+        "muted": "#d0d7de",
+        "hint": "#57606a",
+        "active": "#24292f",
+        "heading": "#24292f"
+    },
+    "status": {
+        "processing": "#0550ae",
+        "pending": "#24292f",
+        "success": "#1a7f37",
+        "warning": "#9a6700",
+        "error": "#cf222e",
+        "skipped": "#57606a",
+        "locked": "#24292f",
+        "downloading": "#9a6700"
+    },
+    "field": {
+        "normal": "#24292f",
+        "overridden": "#9a6700",
+        "missing": "#57606a",
+        "selected": "#1a7f37",
+        "error": "#cf222e"
+    },
+    "confidence": {
+        "high": "#1a7f37",
+        "medium": "#9a6700",
+        "low": "#57606a",
+        "veryLow": "#cf222e"
+    },
+    "diff": {
+        "base": "#57606a",
+        "changed": "#1b7c83",
+        "modified": "#9a6700"
+    },
+    "action": {
+        "primary": "#9a6700",
+        "destructive": "#cf222e",
+        "neutral": "#57606a"
+    }
 }
 ```
 
@@ -398,24 +398,24 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
 ```typescript
 function getStatusColor(status: StatusType, theme: Theme): string {
-  switch (status) {
-    case StatusType.Processing:
-      return theme.status.processing;
-    case StatusType.PendingUserAction:
-      return theme.status.warning;
-    case StatusType.Skipped:
-      return theme.status.skipped;
-    case StatusType.Error:
-      return theme.status.error;
-    case StatusType.Success:
-      return theme.status.success;
-    case StatusType.Locked:
-      return theme.status.locked;
-    case StatusType.Pending:
-      return theme.status.pending;
-    default:
-      return theme.text.secondary;
-  }
+    switch (status) {
+        case StatusType.Processing:
+            return theme.status.processing;
+        case StatusType.PendingUserAction:
+            return theme.status.warning;
+        case StatusType.Skipped:
+            return theme.status.skipped;
+        case StatusType.Error:
+            return theme.status.error;
+        case StatusType.Success:
+            return theme.status.success;
+        case StatusType.Locked:
+            return theme.status.locked;
+        case StatusType.Pending:
+            return theme.status.pending;
+        default:
+            return theme.text.secondary;
+    }
 }
 ```
 

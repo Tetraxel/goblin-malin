@@ -6,7 +6,7 @@ Tasks live **only in memory** in the `FlowOrchestrator` singleton (`src/base/flo
 When the app closes, the working set — imported URLs, fetched metadata, downloads — is lost. There is
 no way to revisit a previous batch of work.
 
-P13 adds a **session system**. A session *is* the list of tasks. Sessions are persisted to
+P13 adds a **session system**. A session _is_ the list of tasks. Sessions are persisted to
 `DEFAULT_APP_DATA_DIR` (next to `settings.json`, `cache/`, `bin/`), can be reopened on startup, and
 are browsed through a new toolbar button + searchable modal.
 
@@ -16,7 +16,7 @@ The already-existing `general.reopenLastSession` setting (`src/settings/appSetti
 **Product decisions (confirmed):**
 
 - **Lifecycle = per app launch.** The live task list is mirrored into a "current session" and
-  auto-saved (debounced). A launch that does *not* reopen begins a fresh **draft** session; the first
+  auto-saved (debounced). A launch that does _not_ reopen begins a fresh **draft** session; the first
   imported task persists it. `reopenLastSession` continues the last session. Selecting an old session
   in the modal makes it current.
 - **Modal actions** (beyond search / view / load / rename): **delete**, **new empty session**, **duplicate**.
@@ -49,17 +49,17 @@ simpler to load/search than a per-session directory).
 type SessionTaskSnapshot = TaskSnapshot<MusicDownloadTaskAttributes>;
 
 interface StoredSession {
-    id: string;               // crypto.randomUUID()
-    name: string;             // default derived from first track/url; user-editable
-    flowId: string;           // "music-downloader"
-    createdAt: string;        // ISO
-    updatedAt: string;        // ISO
+    id: string; // crypto.randomUUID()
+    name: string; // default derived from first track/url; user-editable
+    flowId: string; // "music-downloader"
+    createdAt: string; // ISO
+    updatedAt: string; // ISO
     tasks: SessionTaskSnapshot[];
 }
 
 interface SessionsFile {
     version: 1;
-    lastSessionId: string | null;   // drives reopenLastSession
+    lastSessionId: string | null; // drives reopenLastSession
     sessions: StoredSession[];
 }
 ```
@@ -109,7 +109,7 @@ redundant write.
 ### UI — toolbar button + modal
 
 - `src/components/Toolbar/useSessionsButton.ts` — mirrors `useSettingsButton.ts`; `onPress: () =>
-  switchWindow("sessionsModal")`. Inserted **before** `useSettingsButton` in the toolbar array
+switchWindow("sessionsModal")`. Inserted **before** `useSettingsButton` in the toolbar array
   (`src/components/App.tsx:76`).
 - `src/components/SessionsModal/SessionsModal.tsx` — modeled on `SettingsModal.tsx`: absolute overlay,
   `useShortcuts({ id:"sessionsModal", isActive, exclusive:true, priority:300 })`, `ink-text-input`
@@ -134,39 +134,39 @@ redundant write.
 
 ## Files
 
-| File | Change |
-| ---- | ------ |
-| `src/sessions/types.ts` | New — `StoredSession`, `SessionsFile`, `SessionTaskSnapshot` |
-| `src/sessions/sessionStore.ts` | New — persistence singleton (atomic write, cache, EventEmitter) |
-| `src/sessions/sessionManager.ts` | New — runtime bridge: current-session lifecycle, load/persist/new/duplicate/delete |
-| `src/sessions/sessionSearch.ts` | New — `sessionMatchesQuery`, `deriveSessionName` |
-| `src/components/Toolbar/useSessionsButton.ts` | New — toolbar button opening the modal |
-| `src/components/SessionsModal/SessionsModal.tsx` | New — searchable sessions modal |
-| `src/components/SessionsModal/useSessions.ts` | New — hook feeding the modal (store + manager subscriptions, sort, filter) |
-| `src/flows/musicDownloadFlow/utils/reviveTaskDates.ts` | New — revive `Date` fields on load |
-| `src/hooks/useFocusManager.ts` | Add `"sessionsModal"` to `FocusableWindow` |
-| `src/components/App.tsx` | Insert `useSessionsButton` before `useSettingsButton`; wire `SessionManager.init` + debounced `persistCurrent` |
-| `src/components/AppInner.tsx` | Render `<SessionsModal>` alongside the other modals |
-| `src/base/flow/flow-orchestrator.ts` | Add `setTasks(tasks)` (replace + notify) |
-| `src/base/flow/flow-base.ts` | Add optional `createTasksFromSnapshots?(snapshots)` hook signature |
-| `src/flows/musicDownloadFlow/musicDownloadFlow.ts` | Implement `createTasksFromSnapshots` |
+| File                                                   | Change                                                                                                         |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `src/sessions/types.ts`                                | New — `StoredSession`, `SessionsFile`, `SessionTaskSnapshot`                                                   |
+| `src/sessions/sessionStore.ts`                         | New — persistence singleton (atomic write, cache, EventEmitter)                                                |
+| `src/sessions/sessionManager.ts`                       | New — runtime bridge: current-session lifecycle, load/persist/new/duplicate/delete                             |
+| `src/sessions/sessionSearch.ts`                        | New — `sessionMatchesQuery`, `deriveSessionName`                                                               |
+| `src/components/Toolbar/useSessionsButton.ts`          | New — toolbar button opening the modal                                                                         |
+| `src/components/SessionsModal/SessionsModal.tsx`       | New — searchable sessions modal                                                                                |
+| `src/components/SessionsModal/useSessions.ts`          | New — hook feeding the modal (store + manager subscriptions, sort, filter)                                     |
+| `src/flows/musicDownloadFlow/utils/reviveTaskDates.ts` | New — revive `Date` fields on load                                                                             |
+| `src/hooks/useFocusManager.ts`                         | Add `"sessionsModal"` to `FocusableWindow`                                                                     |
+| `src/components/App.tsx`                               | Insert `useSessionsButton` before `useSettingsButton`; wire `SessionManager.init` + debounced `persistCurrent` |
+| `src/components/AppInner.tsx`                          | Render `<SessionsModal>` alongside the other modals                                                            |
+| `src/base/flow/flow-orchestrator.ts`                   | Add `setTasks(tasks)` (replace + notify)                                                                       |
+| `src/base/flow/flow-base.ts`                           | Add optional `createTasksFromSnapshots?(snapshots)` hook signature                                             |
+| `src/flows/musicDownloadFlow/musicDownloadFlow.ts`     | Implement `createTasksFromSnapshots`                                                                           |
 
 ---
 
 ## Task List
 
-| #   | Title                                                      | Files                                                        | Deps        | Status   |
-| --- | ---------------------------------------------------------- | ------------------------------------------------------------ | ----------- | -------- |
-| T01 | Session types                                              | `sessions/types.ts`                                          | —           | ⬜ Todo |
-| T02 | `SessionStore` persistence singleton                       | `sessions/sessionStore.ts`                                   | T01         | ⬜ Todo |
-| T03 | `reviveTaskDates` + `createTasksFromSnapshots`             | `utils/reviveTaskDates.ts`, `flow-base.ts`, `musicDownloadFlow.ts` | T01   | ⬜ Todo |
-| T04 | `orchestrator.setTasks(tasks)`                             | `flow-orchestrator.ts`                                       | —           | ⬜ Todo |
-| T05 | `SessionManager` (load / persist / new / duplicate / delete)| `sessions/sessionManager.ts`                                | T02–T04     | ⬜ Todo |
-| T06 | `sessionSearch` (match + derive name)                      | `sessions/sessionSearch.ts`                                  | T01         | ⬜ Todo |
-| T07 | `"sessionsModal"` focus window + `useSessionsButton`       | `useFocusManager.ts`, `useSessionsButton.ts`, `App.tsx`      | —           | ⬜ Todo |
-| T08 | `useSessions` hook                                         | `SessionsModal/useSessions.ts`                              | T02, T05, T06 | ⬜ Todo |
-| T09 | `SessionsModal` component (search, list, actions)          | `SessionsModal/SessionsModal.tsx`, `AppInner.tsx`            | T07, T08    | ⬜ Todo |
-| T10 | Startup reopen + debounced auto-save wiring               | `App.tsx`                                                    | T05         | ⬜ Todo |
+| #   | Title                                                        | Files                                                              | Deps          | Status  |
+| --- | ------------------------------------------------------------ | ------------------------------------------------------------------ | ------------- | ------- |
+| T01 | Session types                                                | `sessions/types.ts`                                                | —             | ⬜ Todo |
+| T02 | `SessionStore` persistence singleton                         | `sessions/sessionStore.ts`                                         | T01           | ⬜ Todo |
+| T03 | `reviveTaskDates` + `createTasksFromSnapshots`               | `utils/reviveTaskDates.ts`, `flow-base.ts`, `musicDownloadFlow.ts` | T01           | ⬜ Todo |
+| T04 | `orchestrator.setTasks(tasks)`                               | `flow-orchestrator.ts`                                             | —             | ⬜ Todo |
+| T05 | `SessionManager` (load / persist / new / duplicate / delete) | `sessions/sessionManager.ts`                                       | T02–T04       | ⬜ Todo |
+| T06 | `sessionSearch` (match + derive name)                        | `sessions/sessionSearch.ts`                                        | T01           | ⬜ Todo |
+| T07 | `"sessionsModal"` focus window + `useSessionsButton`         | `useFocusManager.ts`, `useSessionsButton.ts`, `App.tsx`            | —             | ⬜ Todo |
+| T08 | `useSessions` hook                                           | `SessionsModal/useSessions.ts`                                     | T02, T05, T06 | ⬜ Todo |
+| T09 | `SessionsModal` component (search, list, actions)            | `SessionsModal/SessionsModal.tsx`, `AppInner.tsx`                  | T07, T08      | ⬜ Todo |
+| T10 | Startup reopen + debounced auto-save wiring                  | `App.tsx`                                                          | T05           | ⬜ Todo |
 
 ---
 
@@ -200,5 +200,5 @@ redundant write.
 5. Select another session + **Enter** → working set swaps. **r** renames inline (persists). **n** clears
    to a new empty session. **c** duplicates. **Delete** removes (confirm); deleting the current one
    empties the working set.
-6. With reopen **off**, relaunch and import → a *new* session entry is created (per-launch lifecycle);
+6. With reopen **off**, relaunch and import → a _new_ session entry is created (per-launch lifecycle);
    the previous one remains in history.
