@@ -45,7 +45,8 @@ function hash(text: string): number {
  * what a write carries ("I read revision 12") so a write based on an out-of-date read is refused.
  *
  * It covers: the metadata overrides, the links the user added, the favorite/rejected choice of every metadata
- * result, and the download rows (which ones exist, which is selected, which are rejected). It deliberately does
+ * result, the download rows (which ones exist, which is selected, which are rejected) and the collection the track is
+ * in (`parentTaskId`: a group the user put it in). It deliberately does
  * NOT cover status or progress: those change on every tick of a download, and would make every write stale.
  *
  * It is a fingerprint rather than a counter, so it is the same after a restart and cannot drift: going A → B → A
@@ -66,6 +67,7 @@ export function computeTaskRevision(attrs: TrackDownloadTask): number {
             (attrs.userSources ?? []).map((s) => s.uri).join(","),
             results.join(","),
             rows.join(","),
+            attrs.parentTaskId ?? "",
         ].join("\n")
     );
 }

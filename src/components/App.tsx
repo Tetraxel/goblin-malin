@@ -9,6 +9,7 @@ import { TaskOrchestrator } from "#base/task/orchestrator";
 import { Task, type TaskAttributes } from "#base/task/task";
 import { computeColumns, type PrimaryMode } from "#flows/musicDownloadFlow/taskColumns";
 import { buildVisibleTaskOrder } from "#flows/musicDownloadFlow/utils/buildVisibleTaskOrder";
+import { reconcileGroups } from "#flows/musicDownloadFlow/utils/groupTasks";
 import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";
 import { getInstance } from "#utils/mpvPlayer";
 import { getAssetPath } from "#utils/appPaths";
@@ -104,6 +105,8 @@ export const App: React.FC = () => {
         const snapshots = () => orchestrator.getTasks().map((t) => t.get());
         const persist = () => manager.persistCurrent(snapshots);
         const offOrchestrator = orchestrator.subscribe((orch) => {
+            // A track removed or restored on its own changes its group's count.
+            reconcileGroups(orch.getTasks());
             setTasks(orch.getTasks());
             persist();
         });

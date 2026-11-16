@@ -9,6 +9,7 @@ import { startOptionsBridge } from "#base/bridges/startOptionsBridge";
 import { deleteConfirmBridge } from "#base/bridges/deleteConfirmBridge";
 import { TaskLockedError, runUserEdit, type DownloadTask } from "./utils/downloadTask";
 import { type CollectionTask } from "./utils/collectionTask";
+import { askGroupName, groupAndName, isGroupTask, removeFromGroups, ungroup } from "./utils/groupTasks";
 import { explainRefusedRun, runSelected } from "./runController";
 import { toAppUri as toOpenableUri } from "#utils/appLinks";
 import { addLinkFromClipboard } from "./utils/addLinkFromClipboard";
@@ -39,6 +40,9 @@ type BarAttributes = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     selectedTasks?: Task<any>[];
 };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyTask = Task<any>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isTrackTask = (t: Task<any>): t is DownloadTask =>
@@ -121,6 +125,74 @@ function sourceUrlFor(t: DownloadTask, serviceKey: string | undefined): string {
     return source?.metadata.url ?? "";
 }
 
+/** A track with neither TAG? nor DL? ticked would do nothing when started: the user is asked what to do with it. */
+const needsStartOptions = (t: DownloadTask): boolean => {
+    const a = t.getAttributes();
+    return !a?.toTag && !a?.toDownload;
+};
+
+/** Starts tracks as a batch (asking first for the ones with nothing ticked), through `runSelected`. */
+function startTracks(selected: DownloadTask[]): void {
+    const needing = selected.filter(needsStartOptions);
+    const doRun = (tracks: DownloadTask[]) => {
+        fire(runSelected(new Set(tracks.map((t) => t.getId()))).then(explainRefusedRun));
+    };
+    if (needing.length > 0) {
+        startOptionsBridge.request({
+            taskCount: selected.length,
+            apply: (opts) => {
+                // One held by Claude keeps its flags (and `runSelected` leaves it out below).
+                needing.forEach((t) => runUserEdit(() => t.setRunFlags(opts)));
+                doRun(selected);
+            },
+        });
+    } else {
+        doRun(selected);
+    }
+}
+
+/**
+ * Ctrl+G: puts the selected tracks in a new group and asks for its name. On a track or on an album/playlist row with
+ * tracks selected; the tracks among the tasks go into the group, anything else is left out.
+ */
+function groupAction(single: AnyTask[], extra: Partial<ContextualActions> = {}): ContextualActions {
+    return {
+        shortcuts: [{ input: "g", ctrl: true }],
+        label: "Group",
+        description: "Put the selected tracks together in a group you can name",
+        multiSelectAllowed: true,
+        clearsSelection: true,
+        onClick: () => fire(groupAndName(single)),
+        onClickBatch: (tasks) => fire(groupAndName(tasks)),
+        ...extra,
+    };
+}
+
+/** "Remove from group" for the tracks of the selection that are in a group (nothing when none is). */
+function removeFromGroupActions(selected: AnyTask[]): ContextualActions[] {
+    const orchestrator = TaskOrchestrator.getInstance();
+    // Built on every render of the list: only the selected tracks' own parent is looked at (O(1) each), never the queue.
+    const inGroup = (t: AnyTask): boolean => {
+        const a = t.getAttributes() as MusicDownloadTaskAttributes | undefined;
+        if (a?.kind !== "track" || a.parentTaskId === undefined) return false;
+        const parent = orchestrator.getTask(a.parentTaskId);
+        return parent !== undefined && isGroupTask(parent);
+    };
+    if (!selected.some(inGroup)) return [];
+    return [
+        {
+            // Not "u": the MusicBrainz column's "Other releases…" has it, and a track's column row shares the bar.
+            shortcuts: [{ input: "e" }],
+            label: "Remove from group",
+            description: "Take the selected tracks out of their group",
+            multiSelectAllowed: true,
+            clearsSelection: true,
+            onClick: () => removeFromGroups(selected.filter(inGroup)),
+            onClickBatch: (tasks) => removeFromGroups(tasks),
+        },
+    ];
+}
+
 /** Move tasks to the archive (reversible, so no confirmation); running tasks are skipped. */
 function archive(ids: string[]): void {
     const count = SessionManager.getInstance().archiveTasks(ids);
@@ -187,10 +259,7 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
             fire(t.start());
         }
     };
-    const needsOptions = (t: DownloadTask) => {
-        const a = t.getAttributes();
-        return !a?.toTag && !a?.toDownload;
-    };
+    const needsOptions = needsStartOptions;
     const taskActions: ContextualActions[] = [
         {
             shortcuts: [{ input: "r" }],
@@ -210,25 +279,7 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
                     runTask(task);
                 }
             },
-            onClickBatch: (tasks) => {
-                const selected = tasks as DownloadTask[];
-                const needing = selected.filter(needsOptions);
-                const doRun = (selectedTasks: DownloadTask[]) => {
-                    fire(runSelected(new Set(selectedTasks.map((t) => t.getId()))).then(explainRefusedRun));
-                };
-                if (needing.length > 0) {
-                    startOptionsBridge.request({
-                        taskCount: selected.length,
-                        apply: (opts) => {
-                            // One held by Claude keeps its flags (and `runSelected` leaves it out below).
-                            needing.forEach((t) => runUserEdit(() => t.setRunFlags(opts)));
-                            doRun(selected);
-                        },
-                    });
-                } else {
-                    doRun(selected);
-                }
-            },
+            onClickBatch: (tasks) => startTracks(tasks as DownloadTask[]),
         },
     ];
     taskActions.push({
@@ -249,6 +300,7 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
                 archive: () => archive(tasks.map((t) => t.getId())),
             }),
     });
+    taskActions.push(groupAction(group), ...removeFromGroupActions(group));
     if (group.some((t) => attrsOf(t)?.primaryMetadataFetched)) {
         const refetch = (t: DownloadTask) =>
             t.trackPartRun(() => runWithoutCache(() => t.startPrimaryMetadataFetching()));
@@ -529,29 +581,46 @@ function buildCollectionContextualActionBar(task: CollectionTask, attributes: Ba
     const hasBeenRun = attrs?.state !== "pending" && attrs?.state !== "stopped";
     const hasChildren = (attrs?.childTaskIds.length ?? 0) > 0;
     const isPlaylist = attrs?.collectionKind === "playlist";
+    const isGroup = task.isGroup();
 
     const asCollection = (t: { getAttributes: () => unknown }) => t as unknown as CollectionTask;
 
+    // The tracks of a group, as the list shows them (the tracks that point at it).
+    const tracksOfGroups = (groups: AnyTask[]): DownloadTask[] => {
+        const ids = new Set(groups.filter(isGroupTask).map((g) => g.getId()));
+        return orchestrator.getTasks().filter((t) => {
+            const a = t.getAttributes() as MusicDownloadTaskAttributes | undefined;
+            return a?.kind === "track" && a.parentTaskId !== undefined && ids.has(a.parentTaskId);
+        }) as unknown as DownloadTask[];
+    };
+
     // ── Task row (bottom) ─────────────────────────────────────────────────
+    // Albums and playlists fetch their track list; a group has none to fetch, so starting it starts its tracks.
+    const startCollections = (tasks: AnyTask[]) => {
+        for (const t of tasks.filter((x) => !isGroupTask(x))) {
+            const c = asCollection(t);
+            const a = c.getAttributes();
+            fire(a?.state !== "pending" && a?.state !== "stopped" ? c.restart() : c.start());
+        }
+        const tracks = tracksOfGroups(tasks);
+        if (tracks.length > 0) startTracks(tracks);
+    };
     const taskActions: ContextualActions[] = [
         {
             shortcuts: [{ input: "r" }],
-            label: hasBeenRun ? "Restart" : "Start",
-            description: hasBeenRun ? "Re-fetch the track list from scratch" : "Fetch the track list",
+            label: isGroup ? "Start tracks" : hasBeenRun ? "Restart" : "Start",
+            description: isGroup
+                ? "Start every track of this group"
+                : hasBeenRun
+                  ? "Re-fetch the track list from scratch"
+                  : "Fetch the track list",
             multiSelectAllowed: true,
-            onClick: () => fire(hasBeenRun ? task.restart() : task.start()),
-            onClickBatch: (tasks) => {
-                for (const t of tasks) {
-                    const c = asCollection(t);
-                    const a = c.getAttributes();
-                    const run = a?.state !== "pending" && a?.state !== "stopped" ? c.restart() : c.start();
-                    fire(run);
-                }
-            },
+            onClick: () => startCollections([task]),
+            onClickBatch: startCollections,
         },
     ];
 
-    if (hasBeenRun) {
+    if (hasBeenRun && !isGroup) {
         taskActions.push({
             shortcuts: [{ input: "f" }],
             label: "Refetch",
@@ -581,6 +650,26 @@ function buildCollectionContextualActionBar(task: CollectionTask, attributes: Ba
             onClick: () => task.toggleLive(),
             onClickBatch: (tasks) => tasks.filter(isCollectionTask).forEach((t) => t.toggleLive()),
         });
+    }
+
+    if (isGroup || attributes.selectedTasks?.some(isTrackTask)) {
+        // On a group's row: dissolve it. With tracks selected (the cursor happens to be on a collection row):
+        // group those tracks.
+        const selectedTracks = attributes.selectedTasks?.filter(isTrackTask);
+        if (selectedTracks && selectedTracks.length > 0) {
+            taskActions.push(groupAction(selectedTracks));
+        }
+        if (isGroup) {
+            taskActions.push({
+                shortcuts: [{ input: "u" }],
+                label: "Ungroup",
+                description: "Dissolve this group: its tracks stay in the list",
+                multiSelectAllowed: true,
+                clearsSelection: true,
+                onClick: () => void ungroup([task]),
+                onClickBatch: (tasks) => void ungroup(tasks),
+            });
+        }
     }
 
     taskActions.push({
@@ -635,7 +724,15 @@ function buildCollectionContextualActionBar(task: CollectionTask, attributes: Ba
         });
     }
 
-    if (column?.id === "url") {
+    if (column?.id === "url" && isGroup) {
+        // The name sits in this column, and has no link to copy or open.
+        columnActions.push({
+            shortcuts: [{ key: "return" }],
+            label: "Rename group",
+            description: "Change this group's name",
+            onClick: () => fire(askGroupName(task)),
+        });
+    } else if (column?.id === "url") {
         const url = attrs?.userInput.url ?? "";
         columnActions.push({
             shortcuts: [{ input: "c", ctrl: true }],

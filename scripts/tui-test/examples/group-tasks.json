@@ -1,0 +1,62 @@
+{
+    "terminal": { "cols": 160, "rows": 40 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks",
+    "steps": [
+        { "type": "stable", "timeout": 8000 },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "Group" },
+        { "type": "snapshot", "name": "single-selected" },
+
+        { "type": "key", "key": "Ctrl+Shift+ArrowDown" },
+        { "type": "key", "key": "Ctrl+Shift+ArrowDown" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "3 selected tasks" },
+        { "type": "snapshot", "name": "three-selected" },
+
+        { "type": "key", "key": "Ctrl+G" },
+        { "type": "waitForContent", "text": "Name this group" },
+        { "type": "assert", "contains": "Group 1" },
+        { "type": "snapshot", "name": "name-dialog" },
+
+        { "type": "key", "key": "Backspace" },
+        { "type": "key", "key": "Backspace" },
+        { "type": "key", "key": "Backspace" },
+        { "type": "key", "key": "Backspace" },
+        { "type": "key", "key": "Backspace" },
+        { "type": "key", "key": "Backspace" },
+        { "type": "key", "key": "Backspace" },
+        { "type": "type", "text": "Road trip" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "Road trip" },
+        { "type": "key", "key": "Enter" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "[GROUP]" },
+        { "type": "assert", "contains": "Road trip" },
+        { "type": "assert", "contains": "3 tracks" },
+        { "type": "assert", "contains": "Ungroup" },
+        { "type": "snapshot", "name": "grouped" },
+
+        { "type": "key", "key": "Enter" },
+        { "type": "waitForContent", "text": "Rename group" },
+        { "type": "assert", "contains": "Road trip" },
+        { "type": "key", "key": "Escape" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "Road trip" },
+        { "type": "snapshot", "name": "rename-cancelled" },
+
+        { "type": "key", "key": "c" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "Expand" },
+        { "type": "snapshot", "name": "collapsed" },
+
+        { "type": "key", "key": "c" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "Collapse" },
+
+        { "type": "key", "key": "u" },
+        { "type": "stable" },
+        { "type": "snapshot", "name": "ungrouped" }
+    ]
+}

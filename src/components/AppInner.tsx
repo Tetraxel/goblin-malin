@@ -36,6 +36,8 @@ import { dialogBridge, type ConfirmDialog, type DialogTone } from "#base/bridges
 import { ConfirmModal } from "./ConfirmModal/ConfirmModal";
 import { ListDialogModal } from "./ListDialogModal/ListDialogModal";
 import { useListDialog } from "./ListDialogModal/useListDialog";
+import { InputDialogModal } from "./InputDialogModal/InputDialogModal";
+import { useInputDialog } from "./InputDialogModal/useInputDialog";
 import { ClosingModal } from "./ClosingModal/ClosingModal";
 import { TempCleanupModal } from "./TempCleanupModal/TempCleanupModal";
 import { useConfirmModal } from "./ConfirmModal/useConfirmModal";
@@ -193,6 +195,7 @@ Check your internet connection, then try again.`,
     // are answers to something the user just asked for, but a flow may still be waiting on a dialog the user is
     // answering, so a confirm waits for a free slot rather than replacing it.
     const { pending: pendingList, open: openListDialog, answer: answerListDialog } = useListDialog();
+    const { pending: pendingInput, open: openInputDialog, answer: answerInputDialog } = useInputDialog();
     const handleDialogConfirm = useCallback(
         (dialog: ConfirmDialog, resolve: (index: number | null) => void) => {
             const colors: Record<DialogTone, string> = {
@@ -225,6 +228,11 @@ Check your internet connection, then try again.`,
         dialogBridge.setListOpener(openListDialog);
         return () => dialogBridge.setListOpener(null);
     }, [openListDialog]);
+
+    useEffect(() => {
+        dialogBridge.setInputOpener(openInputDialog);
+        return () => dialogBridge.setInputOpener(null);
+    }, [openInputDialog]);
 
     // Bridge: let plain-TS task actions open the start-options modal.
     useEffect(() => {
@@ -378,6 +386,13 @@ Check your internet connection, then try again.`,
                         terminalHeight={terminalHeight}
                         terminalWidth={terminalWidth}
                         onAnswer={answerListDialog}
+                    />
+
+                    <InputDialogModal
+                        pending={pendingInput}
+                        terminalHeight={terminalHeight}
+                        terminalWidth={terminalWidth}
+                        onAnswer={answerInputDialog}
                     />
 
                     <TempCleanupModal terminalHeight={terminalHeight} terminalWidth={terminalWidth} />

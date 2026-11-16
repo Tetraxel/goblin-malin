@@ -35,10 +35,17 @@ const KEY_MAP: Record<string, string> = {
     "Shift+ArrowLeft": "\x1b[1;2D",
     "Shift+←": "\x1b[1;2D",
 
+    // Ctrl+Shift+Arrow keys (extend the task selection)
+    "Ctrl+Shift+ArrowUp": "\x1b[1;6A",
+    "Ctrl+Shift+↑": "\x1b[1;6A",
+    "Ctrl+Shift+ArrowDown": "\x1b[1;6B",
+    "Ctrl+Shift+↓": "\x1b[1;6B",
+
     // Ctrl keys
     "Ctrl+A": "\x01",
     "Ctrl+C": "\x03",
     "Ctrl+D": "\x04",
+    "Ctrl+G": "\x07",
     "Ctrl+L": "\x0c",
     "Ctrl+N": "\x0e",
     "Ctrl+O": "\x0f",

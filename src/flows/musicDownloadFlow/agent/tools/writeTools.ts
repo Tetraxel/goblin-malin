@@ -388,19 +388,20 @@ const isArchiveBusy = (task: ArchivableTask): boolean => {
     });
 };
 
-/** What an archive dialog calls a task: a track by its title, an album or playlist by its name. */
+/** What an archive dialog calls a task: a track by its title, an album, playlist or group by its name. */
 function archiveLabel(task: ArchivableTask): string {
     if (task instanceof DownloadTask) return labelOf(task);
     const a = task.getAttributes() as CollectionDownloadTask | undefined;
     const kind = a?.collectionKind ?? "collection";
     if (a?.name) return `${a.name} (${kind})`;
-    return a?.userInput?.url ? `${shortLink(a.userInput.url)} (${kind})` : task.getId();
+    // A group has no link: its name is all it has.
+    return a?.userInput?.url ? `${shortLink(a.userInput.url)} (${kind})` : `${kind} ${task.getId()}`;
 }
 
 export const archiveTasks = defineAgentTool<{ taskIds: string[] }>({
     name: "archive_tasks",
     summary:
-        "Moves tasks (tracks, albums or playlists; an album's or playlist's tracks go with it) to the archive (their metadata and sources are kept; the user can restore them from the Archive window). Always asks the user first. Tasks that are being processed are left out, and an id that is no task is reported in `skipped`.",
+        "Moves tasks (tracks, albums, playlists or groups the user made; the tracks of an album, playlist or group go with it) to the archive (their metadata and sources are kept; the user can restore them from the Archive window). Always asks the user first. Tasks that are being processed are left out, and an id that is no task is reported in `skipped`.",
     kind: "confirm",
     locks: "tasks",
     undoable: false,

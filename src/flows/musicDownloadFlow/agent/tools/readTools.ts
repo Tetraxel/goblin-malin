@@ -28,7 +28,7 @@ type ListInput = { filter?: TaskFilter; cursor?: string };
 export const listTasks = defineAgentTool<ListInput>({
     name: "list_tasks",
     summary:
-        "Lists the user's tasks (tracks, albums and playlists), 25 per page, with their id, title, artists, state and revision. Use a filter to narrow it; pass the cursor of the previous page for the next one.",
+        "Lists the user's tasks (tracks, albums, playlists and groups the user made), 25 per page, with their id, title, artists, state and revision. Use a filter to narrow it; pass the cursor of the previous page for the next one.",
     kind: "read",
     locks: "none",
     undoable: false,

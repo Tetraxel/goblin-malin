@@ -17,9 +17,10 @@ export class TaskOrchestrator {
     private logger: Logger;
     private subscribers: Set<OrchestratorSubscriber> = new Set();
     private tasks: Task[] = [];
-    // Mirror of `tasks` ids for O(1) membership checks (import dedup) instead of the
+    // Mirror of `tasks` by id for O(1) membership checks (import dedup) and lookups (`getTask`) instead of the
     // O(n) `find` this used to do per added task (O(n²) on a bulk import).
-    private taskIds: Set<string> = new Set();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private tasksById: Map<string, Task<any>> = new Map();
     // Tasks removed while running — kept here so getTasksInProgress() still
     // counts their concurrency slot until the background promise finishes.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,29 +54,37 @@ export class TaskOrchestrator {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    addTasks(tasks: Task<any>[]): void {
+    addTasks(tasks: Task<any>[], options: { before?: string } = {}): void {
         // O(1) duplicate check against the id mirror instead of scanning `this.tasks`.
         for (const task of tasks) {
-            if (this.taskIds.has(task.getId())) {
+            if (this.tasksById.has(task.getId())) {
                 throw new Error(`Task ${task.getId()} is already in the queue`);
             }
         }
 
-        this.tasks = this.tasks.concat(tasks);
-        for (const task of tasks) this.taskIds.add(task.getId());
+        // `before`: put the new tasks in front of that task instead of at the end (a task that is not there: the end).
+        const at = options.before === undefined ? -1 : this.tasks.findIndex((t) => t.getId() === options.before);
+        this.tasks =
+            at >= 0 ? [...this.tasks.slice(0, at), ...tasks, ...this.tasks.slice(at)] : this.tasks.concat(tasks);
+        for (const task of tasks) this.tasksById.set(task.getId(), task);
         this.notifySubscribers();
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setTasks(tasks: Task<any>[]): void {
         this.tasks = [...tasks];
-        this.taskIds = new Set(tasks.map((t) => t.getId()));
+        this.tasksById = new Map(tasks.map((t) => [t.getId(), t]));
         this.removingTasks.clear();
         this.notifySubscribers();
     }
 
     public getTasks(): Task[] {
         return this.tasks;
+    }
+
+    /** The queued task with this id, in O(1) (hot paths must not scan `getTasks()` for one task). */
+    public getTask(id: string): Task | undefined {
+        return this.tasksById.get(id);
     }
 
     public removeTasks(ids: string[]): void {
@@ -87,7 +96,7 @@ export class TaskOrchestrator {
             }
         }
         this.tasks = this.tasks.filter((t) => !idSet.has(t.getId()));
-        for (const id of ids) this.taskIds.delete(id);
+        for (const id of ids) this.tasksById.delete(id);
         this.notifySubscribers();
     }
 

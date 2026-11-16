@@ -5,6 +5,7 @@ import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types
 import { Uri } from "#components/SecondaryPanel/MetadataPanel/Uri";
 import { formatTrackUri } from "#flows/musicDownloadFlow/utils/trackUri";
 import { providerDisplayRegistry } from "#base/providerDisplay";
+import { collectionKindLabel } from "#flows/musicDownloadFlow/utils/collectionKindLabel";
 
 export const UrlCell = React.memo(function UrlCell({
     task,
@@ -15,7 +16,7 @@ export const UrlCell = React.memo(function UrlCell({
     if (attrs?.kind === "collection") {
         const display = providerDisplayRegistry.get(attrs.recognizedServiceKey ?? "unknown");
         const hasChildren = attrs.childTaskIds.length > 0;
-        const kindLabel = attrs.collectionKind === "album" ? "ALBUM" : "PLAYLIST";
+        const kindLabel = collectionKindLabel(attrs.collectionKind);
         const name = attrs.name ?? attrs.userInput.url;
         return (
             <Box flexDirection="row" flexShrink={0} gap={1}>

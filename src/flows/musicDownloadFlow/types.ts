@@ -551,9 +551,13 @@ export type CollectionLiveRefresh = {
 // A parent task for an album/playlist URL. Doesn't fetch track metadata itself —
 // fetching (via CollectionTask.start()/refetch()) spawns real TrackDownloadTask
 // children (tagged parentTaskId) into the same flat orchestrator queue.
+//
+// A "group" is the same thing made by hand (Ctrl+G): it has no link and nothing to fetch, its tracks already exist
+// and are tagged with its id, and its `name` is the user's (an album's or playlist's is the platform's, replaced on
+// every re-fetch). `userInput.url` is "" for a group.
 export type CollectionDownloadTask = {
     kind: "collection";
-    collectionKind: "album" | "playlist";
+    collectionKind: "album" | "playlist" | "group";
     state: "pending" | "running" | "finished" | "failed" | "stopped";
     userInput: UserInput;
     /** Registry key of the metadata service that recognized the input URL. */

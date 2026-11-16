@@ -65,19 +65,33 @@ export type ListDialog = ListDialogBody & {
 
 export type ListAnswer = { index: number } | { none: true } | null;
 
+/** A one-line text field (e.g. the name of a group). */
+export type InputDialog = {
+    title: string;
+    /** A line of text above the field. */
+    message?: string;
+    /** What the field holds when the dialog opens. */
+    initialValue?: string;
+    accent?: string;
+    /** The most characters the field takes. */
+    maxLength?: number;
+};
+
 /**
  * Shows a confirm dialog. May return a function that takes it off the screen again without answering (used when the
  * caller gives up on it: see `confirm`'s `signal`).
  */
 type ConfirmOpener = (dialog: ConfirmDialog, resolve: (index: number | null) => void) => void | (() => void);
 type ListOpener = (dialog: ListDialog, resolve: (answer: ListAnswer) => void) => void;
+type InputOpener = (dialog: InputDialog, resolve: (value: string | null) => void) => void;
 
 let confirmOpener: ConfirmOpener | null = null;
 let listOpener: ListOpener | null = null;
+let inputOpener: InputOpener | null = null;
 
 // One dialog is on screen at a time; the others wait here, in the order they were asked.
 type Entry = {
-    kind: "confirm" | "list";
+    kind: "confirm" | "list" | "input";
     /** Shows the dialog; `done` must be called once it is answered. False when there is no UI to show it. */
     open: (done: () => void) => boolean;
     /** Nobody will answer: resolves the caller's promise with null. */
@@ -104,12 +118,12 @@ function pump(): void {
     }
 }
 
-/** The UI that shows list dialogs went away: the one on screen and the ones waiting can never be answered. */
-function cancelLists(): void {
+/** The UI that shows one kind of dialog went away: the one on screen and the ones waiting can never be answered. */
+function cancelKind(kind: Entry["kind"]): void {
     for (let i = queue.length - 1; i >= 0; i--) {
-        if (queue[i].kind === "list") queue.splice(i, 1)[0].cancel();
+        if (queue[i].kind === kind) queue.splice(i, 1)[0].cancel();
     }
-    if (current?.kind === "list") {
+    if (current?.kind === kind) {
         const gone = current;
         current = null;
         gone.cancel();
@@ -127,7 +141,12 @@ export const dialogBridge = {
     setListOpener(fn: ListOpener | null): void {
         listOpener = fn;
         if (fn) pump();
-        else cancelLists();
+        else cancelKind("list");
+    },
+    setInputOpener(fn: InputOpener | null): void {
+        inputOpener = fn;
+        if (fn) pump();
+        else cancelKind("input");
     },
     /**
      * The index of the button pressed, or null when dismissed / nobody to ask.
@@ -188,6 +207,25 @@ export const dialogBridge = {
                     listOpener(dialog, (answer) => {
                         done();
                         resolve(answer);
+                    });
+                    return true;
+                },
+                cancel: () => resolve(null),
+            });
+            pump();
+        });
+    },
+    /** The text typed (possibly empty), or null when dismissed / nobody to ask. */
+    input(dialog: InputDialog): Promise<string | null> {
+        return new Promise((resolve) => {
+            if (!inputOpener) return resolve(null);
+            queue.push({
+                kind: "input",
+                open: (done) => {
+                    if (!inputOpener) return false;
+                    inputOpener(dialog, (value) => {
+                        done();
+                        resolve(value);
                     });
                     return true;
                 },

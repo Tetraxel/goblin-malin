@@ -45,7 +45,7 @@ function pickRunnable(taskIds: readonly string[]): { tasks: DownloadTask[]; skip
         const task = findTask(taskId);
         if (!task) skipped.push({ taskId, reason: "no task with this id" });
         else if (task instanceof CollectionTask)
-            skipped.push({ taskId, reason: "an album or playlist: run its tracks (see get_task for them)" });
+            skipped.push({ taskId, reason: "an album, playlist or group: run its tracks (see get_task for them)" });
         else if (!(task instanceof DownloadTask)) skipped.push({ taskId, reason: "not a track" });
         else if (isTaskBusy(task)) skipped.push({ taskId, reason: "already being processed" });
         else if (taskLocks.isLocked(task.getId(), "agent")) skipped.push({ taskId, reason: "being edited right now" });

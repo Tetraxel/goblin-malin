@@ -111,11 +111,13 @@ export function useTaskListShortcuts(tasks: Task[], columns: ColumnDefinition<Mu
                             if (multiCount > 1 && action.multiSelectAllowed && action.onClickBatch) {
                                 const selected = tasks.filter((t) => taskList.selectedTaskIds.has(t.getId()));
                                 action.onClickBatch(selected);
+                                if (action.clearsSelection) clearSelection();
                             } else if (
                                 !(multiCount > 1 && !action.multiSelectAllowed) &&
                                 !(multiCount <= 1 && action.multiSelectOnly)
                             ) {
                                 action.onClick();
+                                if (action.clearsSelection) clearSelection();
                             }
                         } catch (err) {
                             globalLogger.error(err instanceof Error ? err.message : String(err));

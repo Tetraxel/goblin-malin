@@ -46,6 +46,9 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
         initialStatus?: StatusAttributes;
     }) {
         super({ id, initialInput, attributes, logger, initialStatus });
+        // A group has nothing to run. Marked finished here, not by whoever makes it, so one loaded from a session or
+        // restored from the archive is not a "Run all" candidate either (`finishedAt` is not saved).
+        if (attributes?.collectionKind === "group") this.finishedAt = new Date();
     }
 
     public override getLogLabel(): string | undefined {
@@ -57,10 +60,45 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
         return this.fetching;
     }
 
+    /** Made by the user (Ctrl+G): no link, nothing to fetch. Its tracks are the ones tagged with its id. */
+    public isGroup(): boolean {
+        return this.getAttributes()?.collectionKind === "group";
+    }
+
+    /**
+     * Renames a group. Whitespace is collapsed and an empty name is refused (the old one stays): a group with no name
+     * would be a blank row. An album's or playlist's name is the platform's, so those are not renamed.
+     * Returns whether the name changed.
+     */
+    rename(name: string): boolean {
+        const attrs = this.getAttributes();
+        if (!attrs || !this.isGroup()) return false;
+        const clean = name.replace(/\s+/g, " ").trim();
+        if (!clean || clean === attrs.name) return false;
+        this.updateAttributes({ name: clean });
+        return true;
+    }
+
+    /** Sets which tracks a group holds (its count and status follow). A no-op when nothing changed. */
+    setMembers(ids: string[]): void {
+        const attrs = this.getAttributes();
+        if (!attrs || !this.isGroup()) return;
+        const same = attrs.childTaskIds.length === ids.length && attrs.childTaskIds.every((id, i) => id === ids[i]);
+        if (same && attrs.totalCount === ids.length) return;
+        this.updateAttributes({ childTaskIds: ids, totalCount: ids.length });
+        this.status.set({ type: StatusType.Success, message: this.summaryMessage() });
+    }
+
     @TaskScoped()
     @SafeAction("Start collection task")
     async start(signal?: AbortSignal): Promise<void> {
         const state = this.getAttributes()?.state;
+        if (this.isGroup()) {
+            // Nothing to fetch: "starting" a group (a batch that includes it) only settles it.
+            this.updateAttributes({ state: "finished", error: undefined });
+            this.status.set({ type: StatusType.Success, message: this.summaryMessage() });
+            return;
+        }
         if (state !== "pending" && state !== "stopped") {
             this.logger.info(`Skipping because collection already processed ${this.getInitialInput()}`);
             return;
@@ -91,6 +129,8 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
     @TaskScoped()
     @SafeAction("Restart collection task")
     async restart(): Promise<void> {
+        // A group's tracks are the user's own: tearing them down would delete what the user put together.
+        if (this.isGroup()) return;
         const attrs = this.getAttributes();
         if (attrs?.childTaskIds.length) {
             TaskOrchestrator.getInstance().removeTasks(attrs.childTaskIds);
@@ -112,7 +152,7 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
     @TaskScoped()
     @SafeAction("Refetch collection task")
     async refetch(signal?: AbortSignal): Promise<void> {
-        if (this.fetching) return;
+        if (this.fetching || this.isGroup()) return;
         try {
             await this.fetchAndSpawn(signal);
             this.updateAttributes({ state: "finished", error: undefined });
@@ -231,12 +271,15 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
                 orchestrator.processTasks(new Set(newChildIds)).catch(() => {});
             }
 
+            // The list as it is now, not as it was before the await: the user may have moved tracks of this
+            // collection into a group meanwhile, and writing the old list back would put them back.
+            const currentChildIds = this.getAttributes()?.childTaskIds ?? attrs.childTaskIds;
             this.updateAttributes({
                 name: expansion.name,
                 ownerName: expansion.ownerName,
                 totalCount: expansion.totalCount,
                 truncated,
-                childTaskIds: [...attrs.childTaskIds, ...newChildIds],
+                childTaskIds: [...currentChildIds, ...newChildIds],
                 live:
                     attrs.collectionKind === "playlist"
                         ? { enabled: attrs.live?.enabled ?? true, lastFetchedAt: new Date() } // a success clears the backoff

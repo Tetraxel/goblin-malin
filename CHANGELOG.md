@@ -4,6 +4,11 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Groups** (`Ctrl+G`): put the selected tracks (or the focused one) together under a name you choose, like an imported album or playlist: a `[GROUP]` row with its tracks under it, foldable (`C`), with its own TAG? / DL? boxes, count and Start (`R` starts its tracks). `Enter` on the group's name renames it, `U` dissolves the group (its tracks stay) or, on a track, takes it out of its group. A track grouped again moves to the new group; a group left empty goes away. Archive / Delete on a group takes its tracks along, and groups are saved with the session.
+- The harness (`scripts/tui-test`) knows `Ctrl+G` and `Ctrl+Shift+↑/↓`; `examples/group-tasks.json` walks the whole flow.
+
 ## [0.2.3] — 2026-11-16
 
 ### Added

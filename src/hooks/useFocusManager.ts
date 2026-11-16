@@ -1,6 +1,7 @@
-﻿import { useState, useCallback, useMemo } from "react";
+﻿import { useState, useCallback, useMemo, useEffect } from "react";
 import { useScreenSize } from "./useScreenSize";
 import { type SetupWizardConfig } from "#base/setupWizard";
+import { taskCursorBridge } from "#base/bridges/taskCursorBridge";
 
 export type CursorPosition =
     | { type: "compiled" }
@@ -46,6 +47,7 @@ export type FocusableWindow =
     | "updateModal"
     | "confirmModal"
     | "listDialog"
+    | "inputDialog"
     | "tempCleanupModal"
     | "chatPanel";
 
@@ -223,7 +225,26 @@ export const useFocusManager = ({
         setPrevTaskIds(taskIds);
         const reconciled = reconcileTaskSelection(focusState.taskList, taskIds);
         if (reconciled !== focusState.taskList) setFocusState((prev) => ({ ...prev, taskList: reconciled }));
+        // A task action may ask for the cursor to follow a new row (a group just made).
+        // (Only peeked here: the request is consumed by the effect below, once this render is committed.)
+        const cursorAt = taskCursorBridge.peek(taskIds);
+        if (cursorAt !== undefined) {
+            setFocusState((prev) => ({
+                ...prev,
+                taskList: {
+                    ...prev.taskList,
+                    selectedTaskIndex: cursorAt,
+                    isHeaderFocused: false,
+                    selectionAnchor: null,
+                },
+            }));
+        }
     }
+
+    // The render above only looked at a cursor request; it is served (and dropped) once that render is committed.
+    useEffect(() => {
+        taskCursorBridge.take(taskIds);
+    }, [taskIds]);
 
     const switchWindow = useCallback((window: FocusableWindow) => {
         // Already there: keep `previousWindow`, or a later switchBack would "return" to the same window.

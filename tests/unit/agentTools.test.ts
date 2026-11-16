@@ -275,7 +275,7 @@ describe("set_metadata_override", () => {
         const { TaskOrchestrator } = await import("#base/task/orchestrator");
         TaskOrchestrator.getInstance().setTasks([album as never, a]);
         const result = await callTool("set_metadata_override", { taskId: "alb1", revision: 0, patch: { year: 2000 } });
-        expect(result.text).toMatch(/album\/playlist, not a track/);
+        expect(result.text).toMatch(/album, playlist or group\), not a track/);
         expect((await callTool("get_task", { taskId: "alb1" })).json.childIds).toEqual(["aaa1"]);
     });
 });

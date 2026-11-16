@@ -435,7 +435,7 @@ const EntryDetail: React.FC<{ entry: ArchivedEntry }> = ({ entry }) => {
 
     const facts =
         entry.kind === "collection"
-            ? [entry.childCount > 0 ? `${entry.childCount} archived tracks` : "Album / playlist", entry.artist]
+            ? [entry.childCount > 0 ? `${entry.childCount} archived tracks` : "Album / playlist / group", entry.artist]
             : [
                   compiled?.album?.albumName,
                   compiled?.year ? String(compiled.year) : undefined,

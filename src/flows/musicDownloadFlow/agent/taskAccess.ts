@@ -18,13 +18,13 @@ export function findTask(id: string): Task | undefined {
     return tasks.find((t) => t.getId() === id) ?? tasks.find((t) => t.getId() === `task:${id}`);
 }
 
-/** The track with this id; a clear error for the model when there is none, or when it is an album/playlist. */
+/** The track with this id; a clear error for the model when there is none, or when it is a collection (an album, a playlist or a group the user made). */
 export function requireDownloadTask(id: string): DownloadTask {
     const task = findTask(id);
     if (!task) throw new AgentToolError(`No task with id "${id}". Use list_tasks to find ids.`, "not-found");
     if (task instanceof CollectionTask) {
         throw new AgentToolError(
-            `Task ${id} is an album/playlist, not a track. Use get_task to see its children, and work on those.`,
+            `Task ${id} is a collection (album, playlist or group), not a track. Use get_task to see its children, and work on those.`,
             "not-a-track"
         );
     }

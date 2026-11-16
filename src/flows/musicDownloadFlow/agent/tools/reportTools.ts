@@ -27,7 +27,7 @@ function resolveTracks(ids: readonly string[]): {
         const task = findTask(taskId);
         if (!task) skipped.push({ taskId, reason: "no task with this id" });
         else if (task instanceof CollectionTask)
-            skipped.push({ taskId, reason: "an album or playlist: ask about its tracks" });
+            skipped.push({ taskId, reason: "an album, playlist or group: ask about its tracks" });
         else if (task instanceof DownloadTask) tracks.push(task);
         else skipped.push({ taskId, reason: "not a track" });
     }

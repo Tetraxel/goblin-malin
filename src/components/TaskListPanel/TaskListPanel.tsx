@@ -16,6 +16,7 @@ import { saveColumnRatios } from "#flows/musicDownloadFlow/taskColumns";
 import { CollectionTask } from "#flows/musicDownloadFlow/utils/collectionTask";
 import type { DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { runCellClickAction } from "#flows/musicDownloadFlow/contextualActions";
+import { collectionKindLabel } from "#flows/musicDownloadFlow/utils/collectionKindLabel";
 
 export type { Shortcut, ContextualActions, ContextualActionBar };
 
@@ -325,7 +326,7 @@ export const TaskListPanel: React.FC<{
             // Clicking a collection's "▾ [PLAYLIST]" tag (cell padding 1 + arrow + gap + tag) folds/unfolds it.
             if (columns[column]?.id !== "url" || !(task instanceof CollectionTask)) return;
             const kind = task.getAttributes()?.collectionKind;
-            const tagWidth = (kind === "album" ? "[ALBUM]" : "[PLAYLIST]").length;
+            const tagWidth = `[${collectionKindLabel(kind ?? "playlist")}]`.length;
             if (xInCell < 1 + 1 + 1 + tagWidth) task.toggleCollapsed();
         },
     });

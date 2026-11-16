@@ -1409,6 +1409,17 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.updateAttributes({ metadataGroups: groups });
     }
 
+    /**
+     * Puts the track in a collection (a group the user made, see `utils/groupTasks.ts`), or with `undefined` takes it
+     * out of its one. Refused while someone else holds the track. Where it shows in the list is part of what the user
+     * edits, so it is in the revision.
+     */
+    setParent(parentTaskId: string | undefined, options?: WriteOptions): void {
+        this.assertWritable(options);
+        if (this.getAttributes()?.parentTaskId === parentTaskId) return;
+        this.updateAttributes({ parentTaskId });
+    }
+
     // ── Misc mutations ────────────────────────────────────────────────────────
 
     @TaskScoped()
