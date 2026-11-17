@@ -9,7 +9,7 @@ import { makeTrack, meta } from "./helpers/agentWorld";
 
 const calls = vi.hoisted(() => ({
     downloads: 0,
-    options: undefined as any,
+    options: undefined as { matchFilter?: string } | undefined,
     /** What the fake run does: resolves when `release` is called, rejects after a kill. */
     release: undefined as undefined | (() => void),
     killed: 0,
@@ -17,11 +17,11 @@ const calls = vi.hoisted(() => ({
 
 vi.mock("#flows/musicDownloadFlow/services/apis/ytdlp-client", () => ({
     getYtDlpClient: async () => ({
-        download: (_url: string, options: unknown) => {
+        download: (_url: string, options: { matchFilter?: string }) => {
             calls.downloads++;
             calls.options = options;
             let fail!: (error: Error) => void;
-            const handle: any = {
+            const handle: { on: () => unknown; kill: () => boolean; run: () => Promise<void> } = {
                 on: () => handle,
                 kill: () => {
                     calls.killed++;
@@ -56,8 +56,8 @@ describe("what yt-dlp is told", () => {
         controller.abort();
         await result;
         expect(calls.options).toMatchObject({ ignoreConfig: true, noPlaylist: true, maxFilesize: "500M" });
-        expect(calls.options.matchFilter).toContain("!is_live");
-        expect(calls.options.matchFilter).toContain("duration<=?");
+        expect(calls.options?.matchFilter).toContain("!is_live");
+        expect(calls.options?.matchFilter).toContain("duration<=?");
     }, 3000);
 });
 

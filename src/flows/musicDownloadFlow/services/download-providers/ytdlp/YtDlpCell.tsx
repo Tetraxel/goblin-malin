@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import path from "path";
 import { Text } from "ink";
 import { type ColumnComponent } from "#components/TaskListPanel/TaskListPanel";

@@ -118,13 +118,13 @@ export class MpvPlayer extends EventEmitter {
         return new Promise((resolve, reject) => {
             const deadline = Date.now() + timeoutMs;
             const poll = () => {
-                if (fs.existsSync(this.socketPath)) {
-                    resolve();
-                } else if (Date.now() >= deadline) {
-                    reject(new Error("Timed out waiting for mpv IPC socket"));
-                } else {
-                    setTimeout(poll, 50);
-                }
+                fs.promises.access(this.socketPath).then(
+                    () => resolve(),
+                    () => {
+                        if (Date.now() >= deadline) reject(new Error("Timed out waiting for mpv IPC socket"));
+                        else setTimeout(poll, 50);
+                    }
+                );
             };
             setTimeout(poll, 100);
         });

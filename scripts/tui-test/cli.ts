@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { runScenario } from "./runner.ts";
+import { parseScenario } from "./parseScenario.ts";
 import { formatProfile } from "./profiling/format.ts";
-import type { HarnessEvent, HarnessResult, Scenario } from "./types.ts";
+import type { HarnessEvent, HarnessResult } from "./types.ts";
 
 const [, , scenarioPath, ...flags] = process.argv;
 const pretty = flags.includes("--pretty");
@@ -97,7 +98,7 @@ function makeLiveHandler(): (event: HarnessEvent) => void {
 
 try {
     const raw = readFileSync(scenarioPath, "utf-8");
-    const scenario = JSON.parse(raw) as Scenario;
+    const scenario = parseScenario(raw);
 
     if (!scenario.name) scenario.name = path.basename(scenarioPath).replace(/\.json$/, "");
     if (profile || updateBaseline) {

@@ -1,6 +1,6 @@
 /**
  * Micro-benchmarks of the hot paths that no screen scenario isolates well (the file-system and serialisation
- * costs behind `AUDIT-performance.md`). Each one calls only the public API of the module, so the same file
+ * costs behind the v0.2.3 performance work). Each one calls only the public API of the module, so the same file
  * measures the code before and after a fix.
  *
  *   yarn tsx scripts/tui-test/bench/microBench.ts            # pretty table

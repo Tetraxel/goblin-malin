@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { Text } from "ink";
 import { useTheme } from "#base/themeContext";
 import { type TrackDownloadSource } from "#flows/musicDownloadFlow/types";

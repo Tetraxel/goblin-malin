@@ -108,7 +108,7 @@ export const world = {
     apiCalls: [] as string[],
 };
 
-type Registry = import("#base/service-registry").ServiceRegistry<DownloadTaskType, any>;
+type Registry = import("#base/service-registry").ServiceRegistry<DownloadTaskType, never>;
 type Loaded = {
     DownloadTask: typeof DownloadTaskType;
     registries: () => { metadata: Registry; discovery: Registry; download: Registry };
@@ -167,12 +167,12 @@ export async function loadWorld(): Promise<Loaded> {
     loaded = {
         DownloadTask: (await import("#flows/musicDownloadFlow/utils/downloadTask")).DownloadTask,
         registries: () => {
-            const metadata = new ServiceRegistry<DownloadTaskType, any>();
+            const metadata = new ServiceRegistry<DownloadTaskType, never>();
             metadata.register("spotify", (world.withAlbumDetails ? FakeSpotify : FakeSpotifyNoAlbum) as never);
             return {
                 metadata,
-                discovery: new ServiceRegistry<DownloadTaskType, any>(),
-                download: new ServiceRegistry<DownloadTaskType, any>(),
+                discovery: new ServiceRegistry<DownloadTaskType, never>(),
+                download: new ServiceRegistry<DownloadTaskType, never>(),
             };
         },
         MusicBrainzClient: (await import("#flows/musicDownloadFlow/services/apis/musicbrainz-client"))

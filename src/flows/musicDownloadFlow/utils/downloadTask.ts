@@ -1938,7 +1938,10 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         try {
             // Another file with this name is replaced only if the user agrees. The track's own saved file doesn't
             // count: this one replaces it anyway.
-            if (isOutputPathTaken(outputPath, [saved?.path]) && !(await overwriteConfirmBridge.confirm(outputPath))) {
+            if (
+                (await isOutputPathTaken(outputPath, [saved?.path])) &&
+                !(await overwriteConfirmBridge.confirm(outputPath))
+            ) {
                 globalLogger.info("Save cancelled: the file name is taken and the user kept the existing file");
                 return;
             }

@@ -1,5 +1,5 @@
-﻿import type YTMusic from "ytmusic-api";
-import type { SongFull, VideoFull, ArtistFull, AlbumFull } from "ytmusic-api";
+import type YTMusic from "ytmusic-api";
+import type { SongFull } from "ytmusic-api";
 import { type Logger } from "#base/logger/logger";
 import { type ParsedUrl, type CollectionExpansion } from "#base/urlParser";
 import { type Task } from "#base/task/task";
@@ -127,108 +127,6 @@ export class YoutubeService extends MetadataService {
                 message: "Error fetching song data",
             });
             throw new Error(`Failed to get song: ${error}`);
-        }
-    }
-
-    /**
-     * Get full information about a specific video
-     * @param videoId - YouTube video ID
-     * @returns Full video data
-     */
-    @Cached()
-    public async getVideo(videoId: string): Promise<VideoFull> {
-        try {
-            this.logger.info(`Getting video data for video ID: "${videoId}"…`);
-            this.status.set({
-                type: StatusType.Processing,
-                message: "Fetching video data",
-                timeTracking: true,
-                progress: 0,
-            });
-
-            const client = await this.getClient();
-            const video = await client.getVideo(videoId);
-
-            this.logger.info("Video data retrieved", { videoId: video.videoId, name: video.name });
-            this.status.update({ progress: 100 });
-            this.status.clear();
-
-            return video;
-        } catch (error) {
-            this.logger.error("Error getting video:", { error });
-            this.status.set({
-                type: StatusType.Error,
-                message: "Error fetching video data",
-            });
-            throw new Error(`Failed to get video: ${error}`);
-        }
-    }
-
-    /**
-     * Get full information about an artist
-     * @param artistId - YouTube Music artist ID
-     * @returns Full artist data including top songs, albums, etc.
-     */
-    @Cached()
-    public async getArtist(artistId: string): Promise<ArtistFull> {
-        try {
-            this.logger.info(`Getting artist data for artist ID: "${artistId}"…`);
-            this.status.set({
-                type: StatusType.Processing,
-                message: "Fetching artist data",
-                timeTracking: true,
-                progress: 0,
-            });
-
-            const client = await this.getClient();
-            const artist = await client.getArtist(artistId);
-
-            this.logger.info("Artist data retrieved", { artistId: artist.artistId, name: artist.name });
-            this.status.update({ progress: 100 });
-            this.status.clear();
-
-            return artist;
-        } catch (error) {
-            this.logger.error("Error getting artist:", { error });
-            this.status.set({
-                type: StatusType.Error,
-                message: "Error fetching artist data",
-            });
-            throw new Error(`Failed to get artist: ${error}`);
-        }
-    }
-
-    /**
-     * Get full information about an album
-     * @param albumId - YouTube Music album ID
-     * @returns Full album data including all songs
-     */
-    @Cached()
-    public async getAlbum(albumId: string): Promise<AlbumFull> {
-        try {
-            this.logger.info(`Getting album data for album ID: "${albumId}"…`);
-            this.status.set({
-                type: StatusType.Processing,
-                message: "Fetching album data",
-                timeTracking: true,
-                progress: 0,
-            });
-
-            const client = await this.getClient();
-            const album = await client.getAlbum(albumId);
-
-            this.logger.info("Album data retrieved", { albumId: album.albumId, name: album.name });
-            this.status.update({ progress: 100 });
-            this.status.clear();
-
-            return album;
-        } catch (error) {
-            this.logger.error("Error getting album:", { error });
-            this.status.set({
-                type: StatusType.Error,
-                message: "Error fetching album data",
-            });
-            throw new Error(`Failed to get album: ${error}`);
         }
     }
 

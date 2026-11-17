@@ -366,9 +366,7 @@ export class SoulseekService extends DownloadService {
             });
 
             const tempDir = getTempDownloadDir();
-            if (!fs.existsSync(tempDir)) {
-                fs.mkdirSync(tempDir, { recursive: true });
-            }
+            await fs.promises.mkdir(tempDir, { recursive: true });
 
             for (const extension of extensionsToTry) {
                 throwIfAborted(signal);
@@ -679,9 +677,7 @@ export class SoulseekService extends DownloadService {
         const extension = path.win32.extname(candidate.file).slice(1).toLowerCase() as Extension;
 
         const tempDir = getTempDownloadDir();
-        if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
-        }
+        await fs.promises.mkdir(tempDir, { recursive: true });
 
         const result = await this.attemptSingleCandidate(
             trackMetadata,

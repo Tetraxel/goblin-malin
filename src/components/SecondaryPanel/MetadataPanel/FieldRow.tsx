@@ -1,4 +1,4 @@
-﻿import React, { useRef } from "react";
+import React, { useRef } from "react";
 import { Box, Text, type DOMElement } from "ink";
 import { TextInput } from "#components/TextInput";
 import { useClickTarget } from "#base/mouse/useMouseTarget";

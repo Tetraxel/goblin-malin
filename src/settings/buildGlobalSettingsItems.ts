@@ -1,4 +1,4 @@
-﻿import { type DeepPartial } from "#utils/types";
+import { type DeepPartial } from "#utils/types";
 import { clearCache } from "#utils/cache";
 import { getAppDataDir } from "#utils/appPaths";
 import { THEME_KEYS } from "#base/theme";

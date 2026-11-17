@@ -39,9 +39,9 @@ let spotifySearchGate: Promise<void> | undefined;
 type Mods = {
     DownloadTask: typeof DownloadTaskType;
     registries: () => {
-        metadata: import("#base/service-registry").ServiceRegistry<DownloadTaskType, any>;
-        discovery: import("#base/service-registry").ServiceRegistry<DownloadTaskType, any>;
-        download: import("#base/service-registry").ServiceRegistry<DownloadTaskType, any>;
+        metadata: import("#base/service-registry").ServiceRegistry<DownloadTaskType, never>;
+        discovery: import("#base/service-registry").ServiceRegistry<DownloadTaskType, never>;
+        download: import("#base/service-registry").ServiceRegistry<DownloadTaskType, never>;
     };
     metadataLimiter: typeof import("#flows/musicDownloadFlow/utils/stageLimiters").metadataLimiter;
 };
@@ -99,14 +99,14 @@ beforeAll(async () => {
     m = {
         DownloadTask: (await import("#flows/musicDownloadFlow/utils/downloadTask")).DownloadTask,
         registries: () => {
-            const metadata = new ServiceRegistry<DownloadTaskType, any>();
+            const metadata = new ServiceRegistry<DownloadTaskType, never>();
             metadata
                 .register("spotify", reading("spotify", "spotify.test") as never)
                 .register("youtube", reading("youtube", "youtube.test") as never);
-            const discovery = new ServiceRegistry<DownloadTaskType, any>();
+            const discovery = new ServiceRegistry<DownloadTaskType, never>();
             // Registered first, so the fallback meets the last-resort service before the regular one.
             discovery.register("claude", FakeLastResort as never).register("fake", FakeRegular as never);
-            return { metadata, discovery, download: new ServiceRegistry<DownloadTaskType, any>() };
+            return { metadata, discovery, download: new ServiceRegistry<DownloadTaskType, never>() };
         },
         metadataLimiter: (await import("#flows/musicDownloadFlow/utils/stageLimiters")).metadataLimiter,
     };

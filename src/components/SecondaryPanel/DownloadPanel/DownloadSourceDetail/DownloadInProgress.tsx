@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Box, Text } from "ink";
 import { useTheme } from "#base/themeContext";
+import { useGlobalTicker } from "#hooks/useGlobalTicker";
 import { type TrackDownloadSource } from "#flows/musicDownloadFlow/types";
 import { formatDuration } from "../../utils";
 import { formatBytes } from "../utils";
@@ -15,15 +16,9 @@ interface DownloadInProgressProps {
 // bar, two stat lines, separator.
 const FIXED_ROWS = 9;
 
-/** Re-renders every second while `active`, so elapsed time keeps moving between progress updates. */
-function useNow(active: boolean): number {
-    const [now, setNow] = useState(() => Date.now());
-    useEffect(() => {
-        if (!active) return;
-        const id = setInterval(() => setNow(Date.now()), 1000);
-        return () => clearInterval(id);
-    }, [active]);
-    return now;
+/** Milliseconds since `startedAt`, read when the pane renders. */
+function elapsedSince(startedAt: number): number {
+    return Math.max(0, Date.now() - startedAt);
 }
 
 /**
@@ -34,7 +29,9 @@ function useNow(active: boolean): number {
 export function DownloadInProgress({ source, width, height }: DownloadInProgressProps) {
     const theme = useTheme();
     const isDownloading = source.state === "downloading";
-    const now = useNow(isDownloading);
+    // The elapsed time is worked out at render time, so it only moves when something re-renders the pane between
+    // two progress updates: the shared ticker (one timer for the whole app, one commit per tick), not a timer here.
+    useGlobalTicker(1000, isDownloading);
     const info = source.progressInfo;
 
     const { stateLabel, stateColor, message } = ((): { stateLabel: string; stateColor: string; message: string } => {
@@ -86,7 +83,7 @@ export function DownloadInProgress({ source, width, height }: DownloadInProgress
         info?.speedBytesPerSec ? `${formatBytes(info.speedBytesPerSec)}/s` : undefined,
     ].filter(Boolean);
     const sizeLine = sizeParts.length > 0 ? sizeParts.join("  ·  ") : "Waiting for data…";
-    const elapsedMs = info ? Math.max(0, now - info.startedAt) : undefined;
+    const elapsedMs = info ? elapsedSince(info.startedAt) : undefined;
     const timeLine = [
         elapsedMs !== undefined
             ? `Elapsed ${formatDuration(elapsedMs) === "—" ? "0:00" : formatDuration(elapsedMs)}`

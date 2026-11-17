@@ -1,12 +1,12 @@
 # TODO
 
-> State of 2026-11-10 (`main`, working towards **v0.2.0**).
-> IDs like `DL-01` or `DATA-04` point to [AUDIT-v0.2.1.md](AUDIT-v0.2.1.md), which has the evidence and the suggested fix for each.
+> State of 2026-11-17 (`main`, **v0.2.3** released; what comes next is under "Unreleased" in [CHANGELOG.md](CHANGELOG.md)).
+> IDs like `DL-01` or `DATA-04` point to [AUDIT-v0.2.3.md](AUDIT-v0.2.3.md), which has the evidence and the suggested fix for each.
 > Per-project roadmap: [docs/projects/](docs/projects/README.md) (`P24`, `P25`… below).
 
-## 🔴 Release blockers (v0.2.0)
+## 🔴 Left from the v0.2.0 plan
 
-- [ ] **Release 0.2.0** — bump `package.json` to `0.2.0`, rehearse with a `dry_run` of `release.yml`, then tag `v0.2.0` — `REL-02` (the pipeline itself is fixed and its actions are pinned by SHA, `REL-03`)
+- [x] **Release 0.2.0** — released, as `v0.2.0` (the release pipeline is fixed and its actions are pinned by SHA, `REL-02`, `REL-03`); `v0.2.3` is the latest
 - [x] **MusicBrainz IDs never reach the saved file** — done in `P30`: "Write MusicBrainz IDs into saved files" setting (on by default), the IDs shown in the compiled metadata, release/recording/artist/release-group written to the tags — `MD-03`
 - [ ] Status per service (Spotify, Ytdlp, etc...) instead of per task — `P25`
 - [ ] Easier `cookies.txt` extraction for yt-dlp (drag and drop? step by step instructions?) — `P24/T24.3`
@@ -30,10 +30,10 @@
 
 **Housekeeping**
 
-- [ ] Dependencies left: `zod` advisory (waits for `ytmusic-api` on zod 4), ESLint 10 (waits for `eslint-plugin-react`; add `cause`s), TypeScript 7 (waits for `typescript-eslint`) — `DEP-02`, `DEP-03`
+- [ ] Dependencies left: `zod` advisory (waits for `ytmusic-api` on zod 4; `yarn audit` runs in CI as a non-blocking job, and Dependabot proposes the minor and patch updates monthly), ESLint 10 (waits for `eslint-plugin-react`; add `cause`s), TypeScript 7 (waits for `typescript-eslint`) — `DEP-02`, `DEP-03`
 - [x] `tests/e2e/perf.test.ts` › "an isolated key paints one frame, not two" failed on Windows — the Metadata and Download tabs re-set the snapshot they had just rendered (`Task.subscribe` replay); React re-rendered for it every other key (an empty commit) and Ink on Windows repaints every full-screen commit, even an unchanged one. Fixed with `useFollowTaskSnapshot` (`immediate: false` + identity catch-up); the test now treats the first two keys as set-up
-- [ ] Get the unit tests green on Linux CI, then enable them there (they only run on Windows now)
-- [ ] **Linux has no working ffmpeg/ffprobe download** — `resolveFfmpegSource` has a macOS branch and treats everything else as Windows (fetches the win64 zip); check, and either add a Linux build or state Linux is unsupported
+- [x] Unit tests run on Linux CI (`ubuntu-latest` is in the `ci.yml` matrix, next to Windows), and so do the end-to-end tests
+- [ ] **Linux has no working ffmpeg/ffprobe download** — `resolveFfmpegSource` has a macOS branch and treats everything else as Windows (fetches the win64 zip); the README states Linux is not supported yet; a Linux build is still to add
 
 ## 🟣 Promised by the former `README-TARGET` but not built yet
 
@@ -56,10 +56,14 @@ Decide per release whether each is wanted.
 - [ ] Music library & duplicate detection — `P23`
 - [ ] Search-based / text import — `P26`
 - [ ] Audio verification (duration/fingerprint) — `P27`
-- [ ] Claude as an assistant (pick the best source, fix metadata) — `P29`
+- [ ] Claude picking the best download source on its own, as a pipeline step (the chat and its tools exist: see "Done") — `P29/T29.1`
 
 ## ✅ Done (removed from the lists above)
 
+- [x] **Claude chat inside the app** — a chat panel where Claude (through the user's own `claude` CLI) reads and edits tracks with typed tools, one track at a time, with a preview before a batch and an undo; the 5 h / 7 d plan usage shows at the top — `P32` (tool catalogue: [docs/agent-tools.md](docs/agent-tools.md))
+- [x] **SoundCloud** — links are read like Spotify / YouTube ones, searched for during discovery and downloaded by yt-dlp (playlists are still open, above) — `P28`
+- [x] **Groups** (`Ctrl+G`) — put tracks together under a name, like an imported album, foldable, saved with the session
+- [x] **MusicBrainz identity** — which release a track is on, matched on conclusive evidence or reviewed by the user, with a guarded way to add a missing release — `P30`
 - [x] **Output format** — Settings → Download → "Convert every download to one audio format" (on by default, FLAC; MP3 / Ogg / Opus / M4A, or off to keep each download as it came); one ffmpeg step at save time, per-format tags; a Soulseek MP3 is no longer saved as a fake `.flac` — `PROD-03`
 - [x] **The saved file is the task's own record** — kept on the task (`savedFile`, with what it was made from) instead of on a download row, so Restart / Re-download / provider retry no longer make it disappear; shown pinned under a "SAVED FILE" title; older sessions are converted on load
 

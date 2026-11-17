@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { type Theme, loadTheme } from "./theme";
 import { SettingsStore } from "#settings/settingsStore";
 

@@ -1,4 +1,4 @@
-﻿import path from "path";
+import path from "path";
 import { fileURLToPath } from "url";
 import { DEFAULT_APP_DATA_DIR } from "#constants";
 

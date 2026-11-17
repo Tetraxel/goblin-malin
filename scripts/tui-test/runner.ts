@@ -70,7 +70,7 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
     if (keepDataDir) console.error(`[tui-test] data folder kept at ${isolated.dir}`);
     const slowMode = !!(process.env["GOBLIN_SLOW"] ?? scenario.env?.["GOBLIN_SLOW"]);
     // Truecolor (`FORCE_COLOR=3`) like Windows Terminal, iTerm2 and most Linux terminals give the app: 16 colours
-    // would make every frame ~30 % shorter than a user's (AUDIT-performance-2.md, TOOL2-02). A scenario can
+    // would make every frame ~30 % shorter than a user's. A scenario can
     // still ask for another level in its `env` (a screenshot test of the 16-colour theme, say).
     Object.assign(ptyEnv, { FORCE_COLOR: "3" }, scenario.env ?? {}, {
         TERM: "xterm-256color",

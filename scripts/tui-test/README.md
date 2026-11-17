@@ -123,7 +123,7 @@ The JSON result gains a `profile` field; `--pretty` prints a `profile` section.
 
 ### Development vs production build
 
-By default the profiled app runs the **development** build of React (`yarn tsx src/profiling/profiledEntry.tsx`), which is the only one that records per-component times. That build is not what users run: in the shipped bundle React is 2–5 % of a keystroke's CPU and Ink's output stage 75–83 % (AUDIT-performance-2.md), so per-component milliseconds rank the wrong things first. For frame, layout, write and byte numbers use the production build:
+By default the profiled app runs the **development** build of React (`yarn tsx src/profiling/profiledEntry.tsx`), which is the only one that records per-component times. That build is not what users run: in the shipped bundle React is 2–5 % of a keystroke's CPU and Ink's output stage 75–83 % , so per-component milliseconds rank the wrong things first. For frame, layout, write and byte numbers use the production build:
 
 ```json
 { "profile": { "enabled": true, "build": "production" } }
@@ -215,7 +215,7 @@ To measure from a state you are about to change, copy the tree first (without `n
 
 ### Key latency
 
-`bench/latency.ts` drives the **built bundle** (`yarn build`, then `node dist/cli.js`) through a PTY and reports what a user feels: per key, the time to the first byte and until the screen has settled, and the bytes the terminal had to parse; for a held key, how long the screen keeps moving after release. `perfSuite.ts` runs four configurations of it (`↓` at 128×50 and 200×60, `Ctrl+A`/`Esc`, view switch `2`/`1`, all with 2,000 tasks) and `perfCompare.ts` prints them as "key latency"; `--no-latency` skips them. Options and the reasoning are in the header of the file and in AUDIT-performance-2.md. Use `--interval 400` or more for `↓`: the second frame of a trailing debounce lands 130–270 ms after the key.
+`bench/latency.ts` drives the **built bundle** (`yarn build`, then `node dist/cli.js`) through a PTY and reports what a user feels: per key, the time to the first byte and until the screen has settled, and the bytes the terminal had to parse; for a held key, how long the screen keeps moving after release. `perfSuite.ts` runs four configurations of it (`↓` at 128×50 and 200×60, `Ctrl+A`/`Esc`, view switch `2`/`1`, all with 2,000 tasks) and `perfCompare.ts` prints them as "key latency"; `--no-latency` skips them. Options and the reasoning are in the header of the file. Use `--interval 400` or more for `↓`: the second frame of a trailing debounce lands 130–270 ms after the key.
 
 The machine-independent part is checked in CI: `tests/e2e/perf.test.ts` asserts that an isolated `↓` sends one frame of bytes, not two.
 

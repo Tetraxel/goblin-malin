@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, type RefObject } from "react";
+import React, { useState, useEffect, useRef, type RefObject } from "react";
 import wrapAnsi from "wrap-ansi";
 import { Box, Text, useBoxMetrics, type DOMElement } from "ink";
 import clipboard from "clipboardy";
@@ -16,7 +16,7 @@ import { MUSICBRAINZ_TAG_FIELDS, hasMusicBrainzTags } from "#flows/musicDownload
 import {
     computeOutputFilename,
     computeOutputPath,
-    isOutputPathTaken,
+    isOwnOutputPath,
 } from "#flows/musicDownloadFlow/utils/computeOutputPath";
 import {
     cleanOutputDir,
@@ -397,6 +397,10 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     const outputExt = previewOutputExtension(getSaveSettings(), downloadPath, source?.savedFile?.path);
     const defaultFilename = compiled ? computeOutputFilename(compiled, undefined, outputExt) : "";
     const currentFilename = compiled ? computeOutputFilename(compiled, filenameOverride, outputExt) : "";
+    // Whether a file already has the name this one would be saved under: looked up off the UI thread (see
+    // `useFileExists`), not with `existsSync` on every render.
+    const candidatePath = compiled ? computeOutputPath(compiled, outputDir, filenameOverride, outputExt) : undefined;
+    const candidateOnDisk = useFileExists(candidatePath) === true;
 
     function isOverridden(target: string): boolean {
         if (target === "output") return isOutputOverridden;
@@ -796,11 +800,9 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
     // When another file already has this name, saving replaces it (after asking). The file this track saved
     // (or the one this source replaces) is not "another file".
     const replacesExisting =
-        compiled != null &&
-        isOutputPathTaken(computeOutputPath(compiled, outputDir, filenameOverride, outputExt), [
-            source.savedFile?.path,
-            savedSource?.savedFile?.path,
-        ]);
+        candidatePath !== undefined &&
+        candidateOnDisk &&
+        !isOwnOutputPath(candidatePath, [source.savedFile?.path, savedSource?.savedFile?.path]);
     const outputEdit = edit?.target === "output" ? edit : null;
 
     const fileNotFound = fileNotFoundNow;

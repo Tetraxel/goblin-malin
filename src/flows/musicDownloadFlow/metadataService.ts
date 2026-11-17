@@ -1,4 +1,4 @@
-﻿import { ServiceBase } from "#base/service-base";
+import { ServiceBase } from "#base/service-base";
 import { type Task } from "#base/task/task";
 import { type Logger } from "#base/logger/logger";
 import { type ParsedUrl, type CollectionExpansion } from "#base/urlParser";

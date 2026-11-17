@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { Box, Text } from "ink";
 import { useTheme } from "#base/themeContext";
 import { providerDisplayRegistry } from "#base/providerDisplay";

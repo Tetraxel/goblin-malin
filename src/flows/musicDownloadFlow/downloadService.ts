@@ -1,4 +1,4 @@
-﻿import { ServiceBase } from "#base/service-base";
+import { ServiceBase } from "#base/service-base";
 import { type Logger } from "#base/logger/logger";
 import { type TrackMetadata, type TrackDownloadSource, type APIProvider } from "./types";
 import { type DownloadTask } from "./utils/downloadTask";

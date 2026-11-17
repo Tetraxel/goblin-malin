@@ -4,7 +4,7 @@
 (Ink 8.0.0). They keep what Ink computes from one frame to the next (the tokenised lines, the clipped slices, the
 rows, the width of each text) so a frame that changed two rows costs about what two rows cost, instead of the whole
 screen. The terminal output is byte-for-byte the same. Measurements and the reasoning:
-[AUDIT-performance-2.md](../../AUDIT-performance-2.md), PERF2-01 and PERF2-07.
+the header of `output.js` and `tests/unit/inkOutputPatch.test.ts`.
 
 - `*.stock.js` — the unmodified Ink 8.0.0 files. `scripts/apply-ink-patch.mjs` only overwrites files that equal
   them (or an older version of our own patch), and `tests/unit/inkOutputPatch.test.ts` renders the same random frames

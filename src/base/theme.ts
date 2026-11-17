@@ -1,4 +1,4 @@
-﻿import darkTheme from "#assets/themes/dark.json";
+import darkTheme from "#assets/themes/dark.json";
 import lightTheme from "#assets/themes/light.json";
 
 export interface ThemePalette {

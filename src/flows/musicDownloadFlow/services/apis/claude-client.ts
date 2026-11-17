@@ -121,6 +121,22 @@ const AUTH_ANYWHERE = /not logged in|please run \/login|invalid api key|authenti
 const QUOTA_ANYWHERE = /usage limit|limit reached|rate limit|quota|too many requests|resets? (at|in)/i;
 
 /**
+ * The error for a Claude CLI that could not be started (`spawn` failed). ENOENT: not on PATH. EINVAL: Windows refuses
+ * to spawn .cmd/.bat shims directly, which is only reached for a shim `resolveCliCommand` could not read, so that is
+ * said instead of "not found".
+ */
+export function cliSpawnError(error: NodeJS.ErrnoException, file: string, command: string): ClaudeCliError {
+    const unrunnableShim = error.code === "EINVAL" && isShellScript(file);
+    const missing = error.code === "ENOENT" || error.code === "EINVAL";
+    const message = unrunnableShim
+        ? `Claude Code CLI ("${file}") is a Windows .cmd script that cannot be started directly. In Settings, set the full path of claude.exe (native install) or of the cli.js it runs.`
+        : missing
+          ? `Claude Code CLI not found ("${command}"). Install it and log in, or set its full path in Settings.`
+          : `Could not start Claude: ${error.message}`;
+    return new ClaudeCliError(missing ? "not-installed" : "failed", message);
+}
+
+/**
  * What kind of failure this is. `status` is the HTTP status the CLI reports for an API error when it does (structured,
  * so it wins over any text); without it the text is read as described at {@link FailureSource}.
  */
@@ -265,18 +281,9 @@ export class ClaudeClient {
             child.stdout.setEncoding("utf-8").on("data", (chunk: string) => (stdout += chunk));
             child.stderr.setEncoding("utf-8").on("data", (chunk: string) => (stderr += chunk));
 
-            child.on("error", (error: NodeJS.ErrnoException) => {
-                // ENOENT: not on PATH. EINVAL: Windows refuses to spawn .cmd/.bat shims directly — only
-                // reached for a shim `resolveCliCommand` could not read, so say that instead of "not found".
-                const unrunnableShim = error.code === "EINVAL" && isShellScript(file);
-                const missing = error.code === "ENOENT" || error.code === "EINVAL";
-                const message = unrunnableShim
-                    ? `Claude Code CLI ("${file}") is a Windows .cmd script that cannot be started directly. In Settings, set the full path of claude.exe (native install) or of the cli.js it runs.`
-                    : missing
-                      ? `Claude Code CLI not found ("${command}"). Install it and log in, or set its full path in Settings.`
-                      : `Could not start Claude: ${error.message}`;
-                finish(() => reject(new ClaudeCliError(missing ? "not-installed" : "failed", message)));
-            });
+            child.on("error", (error: NodeJS.ErrnoException) =>
+                finish(() => reject(cliSpawnError(error, file, command)))
+            );
 
             child.on("close", (code) => {
                 finish(() => {

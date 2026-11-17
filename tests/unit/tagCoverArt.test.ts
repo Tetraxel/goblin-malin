@@ -5,7 +5,6 @@ import * as path from "path";
 import { promisify } from "util";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { type Metadata } from "#utils/metadata";
-import { probeAudio } from "#utils/probeAudio";
 import { readTags } from "#flows/musicDownloadFlow/utils/readFileInfo";
 import { tagAudioFile } from "#flows/musicDownloadFlow/utils/tagAudioFile";
 import { buildPictureBlock, coverFromProbe } from "#flows/musicDownloadFlow/utils/embeddedPicture";

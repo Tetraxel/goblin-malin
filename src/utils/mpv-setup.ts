@@ -1,9 +1,10 @@
-﻿import * as fs from "fs/promises";
+import * as fs from "fs/promises";
 import * as path from "path";
 import { spawn } from "child_process";
 import { getBinDir } from "./appPaths";
 import { downloadFile, httpsGetJson } from "./http";
 import { globalLogger } from "#base/logger/logger";
+import { findExistingBinary, removeOldVersions } from "./binaryFiles";
 
 // Windows-only auto-download.
 // Linux / macOS: install mpv via your package manager (brew, apt, etc.)
@@ -103,7 +104,7 @@ async function locateMpv(): Promise<string> {
         await fs.rename(path.join(getBinDir(), "mpv.exe"), binaryPath);
         await fs.unlink(archivePath);
         // Only now that the new one is in place: until then the old one is what the app falls back to.
-        await cleanupOldVersions("mpv_", binaryName);
+        await removeOldVersions("mpv_", binaryName);
 
         globalLogger.info(`mpv ${version} installed at ${binaryPath}`);
         return binaryPath;
@@ -144,36 +145,4 @@ async function extract7z(archivePath: string, destDir: string, fileFilter?: stri
         });
         proc.on("error", reject);
     });
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-async function findExistingBinary(prefix: string, suffix: string): Promise<string | null> {
-    try {
-        const files = await fs.readdir(getBinDir());
-        const matches = files
-            .filter((f) => f.startsWith(prefix) && f.endsWith(suffix))
-            .sort()
-            .reverse();
-        if (!matches.length) return null;
-        const p = path.join(getBinDir(), matches[0]);
-        await fs.access(p);
-        return p;
-    } catch {
-        return null;
-    }
-}
-
-async function cleanupOldVersions(prefix: string, currentName: string): Promise<void> {
-    try {
-        const files = await fs.readdir(getBinDir());
-        for (const f of files) {
-            if (f.startsWith(prefix) && f.endsWith(".exe") && f !== currentName) {
-                await fs.unlink(path.join(getBinDir(), f));
-                globalLogger.info(`Removed old mpv binary: ${f}`);
-            }
-        }
-    } catch {
-        /* ignore */
-    }
 }

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
 import { type Task } from "#base/task/task";
 import { useTheme } from "#base/themeContext";

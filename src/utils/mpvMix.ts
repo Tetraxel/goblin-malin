@@ -90,7 +90,15 @@ export class MpvMix {
 
     private async start(cues: MixCue[]): Promise<number | null> {
         if (process.env["GOBLIN_NO_AUDIO"]) return null;
-        if (!cues.every((cue) => fs.existsSync(cue.file))) return null;
+        const present = await Promise.all(
+            cues.map((cue) =>
+                fs.promises.access(cue.file).then(
+                    () => true,
+                    () => false
+                )
+            )
+        );
+        if (!present.every(Boolean)) return null;
 
         const mpvBin = await ensureMpv();
         if (this.stopped) return null;

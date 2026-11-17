@@ -68,9 +68,36 @@ jobs:
             - name: Build
               run: yarn build
 
-            # The unit tests run on both systems (the one failing test on Linux, see AUDIT-performance.md TOOL-01,
+            # The unit tests run on both systems (the one failing test on Linux, a path comparison that differed by platform,
             # now compares paths the way the platform does).
             - name: Unit tests
               run: npx vitest run tests/unit --coverage
               env:
                   GOBLIN_NO_AUDIO: "1"
+
+            # The scenarios in tests/e2e run the app headless through scripts/tui-test (collections, groups, restart
+            # confirmations, an isolated key = one frame…): the unit tests do not cover how the screens fit together
+            # (TEST-01). About 45 s.
+            - name: End-to-end tests
+              run: npx vitest run tests/e2e
+              env:
+                  GOBLIN_NO_AUDIO: "1"
+
+    # Known advisories in what ships (`dependencies`, not the dev tools). Reported, not blocking: the one open today
+    # (zod, through ytmusic-api) cannot be fixed from here, and a new advisory must not stop an unrelated change or a
+    # release. The job turns red-with-a-warning in the checks list, which is the reminder (DEP-01).
+    audit:
+        name: yarn audit (production dependencies)
+        runs-on: ubuntu-latest
+        continue-on-error: true
+        steps:
+            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+              with:
+                  ref: ${{ inputs.ref }}
+
+            - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+              with:
+                  node-version: 24
+
+            - name: Audit
+              run: yarn audit --groups dependencies --level high

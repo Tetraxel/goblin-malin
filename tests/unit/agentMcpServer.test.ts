@@ -40,6 +40,8 @@ afterEach(async () => {
     await server.stop();
 });
 
+// The body is whatever JSON the server sent: each test reads the fields it expects.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Reply = { status: number; body: any };
 
 /** One raw HTTP request, so headers a browser or a client would not normally send can be set. */

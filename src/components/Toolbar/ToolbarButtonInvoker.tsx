@@ -1,4 +1,4 @@
-﻿import { Box, Text, type DOMElement } from "ink";
+import { Box, Text, type DOMElement } from "ink";
 import React, { useLayoutEffect, useRef } from "react";
 import { type ToolbarButtonHook } from "./Toolbar";
 import { useToolbarButtonMouse } from "./useToolbarButtonMouse";

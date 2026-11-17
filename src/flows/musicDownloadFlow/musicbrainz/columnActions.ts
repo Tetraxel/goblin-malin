@@ -27,6 +27,7 @@ function fire(label: string, run: () => Promise<unknown>): void {
     run().catch((error) => logger.error(`${label} failed`, { error }));
 }
 
+// `Task` is invariant in its attributes: a list of tasks of any kind is only readable as `Task<any>`.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isTrackTask = (t: Task<any>): t is DownloadTask =>
     (t.getAttributes() as MusicDownloadTaskAttributes | undefined)?.kind === "track";
@@ -207,6 +208,7 @@ export function musicBrainzColumnActions(task: DownloadTask): ContextualActions[
         ...(item.id === "recheck"
             ? {
                   multiSelectAllowed: true,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   onClickBatch: (tasks: Task<any>[]) => {
                       for (const t of tasks.filter(isTrackTask)) {
                           fire("Re-check", () => metadataLimiter.run(() => recheckMusicBrainz(t)));

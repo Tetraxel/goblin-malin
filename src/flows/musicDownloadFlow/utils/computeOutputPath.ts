@@ -36,11 +36,22 @@ export function computeOutputPath(
     return path.join(outputDir, computeOutputFilename(compiled, filenameOverride, extension));
 }
 
+/** Whether `dest` is one of `ownPaths`: files the track already saved, or is about to replace. */
+export function isOwnOutputPath(dest: string, ownPaths: readonly (string | undefined)[] = []): boolean {
+    return ownPaths.some((own) => own !== undefined && samePath(dest, own));
+}
+
 /**
  * Whether writing to `dest` would replace a file this track doesn't own. `ownPaths` are the files the track
  * already saved, or is about to replace: overwriting those is the point, so they don't count.
  */
-export function isOutputPathTaken(dest: string, ownPaths: readonly (string | undefined)[] = []): boolean {
-    if (!fs.existsSync(dest)) return false;
-    return !ownPaths.some((own) => own !== undefined && samePath(dest, own));
+export async function isOutputPathTaken(
+    dest: string,
+    ownPaths: readonly (string | undefined)[] = []
+): Promise<boolean> {
+    const exists = await fs.promises.access(dest).then(
+        () => true,
+        () => false
+    );
+    return exists && !isOwnOutputPath(dest, ownPaths);
 }

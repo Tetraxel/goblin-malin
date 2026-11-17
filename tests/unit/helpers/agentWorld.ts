@@ -84,6 +84,8 @@ export function installWorld(tasks: DownloadTask[]): void {
     TaskOrchestrator.getInstance().setTasks(tasks);
 }
 
+// `json` is the tool's parsed answer: each test reads the fields it expects.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type CallResult = { isError: boolean; text: string; json: any };
 
 /** Calls a tool as the MCP server would, on a turn (a fresh one by default). */

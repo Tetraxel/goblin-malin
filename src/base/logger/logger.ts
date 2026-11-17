@@ -1,4 +1,4 @@
-﻿import fs from "fs";
+import fs from "fs";
 import path from "path";
 import winston from "winston";
 import { inkTransport } from "./ink-transport";

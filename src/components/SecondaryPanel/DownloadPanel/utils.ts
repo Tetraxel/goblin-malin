@@ -1,4 +1,4 @@
-﻿import { providerDisplayRegistry } from "#base/providerDisplay";
+import { providerDisplayRegistry } from "#base/providerDisplay";
 import type { SourceCandidate } from "#flows/musicDownloadFlow/types";
 
 export function getProviderColor(provider: string): string {

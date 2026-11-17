@@ -1,4 +1,4 @@
-﻿import { type ToolbarButtonHook } from "#components/Toolbar/Toolbar";
+import { type ToolbarButtonHook } from "#components/Toolbar/Toolbar";
 import { exitApp } from "#utils/exitApp";
 import { useTheme } from "#base/themeContext";
 

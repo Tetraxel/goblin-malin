@@ -1,8 +1,23 @@
 version: 2
 updates:
-    # Only the GitHub Actions pinned by commit SHA in .github/workflows/ (REL-03).
-    # npm dependencies are deliberately not listed: they are bumped by hand (see DEP-03).
+    # The GitHub Actions pinned by commit SHA in .github/workflows/ (REL-03).
     - package-ecosystem: "github-actions"
       directory: "/"
       schedule:
           interval: "monthly"
+
+    # The npm dependencies (DEP-01). Yarn 1 is read through the "npm" ecosystem (package.json + yarn.lock).
+    # Minor and patch updates only, in one pull request a month: the majors held back on purpose (ESLint 10,
+    # TypeScript 7, see TODO.md, DEP-03) are bumped by hand, when their plugins follow. Security updates are
+    # opened by Dependabot on their own, whatever the schedule says.
+    - package-ecosystem: "npm"
+      directory: "/"
+      schedule:
+          interval: "monthly"
+      open-pull-requests-limit: 5
+      groups:
+          minor-and-patch:
+              update-types: ["minor", "patch"]
+      ignore:
+          - dependency-name: "*"
+            update-types: ["version-update:semver-major"]

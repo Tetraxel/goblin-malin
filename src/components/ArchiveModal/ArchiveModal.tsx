@@ -116,13 +116,20 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({
         });
     }
 
-    function play(entry: ArchivedEntry) {
-        if (!entry.filePath || !fs.existsSync(entry.filePath)) {
+    async function play(entry: ArchivedEntry) {
+        const filePath = entry.filePath;
+        const exists = filePath
+            ? await fs.promises.access(filePath).then(
+                  () => true,
+                  () => false
+              )
+            : false;
+        if (!filePath || !exists) {
             globalLogger.warn("Archive: the saved file no longer exists");
             return;
         }
         getPlayer()
-            .play(entry.filePath)
+            .play(filePath)
             .catch(() => {});
     }
 

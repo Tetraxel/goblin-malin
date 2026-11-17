@@ -1,4 +1,4 @@
-﻿import path from "path";
+import path from "path";
 import { getCacheDir } from "#utils/appPaths";
 import { globalLogger } from "#base/logger/logger";
 import { loadJsonFile, saveJsonFile } from "../metadata-providers/songlink/json";

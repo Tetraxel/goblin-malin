@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useRef } from "react";
+import React, { useMemo, useRef } from "react";
 import { Box, Text, type DOMElement } from "ink";
 import { type Task, type TaskSnapshot } from "#base/task/task";
 import { useTheme } from "#base/themeContext";

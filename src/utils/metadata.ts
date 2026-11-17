@@ -1,4 +1,4 @@
-﻿import * as fs from "fs";
+import * as fs from "fs";
 import * as path from "path";
 import NodeId3 from "node-id3";
 import { readFlacTags, writeFlacTags, type FlacTagMap, type FlacTags } from "flac-tagger";

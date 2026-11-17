@@ -1,4 +1,4 @@
-﻿import { AsyncLocalStorage } from "async_hooks";
+import { AsyncLocalStorage } from "async_hooks";
 import { create } from "flat-cache";
 import * as fs from "fs";
 import { globalLogger } from "#base/logger/logger";

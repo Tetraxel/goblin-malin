@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { Text } from "ink";
 import { type ColumnComponentProps } from "#components/TaskListPanel/TaskListPanel";
 import { type MusicDownloadTaskAttributes } from "#flows/musicDownloadFlow/types";

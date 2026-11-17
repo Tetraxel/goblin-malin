@@ -1,7 +1,7 @@
 /**
  * Installs Goblin Malin's patched `output.js` and `render-node-to-output.js` over the ones in
  * `node_modules/ink/build/` (see `patches/ink/output.js` for what they change and why, and
- * AUDIT-performance-2.md, PERF2-01 and PERF2-07).
+ * its README).
  *
  *   node scripts/apply-ink-patch.mjs           # apply (run by `prepare`, i.e. after every `yarn install`)
  *   node scripts/apply-ink-patch.mjs --check   # only report: exits 1 unless the patched file is in place

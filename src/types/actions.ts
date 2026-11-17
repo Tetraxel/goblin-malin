@@ -1,4 +1,4 @@
-﻿import type React from "react";
+import type React from "react";
 import { type Text, type Key } from "ink";
 import { type Task } from "#base/task/task";
 

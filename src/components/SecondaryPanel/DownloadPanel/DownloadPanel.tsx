@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { Box } from "ink";
 import fs from "fs";
 import path from "path";
@@ -57,6 +57,8 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     const isPanelActive = activeWindow === "secondaryPanel" && secondaryPanel.subTab === "downloadSources";
 
     const typedTask = selectedTask as Task<MusicDownloadTaskAttributes> | null;
+    // The same task, seen as the class whose methods the panel calls (`Task` is invariant in its attributes).
+    const downloadTask = typedTask as unknown as DownloadTask | null;
 
     const [snapshot, setSnapshot] = useState<TaskSnapshot<MusicDownloadTaskAttributes> | undefined>(
         () => typedTask?.get() as TaskSnapshot<MusicDownloadTaskAttributes> | undefined
@@ -253,7 +255,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
 
     /** Lists the next results of one search (a click on its "show more" row, or the shortcut). */
     function handleShowMore(anchorIndex: number) {
-        const added = (typedTask as unknown as DownloadTask)?.showMoreSources(anchorIndex) ?? 0;
+        const added = downloadTask?.showMoreSources(anchorIndex) ?? 0;
         // The new rows go in under the anchor: keep the cursor on the row it was on.
         if (added > 0 && !focusedProvider && selectedSourceIndex > anchorIndex) {
             setSelectedSourceIndex(selectedSourceIndex + added);
@@ -265,14 +267,14 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     }
 
     function handleRetryProvider(provider: DownloadProvider) {
-        (typedTask as unknown as DownloadTask)?.retryDownloadProvider(provider).catch(() => {
+        downloadTask?.retryDownloadProvider(provider).catch(() => {
             // already logged by the task
         });
     }
 
     /** Makes a download row the one that will be saved. False when refused (Claude holds the track right now). */
     function chooseDownload(idx: number): boolean {
-        return runUserEdit(() => (typedTask as unknown as DownloadTask)?.selectDownloadSource(idx));
+        return runUserEdit(() => downloadTask?.selectDownloadSource(idx));
     }
 
     function handleRequestSelect(idx: number) {
@@ -288,11 +290,11 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     function handleRejectSource(idx: number) {
         const source = downloadSources[idx];
         if (!source) return;
-        runUserEdit(() => (typedTask as unknown as DownloadTask)?.rejectDownloadSource(idx, !source.isRejected));
+        runUserEdit(() => downloadTask?.rejectDownloadSource(idx, !source.isRejected));
     }
 
     function handleRetrySource(idx: number) {
-        (typedTask as unknown as DownloadTask)?.retryDownloadSource(idx);
+        downloadTask?.retryDownloadSource(idx);
     }
 
     /** Saves the file of the focused source: the selected one directly, another one after selecting it. */
@@ -329,7 +331,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
 
     function handleCancelDiff() {
         // A pending folder move has no other way out of the diff: cancelling drops the custom folder.
-        if (isMetadataChange && hasFolderChange) (typedTask as unknown as DownloadTask)?.setOutputDir(undefined);
+        if (isMetadataChange && hasFolderChange) downloadTask?.setOutputDir(undefined);
         setSourcesInnerFocus("list");
     }
 
@@ -339,7 +341,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
     async function handleSave(fromSaved = false) {
         if (!typedTask) return;
         try {
-            await (typedTask as unknown as DownloadTask).saveTrack({ fromSaved });
+            await downloadTask?.saveTrack({ fromSaved });
         } catch {
             // status already set to Error inside saveTrack()
         }
@@ -368,9 +370,15 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                 .trim()
                 .replace(/^"(.*)"$/, "$1");
             if (!newPath) return;
-            if (!fs.existsSync(newPath)) return;
-            if (onSaved) (typedTask as unknown as DownloadTask)?.relocateSavedFile(newPath);
-            else (typedTask as unknown as DownloadTask)?.updateLocalFile(sourceIdx, newPath);
+            if (
+                !(await fs.promises.access(newPath).then(
+                    () => true,
+                    () => false
+                ))
+            )
+                return;
+            if (onSaved) downloadTask?.relocateSavedFile(newPath);
+            else downloadTask?.updateLocalFile(sourceIdx, newPath);
         } catch {
             // user cancelled
         }
@@ -460,17 +468,11 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({ selectedTask, widt
                     onCancelDiff={handleCancelDiff}
                     onRelocateFile={handleRelocateFile}
                     onSave={() => handleSave(onSaved)}
-                    onChangeOutputDir={(dir) => (typedTask as unknown as DownloadTask)?.setOutputDir(dir)}
-                    onChangeFilename={(name) => (typedTask as unknown as DownloadTask)?.setOutputFilename(name)}
-                    onChangeOverwriteTags={(overwrite) =>
-                        (typedTask as unknown as DownloadTask)?.setOverwriteTags(overwrite)
-                    }
-                    onChangeIncludeMusicBrainzTags={(include) =>
-                        (typedTask as unknown as DownloadTask)?.setIncludeMusicBrainzTags(include)
-                    }
-                    onOverridesChange={(updated) =>
-                        runUserEdit(() => (typedTask as unknown as DownloadTask)?.setMetadataOverride(updated))
-                    }
+                    onChangeOutputDir={(dir) => downloadTask?.setOutputDir(dir)}
+                    onChangeFilename={(name) => downloadTask?.setOutputFilename(name)}
+                    onChangeOverwriteTags={(overwrite) => downloadTask?.setOverwriteTags(overwrite)}
+                    onChangeIncludeMusicBrainzTags={(include) => downloadTask?.setIncludeMusicBrainzTags(include)}
+                    onOverridesChange={(updated) => runUserEdit(() => downloadTask?.setMetadataOverride(updated))}
                     setIsEditingField={setIsEditingField}
                     onFocusPane={() => focusSourcesPane("detail")}
                 />

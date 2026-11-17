@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { Text } from "ink";
 import { useGlobalTicker } from "#hooks/useGlobalTicker";
 import { SettingsStore } from "#settings/settingsStore";

@@ -1,4 +1,4 @@
-﻿import { type ConfidencePart, type TrackMetadata } from "#flows/musicDownloadFlow/types";
+import { type ConfidencePart, type TrackMetadata } from "#flows/musicDownloadFlow/types";
 
 /**
  * Unicode-aware normalisation: lowercases, strips diacritics (`Beyoncé` → `beyonce`),

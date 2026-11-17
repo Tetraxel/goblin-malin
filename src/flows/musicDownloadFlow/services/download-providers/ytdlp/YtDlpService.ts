@@ -1,4 +1,4 @@
-﻿import fs from "fs";
+import fs from "fs";
 import path from "path";
 import { type FormatOptions, type QualityOptions, type YtDlp } from "ytdlp-nodejs";
 import stripAnsi from "strip-ansi";
@@ -185,9 +185,7 @@ export class YtDlpService extends DownloadService {
             } else {
                 runStem = tempStem;
                 // Ensure download directory exists
-                if (!fs.existsSync(getTempDownloadDir())) {
-                    fs.mkdirSync(getTempDownloadDir(), { recursive: true });
-                }
+                await fs.promises.mkdir(getTempDownloadDir(), { recursive: true });
 
                 // Load cookies if available
                 const cookiesPath = path.join(getBinDir(), "cookies.txt");
@@ -212,7 +210,12 @@ export class YtDlpService extends DownloadService {
 
                 // Add cookies if the file exists. yt-dlp rewrites the file it is given when it exits, so every run
                 // works on its own copy (see `copyCookiesForRun`); the user's file is only read.
-                if (fs.existsSync(cookiesPath)) {
+                if (
+                    await fs.promises.access(cookiesPath).then(
+                        () => true,
+                        () => false
+                    )
+                ) {
                     note(`Using cookies from ${cookiesPath}`, "debug");
                     cookiesCopy = await copyCookiesForRun(cookiesPath);
                     downloadOptions.cookies = cookiesCopy.path;

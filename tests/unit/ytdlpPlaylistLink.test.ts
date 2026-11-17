@@ -8,14 +8,17 @@ import { makeTrack, meta } from "./helpers/agentWorld";
 // A link copied from the address bar while a playlist or a mix plays: `watch?v=<id>&list=<playlist>&index=7`. yt-dlp
 // treats such a URL as the playlist unless it is told not to, and the track file would hold the playlist's first video.
 
-const calls = vi.hoisted(() => ({ url: undefined as string | undefined, options: undefined as any }));
+const calls = vi.hoisted(() => ({
+    url: undefined as string | undefined,
+    options: undefined as { noPlaylist?: boolean } | undefined,
+}));
 
 vi.mock("#flows/musicDownloadFlow/services/apis/ytdlp-client", () => ({
     getYtDlpClient: async () => ({
-        download: (url: string, options: unknown) => {
+        download: (url: string, options: { noPlaylist?: boolean }) => {
             calls.url = url;
             calls.options = options;
-            const handle: any = {
+            const handle: { on: () => unknown; kill: () => undefined; run: () => Promise<void> } = {
                 on: () => handle,
                 kill: () => undefined,
                 // Nothing is downloaded here: the call is all this test looks at.
@@ -45,7 +48,11 @@ describe("a YouTube link that belongs to a playlist", () => {
 
     test("the metadata of a YouTube track carries the video's own page, not the pasted link", async () => {
         const service = Object.create(YoutubeService.prototype) as YoutubeService;
-        (service as any).getSong = async () => ({ videoId: "dQw4w9WgXcQ", name: "Song", duration: 200 });
+        (service as unknown as { getSong: () => Promise<unknown> }).getSong = async () => ({
+            videoId: "dQw4w9WgXcQ",
+            name: "Song",
+            duration: 200,
+        });
         const track = await service.getTrackMetadata(PASTED);
         expect(track.url).toBe("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
         expect(track.url).not.toContain("list=");

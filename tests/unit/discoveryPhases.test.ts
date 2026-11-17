@@ -42,9 +42,9 @@ let lastResortContexts: (DiscoveryContext | undefined)[];
 type Mods = {
     DownloadTask: typeof DownloadTaskType;
     registries: () => {
-        metadata: import("#base/service-registry").ServiceRegistry<DownloadTaskType, any>;
-        discovery: import("#base/service-registry").ServiceRegistry<DownloadTaskType, any>;
-        download: import("#base/service-registry").ServiceRegistry<DownloadTaskType, any>;
+        metadata: import("#base/service-registry").ServiceRegistry<DownloadTaskType, never>;
+        discovery: import("#base/service-registry").ServiceRegistry<DownloadTaskType, never>;
+        download: import("#base/service-registry").ServiceRegistry<DownloadTaskType, never>;
     };
 };
 let m: Mods;
@@ -102,11 +102,11 @@ beforeAll(async () => {
     m = {
         DownloadTask: (await import("#flows/musicDownloadFlow/utils/downloadTask")).DownloadTask,
         registries: () => {
-            const metadata = new ServiceRegistry<DownloadTaskType, any>();
+            const metadata = new ServiceRegistry<DownloadTaskType, never>();
             metadata.register("spotify", FakeSpotify as never).register("youtube", FakeYoutube as never);
-            const discovery = new ServiceRegistry<DownloadTaskType, any>();
+            const discovery = new ServiceRegistry<DownloadTaskType, never>();
             discovery.register("regular", FakeRegular as never).register("claude", FakeLastResort as never);
-            return { metadata, discovery, download: new ServiceRegistry<DownloadTaskType, any>() };
+            return { metadata, discovery, download: new ServiceRegistry<DownloadTaskType, never>() };
         },
     };
 });

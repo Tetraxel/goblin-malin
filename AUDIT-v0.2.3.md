@@ -682,7 +682,7 @@ Anomalies reported by the harness: one `warn` ("4 commits over 20 ms, worst 48 m
 | 🟢 DONE BIN-03   | `utils/binaryArchive.ts:62-71` | Reading and inflating a ~200 MB zip with `adm-zip`, twice (ffmpeg, ffprobe)                                              |
 | 🟢 DONE TAG-03   | `utils/metadata.ts:64`         | `NodeId3.removeTags` reads and rewrites the whole FLAC synchronously on every FLAC save                                  |
 | 🟢 DONE CACHE-01 | `utils/cache.ts:21-33`         | `flat-cache` writes the whole API cache synchronously every 2 minutes and at exit                                        |
-| QUAL-03          | see section 10                 | `existsSync` / `mkdirSync` in both download providers, `existsSync` on the save path                                     |
+| 🟢 DONE QUAL-03  | see section 10                 | `existsSync` / `mkdirSync` in both download providers, `existsSync` on the save path                                     |
 | 🟢 DONE RUN-02   | `runController.ts:24-32`       | "Run all" on a reopened session starts every task once (2,000 no-op starts and status writes)                            |
 | DATA-08          | `sessions/sessionStore.ts`     | The whole `sessions.json` is kept in memory; serialisation is cached per object, so only growth of the file itself costs |
 
@@ -703,45 +703,49 @@ The production bundle latency bench (`bench/latency.ts`) and idle CPU were not r
 
 ### Rules that are broken
 
-- **QUAL-03. "No synchronous file-system calls in render or in the download path."** (Reading)
+- 🟢 DONE **QUAL-03. "No synchronous file-system calls in render or in the download path."** (Reading)
     - `services/download-providers/ytdlp/YtDlpService.ts:185-186` (`existsSync`, `mkdirSync`), `:203` (`existsSync`)
     - `services/download-providers/soulseek/SoulseekService.ts:324-325`, `:609-610`
     - `utils/computeOutputPath.ts:44` (`existsSync` inside `isOutputPathTaken`, called from `runSave`)
     - `components/SecondaryPanel/DownloadPanel/DownloadPanel.tsx:371`, `components/ArchiveModal/ArchiveModal.tsx:120` (`existsSync` in handlers)
     - `utils/metadata.ts:64` (`NodeId3.removeTags`, the big one, see TAG-03)
     - `utils/mpvPlayer.ts:79-80`, `:131`
-- **QUAL-04. "Animations go through `useGlobalTicker`."** (Reading) `components/SecondaryPanel/DownloadPanel/DownloadSourceDetail/DownloadInProgress.tsx:19-27` has its own one-second `setInterval` to refresh the elapsed time. It ignores Settings, Animations and adds a commit per second while a download is shown.
+    - _Done: the yt-dlp and Soulseek providers create the temp folder with `fs.promises.mkdir` and look for the cookies file with `access`; `isOutputPathTaken` is asynchronous (the save awaits it) and the detail pane asks `useFileExists` instead of looking at every render (`isOwnOutputPath` is the pure part); the Relocate and Archive "play" handlers, the mpv socket wait and the mix's cue check are asynchronous. Left as they are: `isExistingFile` in `cleanOutputDir.ts` (a text field's validation, not the download path) and `fileIsGone` in `sessionManager.ts` (runs when a session opens)._
+- 🟢 DONE **QUAL-04. "Animations go through `useGlobalTicker`."** (Reading) `components/SecondaryPanel/DownloadPanel/DownloadSourceDetail/DownloadInProgress.tsx:19-27` has its own one-second `setInterval` to refresh the elapsed time. It ignores Settings, Animations and adds a commit per second while a download is shown. _Done: the pane subscribes to the shared ticker (`useGlobalTicker(1000, …)`, like `StatusCell`) and reads the clock at render time._
 - **"User data is never rebuilt away"**: broken for `metadataOverride` (DATA-03).
-- **Hints must not hard-code keys**: five `<Hint shortcut="...">` literals remain (`ChatPanel.tsx:446`, `SettingsModal.tsx:581`, `PromptModal.tsx:112`, `:119`, `:120`). The rule allows them for keys owned by third-party inputs if a comment says so; I did not check each comment.
+- 🟢 DONE **Hints must not hard-code keys**: five `<Hint shortcut="...">` literals remain (`ChatPanel.tsx:446`, `SettingsModal.tsx:581`, `PromptModal.tsx:112`, `:119`, `:120`). The rule allows them for keys owned by third-party inputs if a comment says so; I did not check each comment. _Checked: each of the five has its comment (Enter owned by the text field, ↑↓ / Enter by `ink-select-input`, Esc as the rebind-capture cancel). Nothing to change._
 
 ### Dead or duplicated code
 
-- **QUAL-01. Dead code.** (Reading)
+- 🟢 DONE **QUAL-01. Dead code.** (Reading)
     - `src/flows/musicDownloadFlow/utils/input-loader.ts` (146 lines): no importer anywhere in `src/`. It reads a file from the data folder with `readFileSync`; if it is revived, that needs a second look.
     - `src/utils/useWhyDidYouUpdate.ts`: no importer.
     - `src/index.tsx:19-53`: `write`, `cleanUpOnExit` and `withFullScreen` are not used by `start()`; `withFullScreen` is exported from the package entry, so it is public API that nothing exercises.
     - `YoutubeService.getVideo`, `getArtist`, `getAlbum` (`YoutubeService.ts:94-189`): cached wrappers with no caller in the files I read.
     - `downloadTask.ts:549-553`: a condition that can never be true (DISC-01).
-- **QUAL-02. Duplication.** (Reading)
+    - _Done: `input-loader.ts`, `useWhyDidYouUpdate.ts`, `FullScreenBox.tsx` (its only user was `withFullScreen`) and the three unused functions of `index.tsx` are deleted, with the three YouTube getters (`getVideo`, `getArtist`, `getAlbum`). `withFullScreen` was not in the package's public entry (`GoblinMalin = { start }`)._
+- 🟢 DONE **QUAL-02. Duplication.** (Reading)
     - `src/base/env.ts:50-130`: the "modes" and "no modes" branches of `getVariablesWithWizard` are the same thirty lines twice.
     - `findExistingBinary` and `cleanupOldVersions` exist in `ffmpeg-setup.ts`, `ytdlp-setup.ts`, `mpv-setup.ts` (and `ffprobe-setup.ts`), each slightly different. BIN-01 has to be fixed in each copy.
     - The spawn-error-to-message mapping is copied between `claude-client.ts:235-246` and `claude-agent-client.ts:309-318`.
     - The "reset a track" object literal exists three times (DATA-03), which is exactly why the three copies drifted from the rule.
-- **QUAL-05. Type escapes.** (Reading) 71 `eslint-disable` comments and 57 `as unknown as` casts in `src/`; several build a `TrackMetadata` from a partial literal (`downloadTask.ts:399-408`, `:1229-1239`), which hides fields the type says are present (see CACHE-01 for `fetchedAt`). 25 lint warnings in tests.
-- **QUAL-06. Mixed byte-order marks.** (Reading) 63 files under `src/`, `scripts/`, `tests/` start with a UTF-8 BOM (for example `utils/appPaths.ts`, `base/logger/logger.ts`, `utils/cache.ts`, `YtDlpService.ts`), the rest do not. `check-utf8.mjs` accepts both. It is harmless to the compiler but produces noisy diffs and occasional tool surprises; pick one (no BOM) and enforce it in the check.
+    - _Done: `getVariablesWithWizard` is one path (the fields to fill are the chosen mode's, or the config's) with `persistWizardValues`; `findExistingBinary` lives in `binaryFiles.ts` next to `removeOldVersions` (mpv's own `cleanupOldVersions` is gone); `cliSpawnError` in `claude-client.ts` builds the "not installed / could not start" error for both Claude clients; the reset literal is `resetForRerun()` since DATA-03/DATA-07._
+- 🟡 PARTLY DONE **QUAL-05. Type escapes.** (Reading) 71 `eslint-disable` comments and 57 `as unknown as` casts in `src/`; several build a `TrackMetadata` from a partial literal (`downloadTask.ts:399-408`, `:1229-1239`), which hides fields the type says are present (see CACHE-01 for `fetchedAt`). 25 lint warnings in tests. _Done: `yarn lint` has 0 warnings (the test registries are typed `ServiceRegistry<DownloadTaskType, never>`, the yt-dlp mocks are typed, an unused import is gone, the JSON-shaped `any` of two test helpers and of `columnActions.ts` carry a reason); `DownloadPanel` casts its task once instead of 14 times. Not done: the other `as unknown as` casts and `eslint-disable` comments (`Task` is invariant in its attributes, so a list of tasks of one kind cannot be read as another without a cast; each one needs its own change)._
+- 🟢 DONE **QUAL-06. Mixed byte-order marks.** (Reading) 63 files under `src/`, `scripts/`, `tests/` start with a UTF-8 BOM (for example `utils/appPaths.ts`, `base/logger/logger.ts`, `utils/cache.ts`, `YtDlpService.ts`), the rest do not. `check-utf8.mjs` accepts both. It is harmless to the compiler but produces noisy diffs and occasional tool surprises; pick one (no BOM) and enforce it in the check. _Done: the 61 tracked files that had one are saved without it, `check-utf8.mjs` fails on a BOM, and an `.editorconfig` sets `charset = utf-8`._
 
 ---
 
 ## 11. Tests, CI, documentation
 
-- **TEST-01. End-to-end tests do not run in CI.** (Reading) `.github/workflows/ci.yml` runs `npx vitest run tests/unit --coverage`. The four files in `tests/e2e` (collections, groups, perf, render profile) only run on a developer's machine with `yarn test`. They passed here on Linux.
-- **DOC-01. The README's first harness example cannot run.** (Reproduced) `scripts/tui-test/examples/navigate-settings.json` contains `//` comments; `scripts/tui-test/cli.ts:100` uses `JSON.parse`. Running the command printed in `scripts/tui-test/README.md` gives `Error: Unexpected token '/' ... is not valid JSON`. No test loads this example. Either strip comments in the loader (the README itself shows scenarios with comments) or remove them from the file.
-- **DOC-02. Stale statements.** (Reading)
+- 🟢 DONE **TEST-01. End-to-end tests do not run in CI.** (Reading) `.github/workflows/ci.yml` runs `npx vitest run tests/unit --coverage`. The four files in `tests/e2e` (collections, groups, perf, render profile) only run on a developer's machine with `yarn test`. They passed here on Linux. _Done: `ci.yml` has an "End-to-end tests" step (`npx vitest run tests/e2e`, about 45 s) after the unit tests, on both systems._
+- 🟢 DONE **DOC-01. The README's first harness example cannot run.** (Reproduced) `scripts/tui-test/examples/navigate-settings.json` contains `//` comments; `scripts/tui-test/cli.ts:100` uses `JSON.parse`. Running the command printed in `scripts/tui-test/README.md` gives `Error: Unexpected token '/' ... is not valid JSON`. No test loads this example. Either strip comments in the loader (the README itself shows scenarios with comments) or remove them from the file. _Done: `scripts/tui-test/parseScenario.ts` reads `//` comments (outside strings) and is used by `cli.ts` and `perfSuite.ts`; `tests/unit/tuiScenarioExamples.test.ts` loads every example._
+- 🟢 DONE **DOC-02. Stale statements.** (Reading)
     - `TODO.md`: "Get the unit tests green on Linux CI ... (they only run on Windows now)": the CI matrix already includes Ubuntu and the tests pass on Linux.
     - `TODO.md` header: "working towards v0.2.0" while `package.json` is 0.2.3; `CLAUDE.md` says "heading to v0.2.0".
     - `AUDIT-v0.2.1.md` section 3: "lint passes with 0 warnings" (25 today).
     - `TODO.md` still lists "Linux has no working ffmpeg/ffprobe download": still true (`ffmpeg-setup.ts:105-125` has a macOS branch and treats everything else as Windows), and worth a clear statement in the README because the result on Linux is a 200 MB Windows archive extracted to a file that cannot run.
-- **DEP-01. Dependency hygiene.** (Reading) `.github/dependabot.yml` covers GitHub Actions only, not npm; `yarn audit` is not part of CI; the one open advisory (`zod` through `ytmusic-api`) is known. Actions are pinned by commit hash and the release uses npm provenance: both good.
+    - _Done: `TODO.md` (state of 2026-11-17, v0.2.3 released, the v0.2.0 release ticked, the Linux CI item ticked, a link to this audit instead of the missing `AUDIT-v0.2.1.md`) and `CLAUDE.md` no longer say "heading to v0.2.0". `AUDIT-v0.2.1.md` is no longer in the repository, so its "0 warnings" line is gone with it. The README already says Linux is not supported yet ("Installation on Linux"); the TODO item stays open for the Linux build itself._
+- 🟢 DONE **DEP-01. Dependency hygiene.** (Reading) `.github/dependabot.yml` covers GitHub Actions only, not npm; `yarn audit` is not part of CI; the one open advisory (`zod` through `ytmusic-api`) is known. Actions are pinned by commit hash and the release uses npm provenance: both good. _Done: Dependabot also watches npm (minor and patch updates, grouped, monthly; majors stay by hand, so ESLint 10 and TypeScript 7 are not proposed) and `ci.yml` has an `audit` job (`yarn audit --groups dependencies --level high`, `continue-on-error`: it shows in the checks without blocking a release). The `zod` advisory is still open: it waits for `ytmusic-api`._
 - **Test gaps that match the findings**: no test restarts a task and checks `metadataOverride` (DATA-03); no test reads an M4A back with a non-ffmpeg reader (TAG-01); no round-trip test for `.env` values (CRED-01); no test switches the task list during a run (RUN-01); `saveTrack` itself has no unit test (already in `TODO.md`).
 
 ---
@@ -1252,15 +1256,15 @@ yarn tsx scripts/tui-test/cli.ts scripts/tui-test/examples/navigate-settings.jso
 | 🟡 PARTLY DONE LOG-02   | Low    | Reading    | Promise object logged; whole task kept in loggers; settings logged per save               |
 | 🟢 DONE UI-02           | Low    | Reproduced | Ambiguous-width symbols break the modal border                                            |
 | ⚪ WON'T FIX PKG-01     | Low    | Reading    | Postinstall writes into the user's data folder                                            |
-| QUAL-01                 | Low    | Reading    | Dead code (`input-loader.ts`, `useWhyDidYouUpdate.ts`, `withFullScreen`, YouTube getters) |
-| QUAL-02                 | Low    | Reading    | Duplicated logic (wizard branches, binary helpers, spawn errors, reset literals)          |
-| QUAL-03                 | Low    | Reading    | Synchronous file-system calls in the download and save paths                              |
-| QUAL-04                 | Low    | Reading    | Own `setInterval` in `DownloadInProgress` instead of the global ticker                    |
-| QUAL-05                 | Low    | Reading    | 71 lint suppressions, 57 double casts, 25 lint warnings                                   |
-| QUAL-06                 | Low    | Reading    | 63 files with a BOM, the rest without                                                     |
-| TEST-01                 | Low    | Reading    | End-to-end tests not run in CI                                                            |
-| DOC-01                  | Low    | Reproduced | `navigate-settings.json` example is not valid JSON for the harness                        |
-| DOC-02                  | Low    | Reading    | Stale statements in `TODO.md`, `CLAUDE.md`, `AUDIT-v0.2.1.md`                             |
-| DEP-01                  | Low    | Reading    | No npm Dependabot, no audit in CI, known `zod` advisory                                   |
+| 🟢 DONE QUAL-01         | Low    | Reading    | Dead code (`input-loader.ts`, `useWhyDidYouUpdate.ts`, `withFullScreen`, YouTube getters) |
+| 🟢 DONE QUAL-02         | Low    | Reading    | Duplicated logic (wizard branches, binary helpers, spawn errors, reset literals)          |
+| 🟢 DONE QUAL-03         | Low    | Reading    | Synchronous file-system calls in the download and save paths                              |
+| 🟢 DONE QUAL-04         | Low    | Reading    | Own `setInterval` in `DownloadInProgress` instead of the global ticker                    |
+| 🟡 PARTLY DONE QUAL-05  | Low    | Reading    | 71 lint suppressions, 57 double casts, 25 lint warnings                                   |
+| 🟢 DONE QUAL-06         | Low    | Reading    | 63 files with a BOM, the rest without                                                     |
+| 🟢 DONE TEST-01         | Low    | Reading    | End-to-end tests not run in CI                                                            |
+| 🟢 DONE DOC-01          | Low    | Reproduced | `navigate-settings.json` example is not valid JSON for the harness                        |
+| 🟢 DONE DOC-02          | Low    | Reading    | Stale statements in `TODO.md`, `CLAUDE.md`, `AUDIT-v0.2.1.md`                             |
+| 🟢 DONE DEP-01          | Low    | Reading    | No npm Dependabot, no audit in CI, known `zod` advisory                                   |
 
 End of document.

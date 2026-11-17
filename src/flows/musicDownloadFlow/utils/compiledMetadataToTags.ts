@@ -1,4 +1,4 @@
-﻿import { type CompiledMetadata } from "./compiledMetadata";
+import { type CompiledMetadata } from "./compiledMetadata";
 import { type Metadata } from "#utils/metadata";
 
 export interface TagOptions {

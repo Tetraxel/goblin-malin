@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { registerAgentCleanup } from "#base/agent/cleanup";
-import { ClaudeCliError, classifyFailure } from "./claude-client";
-import { isShellScript, resolveCliCommand } from "./resolveCliCommand";
+import { ClaudeCliError, classifyFailure, cliSpawnError } from "./claude-client";
+import { resolveCliCommand } from "./resolveCliCommand";
 import { claudeWorkDir } from "#utils/claudeWorkDir";
 
 /**
@@ -335,16 +335,7 @@ export async function runAgentCli(opts: RunAgentCliOptions): Promise<void> {
             stderr = (stderr + chunk).slice(-MAX_STDERR_CHARS);
         });
 
-        child.on("error", (error: NodeJS.ErrnoException) => {
-            const unrunnableShim = error.code === "EINVAL" && isShellScript(file);
-            const missing = error.code === "ENOENT" || error.code === "EINVAL";
-            const message = unrunnableShim
-                ? `Claude Code CLI ("${file}") is a Windows .cmd script that cannot be started directly. In Settings, set the full path of claude.exe (native install) or of the cli.js it runs.`
-                : missing
-                  ? `Claude Code CLI not found ("${command}"). Install it and log in, or set its full path in Settings.`
-                  : `Could not start Claude: ${error.message}`;
-            finish(() => reject(new ClaudeCliError(missing ? "not-installed" : "failed", message)));
-        });
+        child.on("error", (error: NodeJS.ErrnoException) => finish(() => reject(cliSpawnError(error, file, command))));
 
         child.on("close", (code) => {
             lines.end();

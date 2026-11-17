@@ -1,4 +1,4 @@
-﻿import React, { useRef } from "react";
+import React, { useRef } from "react";
 import { Box, Text, type DOMElement } from "ink";
 import { getScreenBounds } from "#base/mouse/screenBounds";
 import { useClickTarget, useHoverTarget } from "#base/mouse/useMouseTarget";

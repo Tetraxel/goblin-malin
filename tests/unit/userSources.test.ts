@@ -47,9 +47,9 @@ const PRIMARY = meta("youtube", "repost1", "Orelsan - Dans ma ville on traine (c
 type Mods = {
     DownloadTask: typeof DownloadTaskType;
     registries: () => {
-        metadata: import("#base/service-registry").ServiceRegistry<DownloadTaskType, any>;
-        discovery: import("#base/service-registry").ServiceRegistry<DownloadTaskType, any>;
-        download: import("#base/service-registry").ServiceRegistry<DownloadTaskType, any>;
+        metadata: import("#base/service-registry").ServiceRegistry<DownloadTaskType, never>;
+        discovery: import("#base/service-registry").ServiceRegistry<DownloadTaskType, never>;
+        download: import("#base/service-registry").ServiceRegistry<DownloadTaskType, never>;
     };
     revive: typeof import("#flows/musicDownloadFlow/utils/reviveTaskDates").reviveTaskDates;
 };
@@ -97,13 +97,13 @@ beforeAll(async () => {
     m = {
         DownloadTask: (await import("#flows/musicDownloadFlow/utils/downloadTask")).DownloadTask,
         registries: () => {
-            const metadata = new ServiceRegistry<DownloadTaskType, any>();
+            const metadata = new ServiceRegistry<DownloadTaskType, never>();
             metadata
                 .register("spotify", reading("spotify", "spotify.test") as never)
                 .register("youtube", reading("youtube", "youtube.test") as never);
-            const discovery = new ServiceRegistry<DownloadTaskType, any>();
+            const discovery = new ServiceRegistry<DownloadTaskType, never>();
             discovery.register("claude", FakeLastResort as never);
-            return { metadata, discovery, download: new ServiceRegistry<DownloadTaskType, any>() };
+            return { metadata, discovery, download: new ServiceRegistry<DownloadTaskType, never>() };
         },
         revive: (await import("#flows/musicDownloadFlow/utils/reviveTaskDates")).reviveTaskDates,
     };

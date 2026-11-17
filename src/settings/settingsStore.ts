@@ -1,4 +1,4 @@
-﻿import * as fs from "fs";
+import * as fs from "fs";
 import * as path from "path";
 import { EventEmitter } from "events";
 import { DEFAULT_APP_DATA_DIR } from "#constants";

@@ -1,4 +1,4 @@
-﻿import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useScreenSize } from "./useScreenSize";
 import { type SetupWizardConfig } from "#base/setupWizard";
 import { taskCursorBridge } from "#base/bridges/taskCursorBridge";

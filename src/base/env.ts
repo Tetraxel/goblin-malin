@@ -1,4 +1,4 @@
-﻿import { type Task } from "./task/task";
+import { type Task } from "./task/task";
 import { type Logger } from "./logger/logger";
 import { EnvironmentError } from "#exceptions/EnvironmentError";
 import { type SetupWizardConfig } from "./setupWizard";
@@ -62,73 +62,47 @@ export class Env {
     }
 
     public async getVariablesWithWizard(config: SetupWizardConfig): Promise<Record<string, string>> {
-        // Mode-aware path
-        if (config.modes && config.modeEnvVar) {
-            const modeEnvVar = config.modeEnvVar;
-            const chosenModeId = appSecrets.get(modeEnvVar) ?? config.modes[0].id;
-            const activeMode = config.modes.find((m) => m.id === chosenModeId) ?? config.modes[0];
+        // With modes, the fields to fill are the chosen mode's (the first one when nothing was chosen yet).
+        const modes = config.modes;
+        const modeEnvVar = config.modeEnvVar;
+        const mode =
+            modes && modeEnvVar
+                ? (modes.find((m) => m.id === (appSecrets.get(modeEnvVar) ?? modes[0].id)) ?? modes[0])
+                : undefined;
+        const fields = mode ? mode.fields : config.fields;
 
-            const missingModeFields = activeMode.fields.filter((f) => !appSecrets.get(f.envVar));
-
-            if (missingModeFields.length === 0) {
-                // All fields already in env; return them without showing wizard
-                return {
-                    [modeEnvVar]: activeMode.id,
-                    ...Object.fromEntries(activeMode.fields.map((f) => [f.envVar, appSecrets.get(f.envVar)!])),
-                };
-            }
-
-            // Show wizard
-            const values = await this.askWizard(config);
-
-            // Persist modeEnvVar + mode fields
-            const nonEmpty = Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim()));
-            try {
-                if (config.envSection && Object.keys(nonEmpty).length > 0) {
-                    await saveEnvVarsGroup(nonEmpty, config.envSection);
-                } else {
-                    for (const [key, value] of Object.entries(nonEmpty)) {
-                        await saveEnvVar(key, value);
-                    }
-                }
-                this.logger.info(`Saved wizard vars to .env file.`);
-            } catch (error) {
-                this.logger.error(`Failed to save wizard vars to .env file:`, { error });
-                throw new Error(`Could not persist environment variables to .env file`);
-            }
-            for (const [key, value] of Object.entries(values)) {
-                appSecrets.set(key, value);
-            }
-            return values;
+        if (fields.every((f) => appSecrets.get(f.envVar))) {
+            // Everything is already known: no wizard.
+            return {
+                ...(mode && modeEnvVar ? { [modeEnvVar]: mode.id } : {}),
+                ...Object.fromEntries(fields.map((f) => [f.envVar, appSecrets.get(f.envVar)!])),
+            };
         }
 
-        // Non-modes path (back-compat)
-        const missing = config.fields.filter((f) => !appSecrets.get(f.envVar));
-
-        if (missing.length > 0) {
-            const values = await this.askWizard(config);
-
-            const nonEmpty = Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim()));
-            try {
-                if (config.envSection && Object.keys(nonEmpty).length > 0) {
-                    await saveEnvVarsGroup(nonEmpty, config.envSection);
-                } else {
-                    for (const [key, value] of Object.entries(nonEmpty)) {
-                        await saveEnvVar(key, value);
-                    }
-                }
-                this.logger.info(`Saved wizard vars to .env file.`);
-            } catch (error) {
-                this.logger.error(`Failed to save wizard vars to .env file:`, { error });
-                throw new Error(`Could not persist environment variables to .env file`);
-            }
-            for (const [key, value] of Object.entries(values)) {
-                appSecrets.set(key, value);
-            }
-            return values;
+        const values = await this.askWizard(config);
+        await this.persistWizardValues(config, values);
+        for (const [key, value] of Object.entries(values)) {
+            appSecrets.set(key, value);
         }
+        return values;
+    }
 
-        return Object.fromEntries(config.fields.map((f) => [f.envVar, appSecrets.get(f.envVar)!]));
+    /** Writes what the wizard collected (the mode choice included) to the `.env` file; empty values are skipped. */
+    private async persistWizardValues(config: SetupWizardConfig, values: Record<string, string>): Promise<void> {
+        const nonEmpty = Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim()));
+        try {
+            if (config.envSection && Object.keys(nonEmpty).length > 0) {
+                await saveEnvVarsGroup(nonEmpty, config.envSection);
+            } else {
+                for (const [key, value] of Object.entries(nonEmpty)) {
+                    await saveEnvVar(key, value);
+                }
+            }
+            this.logger.info(`Saved wizard vars to .env file.`);
+        } catch (error) {
+            this.logger.error(`Failed to save wizard vars to .env file:`, { error });
+            throw new Error(`Could not persist environment variables to .env file`);
+        }
     }
 
     /**

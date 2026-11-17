@@ -7,6 +7,27 @@ import { globalLogger } from "#base/logger/logger";
 const binExt = (): string => (process.platform === "win32" ? ".exe" : "");
 
 /**
+ * The newest cached copy of a tool: the file of the bin folder that starts with `prefix` (`<tool>_`) and ends with
+ * `suffix`, the last one by name (the name holds the version or the date). `null` when there is none.
+ */
+export async function findExistingBinary(prefix: string, suffix: string): Promise<string | null> {
+    try {
+        const files = await fs.readdir(getBinDir());
+        const binaries = files.filter((file) => file.startsWith(prefix) && file.endsWith(suffix));
+        if (binaries.length === 0) return null;
+
+        binaries.sort().reverse();
+        const binaryPath = path.join(getBinDir(), binaries[0]);
+        // Verify the file is accessible
+        await fs.access(binaryPath);
+        return binaryPath;
+    } catch (error) {
+        globalLogger.warn(`Failed to find existing binary: ${error}`);
+        return null;
+    }
+}
+
+/**
  * Where a binary is written while it is being downloaded. It starts with a dot, so it can never be mistaken for a
  * cached tool (those start with `<tool>_`): a download that was cut short, by a kill or a closed terminal, leaves a
  * file the app never runs.

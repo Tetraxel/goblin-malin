@@ -55,18 +55,18 @@ describe("isOutputPathTaken", () => {
         return file;
     };
 
-    it("is free when nothing is there", () => {
-        expect(isOutputPathTaken(path.join(dir, "a.flac"))).toBe(false);
+    it("is free when nothing is there", async () => {
+        expect(await isOutputPathTaken(path.join(dir, "a.flac"))).toBe(false);
     });
 
-    it("is taken when another file has the name", () => {
+    it("is taken when another file has the name", async () => {
         const file = touch("a.flac");
-        expect(isOutputPathTaken(file)).toBe(true);
-        expect(isOutputPathTaken(file, [undefined, path.join(dir, "b.flac")])).toBe(true);
+        expect(await isOutputPathTaken(file)).toBe(true);
+        expect(await isOutputPathTaken(file, [undefined, path.join(dir, "b.flac")])).toBe(true);
     });
 
-    it("does not count the track's own saved file", () => {
+    it("does not count the track's own saved file", async () => {
         const file = touch("a.flac");
-        expect(isOutputPathTaken(file, [file])).toBe(false);
+        expect(await isOutputPathTaken(file, [file])).toBe(false);
     });
 });

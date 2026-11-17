@@ -1,4 +1,4 @@
-﻿import { SpotifyApi, type Track } from "@spotify/web-api-ts-sdk";
+import { SpotifyApi, type Track } from "@spotify/web-api-ts-sdk";
 import { type ProviderDisplay } from "#base/providerDisplay";
 import { type ProviderSettingsSchema } from "#base/providerSettings";
 import { type SetupWizardConfig } from "#base/setupWizard";

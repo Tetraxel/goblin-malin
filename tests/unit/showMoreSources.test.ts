@@ -83,9 +83,9 @@ beforeAll(async () => {
 
     m = {
         makeTask: (sources) => {
-            const download = new ServiceRegistry<DownloadTaskType, any>();
+            const download = new ServiceRegistry<DownloadTaskType, never>();
             download.register("soulseek", FakeSoulseek as never);
-            const unused = new ServiceRegistry<DownloadTaskType, any>();
+            const unused = new ServiceRegistry<DownloadTaskType, never>();
             return new DownloadTask({
                 id: "t1",
                 initialInput: track.url,

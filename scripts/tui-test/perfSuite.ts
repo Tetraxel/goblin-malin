@@ -20,6 +20,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { runScenario } from "./runner.ts";
+import { parseScenario } from "./parseScenario.ts";
 import type { Scenario } from "./types.ts";
 import type { BenchResult } from "./bench/microBench.ts";
 
@@ -128,7 +129,7 @@ function arg(name: string): string | undefined {
 
 function loadScenario(name: string): Scenario {
     const file = path.join(HERE, "examples", `${name}.json`);
-    const scenario = JSON.parse(fs.readFileSync(file, "utf-8")) as Scenario;
+    const scenario = parseScenario(fs.readFileSync(file, "utf-8"));
     scenario.name = name;
     // The suite measures: never write or compare a baseline.
     scenario.profile = { enabled: true, thresholds: scenario.profile?.thresholds };

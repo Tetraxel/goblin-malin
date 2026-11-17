@@ -1,8 +1,7 @@
 import React, { Profiler } from "react";
-import { type Instance, type RenderOptions, render } from "ink";
+import { type RenderOptions, render } from "ink";
 import process from "node:process";
 import { App } from "./components/App";
-import { FullScreenBox } from "./components/FullScreenBox";
 import { globalLogger } from "./base/logger/logger";
 import { detectFuncKey } from "./types/actions";
 import { shortcutRegistry } from "./base/shortcuts/ShortcutRegistry";
@@ -15,42 +14,6 @@ import { textInputFocus } from "./base/textInputFocus";
 import { getAppDataDir } from "./utils/appPaths";
 import { acquireInstanceLock, releaseInstanceLock } from "./utils/instanceLock";
 import { emergencyExit, restoreTerminal } from "./utils/exitApp";
-
-async function write(content: string) {
-    return new Promise<void>((resolve, reject) => {
-        process.stdout.write(content, (error) => {
-            if (error) reject(error);
-            else resolve();
-        });
-    });
-}
-
-async function cleanUpOnExit(instance: Instance) {
-    await instance.waitUntilExit();
-    await write(DISABLE_MOUSE + "\x1b[?1049l");
-}
-
-type WithFullScreen = (...args: Parameters<typeof render>) => {
-    instance: Instance;
-    start: () => Promise<void>;
-    waitUntilExit: () => Promise<void>;
-};
-
-export const withFullScreen: WithFullScreen = (node, options) => {
-    const instance = render(null, options);
-    const exitPromise = cleanUpOnExit(instance);
-    function waitUntilExit() {
-        return exitPromise;
-    }
-
-    return {
-        instance: instance,
-        start: async () => {
-            instance.rerender(<FullScreenBox>{node}</FullScreenBox>);
-        },
-        waitUntilExit,
-    };
-};
 
 export function start(): void {
     // One app per data folder: a second one would silently overwrite the first one's sessions.

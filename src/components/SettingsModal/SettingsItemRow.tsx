@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { Box, Text } from "ink";
 import { TextInput } from "#components/TextInput";
 import { ClickArea } from "#base/mouse/ClickArea";

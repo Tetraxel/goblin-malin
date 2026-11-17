@@ -6,7 +6,7 @@ import { getLatestWin64Build } from "./ffmpegBuilds";
 import { installWin64Archive, versionedBinaryName } from "./ffmpegInstall";
 import { httpsGetJson } from "./http";
 import { withBinaryAlert } from "./withBinaryAlert";
-import { removeOldVersions } from "./binaryFiles";
+import { findExistingBinary, removeOldVersions } from "./binaryFiles";
 import { globalLogger } from "#base/logger/logger";
 
 // Executable suffix for locally-stored binaries: ".exe" on Windows, none elsewhere.
@@ -128,24 +128,4 @@ async function getEvermeetFfprobeVersion(): Promise<string> {
         globalLogger.warn(`Failed to fetch evermeet ffprobe version: ${error}`);
     }
     return new Date().toISOString().split("T")[0];
-}
-
-async function findExistingBinary(prefix: string, suffix: string): Promise<string | null> {
-    try {
-        const files = await fs.readdir(getBinDir());
-        const binaries = files.filter((file) => file.startsWith(prefix) && file.endsWith(suffix));
-
-        if (binaries.length === 0) {
-            return null;
-        }
-
-        binaries.sort().reverse();
-        const binaryPath = path.join(getBinDir(), binaries[0]);
-
-        await fs.access(binaryPath);
-        return binaryPath;
-    } catch (error) {
-        globalLogger.warn(`Failed to find existing binary: ${error}`);
-        return null;
-    }
 }

@@ -1,4 +1,4 @@
-﻿import fs from "fs/promises";
+import fs from "fs/promises";
 import { getCacheDir } from "#utils/appPaths";
 
 async function ensureCacheDir() {

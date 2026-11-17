@@ -1,10 +1,10 @@
-﻿import * as fs from "fs/promises";
+import * as fs from "fs/promises";
 import * as path from "path";
 import { getBinDir } from "#utils/appPaths";
 import { verifyAgainstPublishedChecksums } from "#utils/checksum";
 import { downloadFile, httpsGetJson } from "#utils/http";
 import { withBinaryAlert } from "#utils/withBinaryAlert";
-import { installViaStaging, removeOldVersions } from "#utils/binaryFiles";
+import { findExistingBinary, installViaStaging, removeOldVersions } from "#utils/binaryFiles";
 import { globalLogger } from "#base/logger/logger";
 
 // Executable suffix for locally-stored binaries: ".exe" on Windows, none elsewhere.
@@ -103,28 +103,6 @@ async function setUpYtDlp(autoDownloadBinary: boolean): Promise<string> {
             return existingBinary;
         }
         throw new Error(`Could not download yt-dlp (${cause}) and no downloaded copy exists in ${getBinDir()}.`);
-    }
-}
-
-async function findExistingBinary(prefix: string, suffix: string): Promise<string | null> {
-    try {
-        const files = await fs.readdir(getBinDir());
-        const binaries = files.filter((file) => file.startsWith(prefix) && file.endsWith(suffix));
-
-        if (binaries.length === 0) {
-            return null;
-        }
-
-        // Sort by name (which includes version) and return the most recent
-        binaries.sort().reverse();
-        const binaryPath = path.join(getBinDir(), binaries[0]);
-
-        // Verify the file is accessible
-        await fs.access(binaryPath);
-        return binaryPath;
-    } catch (error) {
-        globalLogger.warn(`Failed to find existing binary: ${error}`);
-        return null;
     }
 }
 

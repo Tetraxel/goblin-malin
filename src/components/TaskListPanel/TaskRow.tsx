@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { Box, Text } from "ink";
 import { type Task } from "#base/task/task";
 import { type Theme } from "#base/theme";

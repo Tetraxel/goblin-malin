@@ -1,4 +1,4 @@
-﻿import { useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { type PendingImport } from "./ImportModal";
 import { useFocusChrome } from "#contexts/FocusContext";
 import { globalLogger } from "#base/logger/logger";

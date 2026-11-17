@@ -167,9 +167,9 @@ beforeAll(async () => {
         setStrategy: (value) =>
             SettingsStore.getInstance().patchMusicSettings({ download: { downloadStrategy: value } }),
         makeTask: () => {
-            const download = new ServiceRegistry<DownloadTaskType, any>();
+            const download = new ServiceRegistry<DownloadTaskType, never>();
             download.register("ytdlp", FakeYtdlp as never).register("soulseek", FakeSoulseek as never);
-            const unused = new ServiceRegistry<DownloadTaskType, any>();
+            const unused = new ServiceRegistry<DownloadTaskType, never>();
             return new DownloadTask({
                 id: "t1",
                 initialInput: track.url,

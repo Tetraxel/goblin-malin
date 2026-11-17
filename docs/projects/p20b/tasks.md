@@ -1,4 +1,4 @@
-﻿# P20b — Remove the Flow Abstraction: Tasks
+# P20b — Remove the Flow Abstraction: Tasks
 
 > **Done — kept for history.** This project was delivered, so the files it deletes or splits (`src/base/flow/*`, `FlowSelector.tsx`, `musicDownloadFlow.ts`) are gone and are no longer linked. Where things live now: [docs/ARCHITECTURE.md](../../ARCHITECTURE.md).
 
