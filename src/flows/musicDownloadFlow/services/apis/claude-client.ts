@@ -1,8 +1,8 @@
 import { spawn } from "child_process";
-import os from "os";
 import { globalLogger } from "#base/logger/logger";
 import { Semaphore } from "#utils/semaphore";
 import { isShellScript, resolveCliCommand } from "./resolveCliCommand";
+import { claudeWorkDir } from "#utils/claudeWorkDir";
 
 /**
  * Thin wrapper around the Claude Code CLI in headless mode (`claude -p`), so the app can use the
@@ -224,15 +224,16 @@ export class ClaudeClient {
         });
     }
 
-    private exec(opts: ClaudeRunOptions): Promise<string> {
+    private async exec(opts: ClaudeRunOptions): Promise<string> {
         const command = opts.command?.trim() || DEFAULT_CLAUDE_COMMAND;
         const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+        const cwd = await claudeWorkDir();
 
         return new Promise<string>((resolve, reject) => {
             // On Windows an npm install is a `.cmd` shim Node cannot start: run what the shim runs.
             const { file, prefixArgs } = resolveCliCommand(command);
             const child = spawn(file, [...prefixArgs, ...buildClaudeArgs(opts)], {
-                cwd: os.tmpdir(),
+                cwd,
                 windowsHide: true,
                 stdio: ["pipe", "pipe", "pipe"],
             });

@@ -1915,7 +1915,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         const sameOrigin = !!saved && (!selectedSource || isSavedFrom(saved, selectedSource));
 
         const settings = getSaveSettings();
-        globalLogger.info("Saving track with settings:", { settings });
+        globalLogger.debug("Saving track with settings:", { settings });
 
         // The track's own choice wins over the setting. Left out, the IDs are not even looked up (a re-check is a
         // network round trip nobody asked for).

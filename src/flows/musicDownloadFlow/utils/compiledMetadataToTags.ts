@@ -12,6 +12,7 @@ export function compiledMetadataToTags(compiled: CompiledMetadata, options: TagO
         albumArtists: compiled.album?.artists?.map((a) => a.name),
         albumName: compiled.album?.albumName,
         year: compiled.year != null ? String(compiled.year) : undefined,
+        date: compiled.releaseDate,
         trackNumber: compiled.trackNumber != null ? String(compiled.trackNumber) : undefined,
         isrc: compiled.isrc,
         genres: compiled.genres,

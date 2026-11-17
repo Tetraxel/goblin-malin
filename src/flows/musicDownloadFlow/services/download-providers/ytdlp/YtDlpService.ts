@@ -10,6 +10,7 @@ import { type Logger } from "#base/logger/logger";
 import { platformRegistry } from "#base/platformRegistry";
 import { getBinDir } from "#utils/appPaths";
 import { makeAbortError } from "#utils/errors";
+import { killProcessTree } from "#utils/killProcessTree";
 import {
     type APIProvider,
     type TrackMetadata,
@@ -33,6 +34,16 @@ import { extensionOf, parseOutputFormat } from "#flows/musicDownloadFlow/utils/o
  * extracts as-is (Opus → .opus, Vorbis → .ogg, AAC → .m4a, MP3 → .mp3). Never an intermediate `.webm` / `.part`.
  */
 const YTDLP_AUDIO_EXTENSIONS = ["flac", "opus", "m4a", "ogg", "mp3"] as const;
+
+/**
+ * What a "track" may be. yt-dlp is told to skip anything bigger or longer (and any live stream), so a link to a
+ * ten-hour video or a stream that never ends cannot fill the disk. Both skips make yt-dlp exit successfully
+ * without a file, which the download then reports.
+ */
+const MAX_TRACK_FILESIZE = "500M";
+const MAX_TRACK_SECONDS = 3 * 60 * 60;
+/** `?` lets a video with no known duration through: the size limit still applies to it. */
+const TRACK_MATCH_FILTER = `!is_live & duration<=?${MAX_TRACK_SECONDS}`;
 
 /** Whether `file` is the finished download named `<stem>.<audio extension>` (and not a leftover like `<stem>.f251.webm`). */
 function isFinishedAudioFile(file: string, stem: string): boolean {
@@ -83,6 +94,8 @@ export class YtDlpService extends DownloadService {
         // A dedicated controller so the row can be cancelled on its own (e.g. the
         // user rejects it mid-download) without needing the task-level `signal` —
         // linked to it so a real task-level abort still cascades down here too.
+        // Stopped before it began: no row, nothing to clean (the event below never fires for a signal already aborted).
+        if (signal?.aborted) throw makeAbortError();
         const rowAbortController = new AbortController();
         const onOuterAbort = () => rowAbortController.abort();
         signal?.addEventListener("abort", onOuterAbort, { once: true });
@@ -124,6 +137,8 @@ export class YtDlpService extends DownloadService {
 
         // This run's private copy of cookies.txt, if there is one; removed whatever way the run ends.
         let cookiesCopy: CookiesCopy | undefined;
+        // The name of the files this run is making, once it has started making them (see the clean-up on failure).
+        let runStem: string | undefined;
         try {
             note(`Downloading track from ${trackMetadata.apiProvider}: ${trackMetadata.trackName}`);
             this.status.set({
@@ -168,6 +183,7 @@ export class YtDlpService extends DownloadService {
                     sourceUrl: trackUrl,
                 };
             } else {
+                runStem = tempStem;
                 // Ensure download directory exists
                 if (!fs.existsSync(getTempDownloadDir())) {
                     fs.mkdirSync(getTempDownloadDir(), { recursive: true });
@@ -186,6 +202,12 @@ export class YtDlpService extends DownloadService {
                     // A link copied while a playlist or a mix plays carries `&list=…`: without this yt-dlp would take
                     // the playlist's first video (into this track's file name) and then walk the whole list.
                     noPlaylist: true,
+                    // The user's own yt-dlp.conf (output template, format, post-processors, embedded thumbnails) must not
+                    // change what the app gets, nor break the "find the produced file" step.
+                    ignoreConfig: true,
+                    // A track, not a ten-hour video or a live stream.
+                    maxFilesize: MAX_TRACK_FILESIZE,
+                    matchFilter: TRACK_MATCH_FILTER,
                 };
 
                 // Add cookies if the file exists. yt-dlp rewrites the file it is given when it exits, so every run
@@ -195,11 +217,14 @@ export class YtDlpService extends DownloadService {
                     cookiesCopy = await copyCookiesForRun(cookiesPath);
                     downloadOptions.cookies = cookiesCopy.path;
                 } else {
-                    note("No cookies file found, proceeding without cookies", "warn");
+                    // The normal case for most users: not worth a warning on every track.
+                    note("No cookies file found, proceeding without cookies", "debug");
                 }
 
                 // Use the builder API so we can kill the process on abort
                 const client = await this.getClient();
+                // Stopped while the set-up ran: the abort listener below would be added too late to ever fire.
+                if (rowAbortController.signal.aborted) throw makeAbortError();
                 // yt-dlp emits a progress event per stdout line (many per second). The
                 // UI only ever shows whole-percent progress, so quantize to integer and
                 // ignore ticks that don't change it - that collapses status updates,
@@ -255,14 +280,17 @@ export class YtDlpService extends DownloadService {
                 };
                 dl.on("stdout", makeLineForwarder()).on("stderr", makeLineForwarder());
 
-                const onAbort = () => dl.kill();
+                // The whole tree: on Windows a plain kill leaves the ffmpeg yt-dlp started running, and the file locked.
+                const onAbort = () => killProcessTree(dl);
                 rowAbortController.signal.addEventListener("abort", onAbort, { once: true });
 
                 try {
                     await dl.run();
+                } catch (error) {
+                    // A killed yt-dlp can exit with an error code: that is the stop, not a failed download.
+                    if (!rowAbortController.signal.aborted) throw error;
                 } finally {
                     rowAbortController.signal.removeEventListener("abort", onAbort);
-                    signal?.removeEventListener("abort", onOuterAbort);
                 }
 
                 // If aborted (task-level or just this row), delete the partial temp file
@@ -270,9 +298,7 @@ export class YtDlpService extends DownloadService {
                 // run, then re-raise as AbortError.
                 if (rowAbortController.signal.aborted) {
                     // Whatever name yt-dlp had got to: the finished file and any `.part` / intermediate leftovers.
-                    for (const leftover of await listTempFilesWithStem(getTempDownloadDir(), tempStem)) {
-                        await fs.promises.unlink(leftover).catch(() => {});
-                    }
+                    await this.removeLeftovers(tempStem);
                     throw makeAbortError();
                 }
 
@@ -280,8 +306,19 @@ export class YtDlpService extends DownloadService {
                     const produced = (await listTempFilesWithStem(getTempDownloadDir(), tempStem)).find((file) =>
                         isFinishedAudioFile(file, tempStem)
                     );
-                    if (!produced) throw new Error("yt-dlp finished but no audio file was found");
-                    fullPath = produced;
+                    if (produced) fullPath = produced;
+                }
+                // yt-dlp skips a video that is too long, too big or live and still exits successfully: whatever the
+                // output format, no file is the sign.
+                if (
+                    !(await fs.promises.access(fullPath).then(
+                        () => true,
+                        () => false
+                    ))
+                ) {
+                    throw new Error(
+                        "yt-dlp produced no file (a live stream, or longer than 3 hours, or bigger than 500 MB, is not downloaded as a track)"
+                    );
                 }
 
                 note(`Successfully downloaded: ${path.basename(fullPath)}`);
@@ -327,6 +364,8 @@ export class YtDlpService extends DownloadService {
             return downloadSource;
         } catch (error) {
             if ((error as Error).name === "AbortError") throw error;
+            // The partial files of a run that failed (named after a name no later attempt reuses) go with it.
+            if (runStem) await this.removeLeftovers(runStem);
             this.logger.error(`Error downloading track: ${trackMetadata.trackName}`, { error });
             this.status.set({
                 type: StatusType.Error,
@@ -336,7 +375,23 @@ export class YtDlpService extends DownloadService {
             publish("failed");
             throw error;
         } finally {
+            signal?.removeEventListener("abort", onOuterAbort);
             await cookiesCopy?.cleanup().catch(() => {});
+        }
+    }
+
+    /** Deletes the finished file and any `.part` / intermediate leftovers of a run, saying so when one cannot go. */
+    private async removeLeftovers(stem: string): Promise<void> {
+        try {
+            for (const leftover of await listTempFilesWithStem(getTempDownloadDir(), stem)) {
+                await fs.promises.unlink(leftover).catch((error: NodeJS.ErrnoException) => {
+                    // Still locked (an antivirus, a process that was not ended): it stays, and the temp clean-up gets it.
+                    if (error.code !== "ENOENT")
+                        this.logger.warn(`Could not remove ${path.basename(leftover)}`, { error });
+                });
+            }
+        } catch (error) {
+            this.logger.warn("Could not list the leftovers of a download", { error });
         }
     }
 }

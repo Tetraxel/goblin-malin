@@ -90,8 +90,19 @@ export type AgentChange<T> = {
  * Every write tool changes a track through here: the shared refusals, the budget, the change itself (a named method
  * called as the agent, which checks the lock and validates the value), and the journal entry that makes it
  * undoable. Returns what the tool answers plus the track's new revision, so the model can go on without re-reading.
+ *
+ * `change` runs while the track's write queue is held: it must be quick and must not wait for the user (ask through
+ * `ctx.confirm` BEFORE calling `agentWrite`, as the confirm tools do) nor call `agentWrite` again for the same track
+ * (it would wait for itself). An undo (the journal's `restore`) and a stop do not go through the queue.
  */
-export async function agentWrite<T extends object>(opts: {
+export function agentWrite<T extends object>(opts: AgentWriteOptions<T>): Promise<T & { revision: number }> {
+    // One write at a time per track: two calls of an asynchronous tool on the same track in one turn would otherwise
+    // both pass the budget and revision checks and then change the track side by side. The second one waits, then
+    // meets the first one's new revision and is refused as out of date, like any read that went stale.
+    return serialisedPerTask(opts.task.getId(), () => writeNow(opts));
+}
+
+type AgentWriteOptions<T> = {
     ctx: AgentToolContext;
     tool: string;
     task: DownloadTask;
@@ -99,7 +110,27 @@ export async function agentWrite<T extends object>(opts: {
     /** One line for the chat and the journal. */
     label: string;
     change: (as: WriteOptions) => AgentChange<T> | Promise<AgentChange<T>>;
-}): Promise<T & { revision: number }> {
+};
+
+const writeQueues = new Map<string, Promise<unknown>>();
+
+/** Runs `run` after every earlier call for the same task has ended (whatever way it ended). */
+async function serialisedPerTask<R>(taskId: string, run: () => Promise<R>): Promise<R> {
+    const previous = writeQueues.get(taskId) ?? Promise.resolve();
+    const mine = previous.then(run);
+    const tail = mine.then(
+        () => undefined,
+        () => undefined
+    );
+    writeQueues.set(taskId, tail);
+    try {
+        return await mine;
+    } finally {
+        if (writeQueues.get(taskId) === tail) writeQueues.delete(taskId);
+    }
+}
+
+async function writeNow<T extends object>(opts: AgentWriteOptions<T>): Promise<T & { revision: number }> {
     const { ctx, task } = opts;
     assertAgentMayWrite(task, opts.revision);
     // Counted once the change went through: a refused or invalid one (a "locked", a bad ISRC) changed nothing and

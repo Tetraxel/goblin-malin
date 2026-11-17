@@ -10,6 +10,8 @@ export type Metadata = {
     albumArtists?: string[];
     albumName?: string;
     year?: string;
+    /** The full release date (`YYYY-MM-DD`) when the source gave one and it agrees with `year`; `year` alone otherwise. */
+    date?: string;
     trackNumber?: string;
     isrc?: string;
     genres?: string[];
@@ -25,14 +27,24 @@ export type Metadata = {
     musicBrainzReleaseTrackId?: string;
 };
 
+/** The album artists to write: the track's own artists when no album artist is known (an empty list is none). */
+export function albumArtistsOf(metadata: Metadata): string[] {
+    return metadata.albumArtists?.length ? metadata.albumArtists : metadata.artists;
+}
+
+/** The value of `DATE`: the full date when there is one, else the year. */
+export function dateOf(metadata: Metadata): string | undefined {
+    return metadata.date ?? metadata.year;
+}
+
 /** The Vorbis comments of a FLAC file for `metadata`: only the fields that have a value. */
 export function buildFlacTagMap(metadata: Metadata): FlacTagMap {
     return {
         TITLE: metadata.trackTitle,
         ARTIST: metadata.artists,
-        ALBUMARTIST: metadata.albumArtists ?? metadata.artists,
+        ALBUMARTIST: albumArtistsOf(metadata),
         ...(metadata.albumName ? { ALBUM: metadata.albumName } : {}),
-        ...(metadata.year ? { YEAR: metadata.year, DATE: metadata.year } : {}),
+        ...(metadata.year ? { YEAR: metadata.year, DATE: dateOf(metadata)! } : {}),
         ...(metadata.trackNumber ? { TRACKNUMBER: metadata.trackNumber } : {}),
         ...(metadata.isrc ? { ISRC: metadata.isrc } : {}),
         ...(metadata.genres?.length ? { GENRE: metadata.genres } : {}),

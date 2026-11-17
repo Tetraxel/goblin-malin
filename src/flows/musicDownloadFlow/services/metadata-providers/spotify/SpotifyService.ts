@@ -24,6 +24,7 @@ import { getSpotifyEmbedDetails } from "../../apis/spotify-url-info-client";
 import { convertSpotifyUrlInfoToTrack } from "./convertSpotifyUrlInfoToTrack";
 import { getMetadataProviderSettings } from "../../../saveSettings";
 import { resolveSpotifyMarket } from "./spotifyMarket";
+import { appSecrets } from "#base/appSecrets";
 
 /** How many of Spotify's top hits `searchTrack` scores before choosing one. */
 const SEARCH_CANDIDATES = 8;
@@ -172,12 +173,12 @@ export class SpotifyService extends MetadataService {
         return this.runExclusive("init", async () => {
             if (SpotifyService.authMode !== null) return;
             await this.env.getVariablesWithWizard(SpotifyService.setupWizard);
-            const mode = (process.env.SPOTIFY_AUTH_MODE ?? "official") as SpotifyAuthMode;
+            const mode = (appSecrets.get("SPOTIFY_AUTH_MODE") ?? "official") as SpotifyAuthMode;
             SpotifyService.authMode = mode;
             if (mode === "official") {
                 SpotifyService.client = SpotifyApi.withClientCredentials(
-                    process.env.SPOTIFY_CLIENT_ID!,
-                    process.env.SPOTIFY_CLIENT_SECRET!,
+                    appSecrets.get("SPOTIFY_CLIENT_ID")!,
+                    appSecrets.get("SPOTIFY_CLIENT_SECRET")!,
                     undefined,
                     { fetch: fetchWithTimeout() }
                 );

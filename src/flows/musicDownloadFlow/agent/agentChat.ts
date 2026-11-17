@@ -1,5 +1,4 @@
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
 import { globalLogger } from "#base/logger/logger";
@@ -23,6 +22,7 @@ import { claudeQuota } from "./claudeQuota";
 import { registerAgentTools } from "./registerAgentTools";
 import { runAllowance } from "./runAllowance";
 import { agentLog, type AgentLogWriter } from "./agentLog";
+import { claudeWorkDir } from "#utils/claudeWorkDir";
 import { loadChatHistory, saveChatHistory, summarizeSavedChat, type SavedChatSummary } from "./chatHistory";
 
 const logger = globalLogger.createChild({ service: "AgentChat" });
@@ -212,6 +212,15 @@ export class AgentChat {
 
     private async runTurn(prompt: string, mayRetryFresh: boolean): Promise<void> {
         const settings = getAgentSettings();
+        // Before the turn begins: a folder that cannot be made (read-only data folder, full disk) must fail the message,
+        // not leave a started turn that nothing ever ends.
+        let workDir: string;
+        try {
+            workDir = await claudeWorkDir();
+        } catch (error) {
+            this.fail(`Could not prepare the Claude work folder: ${error instanceof Error ? error.message : error}`);
+            return;
+        }
         let started: { turn: AgentTurn; token: string };
         try {
             started = await this.runtime.beginTurn();
@@ -223,7 +232,7 @@ export class AgentChat {
         const { turn, token } = started;
         turn.onProgress = (text) => this.store.setActivity(text);
 
-        const configPath = path.join(os.tmpdir(), `goblin-agent-${randomBytes(6).toString("hex")}.json`);
+        const configPath = path.join(workDir, `goblin-agent-${randomBytes(6).toString("hex")}.json`);
         let streamedText = false;
         let resumeFailed = false;
         let retryFresh = false;
@@ -325,7 +334,12 @@ export class AgentChat {
         };
 
         try {
-            await fs.writeFile(configPath, buildMcpConfig(this.runtime.url), "utf8");
+            // New file, readable by the user alone: it names the loopback address of this turn's tool server.
+            await fs.writeFile(configPath, buildMcpConfig(this.runtime.url), {
+                encoding: "utf8",
+                flag: "wx",
+                mode: 0o600,
+            });
             await this.runCli({
                 command: settings.command,
                 args: buildAgentArgs({

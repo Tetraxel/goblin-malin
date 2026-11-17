@@ -1,9 +1,9 @@
 import { spawn, type ChildProcess } from "child_process";
 import * as fs from "fs";
 import * as net from "net";
-import * as os from "os";
 import * as path from "path";
 import { ensureMpv } from "./mpv-setup";
+import { createIpcEndpoint } from "./ipcEndpoint";
 
 // Plays a timeline of overlapping sounds. MpvPlayer can't: it holds a single track, and it
 // belongs to the user's music. Here one short-lived mpv mixes every sound through a filter
@@ -96,9 +96,10 @@ export class MpvMix {
         if (this.stopped) return null;
 
         const id = `mpv-mix-${process.pid}-${++mixCount}`;
-        const isWindows = process.platform === "win32";
-        const socketArg = isWindows ? id : path.join(os.tmpdir(), `${id}.sock`);
-        const socketPath = isWindows ? `\\\\.\\pipe\\${id}` : socketArg;
+        const endpoint = await createIpcEndpoint(id);
+        if (this.stopped) return null;
+        const socketArg = endpoint.arg;
+        const socketPath = endpoint.path;
 
         // Relative paths: Windows caps a command line at 32k characters, and a cue sheet
         // of long sample names adds up.

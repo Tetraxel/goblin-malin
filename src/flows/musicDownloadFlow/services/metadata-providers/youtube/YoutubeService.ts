@@ -56,6 +56,9 @@ function channelArtists(artist: { artistId: string | null; name: string } | null
     ];
 }
 
+/** A YouTube video id: 11 characters of letters, digits, `-` and `_`. */
+const YOUTUBE_VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+
 export class YoutubeService extends MetadataService {
     static readonly display: ProviderDisplay = {
         label: "YouTube",
@@ -237,28 +240,33 @@ export class YoutubeService extends MetadataService {
             return null;
         }
         const host = parsed.hostname.replace(/^www\./, "");
+        const track = (id: string | null | undefined): ParsedUrl | null =>
+            id && YOUTUBE_VIDEO_ID.test(id) ? { platform: "youtube", type: "track", id } : null;
+        const playlist = (id: string | null): ParsedUrl | null =>
+            id ? { platform: "youtube", type: "playlist", id } : null;
+        // The first path segment after the prefix: `/shorts/<id>/anything` is still `<id>`.
+        const segmentAfter = (prefix: string): string | undefined =>
+            parsed.pathname.startsWith(prefix) ? parsed.pathname.slice(prefix.length).split("/")[0] : undefined;
 
-        if (host === "music.youtube.com") {
-            if (parsed.pathname === "/playlist") {
-                const id = parsed.searchParams.get("list") ?? undefined;
-                return id ? { platform: "youtube", type: "playlist", id } : null;
-            }
-            if (!parsed.pathname.startsWith("/watch")) return null;
-            return { platform: "youtube", type: "track", id: parsed.searchParams.get("v") ?? undefined };
+        if (host === "youtu.be") return track(parsed.pathname.slice(1).split("/")[0]);
+
+        // The privacy-friendly embed host: only embeds live there.
+        if (host === "youtube-nocookie.com") {
+            const id = segmentAfter("/embed/");
+            return id === "videoseries" ? playlist(parsed.searchParams.get("list")) : track(id);
         }
 
         if (host === "youtube.com" || host.endsWith(".youtube.com")) {
-            if (parsed.pathname === "/playlist") {
-                const id = parsed.searchParams.get("list") ?? undefined;
-                return id ? { platform: "youtube", type: "playlist", id } : null;
+            if (parsed.pathname === "/playlist") return playlist(parsed.searchParams.get("list"));
+            if (parsed.pathname === "/watch") return track(parsed.searchParams.get("v"));
+            // A Short, a live stream's page, an embedded player and the old `/v/` form all name a video the same way.
+            for (const prefix of ["/shorts/", "/live/", "/embed/", "/v/"]) {
+                const id = segmentAfter(prefix);
+                if (id === undefined) continue;
+                // `/embed/videoseries?list=…` is an embedded playlist; "videoseries" only looks like an 11-character id.
+                if (id === "videoseries") return playlist(parsed.searchParams.get("list"));
+                return track(id);
             }
-            if (parsed.pathname !== "/watch") return null;
-            return { platform: "youtube", type: "track", id: parsed.searchParams.get("v") ?? undefined };
-        }
-
-        if (host === "youtu.be") {
-            const id = parsed.pathname.slice(1) || undefined;
-            return { platform: "youtube", type: "track", id };
         }
 
         return null;

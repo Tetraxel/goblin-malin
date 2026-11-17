@@ -6,6 +6,7 @@ import { type Task } from "./task/task";
 import { type ProviderDisplay, providerDisplayRegistry } from "./providerDisplay";
 import { type ParsedUrl, type CollectionExpansion, urlParserRegistry } from "./urlParser";
 import { type ProviderConsent, type ProviderSettingsSchema } from "./providerSettings";
+import { type SetupWizardConfig } from "./setupWizard";
 import { type ContextualActions } from "#types/actions";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -24,6 +25,8 @@ type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> =
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expandCollection?: (url: string, logger: Logger, task: Task<any>) => Promise<CollectionExpansion>;
     defaultSettings?: ProviderSettingsSchema;
+    // The credentials the service needs (read from the app's secrets, see `appSecrets`).
+    setupWizard?: SetupWizardConfig;
     // Must be explicitly allowed by the user (once) before the service is ever used.
     consent?: ProviderConsent;
     // Slow/expensive last resort: only run when the regular services left a gap.

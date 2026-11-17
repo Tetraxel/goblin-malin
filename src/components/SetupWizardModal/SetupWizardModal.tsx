@@ -13,6 +13,7 @@ import { openUrl } from "#utils/openUrl";
 import { removeEnvVars, saveEnvVar, saveEnvVarsGroup } from "#utils/envFile";
 import { useActiveWizardPrompt } from "./useActiveWizardPrompt";
 import { Hint } from "../Hint";
+import { appSecrets } from "#base/appSecrets";
 
 type InteractiveItemUnion =
     | { kind: "link"; text: string; url: string }
@@ -100,7 +101,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
     const [editingField, setEditingField] = useState<string | null>(null);
     const [selectedMode, setSelectedMode] = useState<string>(() => {
         if (config?.modes && config.modeEnvVar) {
-            return process.env[config.modeEnvVar] ?? config.modes[0].id;
+            return appSecrets.get(config.modeEnvVar) ?? config.modes[0].id;
         }
         return "";
     });
@@ -111,12 +112,12 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
             setFocusedIndex(0);
             setEditingField(null);
             const initialMode =
-                config.modes && config.modeEnvVar ? (process.env[config.modeEnvVar] ?? config.modes[0].id) : "";
+                config.modes && config.modeEnvVar ? (appSecrets.get(config.modeEnvVar) ?? config.modes[0].id) : "";
             setSelectedMode(initialMode);
             const activeFields = config.modes
                 ? (config.modes.find((m) => m.id === initialMode) ?? config.modes[0]).fields
                 : config.fields;
-            setFieldValues(Object.fromEntries(activeFields.map((f) => [f.envVar, process.env[f.envVar] ?? ""])));
+            setFieldValues(Object.fromEntries(activeFields.map((f) => [f.envVar, appSecrets.get(f.envVar) ?? ""])));
         }
     }
 
@@ -133,23 +134,23 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
             ? (config.modes.find((m) => m.id === selectedMode) ?? config.modes[0]).fields
             : config.fields;
 
-        // Always persist to .env and process.env (both settings-triggered and auto-triggered)
+        // Always persist to .env and the app's secrets (both settings-triggered and auto-triggered)
         const nonEmpty: Record<string, string> = {};
         const toRemove: string[] = [];
 
         // Persist modeEnvVar if modes are present
         if (config.modes && config.modeEnvVar) {
-            process.env[config.modeEnvVar] = selectedMode;
+            appSecrets.set(config.modeEnvVar, selectedMode);
             nonEmpty[config.modeEnvVar] = selectedMode;
         }
 
         for (const field of activeFields) {
             const value = fieldValues[field.envVar] ?? "";
             if (value.trim()) {
-                process.env[field.envVar] = value;
+                appSecrets.set(field.envVar, value);
                 nonEmpty[field.envVar] = value;
-            } else if (process.env[field.envVar] !== undefined) {
-                delete process.env[field.envVar];
+            } else if (appSecrets.get(field.envVar) !== undefined) {
+                appSecrets.delete(field.envVar);
                 toRemove.push(field.envVar);
             }
         }
@@ -206,7 +207,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ tasks, termi
             const newActiveMode = config.modes.find((m) => m.id === newMode) ?? config.modes[0];
             setFieldValues((prev) => ({
                 ...prev,
-                ...Object.fromEntries(newActiveMode.fields.map((f) => [f.envVar, process.env[f.envVar] ?? ""])),
+                ...Object.fromEntries(newActiveMode.fields.map((f) => [f.envVar, appSecrets.get(f.envVar) ?? ""])),
             }));
         }
     };

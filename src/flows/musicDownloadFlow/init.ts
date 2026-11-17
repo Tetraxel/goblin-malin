@@ -14,6 +14,8 @@ import { YtDlpService } from "./services/download-providers/ytdlp/YtDlpService";
 import { SoulseekService } from "./services/download-providers/soulseek/SoulseekService";
 import { registerAgentTools } from "./agent/registerAgentTools";
 import { taskLocks } from "#base/task/taskLock";
+import { appSecrets, wizardEnvKeys } from "#base/appSecrets";
+import { sweepStaleCookieCopies } from "./services/download-providers/ytdlp/cookiesCopy";
 
 let initialized = false;
 
@@ -40,6 +42,16 @@ export function initMusicApp(): void {
 
     downloadServiceRegistry.register("ytdlp", YtDlpService);
     downloadServiceRegistry.register("soulseek", SoulseekService);
+
+    // The credentials the providers declare leave the environment, so the programs the app starts never inherit them.
+    for (const registry of [metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry]) {
+        for (const ctor of registry.getAllConstructors().values()) {
+            if (ctor.setupWizard) appSecrets.adopt(wizardEnvKeys(ctor.setupWizard));
+        }
+    }
+
+    // Cookie copies a killed download left behind hold the user's session: removed (old ones only).
+    void sweepStaleCookieCopies();
 
     // The tools the chat agent can call (the chat itself only starts when the user asks and allows it).
     registerAgentTools();

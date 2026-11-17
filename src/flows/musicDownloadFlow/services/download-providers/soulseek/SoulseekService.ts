@@ -9,6 +9,7 @@ import { StatusType } from "#base/task/task-status";
 import { type Logger } from "#base/logger/logger";
 import { makeAbortError, throwIfAborted } from "#utils/errors";
 import { probeAudio } from "#utils/probeAudio";
+import { formatSize } from "#utils/formatBytes";
 import {
     type APIProvider,
     type TrackMetadata,
@@ -32,6 +33,10 @@ import {
     DEFAULT_RESULTS_LIMIT,
     MAX_DOWNLOAD_ATTEMPTS,
     MAX_HIDDEN_RESULTS,
+    DEFAULT_SEARCH_TIMEOUT_MS,
+    MAX_ANNOUNCED_SIZE_BYTES,
+    parseSearchTimeout,
+    soulseekProvenance,
     DURATION_TOLERANCE_MS,
     announcedAudio,
 } from "./ranking";
@@ -46,7 +51,6 @@ const DOWNLOAD_TIMEOUT_MS = 60_000;
 // How often a download waiting in a peer's queue asks for its place. Each answer counts as progress for
 // DOWNLOAD_TIMEOUT_MS, so it must come well within it (slsk-client's default, 60 s, would race it).
 const QUEUE_POLL_INTERVAL_MS = 20_000;
-const DEFAULT_SEARCH_TIMEOUT_MS = 5000;
 
 /**
  * What a row keeps to download its file again later. Rows saved by older versions hold a slsk-client 1.x
@@ -92,7 +96,7 @@ export class SoulseekService extends DownloadService {
             },
             {
                 type: "note",
-                text: "Any username/password works — an account is created automatically the first time you connect. Pick credentials you don't use elsewhere.",
+                text: "Any username/password works — an account is created automatically the first time you connect. Pick credentials you don't use elsewhere: they are kept as plain text in the app's .env file.",
             },
             {
                 type: "note",
@@ -272,6 +276,12 @@ export class SoulseekService extends DownloadService {
         onProgress: (ratio: number) => void,
         onQueued: (place: number | undefined) => void
     ): Promise<void> {
+        // The size is the peer's own claim: a "track" of gigabytes is refused before anything is transferred.
+        if (file.size > MAX_ANNOUNCED_SIZE_BYTES) {
+            throw new Error(
+                `The peer announces ${formatSize(file.size)}, more than a track can be (limit ${formatSize(MAX_ANNOUNCED_SIZE_BYTES)})`
+            );
+        }
         const client = await this.getClient();
         throwIfAborted(signal);
         const download = client.download({
@@ -341,7 +351,7 @@ export class SoulseekService extends DownloadService {
         const albumName = trackMetadata.album?.albumName;
 
         const settings = getDownloadProviderSettings("soulseek");
-        const searchTimeoutMs = Number(settings.searchTimeoutMs) || DEFAULT_SEARCH_TIMEOUT_MS;
+        const searchTimeoutMs = parseSearchTimeout(settings.searchTimeoutMs);
         const resultsLimit = parseResultsLimit(settings.resultsLimit);
         const mp3FallbackEnabled = settings.mp3Fallback !== false;
         const extensionsToTry: Extension[] = mp3FallbackEnabled ? ["flac", "mp3"] : ["flac"];
@@ -713,13 +723,11 @@ export class SoulseekService extends DownloadService {
 
         let fileInfo: FileInfo | undefined;
         try {
-            // Soulseek FLACs are the genuine lossless source this provider exists for;
-            // MP3 fallbacks are honestly lossy at their real (probed) bitrate.
-            fileInfo = await readFileInfo(
-                filePath,
-                trackMetadata.duration ?? 0,
-                extension === "flac" ? "lossless" : "lossy"
-            );
+            // Soulseek FLACs are the genuine lossless source this provider exists for; MP3 fallbacks are honestly
+            // lossy at their real (probed) bitrate. A `.flac` is only a name, though: what the probe finds in the
+            // file decides (see `soulseekProvenance`).
+            const probed = await readFileInfo(filePath, trackMetadata.duration ?? 0, "lossless");
+            fileInfo = { ...probed, provenance: soulseekProvenance(extension, probed.codec) };
         } catch (err) {
             this.logger.warn(`Failed to read file info for ${path.basename(filePath)}`, { error: err });
         }

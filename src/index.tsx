@@ -67,8 +67,9 @@ export function start(): void {
     // Register providers + apply concurrency budgets before the first render.
     initMusicApp();
 
-    process.on("unhandledRejection", (reason, promise) => {
-        globalLogger.error("Unhandled Rejection", { promise, reason });
+    process.on("unhandledRejection", (reason) => {
+        // The promise itself says nothing (it logs as an empty object): the reason is what to look at.
+        globalLogger.error("Unhandled Rejection", { reason });
     });
     // A crash or the system stopping the app skips the normal Exit: still save, and give the terminal back.
     process.on("uncaughtException", (error) => emergencyExit("unexpected error", 1, error));

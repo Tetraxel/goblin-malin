@@ -1,10 +1,9 @@
 import { EventEmitter } from "events";
 import { spawn, type ChildProcess } from "child_process";
 import * as net from "net";
-import * as path from "path";
-import * as os from "os";
 import * as fs from "fs";
 import { ensureMpv } from "./mpv-setup";
+import { createIpcEndpoint } from "./ipcEndpoint";
 
 export interface PlayerStatus {
     isPlaying: boolean;
@@ -23,10 +22,10 @@ interface PendingRequest {
 export class MpvPlayer extends EventEmitter {
     private mpvProcess: ChildProcess | null = null;
     private socket: net.Socket | null = null;
-    // What we pass to mpv --input-ipc-server (pipe name only on Windows)
-    private readonly mpvIpcArg: string;
-    // What Node's net.Socket connects to (full \\.\pipe\ path on Windows)
-    private readonly socketPath: string;
+    // What we pass to mpv --input-ipc-server (pipe name only on Windows). Set when mpv starts.
+    private mpvIpcArg = "";
+    // What Node's net.Socket connects to (full \\.\pipe\ path on Windows). Set when mpv starts.
+    private socketPath = "";
     private requestId = 0;
     private readonly pending = new Map<number, PendingRequest>();
     private readBuffer = "";
@@ -41,17 +40,6 @@ export class MpvPlayer extends EventEmitter {
 
     constructor() {
         super();
-        const pid = process.pid;
-        if (process.platform === "win32") {
-            // mpv on Windows prepends \\.\pipe\ automatically — only pass the name
-            this.mpvIpcArg = `mpv-ipc-${pid}`;
-            // Node.js net.Socket needs the full UNC pipe path
-            this.socketPath = `\\\\.\\pipe\\mpv-ipc-${pid}`;
-        } else {
-            const sockPath = path.join(os.tmpdir(), `mpv-ipc-${pid}.sock`);
-            this.mpvIpcArg = sockPath;
-            this.socketPath = sockPath;
-        }
         // Prevent unhandled 'error' event crash when no component has subscribed yet
         this.on("error", () => {});
     }
@@ -76,9 +64,11 @@ export class MpvPlayer extends EventEmitter {
     private async _start(): Promise<void> {
         if (process.env["GOBLIN_NO_AUDIO"]) return;
 
-        if (process.platform !== "win32" && fs.existsSync(this.socketPath)) {
-            fs.unlinkSync(this.socketPath);
-        }
+        // A private place (a 0700 folder, or a pipe with a random name); a leftover socket of an earlier run is removed
+        // there. See `createIpcEndpoint`.
+        const endpoint = await createIpcEndpoint(`mpv-ipc-${process.pid}`);
+        this.mpvIpcArg = endpoint.arg;
+        this.socketPath = endpoint.path;
 
         const mpvBin = await ensureMpv();
 

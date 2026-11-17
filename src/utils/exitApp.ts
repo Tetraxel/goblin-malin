@@ -6,6 +6,7 @@ import { shutdownState } from "#utils/shutdownState";
 import { DISABLE_MOUSE } from "#base/mouse/mouse";
 import { releaseInstanceLock } from "#utils/instanceLock";
 import { runAgentCleanups } from "#base/agent/cleanup";
+import { TaskOrchestrator } from "#base/task/orchestrator";
 
 const LEAVE_ALT_SCREEN_COMMAND = "\x1b[?1049l";
 
@@ -20,6 +21,8 @@ const LAST_FRAME_PROBLEM_MS = 2000;
 const MAX_CLOSE_MS = 8000;
 // After a crash or a signal there is no closing screen: save what we can, but don't linger.
 const EMERGENCY_MAX_MS = 4000;
+// Time given to the programs that were told to stop (and to the tasks reporting it) before the session is saved.
+const STOP_WORK_MS = 250;
 
 let closing = false;
 let emergency = false;
@@ -33,14 +36,28 @@ export function restoreTerminal(): void {
     }
 }
 
-function finish(note?: string): never {
+/**
+ * Ends the downloads, conversions and searches still going on: their programs (yt-dlp, ffmpeg) would otherwise keep
+ * running and writing after the app is gone and its lock released. Each task stops its own runs, which kills what it
+ * started. Synchronous: the kills are sent at once.
+ */
+function stopRunningWork(): void {
+    try {
+        TaskOrchestrator.getInstance().stopProcessing();
+    } catch (error) {
+        globalLogger.warn("Shutdown: could not stop the running work", { error });
+    }
+}
+
+/** `code` is 0 for a clean close, 1 when something was lost (a session that could not be saved, a close cut short). */
+function finish(note?: string, code = 0): never {
     // Back on the normal screen the closing box is gone: leave one line saying it really ended.
     const lines = ["Goblin Malin closed.", ...(note ? [note] : [])];
     process.stdout.write(
         DISABLE_MOUSE + LEAVE_ALT_SCREEN_COMMAND + lines.join(String.fromCharCode(13, 10)) + String.fromCharCode(13, 10)
     );
     releaseInstanceLock();
-    process.exit(0);
+    process.exit(code);
 }
 
 async function runStep(label: string, work: () => void | Promise<void>): Promise<void> {
@@ -58,9 +75,14 @@ async function runStep(label: string, work: () => void | Promise<void>): Promise
 async function shutdown(): Promise<void> {
     const startedAt = performance.now();
     let sessionSaved = true;
-    // First, so the Claude chat changes nothing after the session is written (its process and server must not
-    // outlive the app either).
+    // First: the tasks are told to stop (synchronously) before any program is killed, so a conversion cut by the
+    // clean-ups below is a stop, not an ffmpeg failure that would be saved as the task's outcome.
+    await runStep("Stopping downloads…", () => stopRunningWork());
+    // Then the Claude chat (its process and server must not outlive the app, nor change anything once the session is
+    // written) and the other registered programs.
     await runStep("Stopping Claude…", () => runAgentCleanups());
+    // Before the session is written, so what the tasks report while stopping ("stopped") is part of it.
+    await runStep("Letting the tasks report…", () => new Promise((resolve) => setTimeout(resolve, STOP_WORK_MS)));
     await runStep("Saving your session…", async () => {
         // Changes are written a moment after they happen: drop none of the latest ones.
         SessionManager.getInstance().flushNow();
@@ -79,7 +101,8 @@ async function shutdown(): Promise<void> {
     globalLogger.error(`Shutdown: ${note}`);
     shutdownState.setDone(note);
     await new Promise((resolve) => setTimeout(resolve, LAST_FRAME_PROBLEM_MS));
-    finish(note);
+    // A non-zero code: a script or a service wrapper must be able to tell that the session was not kept.
+    finish(note, 1);
 }
 
 /**
@@ -91,7 +114,11 @@ export function exitApp(): void {
     closing = true;
     shutdownState.setStep("Closing…");
     setTimeout(() => void shutdown(), PAINT_MS);
-    setTimeout(() => finish(), MAX_CLOSE_MS);
+    // Only reached when the shutdown is stuck (it ends the process itself otherwise): what was saved is all there is.
+    setTimeout(
+        () => finish("Closing took too long: the latest changes may not be saved (see app.log).", 1),
+        MAX_CLOSE_MS
+    );
 }
 
 /**
@@ -118,8 +145,13 @@ export function emergencyExit(reason: string, exitCode: number, error?: unknown)
     setTimeout(end, EMERGENCY_MAX_MS).unref();
     void (async () => {
         try {
-            // Stopped first (not awaited: killing the process is enough), so nothing changes after the save.
+            // The tasks are told to stop before any program is killed (a conversion cut first would be saved as an
+            // ffmpeg failure, not a stop). The clean-ups are not awaited: killing the process is enough.
+            stopRunningWork();
             void runAgentCleanups(500);
+            // The same short wait as a normal close: the tasks report "stopped" a moment after the kill, and the
+            // session must say what the files on disk say.
+            await new Promise((resolve) => setTimeout(resolve, STOP_WORK_MS));
             SessionManager.getInstance().flushNow();
             await SessionStore.getInstance().flush(EMERGENCY_MAX_MS - 1000);
             cache.save();

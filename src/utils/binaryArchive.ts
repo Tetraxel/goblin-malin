@@ -61,7 +61,7 @@ async function doInstall(source: ArchiveSource, targets: ArchiveTarget[]): Promi
     const zipPath = path.join(binDir, source.tempName);
 
     try {
-        await downloadFile(source.url, zipPath);
+        await downloadFile(source.url, zipPath, { userAgent: source.userAgent });
         if (source.checksumsUrl && source.archiveName) {
             await verifyAgainstPublishedChecksums(zipPath, source.checksumsUrl, source.archiveName, source.userAgent, {
                 required: source.requireChecksum,

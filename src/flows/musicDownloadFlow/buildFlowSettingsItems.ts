@@ -12,6 +12,7 @@ import { DEFAULT_CLAUDE_MODEL } from "./services/apis/claude-client";
 import { AGENT_MODELS } from "./agent/chooseAgentModel";
 import { OUTPUT_FORMATS, OUTPUT_FORMAT_KEYS, parseOutputFormat } from "./utils/outputFormat";
 import { DOWNLOAD_STRATEGY_KEYS, DOWNLOAD_STRATEGY_NOTES, parseDownloadStrategy } from "./utils/downloadStrategy";
+import { appSecrets } from "#base/appSecrets";
 
 export type ProviderEntry = {
     key: string;
@@ -24,7 +25,7 @@ function schemaOf(ctor: ProviderConstructorLike): ProviderSettingsSchema {
 
 function hasMissingCredentials(ctor: ProviderConstructorLike): boolean {
     if (!ctor.setupWizard) return false;
-    return ctor.setupWizard.fields.some((f) => f.required !== false && !process.env[f.envVar]?.trim());
+    return ctor.setupWizard.fields.some((f) => f.required !== false && !appSecrets.get(f.envVar)?.trim());
 }
 
 function providerItems(
@@ -326,7 +327,7 @@ export function buildFlowSettingsItems(
     items.push({
         kind: "textInput",
         indent: 0,
-        label: "🗁  Default output directory",
+        label: "⌂  Default output directory",
         get: () => flowSettings.download.outputDir,
         set: (v) => onChange({ download: { outputDir: v } }),
     });
@@ -365,14 +366,14 @@ export function buildFlowSettingsItems(
     items.push({
         kind: "textInput",
         indent: 0,
-        label: "🗁  Temporary download directory",
+        label: "⌂  Temporary download directory",
         get: () => flowSettings.download.outputTemporaryDir,
         set: (v) => onChange({ download: { outputTemporaryDir: v } }),
     });
     items.push({
         kind: "action",
         indent: 0,
-        label: "⛒  Clear temporary downloads…",
+        label: "✕  Clear temporary downloads…",
         run: () => void runTempCleanup("manual", flowSettings.download.outputTemporaryDir),
     });
     items.push({ kind: "note", indent: 0, text: extras.tempUsageText ?? "calculating…" });

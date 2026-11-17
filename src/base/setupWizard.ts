@@ -1,3 +1,5 @@
+import { appSecrets } from "./appSecrets";
+
 export type WizardContentBlock =
     | { type: "paragraph"; text: string }
     | { type: "note"; text: string }
@@ -44,7 +46,7 @@ export interface SetupWizardConfig {
  * By convention a mode without fields is the credential-less, limited option (e.g. a scraped page),
  * so choosing it does not count as complete.
  */
-export function isSetupComplete(config: SetupWizardConfig, env: NodeJS.ProcessEnv = process.env): boolean {
+export function isSetupComplete(config: SetupWizardConfig, env: NodeJS.ProcessEnv = appSecrets.asEnv()): boolean {
     let fields = config.fields;
     if (config.modes && config.modes.length > 0) {
         const selected = config.modeEnvVar ? env[config.modeEnvVar] : undefined;

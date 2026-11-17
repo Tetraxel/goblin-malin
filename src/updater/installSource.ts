@@ -4,14 +4,25 @@ import { DEFAULT_APP_DATA_DIR } from "#constants";
 
 type Installer = "npm" | "yarn" | "pnpm" | "unknown";
 
+/**
+ * Which package manager owns a script path, from where each one keeps its global packages. Only those folders count:
+ * a user, a project or a folder that happens to be called "yarn" or "npm" must not pick the installer.
+ */
+export function detectInstallerFromPath(scriptPath: string): Installer | null {
+    const p = scriptPath.replace(/\\/g, "/");
+    // Yarn classic: ~/.config/yarn/global/node_modules, %LOCALAPPDATA%/Yarn/Data/global/node_modules
+    if (/\/yarn\/(?:data\/)?global\/node_modules\//i.test(p)) return "yarn";
+    // pnpm: .../pnpm/global/<n>/node_modules (its packages sit in a ".pnpm" store folder)
+    if (/\/pnpm\/global\//i.test(p) || p.includes("/.pnpm/")) return "pnpm";
+    // npm: %APPDATA%/npm/node_modules, <prefix>/lib/node_modules
+    if (/\/npm\/node_modules\//i.test(p) || p.includes("/lib/node_modules/")) return "npm";
+    return null;
+}
+
 // Detect from the running script path — more reliable than install.json when
 // both npm and yarn have the package installed (different global locations).
 function detectInstallerFromArgv(): Installer | null {
-    const scriptPath = (process.argv[1] ?? "").replace(/\\/g, "/");
-    if (scriptPath.includes("/Yarn/") || scriptPath.includes("/yarn/")) return "yarn";
-    if (scriptPath.includes("/.pnpm/") || scriptPath.includes("/pnpm/")) return "pnpm";
-    if (scriptPath.includes("/npm/")) return "npm";
-    return null;
+    return detectInstallerFromPath(process.argv[1] ?? "");
 }
 
 export function getInstaller(): Installer {

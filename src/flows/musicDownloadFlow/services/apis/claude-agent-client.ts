@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
-import os from "node:os";
 import { registerAgentCleanup } from "#base/agent/cleanup";
 import { ClaudeCliError, classifyFailure } from "./claude-client";
 import { isShellScript, resolveCliCommand } from "./resolveCliCommand";
+import { claudeWorkDir } from "#utils/claudeWorkDir";
 
 /**
  * Runs ONE message of the chat through the user's own Claude Code CLI (`claude -p`), streaming what it does.
@@ -274,16 +274,17 @@ export interface RunAgentCliOptions {
  * Runs the CLI for one message and resolves when it has exited. Rejects with a {@link ClaudeCliError}: not installed,
  * not logged in, quota, timeout, aborted, or failed. Events are delivered as they stream in.
  */
-export function runAgentCli(opts: RunAgentCliOptions): Promise<void> {
+export async function runAgentCli(opts: RunAgentCliOptions): Promise<void> {
     const command = opts.command.trim() || "claude";
     const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const cwd = await claudeWorkDir();
 
     return new Promise<void>((resolve, reject) => {
         if (opts.signal.aborted) return reject(new ClaudeCliError("aborted", "Stopped"));
         // On Windows an npm install is a `.cmd` shim Node cannot start: run what the shim runs.
         const { file, prefixArgs } = resolveCliCommand(command);
         const child = spawn(file, [...prefixArgs, ...opts.args], {
-            cwd: os.tmpdir(),
+            cwd,
             env: { ...process.env, [TOKEN_ENV_VAR]: opts.token, MCP_TOOL_TIMEOUT: String(MCP_TOOL_TIMEOUT_MS) },
             windowsHide: true,
             stdio: ["pipe", "pipe", "pipe"],

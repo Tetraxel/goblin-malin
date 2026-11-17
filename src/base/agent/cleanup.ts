@@ -1,5 +1,6 @@
 /**
- * Things the agent starts that must not outlive the app (the Claude CLI process of a turn, the MCP server).
+ * Things the app starts that must not outlive it: the Claude CLI process of a turn and the MCP server, an ffmpeg
+ * conversion, the package manager of an update.
  * Whoever starts one registers how to stop it; closing the app (or a crash) runs them all. Lives in `base/` so the
  * shutdown code in `utils/` can call it without knowing anything about music.
  */

@@ -1,7 +1,8 @@
 import * as fs from "fs";
 import NodeId3 from "node-id3";
 import { globalLogger } from "#base/logger/logger";
-import { cleanAndTagFlac, type Metadata } from "#utils/metadata";
+import { renameReplacing } from "#utils/dataFile";
+import { albumArtistsOf, cleanAndTagFlac, dateOf, type Metadata } from "#utils/metadata";
 import { runFfmpeg } from "./ffmpegRun";
 import { extensionOf } from "./outputFormat";
 import { addMp4Items, type Mp4Item } from "./mp4Freeform";
@@ -34,12 +35,15 @@ async function tagMp3(filePath: string, metadata: Metadata): Promise<void> {
             : []),
     ];
 
+    const dayMonth = id3DayMonth(metadata);
     const tags: NodeId3.Tags = {
         title: metadata.trackTitle,
         artist: joinValues(metadata.artists),
-        performerInfo: joinValues(metadata.albumArtists ?? metadata.artists),
+        performerInfo: joinValues(albumArtistsOf(metadata)),
         ...(metadata.albumName ? { album: metadata.albumName } : {}),
         ...(metadata.year ? { year: metadata.year } : {}),
+        // ID3v2.3 keeps the year (TYER) and the day and month (TDAT, "DDMM") apart.
+        ...(dayMonth ? { date: dayMonth } : {}),
         ...(metadata.trackNumber ? { trackNumber: metadata.trackNumber } : {}),
         ...(metadata.isrc ? { ISRC: metadata.isrc } : {}),
         ...(metadata.genres?.length ? { genre: joinValues(metadata.genres) } : {}),
@@ -63,15 +67,21 @@ async function tagMp3(filePath: string, metadata: Metadata): Promise<void> {
     globalLogger.info("MP3 (ID3) metadata updated successfully! ✅");
 }
 
+/** The `DDMM` of a full release date, for ID3's TDAT frame; nothing when only the year is known. */
+function id3DayMonth(metadata: Metadata): string | undefined {
+    const match = metadata.date?.match(/^\d{4}-(\d{2})-(\d{2})$/);
+    return match ? `${match[2]}${match[1]}` : undefined;
+}
+
 /** The tag names ffmpeg writes: Vorbis comments for Ogg / Opus, MP4 atoms for M4A. */
 function ffmpegTagEntries(ext: string, metadata: Metadata): [string, string][] {
     const isMp4 = ext === "m4a";
     const entries: [string, string | undefined][] = [
         [isMp4 ? "title" : "TITLE", metadata.trackTitle],
         [isMp4 ? "artist" : "ARTIST", joinValues(metadata.artists)],
-        [isMp4 ? "album_artist" : "ALBUMARTIST", joinValues(metadata.albumArtists ?? metadata.artists)],
+        [isMp4 ? "album_artist" : "ALBUMARTIST", joinValues(albumArtistsOf(metadata))],
         [isMp4 ? "album" : "ALBUM", metadata.albumName],
-        [isMp4 ? "date" : "DATE", metadata.year],
+        [isMp4 ? "date" : "DATE", dateOf(metadata)],
         [isMp4 ? "track" : "TRACKNUMBER", metadata.trackNumber],
         [isMp4 ? "genre" : "GENRE", metadata.genres?.length ? joinValues(metadata.genres) : undefined],
         // The MP4 muxer has no atom for the rest, and the switch that keeps them breaks the file for other software:
@@ -185,7 +195,8 @@ async function tagWithFfmpeg(filePath: string, metadata: Metadata): Promise<void
                 );
             }
         }
-        await fs.promises.rename(rewritten, filePath);
+        // Retries when an antivirus or an indexer briefly holds the file (Windows), like every other replacing rename.
+        await renameReplacing(rewritten, filePath);
     } catch (error) {
         await fs.promises.rm(rewritten, { force: true });
         throw error;

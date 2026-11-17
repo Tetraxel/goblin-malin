@@ -56,6 +56,10 @@ Never read `task.running` or a `state` string to know whether work is going on, 
 
 Every run a task makes on its own (`start()` called by hand, a part run through `trackPartRun`) has its own stop: `task.abortRun()`, which `TaskOrchestrator.stopProcessing()` and `removeTasks()` call. A stage that waits for a provider takes the run's signal and waits with `untilAborted(promise, signal)` (`tests/unit/stopRuns.test.ts`). A download row is found again by its `rowKey`, never by its position: work that outlives a change of the list (a transfer to cancel, a retry that writes its answer back) keeps the key, not the index (`tests/unit/downloadRowKeys.test.ts`). A call to the outside world has a limit: `fetchWithTimeout` / `withTimeouts` / `withTimeout` in `src/utils/timeout.ts`.
 
+### Credentials and child processes
+
+A provider's credentials (the fields of its `static setupWizard`) are read and written through `appSecrets` (`src/base/appSecrets.ts`), never `process.env`: `initMusicApp()` moves the declared keys out of the environment, so no program the app starts (yt-dlp, ffmpeg, mpv, the package manager, the Claude CLI) inherits them. A new provider that declares a `setupWizard` needs nothing else. A program the app starts is registered with `registerAgentCleanup(() => killProcessTree(child))` (`src/base/agent/cleanup.ts`, `src/utils/killProcessTree.ts`) so closing the app or a crash ends it; a download run ends through its task's own stop (`task.abortRun()`).
+
 ### Pasted text
 
 Most terminals catch `Ctrl+V` and type the clipboard into the app as plain input, so a "Ctrl+V" shortcut alone never fires for a paste: `ShortcutDispatcher` sees a chunk of text with links in it and opens the import dialog. A part of the screen with its own use for a pasted link (e.g. "add it to this track") registers a handler with `pasteRouter.register()` (`src/base/pasteRouter.ts`) while it is focused and returns true to claim the text; the import dialog only opens when nobody does. Keep the `Ctrl+V` shortcut as well, for terminals that deliver the key.

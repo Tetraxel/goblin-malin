@@ -5,6 +5,7 @@ import { type SetupWizardConfig } from "./setupWizard";
 import { saveEnvVar, saveEnvVarsGroup } from "#utils/envFile";
 import { SettingsStore } from "#settings/settingsStore";
 import { dialogBridge } from "./bridges/dialogBridge";
+import { appSecrets } from "./appSecrets";
 
 /** How long a closed setup wizard is remembered, so a batch of tracks is not asked track by track. */
 const CLOSED_SETUP_MEMORY_MS = 10 * 60_000;
@@ -39,7 +40,7 @@ export class Env {
         } = {}
     ): Promise<string> {
         try {
-            const value = process.env[key];
+            const value = appSecrets.get(key);
             if (value === undefined) {
                 throw new EnvironmentError(key);
             }
@@ -54,7 +55,7 @@ export class Env {
             });
 
             await this.saveToEnvFile(key, value);
-            process.env[key] = value;
+            appSecrets.set(key, value);
 
             return value;
         }
@@ -64,16 +65,16 @@ export class Env {
         // Mode-aware path
         if (config.modes && config.modeEnvVar) {
             const modeEnvVar = config.modeEnvVar;
-            const chosenModeId = process.env[modeEnvVar] ?? config.modes[0].id;
+            const chosenModeId = appSecrets.get(modeEnvVar) ?? config.modes[0].id;
             const activeMode = config.modes.find((m) => m.id === chosenModeId) ?? config.modes[0];
 
-            const missingModeFields = activeMode.fields.filter((f) => !process.env[f.envVar]);
+            const missingModeFields = activeMode.fields.filter((f) => !appSecrets.get(f.envVar));
 
             if (missingModeFields.length === 0) {
                 // All fields already in env; return them without showing wizard
                 return {
                     [modeEnvVar]: activeMode.id,
-                    ...Object.fromEntries(activeMode.fields.map((f) => [f.envVar, process.env[f.envVar]!])),
+                    ...Object.fromEntries(activeMode.fields.map((f) => [f.envVar, appSecrets.get(f.envVar)!])),
                 };
             }
 
@@ -96,13 +97,13 @@ export class Env {
                 throw new Error(`Could not persist environment variables to .env file`);
             }
             for (const [key, value] of Object.entries(values)) {
-                process.env[key] = value;
+                appSecrets.set(key, value);
             }
             return values;
         }
 
         // Non-modes path (back-compat)
-        const missing = config.fields.filter((f) => !process.env[f.envVar]);
+        const missing = config.fields.filter((f) => !appSecrets.get(f.envVar));
 
         if (missing.length > 0) {
             const values = await this.askWizard(config);
@@ -122,12 +123,12 @@ export class Env {
                 throw new Error(`Could not persist environment variables to .env file`);
             }
             for (const [key, value] of Object.entries(values)) {
-                process.env[key] = value;
+                appSecrets.set(key, value);
             }
             return values;
         }
 
-        return Object.fromEntries(config.fields.map((f) => [f.envVar, process.env[f.envVar]!]));
+        return Object.fromEntries(config.fields.map((f) => [f.envVar, appSecrets.get(f.envVar)!]));
     }
 
     /**

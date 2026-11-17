@@ -1,6 +1,8 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { makeAbortError } from "#utils/errors";
+import { killProcessTree } from "#utils/killProcessTree";
+import { registerAgentCleanup } from "#base/agent/cleanup";
 import { ensureFfmpeg } from "#utils/ffmpeg-setup";
 import { getDownloadProviderSettings } from "../saveSettings";
 
@@ -31,16 +33,22 @@ function getFfmpegPath(): Promise<string> {
  */
 export async function runFfmpeg(args: readonly string[], signal?: AbortSignal): Promise<void> {
     const ffmpeg = await getFfmpegPath();
+    let forget: (() => void) | undefined;
     try {
-        await execFileAsync(ffmpeg, ["-hide_banner", "-nostdin", "-loglevel", "error", "-y", ...args], {
+        const run = execFileAsync(ffmpeg, ["-hide_banner", "-nostdin", "-loglevel", "error", "-y", ...args], {
             signal,
             windowsHide: true,
             maxBuffer: 16 * 1024 * 1024,
         });
+        // Closing the app must not leave a conversion running and writing after it.
+        forget = registerAgentCleanup(() => killProcessTree(run.child));
+        await run;
     } catch (error) {
         if (signal?.aborted) throw makeAbortError();
         const stderr = (error as { stderr?: string }).stderr?.trim();
         const reason = stderr ? stderr.slice(-STDERR_TAIL_CHARS) : (error as Error).message;
         throw new Error(`ffmpeg failed: ${reason}`);
+    } finally {
+        forget?.();
     }
 }

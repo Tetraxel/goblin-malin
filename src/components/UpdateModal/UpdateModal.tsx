@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Box, Text } from "ink";
 import { spawn } from "child_process";
-import open from "open";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
@@ -10,6 +9,9 @@ import { APP_VERSION } from "#constants";
 import { getInstaller, getUpdateArgv, getUpdateCommand } from "#updater/installSource";
 import { globalLogger } from "#base/logger/logger";
 import { exitApp } from "#utils/exitApp";
+import { openUrl } from "#utils/openUrl";
+import { killProcessTree } from "#utils/killProcessTree";
+import { createLineSplitter } from "#utils/lineSplitter";
 
 interface UpdateModalProps {
     latestVersion: string;
@@ -19,6 +21,9 @@ interface UpdateModalProps {
 }
 
 type PkgUpdateState = "idle" | "running" | "done" | "error";
+
+/** A package manager that has not finished after this long is stuck (a lock, a prompt, no network): it is stopped. */
+const UPDATE_TIMEOUT_MS = 10 * 60_000;
 
 const installer = getInstaller();
 
@@ -46,9 +51,9 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
     const [pkgStatus, setPkgStatus] = useState<PkgUpdateState>("idle");
     const [pkgOutput, setPkgOutput] = useState<string[]>([]);
 
-    const handleClose = useCallback(() => {
-        switchBack();
-    }, [switchBack]);
+    // While the package manager runs the window may be closed: the install is not tied to it (it is never killed on
+    // close, since a cut install can break the app), and the window, always mounted, shows how it ended when reopened.
+    const handleClose = useCallback(() => switchBack(), [switchBack]);
 
     const handleConfirm = useCallback(() => {
         if (pkgStatus === "done") {
@@ -63,7 +68,8 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
         if (pkgStatus === "running") return;
 
         if (selectedIndex === 1) {
-            void open(releaseUrl);
+            // Only http(s) links, and never through a shell (the address came from the network).
+            openUrl(releaseUrl);
             switchBack();
             return;
         }
@@ -76,15 +82,30 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
         // Safe there because every argument is a constant or a version validated by getUpdateArgv.
         const proc = spawn(bin, args, { stdio: "pipe", shell: process.platform === "win32" });
 
-        const addLines = (chunk: Buffer) => {
-            const lines = chunk.toString().split("\n").filter(Boolean);
-            lines.forEach((l) => globalLogger.info(`[updater] ${l}`));
-            setPkgOutput((prev) => [...prev, ...lines].slice(-20));
-        };
-        proc.stdout?.on("data", addLines);
-        proc.stderr?.on("data", addLines);
+        // Deliberately NOT registered for the exit clean-up: the window refuses to close while this runs because a cut
+        // install can leave the global package half written, and killing it when the app exits would do just that.
+        // Left alone, the package manager finishes the install by itself. Only the time limit below ends it.
+        const timeout = setTimeout(() => {
+            globalLogger.error(`[updater] no end after ${UPDATE_TIMEOUT_MS / 60_000} minutes: stopping it`);
+            killProcessTree(proc);
+        }, UPDATE_TIMEOUT_MS);
 
+        const addLine = (line: string) => {
+            globalLogger.info(`[updater] ${line}`);
+            if (mountedRef.current) setPkgOutput((prev) => [...prev, line].slice(-20));
+        };
+        // One splitter per stream: each keeps its own unfinished line and split characters.
+        const out = createLineSplitter(addLine);
+        const err = createLineSplitter(addLine);
+        proc.stdout?.on("data", out.write);
+        proc.stderr?.on("data", err.write);
+
+        proc.on("close", () => {
+            out.end();
+            err.end();
+        });
         proc.on("exit", (code) => {
+            clearTimeout(timeout);
             if (!mountedRef.current) return;
             if (code === 0) {
                 globalLogger.info(`[updater] success`);
@@ -95,10 +116,11 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
             }
         });
 
-        proc.on("error", (err) => {
+        proc.on("error", (error) => {
+            clearTimeout(timeout);
             if (!mountedRef.current) return;
-            globalLogger.error(`[updater] spawn error: ${err.message}`);
-            setPkgOutput((prev) => [...prev, err.message]);
+            globalLogger.error(`[updater] spawn error: ${error.message}`);
+            setPkgOutput((prev) => [...prev, error.message]);
             setPkgStatus("error");
         });
     }, [pkgStatus, selectedIndex, releaseUrl, latestVersion, switchBack, updateCommand]);
@@ -242,7 +264,12 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                             <Hint label="Dismiss" shortcutId="updateModal.close" />
                         </>
                     )}
-                    {isInProgress && <Text dimColor>Please wait...</Text>}
+                    {isInProgress && (
+                        <>
+                            <Text dimColor>The update goes on if you close this window. </Text>
+                            <Hint label="Close" shortcutId="updateModal.close" />
+                        </>
+                    )}
                     {!isIdle && !isInProgress && (
                         <>
                             {pkgStatus === "done" && <Hint label="Exit" shortcutId="updateModal.confirm" />}

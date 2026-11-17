@@ -32,6 +32,8 @@ export type CompiledMetadata = {
     isrc?: string;
     album?: StandardAlbum;
     year?: number;
+    /** The full `YYYY-MM-DD` the year comes from, when the source gave more than the year. Dropped when the year is typed. */
+    releaseDate?: string;
     trackNumber?: number;
     bpm?: number;
     key?: string;
@@ -44,6 +46,12 @@ function extractYear(releaseDate: string | undefined): number | undefined {
     if (!releaseDate) return undefined;
     const year = parseInt(releaseDate.split("-")[0]);
     return isNaN(year) ? undefined : year;
+}
+
+/** `YYYY-MM-DD` out of a release date that has a day and a month (`2019` and `2019-05` are years only). */
+function extractFullDate(releaseDate: string | undefined): string | undefined {
+    const match = releaseDate?.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return match ? `${match[1]}-${match[2]}-${match[3]}` : undefined;
 }
 
 // From each group, pick one representative result for compilation:
@@ -89,6 +97,10 @@ export function computeCompiledMetadata(
     const isrcR = pickFirst(sorted, (m) => m.isrc);
     const albumR = pickFirst(sorted, (m) => m.album);
     const yearR = pickFirst(sorted, (m) => extractYear(m.album?.releaseDate));
+    // The same source as the year (it is the first result that has one), so the two never disagree.
+    const releaseDateR = pickFirst(sorted, (m) =>
+        extractYear(m.album?.releaseDate) !== undefined ? (m.album?.releaseDate ?? "") : undefined
+    );
     const trackNumberR = pickFirst(sorted, (m) => m.trackNumber);
     const bpmR = pickFirst(sorted, (m) => m.bpm);
     const keyR = pickFirst(sorted, (m) => m.key);
@@ -112,6 +124,7 @@ export function computeCompiledMetadata(
         isrc: isrcR.value,
         album: albumR.value,
         year: yearR.value,
+        releaseDate: extractFullDate(releaseDateR.value),
         trackNumber: trackNumberR.value,
         bpm: bpmR.value,
         key: keyR.value,
@@ -141,6 +154,9 @@ export function computeCompiledMetadata(
         attribution.album = "manual";
     }
     if (overrides.year !== undefined) {
+        // A typed year is the user's: the source's day and month no longer describe it.
+        if (compiled.releaseDate && extractYear(compiled.releaseDate) !== overrides.year)
+            compiled.releaseDate = undefined;
         compiled.year = overrides.year;
         attribution.year = "manual";
     }

@@ -133,6 +133,8 @@ export function calculateResultWeight(result: SearchResult, query: RankingQuery)
     const audio = announcedAudio(result);
 
     if (fileExtension !== query.extension) return -1;
+    // Filtered here, not when downloading: a refused file would use up one of the few automatic download attempts.
+    if (result.size > MAX_ANNOUNCED_SIZE_BYTES) return -1;
     if (contains(fileName, "remix") !== contains(query.trackTitle, "remix")) return -1;
     // The other versions a title names (live, instrumental, karaoke…) must be the file's too, both ways.
     if (disagreesOnVersion(fileName, query.trackTitle, query.artistName)) return -1;
@@ -198,6 +200,40 @@ export function parseResultsLimit(value: unknown): number {
     const parsed = Math.floor(Number(value));
     if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_RESULTS_LIMIT;
     return Math.min(parsed, MAX_HIDDEN_RESULTS);
+}
+
+/** How long a search may wait for answers, in ms: the default for text that is no number, and the bounds around it. */
+export const DEFAULT_SEARCH_TIMEOUT_MS = 5000;
+export const MIN_SEARCH_TIMEOUT_MS = 1000;
+export const MAX_SEARCH_TIMEOUT_MS = 30_000;
+
+/**
+ * Reads the "search timeout" setting (free text): no number falls back to the default, and a number is kept between
+ * the bounds, since `1` would end every search before a peer could answer and a huge one would hold a track for ever.
+ */
+export function parseSearchTimeout(value: unknown): number {
+    const parsed = Math.floor(Number(value));
+    if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_SEARCH_TIMEOUT_MS;
+    return Math.min(Math.max(parsed, MIN_SEARCH_TIMEOUT_MS), MAX_SEARCH_TIMEOUT_MS);
+}
+
+/**
+ * The biggest file a peer may announce for one track. A peer states the size itself and nothing else checks it: a
+ * "track" of several gigabytes is a whole discography or a trap, not something to pull into the temporary folder.
+ */
+export const MAX_ANNOUNCED_SIZE_BYTES = 500 * 1024 * 1024;
+
+/** Codecs that keep every sample: ALAC or WAV (PCM) data renamed `.flac` is still lossless. */
+const LOSSLESS_CODEC = /^(flac|alac|pcm_|wavpack|ape|tta|mlp|truehd)/i;
+
+/**
+ * Whether a file really is lossless. A peer's `.flac` is only a name: the codec found by probing the downloaded file is
+ * what counts, so an MP3 or AAC stream renamed `.flac` is not shown as lossless, while a lossless codec of another
+ * name (ALAC, PCM) is. A file that could not be probed keeps what its extension says.
+ */
+export function soulseekProvenance(extension: "flac" | "mp3", probedCodec: string | undefined): "lossless" | "lossy" {
+    if (extension !== "flac") return "lossy";
+    return probedCodec && !LOSSLESS_CODEC.test(probedCodec) ? "lossy" : "lossless";
 }
 
 /** "name.flac" out of a Soulseek path (always backslash-separated, whatever OS this runs on). */
