@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import {
     shortcutRegistry,
     type ShortcutEntry,
@@ -76,14 +76,20 @@ export function useShortcuts({
         return hintLines.map((l) => ({ id: l.id, left: l.left, shortcutIds: l.shortcutIds }));
     }
 
-    // Synchronous registration on first encounter — ensures DynamicHintBar sees
-    // this context on the very first render (no one-frame flash of missing hints).
+    // Synchronous registration on first encounter — the context is in the registry before anything reads it (the
+    // hint bar's next render, a key pressed right away). The subscribers are told once this render has committed
+    // (below): notifying from the render itself is a `setState` on another component while one renders, which React
+    // warns about (and the warning, logged, used to flood the log panel).
     if (!shortcutRegistry.hasContext(id)) {
-        shortcutRegistry.register(id, buildEntries(shortcuts), buildLines(), isActive, priority, exclusive);
+        shortcutRegistry.register(id, buildEntries(shortcuts), buildLines(), isActive, priority, exclusive, false);
     } else {
         // Sync every render: keeps isActive, hint-line content, and keybindings fresh.
-        shortcutRegistry.update(id, buildEntries(shortcuts), buildLines(), isActive);
+        shortcutRegistry.update(id, buildEntries(shortcuts), buildLines(), isActive, false);
     }
+    // Layout effect: before the frame is written, so the hint bar does not show the old hints for a frame.
+    useLayoutEffect(() => {
+        shortcutRegistry.flushHints();
+    });
 
     // Unregister on unmount.
     useEffect(() => {

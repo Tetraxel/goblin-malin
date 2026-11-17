@@ -138,7 +138,10 @@ function parseSettingsFile(raw: unknown): Parsed<StoredSettings> {
 export class SettingsStore {
     private static instance: SettingsStore;
     private cache: StoredSettings | null = null;
-    private readonly emitter = new EventEmitter();
+    // Every `Hint` on screen listens for a changed key binding, so a screen with a dozen hints passes Node's default
+    // of 10 listeners: a warning ("possible memory leak") that was logged as an error. The bound is raised, not lifted,
+    // so a real leak (a listener added at every render) still warns.
+    private readonly emitter = new EventEmitter().setMaxListeners(200);
     /** The last load found a good file, so it is worth keeping as `.bak` before the first write. */
     private loadedHealthy = false;
     /** The file exists but couldn't be read: never write over content we haven't seen. */

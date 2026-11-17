@@ -1,3 +1,4 @@
+import { format } from "node:util";
 import { globalLogger } from "./logger";
 
 /**
@@ -6,7 +7,7 @@ import { globalLogger } from "./logger";
  * never by `start()`: code that imports `GoblinMalin.start()` as a library keeps its own console.
  */
 export function redirectConsoleToLog(): void {
-    console.log = (...args: unknown[]) => globalLogger.info(args.join(" "));
-    console.error = (...args: unknown[]) => globalLogger.error(args.join(" "));
-    console.warn = (...args: unknown[]) => globalLogger.warn(args.join(" "));
+    console.log = (...args: unknown[]) => globalLogger.info(format(...args));
+    console.error = (...args: unknown[]) => globalLogger.error(format(...args));
+    console.warn = (...args: unknown[]) => globalLogger.warn(format(...args));
 }

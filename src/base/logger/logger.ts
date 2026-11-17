@@ -107,15 +107,19 @@ export class Logger {
             details,
         };
 
-        if (level === LogLevel.ERROR) {
-            Logger.logger.error(plainMessage, metadata);
-        } else if (level === LogLevel.WARN) {
-            Logger.logger.warn(plainMessage, metadata);
-        } else if (level === LogLevel.DEBUG) {
-            Logger.logger.debug(plainMessage, metadata);
-        } else {
-            Logger.logger.info(plainMessage, metadata);
-        }
+        // The single-object form, never `logger.error(message, metadata)`: when the message holds a format token
+        // (`%s`, as a React warning does) winston takes the second argument for a value to format and drops the
+        // metadata, so the entry reached the log panel with no id and no time (every row got the same key, which React
+        // warned about, which was logged with a `%s`, which...).
+        const winstonLevel =
+            level === LogLevel.ERROR
+                ? "error"
+                : level === LogLevel.WARN
+                  ? "warn"
+                  : level === LogLevel.DEBUG
+                    ? "debug"
+                    : "info";
+        Logger.logger.log({ ...metadata, level: winstonLevel, message: plainMessage });
     }
 
     public info(message: unknown, details?: LogDetails) {

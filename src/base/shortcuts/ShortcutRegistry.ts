@@ -110,24 +110,40 @@ class ShortcutRegistryClass {
         hintLines: HintLineEntry[],
         isActive: boolean,
         priority: number,
-        exclusive = false
+        exclusive = false,
+        notify = true
     ): () => void {
         this.contexts.set(contextId, { contextId, priority, isActive, exclusive, shortcuts, hintLines });
         this.persistStubs(contextId, priority, shortcuts);
-        this.maybeNotify();
+        if (notify) this.maybeNotify();
         return () => {
             this.contexts.delete(contextId);
             this.maybeNotify();
         };
     }
 
-    /** Update an existing context registration (called every render). */
-    update(contextId: string, shortcuts: ShortcutEntry[], hintLines: HintLineEntry[], isActive: boolean): void {
+    /**
+     * Update an existing context registration (called every render). From a render, pass `notify: false` and call
+     * {@link flushHints} once committed: the subscribers are components, and React refuses a `setState` on another
+     * component while one renders ("Cannot update a component while rendering a different component").
+     */
+    update(
+        contextId: string,
+        shortcuts: ShortcutEntry[],
+        hintLines: HintLineEntry[],
+        isActive: boolean,
+        notify = true
+    ): void {
         const ctx = this.contexts.get(contextId);
         if (!ctx) return;
         // Always update handlers (so dispatch always uses the latest closures)
         this.contexts.set(contextId, { ...ctx, shortcuts, hintLines, isActive });
         this.persistStubs(contextId, ctx.priority, shortcuts);
+        if (notify) this.maybeNotify();
+    }
+
+    /** Tells the subscribers about what a silent `register` / `update` changed (a no-op when nothing visible did). */
+    flushHints(): void {
         this.maybeNotify();
     }
 
