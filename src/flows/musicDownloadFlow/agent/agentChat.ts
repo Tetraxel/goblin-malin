@@ -19,6 +19,7 @@ import { AGENT_SYSTEM_PROMPT, selectionHeader } from "./agentPrompt";
 import { agentRuntime, type AgentRuntime } from "./agentRuntime";
 import { agentJournal } from "./taskAccess";
 import { chatStore, type ChatStore } from "./chatStore";
+import { claudeQuota } from "./claudeQuota";
 import { registerAgentTools } from "./registerAgentTools";
 import { runAllowance } from "./runAllowance";
 import { agentLog, type AgentLogWriter } from "./agentLog";
@@ -301,6 +302,9 @@ export class AgentChat {
                     this.store.setActivity("Thinking…");
                     break;
                 }
+                case "quota":
+                    claudeQuota.update(event.windows);
+                    break;
                 case "result":
                     flushSpoken();
                     this.log.write({

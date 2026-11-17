@@ -20,6 +20,7 @@ import { Hint } from "../Hint";
 import { ChatEmptyState } from "./ChatEmptyState";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { readClipboard } from "#components/ImportModal/clipboard";
+import { ChatQuota, useQuotaRowCount } from "./ChatQuota";
 import { ChatRowView } from "./ChatRowView";
 import { ChatSelection } from "./ChatSelection";
 import { CHAT_TITLE, useChatTitleInfo } from "./ChatTitleBar";
@@ -95,7 +96,8 @@ export const ChatPanel: React.FC<Props> = ({ tasks, width, height, variant, term
     const innerWidth = Math.max(10, width - (docked ? 1 : 2) - 3);
     const inputWidth = Math.max(4, innerWidth - 2);
     const inputRows = inputRowCount(draft, inputWidth);
-    const bodyHeight = Math.max(1, height - CHROME_ROWS - (docked ? 0 : 3) - inputRows);
+    const quotaRows = useQuotaRowCount();
+    const bodyHeight = Math.max(1, height - CHROME_ROWS - (docked ? 0 : 3) - inputRows - quotaRows);
     const rows = useMemo(() => formatChatRows(chat.messages, innerWidth), [chat.messages, innerWidth]);
     const limit = maxScroll(rows.length, bodyHeight);
     const offset = Math.min(scroll, limit);
@@ -407,6 +409,9 @@ export const ChatPanel: React.FC<Props> = ({ tasks, width, height, variant, term
                     </Text>
                 </Box>
             )}
+
+            {/* How much of the plan's 5-hour and 7-day usage is left, as the last message reported it. */}
+            {quotaRows > 0 && <ChatQuota width={innerWidth} />}
 
             <Box
                 ref={bodyRef}

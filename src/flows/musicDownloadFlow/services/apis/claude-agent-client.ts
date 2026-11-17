@@ -109,6 +109,8 @@ export type AgentCliEvent =
     | { type: "assistant-text"; text: string }
     | { type: "tool-use"; id: string; name: string; input: unknown }
     | { type: "tool-result"; id: string; isError: boolean; /** What the tool answered, as text. */ output?: string }
+    /** How much of the plan's 5-hour and 7-day windows is used (the CLI reports it with every message). */
+    | { type: "quota"; windows: QuotaWindows }
     | {
           type: "result";
           ok: boolean;
@@ -119,9 +121,31 @@ export type AgentCliEvent =
           durationMs?: number;
       };
 
+/** One usage window of the plan: the share used (0–1) and when it resets (epoch milliseconds). */
+export type QuotaWindow = { utilization: number; resetsAt: number };
+export type QuotaWindows = { fiveHour?: QuotaWindow; sevenDay?: QuotaWindow };
+
 type Json = Record<string, unknown>;
 const obj = (v: unknown): Json | undefined =>
     v && typeof v === "object" && !Array.isArray(v) ? (v as Json) : undefined;
+
+function quotaWindow(value: unknown): QuotaWindow | undefined {
+    const w = obj(value);
+    if (!w || typeof w.utilization !== "number" || typeof w.resetsAt !== "number") return undefined;
+    if (!Number.isFinite(w.utilization) || !Number.isFinite(w.resetsAt) || w.resetsAt <= 0) return undefined;
+    // A share (0.41), though a CLI that reports percent (41) is read as well.
+    const share = w.utilization > 1 ? w.utilization / 100 : w.utilization;
+    // `resetsAt` is in epoch seconds.
+    return { utilization: Math.min(1, Math.max(0, share)), resetsAt: w.resetsAt * 1000 };
+}
+
+/** The plan's windows out of a `rate_limit_event`'s info (none when it carries neither). */
+export function parseQuotaWindows(info: unknown): QuotaWindows | undefined {
+    const windows = obj(obj(info)?.unifiedWindows);
+    const fiveHour = quotaWindow(windows?.five_hour);
+    const sevenDay = quotaWindow(windows?.seven_day);
+    return fiveHour || sevenDay ? { ...(fiveHour ? { fiveHour } : {}), ...(sevenDay ? { sevenDay } : {}) } : undefined;
+}
 
 /** The text of a tool result: a string, or a list of blocks of which the text ones are joined. */
 function toolResultText(content: unknown): string | undefined {
@@ -149,6 +173,10 @@ export function parseAgentStreamLine(line: string): AgentCliEvent[] {
             return json.subtype === "init" && typeof json.session_id === "string"
                 ? [{ type: "session", sessionId: json.session_id }]
                 : [];
+        case "rate_limit_event": {
+            const windows = parseQuotaWindows(json.rate_limit_info);
+            return windows ? [{ type: "quota", windows }] : [];
+        }
         case "stream_event": {
             const delta = obj(obj(json.event)?.delta);
             return delta?.type === "text_delta" && typeof delta.text === "string"
