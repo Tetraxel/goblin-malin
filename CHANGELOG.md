@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.2.4] — 2026-11-17
+
 ### Added
 
 - **SoundCloud**: paste a `soundcloud.com/<artist>/<track>` link (or an `on.soundcloud.com` short link) and the track is read like a Spotify or YouTube one, with its own column in the list. While discovering, the app also searches SoundCloud for tracks from other platforms and proposes the uploads that really look like the track (a slowed edit or an unrelated upload is left out). **yt-dlp downloads from SoundCloud**: when a SoundCloud link is the best source, it shows as a yt-dlp download source. SoundCloud can be switched off in Settings → Metadata.
