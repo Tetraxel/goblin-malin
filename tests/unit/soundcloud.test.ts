@@ -4,6 +4,7 @@ import { join } from "path";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
     parseSoundCloudUrl,
+    soundcloudPlaylistUrl,
     soundcloudTrackUrl,
 } from "#flows/musicDownloadFlow/services/metadata-providers/soundcloud/soundcloudUrl";
 import {
@@ -74,9 +75,30 @@ describe("parseSoundCloudUrl", () => {
         expect(parseSoundCloudUrl("https://on.soundcloud.com/")).toBeNull();
     });
 
-    test("does not take playlists, profiles and site pages for tracks", () => {
+    test("reads a playlist or album (a set), with its secret token when it is private", () => {
+        expect(parseSoundCloudUrl("https://soundcloud.com/flume/sets/skin")).toEqual({
+            platform: "soundcloud",
+            type: "playlist",
+            id: "flume/sets/skin",
+        });
+        // The casing of the permalink does not matter, the query and the mobile host neither; a token keeps its case.
+        expect(parseSoundCloudUrl("https://m.soundcloud.com/Flume/sets/SKIN/?utm_source=clipboard")?.id).toBe(
+            "flume/sets/skin"
+        );
+        expect(parseSoundCloudUrl("https://soundcloud.com/flume/sets/skin/s-AbC123xyz")?.id).toBe(
+            "flume/sets/skin/s-AbC123xyz"
+        );
+        expect(soundcloudPlaylistUrl("flume/sets/skin/s-AbC123xyz")).toBe(
+            "https://soundcloud.com/flume/sets/skin/s-AbC123xyz"
+        );
+        // A page under the set is not the set.
+        expect(parseSoundCloudUrl("https://soundcloud.com/flume/sets/skin/comments")).toBeNull();
+        expect(parseSoundCloudUrl("https://soundcloud.com/flume/sets/skin/s-AbC/extra")).toBeNull();
+    });
+
+    test("does not take profiles and site pages for tracks or playlists", () => {
         for (const url of [
-            "https://soundcloud.com/flume/sets/skin",
+            "https://soundcloud.com/flume/sets",
             "https://soundcloud.com/flume",
             "https://soundcloud.com/flume/tracks",
             "https://soundcloud.com/flume/likes",
@@ -355,6 +377,104 @@ describe("SoundCloudService", () => {
         const results = await service.searchTracks("anything", 2);
         expect(getInfoAsync).toHaveBeenCalledWith("scsearch2:anything");
         expect(results.map((r) => r.trackName)).toEqual(["A", "B"]);
+    });
+});
+
+describe("SoundCloudService.expandCollection (playlists and albums)", () => {
+    const logger = () => {
+        const log: Record<string, unknown> = { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() };
+        log.createChild = () => log;
+        return log as never;
+    };
+    const expand = async (url: string) => {
+        const { SoundCloudService } =
+            await import("#flows/musicDownloadFlow/services/metadata-providers/soundcloud/SoundCloudService");
+        return SoundCloudService.expandCollection(url, logger(), {} as never);
+    };
+    // What yt-dlp really printed for `soundcloud.com/flume/sets/skin` with --flat-playlist (trimmed).
+    const SET = {
+        _type: "playlist",
+        title: "SKIN",
+        uploader: "Flume",
+        album_type: "album",
+        entries: [
+            { _type: "url_transparent", url: "https://soundcloud.com/flume/never-be-like-you-feat-kai" },
+            { _type: "url_transparent", url: "https://soundcloud.com/flume/flume-lose-it-feat-vic-mensa" },
+        ],
+    };
+
+    beforeEach(() => {
+        getInfoAsync.mockReset();
+    });
+
+    test("lists the set's tracks as canonical track links, with its name and owner", async () => {
+        getInfoAsync.mockResolvedValue(SET);
+        const expansion = await expand("https://soundcloud.com/Flume/sets/SKIN?utm_source=clipboard");
+
+        expect(getInfoAsync).toHaveBeenCalledWith("https://soundcloud.com/flume/sets/skin");
+        expect(expansion).toEqual({
+            kind: "album",
+            name: "SKIN",
+            ownerName: "Flume",
+            totalCount: 2,
+            trackUrls: [
+                "https://soundcloud.com/flume/never-be-like-you-feat-kai",
+                "https://soundcloud.com/flume/flume-lose-it-feat-vic-mensa",
+            ],
+        });
+    });
+
+    test("a plain playlist is a playlist; a track listed twice, or an entry that is not a track page, is left out", async () => {
+        getInfoAsync.mockResolvedValue({
+            title: "  mix  ",
+            uploader: "someone",
+            entries: [
+                { url: "https://soundcloud.com/a/one" },
+                { url: "https://soundcloud.com/A/One?in=x" },
+                { url: "https://api-v2.soundcloud.com/tracks/123" },
+                { url: "https://soundcloud.com/b/sets/other" },
+                {},
+            ],
+        });
+        const expansion = await expand("https://soundcloud.com/someone/sets/mix");
+        expect(expansion.kind).toBe("playlist");
+        expect(expansion.name).toBe("mix");
+        expect(expansion.trackUrls).toEqual(["https://soundcloud.com/a/one"]);
+        expect(expansion.totalCount).toBe(1);
+    });
+
+    test("a set that SoundCloud will not show says what to do, as a collection access error", async () => {
+        getInfoAsync.mockRejectedValue(new Error("Unable to download JSON metadata: HTTP Error 404: Not Found"));
+        const { CollectionAccessError } = await import("#base/collectionAccessError");
+        await expect(expand("https://soundcloud.com/flume/sets/gone")).rejects.toBeInstanceOf(CollectionAccessError);
+
+        // Any other failure (offline, a timeout) is not blamed on the playlist.
+        getInfoAsync.mockRejectedValue(new Error("SoundCloud took too long to answer"));
+        await expect(expand("https://soundcloud.com/flume/sets/skin")).rejects.toThrow(/too long/);
+    });
+
+    test("refuses a link that is not a playlist", async () => {
+        await expect(expand("https://soundcloud.com/flume/never-be-like-you-feat-kai")).rejects.toThrow(
+            /Not a SoundCloud playlist/
+        );
+    });
+
+    test("importing the link makes a playlist collection recognised by SoundCloud, not a track", async () => {
+        const { SoundCloudService } =
+            await import("#flows/musicDownloadFlow/services/metadata-providers/soundcloud/SoundCloudService");
+        const { resolveCollectionRecognition } =
+            await import("#flows/musicDownloadFlow/utils/resolveCollectionRecognition");
+        const { resolveTrackRecognition } = await import("#flows/musicDownloadFlow/utils/resolveTrackRecognition");
+        const registry = new ServiceRegistry();
+        registry.register("soundcloud", SoundCloudService as never);
+
+        const url = "https://soundcloud.com/flume/sets/skin";
+        expect(resolveCollectionRecognition(url, registry as never)).toEqual({
+            serviceKey: "soundcloud",
+            collectionKind: "playlist",
+            sourceId: "flume/sets/skin",
+        });
+        expect(resolveTrackRecognition(url, registry as never)).toBeNull();
     });
 });
 

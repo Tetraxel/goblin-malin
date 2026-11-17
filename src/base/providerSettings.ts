@@ -18,11 +18,32 @@ export interface ProviderConsent {
     message: string;
 }
 
+/**
+ * An extra row a provider adds under its own settings, for what a plain checkbox / text / select cannot do (import a
+ * file, show what is on disk). Rows are built each time the settings are drawn, so they must be cheap and never
+ * touch the disk: what needs reading goes into `settingsStatus`, which the settings modal awaits in the background.
+ */
+export type ProviderSettingsRow =
+    /** Runs at once when chosen (not part of the Save / Cancel draft); a failure is logged by the settings. */
+    | { kind: "action"; label: string; run: () => void | Promise<void> }
+    /** A dim line under the row above it. */
+    | { kind: "note"; text: string };
+
 /** Minimal interface for a service constructor that may declare settings and display. */
 export interface ProviderConstructorLike {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     new (...args: any[]): any;
     defaultSettings?: ProviderSettingsSchema;
+    /**
+     * Extra rows under the provider's settings. `stored` is the provider's settings as being edited; `status` is what
+     * `settingsStatus` last answered (undefined until it has).
+     */
+    settingsRows?: (stored: Record<string, boolean | string>, status: string | undefined) => ProviderSettingsRow[];
+    /**
+     * A line about the provider's state on disk or elsewhere (e.g. "cookies.txt imported 3 days ago"), read in the
+     * background each time the settings open and after every dialog closes. Undefined: nothing to say.
+     */
+    settingsStatus?: () => Promise<string | undefined>;
     setupWizard?: SetupWizardConfig;
     consent?: ProviderConsent;
 }

@@ -5,10 +5,10 @@ import { type ContextualActions, type Shortcut } from "#types/actions";
 import { type DownloadTask } from "../utils/downloadTask";
 import { metadataLimiter } from "../utils/stageLimiters";
 import { type MusicDownloadTaskAttributes } from "../types";
-import { dialogBridge } from "#base/bridges/dialogBridge";
 import { getMusicSettings } from "../settings";
 import { computeCompiledMetadata } from "../utils/compiledMetadata";
-import { picardPort, picardTargetFor, sendToPicard } from "./picard";
+import { picardPort } from "./picard";
+import { openInPicard, picardTargetOfTask } from "./picardActions";
 import { tagLookupUrl } from "./tagLookup";
 import {
     addToMusicBrainz,
@@ -48,22 +48,6 @@ export type MusicBrainzActionItem = {
     run: () => void;
 };
 
-/**
- * Asks the running Picard to load it — directly, not through the browser — and says what to do when nothing answers.
- */
-async function openInPicard(url: string, port: number): Promise<void> {
-    if (await sendToPicard(url)) return;
-    await dialogBridge.confirm({
-        title: "MusicBrainz Picard did not answer",
-        message:
-            `Nothing is listening on 127.0.0.1:${port}.\n\n` +
-            "Start MusicBrainz Picard and turn on Options → Network → Browser integration (note the port it uses: " +
-            "it can be changed in Goblin Malin's Settings → MusicBrainz).",
-        choices: [{ label: "OK", tone: "primary" }],
-        accent: "#741b81",
-    });
-}
-
 /** What can be done about the track's verdict right now, most relevant first. */
 export function musicBrainzActionItems(task: DownloadTask): MusicBrainzActionItem[] {
     // An album/playlist row has no metadata groups to check (`computeCompiledMetadata` would throw on them).
@@ -101,14 +85,10 @@ export function musicBrainzActionItems(task: DownloadTask): MusicBrainzActionIte
             run: () => fire("Add to MusicBrainz", () => addToMusicBrainz(task)),
         });
     }
-    // Picard: ALWAYS the release when one is known (files get their album, track number and cover art), the recording
-    // only when there is no release at all (see `picardTargetFor`). It comes from the verdict, not from the discovery's
-    // anchor: the anchor is missing whenever discovery started from a source that has no ISRC (an unofficial
-    // re-upload), even though the verdict has since found the release.
-    // The recording the discovery found (its anchor's id) stands in when the verdict has none.
-    const anchorRecording = task.getAttributes()?.discoveryAnchors?.["musicBrainz"]?.id;
+    // Picard: ALWAYS the release when one is known, the recording only when there is no release at all
+    // (see `picardTargetOfTask`).
     const port = picardPort(getMusicSettings().musicBrainz.picardPort);
-    const target = picardTargetFor({ ...identity, recordingId: identity?.recordingId ?? anchorRecording }, port);
+    const target = picardTargetOfTask(task, port);
     const picard = target?.url;
     if (picard && target) {
         items.push({

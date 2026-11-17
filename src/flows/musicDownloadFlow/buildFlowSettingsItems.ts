@@ -13,6 +13,7 @@ import { AGENT_MODELS } from "./agent/chooseAgentModel";
 import { OUTPUT_FORMATS, OUTPUT_FORMAT_KEYS, parseOutputFormat } from "./utils/outputFormat";
 import { DOWNLOAD_STRATEGY_KEYS, DOWNLOAD_STRATEGY_NOTES, parseDownloadStrategy } from "./utils/downloadStrategy";
 import { appSecrets } from "#base/appSecrets";
+import { globalLogger } from "#base/logger/logger";
 
 export type ProviderEntry = {
     key: string;
@@ -35,7 +36,8 @@ function providerItems(
     onChange: (patch: DeepPartial<MusicDownloadFlowSettings>) => void,
     section: "metadata" | "download",
     providerSubKey: string,
-    onOpenWizard: (config: SetupWizardConfig, onDisable?: () => void) => void
+    onOpenWizard: (config: SetupWizardConfig, onDisable?: () => void) => void,
+    status: string | undefined
 ): SettingsItem[] {
     const display = providerDisplayRegistry.get(key);
     const schema = schemaOf(ctor);
@@ -116,6 +118,24 @@ function providerItems(
         }
     }
 
+    // What the provider adds of its own (an import button, a line about a file on disk).
+    for (const row of ctor.settingsRows?.(stored, status) ?? []) {
+        if (row.kind === "note") {
+            items.push({ kind: "note", indent: 4, text: row.text });
+        } else {
+            items.push({
+                kind: "action",
+                indent: 4,
+                label: row.label,
+                run: () => {
+                    Promise.resolve()
+                        .then(() => row.run())
+                        .catch((error) => globalLogger.error(`Settings action "${row.label}" failed`, { error }));
+                },
+            });
+        }
+    }
+
     return items;
 }
 
@@ -123,7 +143,28 @@ function providerItems(
 export type FlowSettingsExtras = {
     /** The temporary folder's size, as text; `undefined` while it is still being measured. */
     tempUsageText?: string;
+    /** What each provider's `settingsStatus` answered, by registry key (missing until it has). */
+    providerStatus?: Record<string, string | undefined>;
 };
+
+/** Asks every provider that has a `settingsStatus` for it. A provider that fails is left out, never thrown. */
+export async function loadProviderStatuses(): Promise<Record<string, string | undefined>> {
+    const entries: [string, ProviderConstructorLike][] = [];
+    for (const registry of [metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry]) {
+        for (const [key, ctor] of registry.getAllConstructors()) entries.push([key, ctor as ProviderConstructorLike]);
+    }
+    const answers = await Promise.all(
+        entries.map(async ([key, ctor]) => {
+            try {
+                return [key, await ctor.settingsStatus?.()] as const;
+            } catch (error) {
+                globalLogger.warn(`Could not read the settings status of ${key}`, { error });
+                return [key, undefined] as const;
+            }
+        })
+    );
+    return Object.fromEntries(answers.filter(([, text]) => text !== undefined));
+}
 
 export function buildFlowSettingsItems(
     flowSettings: MusicDownloadFlowSettings,
@@ -150,7 +191,8 @@ export function buildFlowSettingsItems(
                     onChange,
                     "metadata",
                     "providers",
-                    onOpenWizard
+                    onOpenWizard,
+                    extras.providerStatus?.[key]
                 )
             );
         }
@@ -167,7 +209,8 @@ export function buildFlowSettingsItems(
                     onChange,
                     "metadata",
                     "discoveryProviders",
-                    onOpenWizard
+                    onOpenWizard,
+                    extras.providerStatus?.[key]
                 )
             );
         }
@@ -403,7 +446,8 @@ export function buildFlowSettingsItems(
                     onChange,
                     "download",
                     "providers",
-                    onOpenWizard
+                    onOpenWizard,
+                    extras.providerStatus?.[key]
                 )
             );
         }

@@ -17,6 +17,8 @@ export type SoundCloudInfo = {
     uploader?: string;
     uploader_id?: string | number;
     uploader_url?: string;
+    /** On a playlist's listing: "album" when the set was published as one, a plain playlist otherwise. */
+    album_type?: string;
     duration?: number; // seconds, fractional
     /** The canonical page of the track. (`url` is an API address: never use it.) */
     webpage_url?: string;
@@ -95,9 +97,9 @@ export function convertSoundCloudToTrack(info: SoundCloudInfo, readAsId?: string
         return null;
     }
     // The page must be a track's; the id is then the page's permalink, or the one the caller read the link as.
-    const pageId = parseSoundCloudUrl(url)?.id;
-    if (!pageId) return null;
-    const id = readAsId ?? pageId;
+    const page = parseSoundCloudUrl(url);
+    if (page?.type !== "track" || !page.id) return null;
+    const id = readAsId ?? page.id;
 
     // Only an upload without a declared artist is worth splitting: "Artist - Title" is then the best clue there is.
     const hasCredit = !!info.artist || (info.artists?.length ?? 0) > 0;

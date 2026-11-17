@@ -49,6 +49,7 @@ export type FocusableWindow =
     | "listDialog"
     | "inputDialog"
     | "tempCleanupModal"
+    | "actionsMenu"
     | "chatPanel";
 
 export interface FocusState {

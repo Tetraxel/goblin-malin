@@ -3,6 +3,8 @@ import React, { useLayoutEffect, useRef } from "react";
 import { type ToolbarButtonHook } from "./Toolbar";
 import { useToolbarButtonMouse } from "./useToolbarButtonMouse";
 import { useHoverTarget } from "#base/mouse/useMouseTarget";
+import { getScreenBounds } from "#base/mouse/screenBounds";
+import { toolbarAnchor } from "#base/toolbarAnchor";
 import { useToolbarActionsRef } from "#contexts/ToolbarActionsContext";
 import { useTheme } from "#base/themeContext";
 import { AnimatedIcon, Icon } from "#components/AnimatedIcon";
@@ -26,7 +28,13 @@ export const ToolbarButtonInvoker = ({
     // Register the current onPress for this button index into the shared ref.
     // Runs on every render so the handler always sees the latest closure.
     useLayoutEffect(() => {
-        actionsRef.current[index] = onPress;
+        // Remembers where the button is, for a menu that drops down from it (see `toolbarAnchor`).
+        actionsRef.current[index] = onPress
+            ? () => {
+                  toolbarAnchor.set(getScreenBounds(boxRef.current));
+                  onPress();
+              }
+            : undefined;
     });
 
     if (!enabled) return null;

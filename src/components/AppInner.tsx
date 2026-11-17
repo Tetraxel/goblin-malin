@@ -40,6 +40,7 @@ import { InputDialogModal } from "./InputDialogModal/InputDialogModal";
 import { useInputDialog } from "./InputDialogModal/useInputDialog";
 import { ClosingModal } from "./ClosingModal/ClosingModal";
 import { TempCleanupModal } from "./TempCleanupModal/TempCleanupModal";
+import { ActionsMenu } from "./ActionsMenu/ActionsMenu";
 import { useConfirmModal } from "./ConfirmModal/useConfirmModal";
 import { useTheme } from "#base/themeContext";
 import { useQuitShortcut } from "#hooks/useQuitShortcut";
@@ -396,6 +397,9 @@ Check your internet connection, then try again.`,
                     />
 
                     <TempCleanupModal terminalHeight={terminalHeight} terminalWidth={terminalWidth} />
+
+                    {/* A drop-down, not a modal: it hangs under the toolbar's Actions button. */}
+                    <ActionsMenu terminalWidth={terminalWidth} terminalHeight={terminalHeight} />
 
                     <ClosingModal terminalHeight={terminalHeight} />
 

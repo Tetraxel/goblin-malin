@@ -43,7 +43,7 @@ _Depends on: T28.1 (shares the API client)_
 
 `src/flows/musicDownloadFlow/services/metadata-providers/soundcloud/SoundCloudService.ts`:
 
-- `static parseUrl` for `soundcloud.com/{user}/{track}` (exclude `/sets/` for now — that's a P21 collection kind to add later) and `on.soundcloud.com` short links.
+- `static parseUrl` for `soundcloud.com/{user}/{track}` and `on.soundcloud.com` short links. `/sets/` links are playlists / albums (`type: "playlist"`, read by `static expandCollection` through yt-dlp's flat listing: one request, one `url` per track, not cached so a live playlist sees new tracks).
 - `getTrackMetadata(url)`: `yt-dlp -J <url>` via `ytdlp-nodejs` (no API key needed; yt-dlp's SoundCloud extractor is maintained) → map title/uploader/duration/artwork/genre. Parse `Artist - Title` out of the SoundCloud title when the uploader is a label/channel — reuse the P26/T26.2 line parser if it has landed, else a minimal local split.
 - `searchTrack(seed)`: `yt-dlp -J "scsearch5:{artist} {title}"` → ranked results. Both calls run under the metadata stage limiter and `@Cached()`.
 

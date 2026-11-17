@@ -10,7 +10,7 @@ import { type AppSettings } from "#settings/appSettings";
 import { buildGlobalSettingsItems } from "#settings/buildGlobalSettingsItems";
 import { filterSettingsItems, isInteractive, type SettingsItem } from "#settings/buildSettingsItems";
 import { getMusicSettings, saveMusicSettings } from "#flows/musicDownloadFlow/settings";
-import { buildMusicSettingsItems } from "#flows/musicDownloadFlow/buildFlowSettingsItems";
+import { buildMusicSettingsItems, loadProviderStatuses } from "#flows/musicDownloadFlow/buildFlowSettingsItems";
 import { describeTempUsage, getTempUsage, type TempUsage } from "#flows/musicDownloadFlow/tempCleanupFlow";
 import { deepMerge } from "#utils/deepMerge";
 import { type DeepPartial } from "#utils/types";
@@ -44,6 +44,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
     // How much the temporary folder holds. Measured in the background once the modal is open (it can be
     // hundreds of files): the rest of the page works meanwhile and the row says "calculating…".
     const [tempUsage, setTempUsage] = useState<TempUsage | undefined>(undefined);
+    // What providers say about their own state on disk ("cookies.txt imported 3 days ago"), read in the background too.
+    const [providerStatus, setProviderStatus] = useState<Record<string, string | undefined>>({});
     const [originalKeybindings, setOriginalKeybindings] = useState<AppSettings["keybindings"]>(
         () => SettingsStore.getInstance().getAppSettings().keybindings
     );
@@ -71,6 +73,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
             setOriginalKeybindings(freshSettings.keybindings);
             setFlowPatch({});
             setTempUsage(undefined);
+            setProviderStatus({});
             setSelectedIndex(0);
             setEditingIndex(null);
             setEditValue("");
@@ -107,6 +110,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
         };
     }, [isVisible, draftTempDir, returningFromWindow]);
 
+    // Read when the modal opens and after a dialog closes: an action row (import a file…) may have changed it.
+    useEffect(() => {
+        if (!isVisible) return;
+        let cancelled = false;
+        void loadProviderStatuses().then((status) => {
+            if (!cancelled) setProviderStatus(status);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [isVisible, returningFromWindow]);
+
     const allItems = useMemo((): SettingsItem[] => {
         const globalItems = buildGlobalSettingsItems(appDraft, (patch) =>
             setAppDraft((prev) => deepMerge(prev, patch as DeepPartial<AppSettings>))
@@ -116,11 +131,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
             fullMusicSettings,
             (patch) => setFlowPatch((prev) => deepMerge(prev, patch) as Record<string, unknown>),
             openWizard,
-            { tempUsageText: describeTempUsage(tempUsage) }
+            { tempUsageText: describeTempUsage(tempUsage), providerStatus }
         );
         return [...globalItems, ...musicItems];
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [appDraft, flowPatch, returningFromWindow, tempUsage]);
+    }, [appDraft, flowPatch, returningFromWindow, tempUsage, providerStatus]);
 
     const filteredItems = useMemo(() => filterSettingsItems(allItems, searchQuery), [allItems, searchQuery]);
     const safeSelectedIndex = Math.min(selectedIndex, Math.max(0, filteredItems.length - 1));

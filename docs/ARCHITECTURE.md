@@ -31,7 +31,7 @@ import URL ──► primary metadata ──► discovery on other platforms ─
     - `taskFactory.ts`, `runController.ts` — create tasks from URLs or saved snapshots; Run all / Run selected / Stop.
     - `services/` — the providers (below).
     - `columns/`, `contextualActions.ts`, `taskColumns.ts`, `settings.ts`, `buildFlowSettingsItems.ts` — what the task list shows, which actions each row offers, and the matching Settings rows.
-- **`src/components/`** — Ink UI: the task list, the secondary panel (metadata / download sources / logs), modals (import, settings, sessions, archive, start, update, welcome tour, …), the toolbar and the hint bars.
+- **`src/components/`** — Ink UI: the task list, the secondary panel (metadata / download sources / logs), modals (import, settings, sessions, archive, start, update, welcome tour, …), the toolbar (with its **Actions** drop-down: [CLAUDE.md](../CLAUDE.md#the-toolbars-actions-menu)) and the hint bars.
 - **`src/hooks/`, `src/contexts/`** — focus management, shortcut registration (`useShortcuts`), settings and task subscriptions.
 - **`src/sessions/`, `src/settings/`, `src/utils/`** — persistence (`sessions.json`, archive, `settings.json`, both versioned with a `.bak`), the app-data-dir helpers, tool downloads (yt-dlp, ffmpeg, ffprobe, mpv), tagging, caching, HTTP.
 - **`src/updater/`** — the update check and the installer detection used by the self-update.

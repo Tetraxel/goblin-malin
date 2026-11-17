@@ -13,6 +13,7 @@ import { ClaudeDiscoveryService } from "./services/metadata-providers/claude/Cla
 import { YtDlpService } from "./services/download-providers/ytdlp/YtDlpService";
 import { SoulseekService } from "./services/download-providers/soulseek/SoulseekService";
 import { registerAgentTools } from "./agent/registerAgentTools";
+import { registerActionsMenuItems } from "./actionsMenuItems";
 import { taskLocks } from "#base/task/taskLock";
 import { appSecrets, wizardEnvKeys } from "#base/appSecrets";
 import { sweepStaleCookieCopies } from "./services/download-providers/ytdlp/cookiesCopy";
@@ -52,6 +53,9 @@ export function initMusicApp(): void {
 
     // Cookie copies a killed download left behind hold the user's session: removed (old ones only).
     void sweepStaleCookieCopies();
+
+    // What the toolbar's "Actions" menu offers.
+    registerActionsMenuItems();
 
     // The tools the chat agent can call (the chat itself only starts when the user asks and allows it).
     registerAgentTools();

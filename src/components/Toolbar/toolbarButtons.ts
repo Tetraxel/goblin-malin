@@ -2,6 +2,7 @@ import { type ToolbarButtonHook } from "./Toolbar";
 import { useRunAllButton } from "#flows/musicDownloadFlow/toolbar/useRunAllButton";
 import { useSessionsButton } from "./useSessionsButton";
 import { useArchiveButton } from "./useArchiveButton";
+import { useActionsButton } from "./useActionsButton";
 import { useSettingsButton } from "./useSettingsButton";
 import { useChatButton } from "./useChatButton";
 import { useExitButton } from "./useExitButton";
@@ -12,6 +13,7 @@ export const TOOLBAR_BUTTONS: ToolbarButtonHook[] = [
     useRunAllButton,
     useSessionsButton,
     useArchiveButton,
+    useActionsButton,
     useSettingsButton,
     useChatButton,
     useExitButton,

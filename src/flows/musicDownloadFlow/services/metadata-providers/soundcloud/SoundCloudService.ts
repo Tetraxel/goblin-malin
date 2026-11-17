@@ -1,5 +1,7 @@
 import { type Logger } from "#base/logger/logger";
-import { type ParsedUrl } from "#base/urlParser";
+import { type ParsedUrl, type CollectionExpansion } from "#base/urlParser";
+import { type Task } from "#base/task/task";
+import { CollectionAccessError } from "#base/collectionAccessError";
 import { StatusType } from "#base/task/task-status";
 import { type ProviderDisplay } from "#base/providerDisplay";
 import { type ProviderSettingsSchema } from "#base/providerSettings";
@@ -11,7 +13,7 @@ import { MetadataService } from "../../../metadataService";
 import { isYtDlpEnabled, readYtDlpInfo } from "../../apis/ytdlp-client";
 import { SoundCloudCell } from "./SoundCloudCell";
 import { convertSoundCloudToTrack, slimSoundCloudInfo, type SoundCloudInfo } from "./convertSoundCloudToTrack";
-import { parseSoundCloudUrl, soundcloudTrackUrl } from "./soundcloudUrl";
+import { parseSoundCloudUrl, soundcloudPlaylistUrl, soundcloudTrackUrl } from "./soundcloudUrl";
 
 /** yt-dlp is a process that talks to SoundCloud: a hung one must not hold the whole metadata stage. */
 const YTDLP_TIMEOUT_MS = 60_000;
@@ -27,6 +29,11 @@ const MAX_MATCHES = 3;
 const MIN_CONFIDENCE = MIN_SEARCH_CONFIDENCE;
 
 type FlatSearch = { entries?: SoundCloudInfo[] };
+/** yt-dlp's flat listing of a set: its own title and owner, then one entry per track (`url` is the track's page). */
+type SoundCloudSetInfo = SoundCloudInfo & { entries?: { url?: string }[] };
+
+/** A set of a few hundred tracks takes longer to list than one track page to read. */
+const PLAYLIST_TIMEOUT_MS = 120_000;
 
 /**
  * SoundCloud, read through yt-dlp's own SoundCloud extractor: no API key (SoundCloud has closed new API
@@ -56,6 +63,57 @@ export class SoundCloudService extends MetadataService {
         return parseSoundCloudUrl(url);
     }
 
+    /**
+     * Lists the tracks of a playlist or album (a SoundCloud "set") through yt-dlp's flat listing: one request, no
+     * track page is read yet (each track is then imported like a pasted link). Deliberately NOT cached: a live playlist
+     * must see its new tracks on every refresh.
+     */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    static async expandCollection(url: string, logger: Logger, _task: Task<any>): Promise<CollectionExpansion> {
+        const parsed = parseSoundCloudUrl(url);
+        if (parsed?.type !== "playlist" || !parsed.id) throw new Error(`Not a SoundCloud playlist URL: ${url}`);
+
+        logger.info(`Reading SoundCloud playlist: ${parsed.id}`);
+        let listing: SoundCloudSetInfo;
+        try {
+            listing = await readYtDlpInfo<SoundCloudSetInfo>(soundcloudPlaylistUrl(parsed.id), {
+                timeoutMs: PLAYLIST_TIMEOUT_MS,
+                timeoutMessage: "SoundCloud took too long to answer",
+            });
+        } catch (error) {
+            // A private set (or one that was deleted) answers 403 / 404 to a reader with no sign-in.
+            if (/\b(403|404)\b|private|not found|does not exist/i.test(error instanceof Error ? error.message : "")) {
+                throw new CollectionAccessError(
+                    `SoundCloud would not show this playlist: ${parsed.id}`,
+                    "SoundCloud did not let the app read this playlist. It may be private (use its “secret link”, the one ending in /s-…) or it may have been deleted."
+                );
+            }
+            throw error;
+        }
+
+        // Each track is the page SoundCloud lists it under, written the way a pasted link is read (one track, one id);
+        // an entry that is not a track page is not importable and is left out.
+        const seen = new Set<string>();
+        const trackUrls: string[] = [];
+        for (const entry of listing.entries ?? []) {
+            const track = entry.url ? parseSoundCloudUrl(entry.url) : null;
+            if (track?.type !== "track" || !track.id || seen.has(track.id)) continue;
+            seen.add(track.id);
+            trackUrls.push(soundcloudTrackUrl(track.id));
+        }
+        const skipped = (listing.entries?.length ?? 0) - trackUrls.length;
+        if (skipped > 0)
+            logger.warn(`SoundCloud: ${skipped} entr${skipped === 1 ? "y" : "ies"} of the playlist skipped`);
+
+        return {
+            kind: listing.album_type === "album" ? "album" : "playlist",
+            name: (listing.title ?? "").trim() || parsed.id,
+            ownerName: listing.uploader || undefined,
+            trackUrls,
+            totalCount: trackUrls.length,
+        };
+    }
+
     /** yt-dlp's JSON for one track page. Cached as the raw JSON: it is plain data, and dates are made fresh when mapped. */
     @Cached()
     private async getTrackInfo(url: string): Promise<SoundCloudInfo> {
@@ -82,7 +140,7 @@ export class SoundCloudService extends MetadataService {
 
     async getTrackMetadata(url: string): Promise<TrackMetadata> {
         const parsed = parseSoundCloudUrl(url);
-        if (!parsed?.id) throw new Error(`Invalid SoundCloud track URL: ${url}`);
+        if (parsed?.type !== "track" || !parsed.id) throw new Error(`Invalid SoundCloud track URL: ${url}`);
 
         this.status.set({
             type: StatusType.Processing,

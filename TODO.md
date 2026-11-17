@@ -8,9 +8,6 @@
 
 - [x] **Release 0.2.0** — released, as `v0.2.0` (the release pipeline is fixed and its actions are pinned by SHA, `REL-02`, `REL-03`); `v0.2.3` is the latest
 - [x] **MusicBrainz IDs never reach the saved file** — done in `P30`: "Write MusicBrainz IDs into saved files" setting (on by default), the IDs shown in the compiled metadata, release/recording/artist/release-group written to the tags — `MD-03`
-- [ ] Status per service (Spotify, Ytdlp, etc...) instead of per task — `P25`
-- [ ] Easier `cookies.txt` extraction for yt-dlp (drag and drop? step by step instructions?) — `P24/T24.3`
-- [ ] Better way to select the app path / folders in settings (a path picker; the temp folder defaults to a sub-folder of the Music library) — `P24/T24.4`
 
 ## 🔵 Release backlog
 
@@ -18,15 +15,12 @@
 
 - [ ] Saving can't be cancelled: an ffmpeg conversion or tagging step keeps running when the task is stopped or the app quits (thread an `AbortSignal` through `saveTrack`; `runFfmpeg` already takes one)
 - [ ] A download whose format has no tag writer (wav, wma… with conversion off) is copied untagged and still reported as "Saved" — `tagAudioFile`
-- [ ] No unit tests for `saveTrack` itself (delete-after-write order, tag failure after a rename, partial output): it needs a mocked harness, like the one `retryDownloadProvider.test.ts` has for the other task actions
 - [ ] On the pinned saved file, `Ctrl+F` (relocate) does nothing, and a changed format setting can only be applied from a download row (updating the saved file keeps its format)
 
 **Product**
 
 - [ ] Embed cover art — `PROD-04`
 - [ ] Temp downloads: move the default out of the Music library (with a one-time migration of the old folder), clean unselected candidates after a save
-- [ ] SoundCloud **playlists** (`/sets/`) as collections (tracks are read and downloaded already)
-- [ ] Add a button `Open all tracks in MB Picard`
 
 **Housekeeping**
 
@@ -60,8 +54,11 @@ Decide per release whether each is wanted.
 
 ## ✅ Done (removed from the lists above)
 
+- [x] **Easier YouTube cookies** — Settings → Download → YtDlp: _Import cookies.txt…_ (guided, checked, copied), the file's age under it, _Remove_, and _Cookies from browser_; a failed download that is YouTube's bot check / age gate / unreadable browser cookies / 403 says what to do — `P24/T24.3`, `T24.5`
+- [x] **Actions menu** in the toolbar, with _Open all tracks in MusicBrainz Picard_ — the first item; more are one `actionsMenuRegistry.register()` away
+- [x] **`saveTrack` is tested** (`tests/unit/saveTrack.test.ts`): the order of write / tag / delete-the-old-file, what a failed step leaves behind, a name that is taken, a relocated file, one save at a time
 - [x] **Claude chat inside the app** — a chat panel where Claude (through the user's own `claude` CLI) reads and edits tracks with typed tools, one track at a time, with a preview before a batch and an undo; the 5 h / 7 d plan usage shows at the top — `P32` (tool catalogue: [docs/agent-tools.md](docs/agent-tools.md))
-- [x] **SoundCloud** — links are read like Spotify / YouTube ones, searched for during discovery and downloaded by yt-dlp (playlists are still open, above) — `P28`
+- [x] **SoundCloud** — links are read like Spotify / YouTube ones, searched for during discovery and downloaded by yt-dlp; playlists and albums (`/sets/`) are imported as collections — `P28`
 - [x] **Groups** (`Ctrl+G`) — put tracks together under a name, like an imported album, foldable, saved with the session
 - [x] **MusicBrainz identity** — which release a track is on, matched on conclusive evidence or reviewed by the user, with a guarded way to add a missing release — `P30`
 - [x] **Output format** — Settings → Download → "Convert every download to one audio format" (on by default, FLAC; MP3 / Ogg / Opus / M4A, or off to keep each download as it came); one ffmpeg step at save time, per-format tags; a Soulseek MP3 is no longer saved as a fake `.flac` — `PROD-03`

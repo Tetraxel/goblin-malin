@@ -54,7 +54,9 @@ _Depends on: T24.1_
 
 ### T24.3 — Cookies wizard (release blocker)
 
-A `SetupWizardConfig` with two modes (the infra already supports mode choosers):
+**Done, in another shape than the wizard below.** The setup wizard is built for environment-variable fields, which a cookies file is not, so the same two modes live in Settings → Download → YtDlp as provider settings rows (`static settingsRows` / `settingsStatus`, see CLAUDE.md): a _Cookies from browser_ select (`firefox`, `chrome`, `edge`…, passed to yt-dlp as `cookiesFromBrowser`), and _Import cookies.txt…_ (`ytdlp/cookiesFile.ts`, `cookiesSettings.ts`): step-by-step text in a one-line input dialog (a file dropped on the terminal pastes its path, in any of the forms terminals paste it), then the file is checked (Netscape format with TAB-separated lines, not JSON, has youtube.com cookies, not all expired; the first line yt-dlp insists on is added when missing) before it is copied into `bin/cookies.txt`; the file's age is shown under the row (a month old: "YouTube may have signed it out") and _Remove_ deletes it. Chrome-family browsers are listed but flagged: on Windows yt-dlp often cannot read their cookies. The path picker (T24.4) was dropped from the TODO, so the path is typed or dropped, not browsed. The doctor's `fix` link (T24.1) does not exist yet.
+
+The original plan, for the record: a `SetupWizardConfig` with two modes (the infra already supports mode choosers):
 
 - **Mode A — from browser (recommended)**: `ytdlp-nodejs` supports `cookiesFromBrowser`; the wizard picks the browser (chrome/firefox/edge/brave) and stores `download.ytdlp.cookiesMode = "browser:<name>"`. No file handling at all — this makes the blocker disappear for most users. `YtDlpService` passes `cookiesFromBrowser` instead of `cookies` when set.
 - **Mode B — cookies.txt file**: step-by-step content blocks (install "Get cookies.txt LOCALLY" extension → export youtube.com → paste the file path), with the path field validated on submit: file exists, first line smells like Netscape format (`# Netscape HTTP Cookie File` or tab-separated), contains `youtube.com` lines. On success the file is **copied** into `bin/cookies.txt` so the original can live anywhere (drag-and-dropping a file onto most terminals pastes its path — document that in the wizard text).
@@ -65,6 +67,8 @@ _Depends on: T24.1 (fix wiring); wizard itself has no dependency_
 ---
 
 ### T24.4 — Path picker component (release blocker)
+
+**Dropped (2026-11-17):** removed from the TODO, not wanted for now. Folders and binaries stay plain text rows in Settings.
 
 `src/components/PathPickerModal/` — a keyboard directory/file browser:
 
@@ -77,6 +81,8 @@ _Depends on: nothing_
 ---
 
 ### T24.5 — Actionable error mapping
+
+**Partly done** (`ytdlp/explainError.ts`): the bot check, an age gate, a browser whose cookies could not be read and a 403 are explained in the status and the download's log (the raw message stays in the log), pointing at the Settings rows of T24.3. "Video removed" and the doctor deep-links are not done.
 
 `src/flows/musicDownloadFlow/services/download-providers/ytdlp/errorMap.ts` — match known yt-dlp stderr patterns to user-facing status + fix hint:
 

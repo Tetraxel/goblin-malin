@@ -26,7 +26,7 @@ A keyboard-driven terminal UI for downloading and tagging music tracks with meta
 
 ## What it does
 
-- **Import** Spotify, YouTube (Music) and SoundCloud links: tracks, **albums and playlists** from Spotify, tracks and playlists from YouTube, tracks from SoundCloud (a playlist can keep refreshing itself). Plain links, links without `https://` and `spotify:track:…` URIs are understood.
+- **Import** Spotify, YouTube (Music) and SoundCloud links: tracks, **albums and playlists** from Spotify, tracks and playlists from YouTube, tracks, playlists and albums from SoundCloud (a playlist can keep refreshing itself). Plain links, links without `https://` and `spotify:track:…` URIs are understood.
 - **Cross-reference** the same track on other platforms to compare and merge metadata: **MusicBrainz**, plus **Songlink** and **Claude** if you opt in (see [Privacy](#privacy)). Every field can be edited or copied.
 - **Find download sources** from **yt-dlp** (YouTube and SoundCloud) and **Soulseek**, preview them in the app (through `mpv`), compare them, and pick the best one.
 - **Save** the chosen source to your output folder with clean tags, replacing a previously saved file if you want to. Every track is converted to one format, **FLAC** by default; Settings → Download → _Convert every download to one audio format_ lets you pick **MP3**, **Ogg**, **Opus** or **M4A** instead (handy for software that cannot swap a file for another format, like rekordbox), or turn the conversion off to keep each download as it came (Opus or M4A from YouTube, MP3 or FLAC from Soulseek). Converting a lossy source to FLAC does not add quality: the app marks those files `FLAC*`.
@@ -158,7 +158,7 @@ Every shortcut can be rebound in Settings → _Shortcuts_, and the hints at the 
 | `Ctrl+F`                   | Relocate a saved file that moved                                                                                                                                                                            |
 | `F3`                       | Toggle the stats overlay                                                                                                                                                                                    |
 
-The mouse works as well: click to focus and select, scroll, click the toolbar buttons.
+The mouse works as well: click to focus and select, scroll, click the toolbar buttons. The **Actions** button drops down a menu of things to do to the whole list (for now: open every track in MusicBrainz Picard).
 
 ## Where your data lives
 
@@ -201,7 +201,7 @@ Songlink and Claude stay off until you allow them in a dialog; you can change yo
 
 ## Troubleshooting
 
-- **YouTube says "Sign in to confirm you're not a bot", or a download fails with HTTP 403** — give `yt-dlp` your browser's cookies: export them in the Netscape format (a browser extension such as _Get cookies.txt LOCALLY_ does it) and save the file as `cookies.txt` in the `bin/` folder of the [data folder](#where-your-data-lives). It is used on the next download.
+- **YouTube says "Sign in to confirm you're not a bot", or a download fails with HTTP 403** — give `yt-dlp` your browser's cookies. Settings → Download → YtDlp → _Import cookies.txt…_ walks you through it (export the cookies with a browser extension such as _Get cookies.txt LOCALLY_, drop the file on the terminal, done: the file is checked and copied into the `bin/` folder of the [data folder](#where-your-data-lives)), or set _Cookies from browser_ to Firefox to let `yt-dlp` read them itself. Either is used on the next download; the settings say how old the imported file is, since YouTube signs sessions out after a while.
 - **"ffmpeg/yt-dlp could not be found or downloaded"** — the dialog says why (usually no network, or a proxy/antivirus blocking the download). Fix the cause and restart the task; the tool is downloaded again. On Linux, see [Installation on Linux](#installation-on-linux).
 - **Nothing plays / "mpv"** — preview needs [`mpv`](https://mpv.io/). Windows downloads it for you; on macOS and Linux install it so that `mpv` is on your `PATH`. Check that `GOBLIN_NO_AUDIO` is not set.
 - **Spotify tracks have no album or ISRC** — you are in the no-credentials mode. Run Settings → _⚙ Setup Wizard_ and enter your own Spotify API app.

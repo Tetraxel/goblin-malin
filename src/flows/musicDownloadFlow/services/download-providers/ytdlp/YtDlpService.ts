@@ -23,9 +23,11 @@ import {
 import { type DownloadTask } from "#flows/musicDownloadFlow/utils/downloadTask";
 import { readFileInfo } from "#flows/musicDownloadFlow/utils/readFileInfo";
 import { copyCookiesForRun, type CookiesCopy } from "./cookiesCopy";
+import { COOKIE_BROWSERS, cookiesBrowserFrom, cookiesSettingsRows, cookiesSettingsStatus } from "./cookiesSettings";
+import { explainYtDlpFailure } from "./explainError";
 import { YtDlpCell } from "./YtDlpCell";
 import { getYtDlpClient } from "../../apis/ytdlp-client";
-import { getTempDownloadDir, getSaveSettings } from "../../../saveSettings";
+import { getTempDownloadDir, getSaveSettings, getDownloadProviderSettings } from "../../../saveSettings";
 import { generateTempStem, findExistingTempFile, listTempFilesWithStem } from "#flows/musicDownloadFlow/utils/tempFile";
 import { extensionOf, parseOutputFormat } from "#flows/musicDownloadFlow/utils/outputFormat";
 
@@ -62,7 +64,17 @@ export class YtDlpService extends DownloadService {
     static readonly defaultSettings: ProviderSettingsSchema = {
         enabled: { label: "Enable", defaultValue: true, kind: "checkbox" },
         autoDownloadBinary: { label: "Auto-download latest binaries", defaultValue: true, kind: "checkbox" },
+        // YouTube asks a client with no session to sign in ("confirm you're not a bot"): the cookies of a signed-in
+        // browser, read by yt-dlp itself, are the quickest way past it (the other is an imported cookies.txt, below).
+        cookiesBrowser: {
+            label: "Cookies from browser (off: use the imported cookies.txt)",
+            defaultValue: "off",
+            kind: "select",
+            options: COOKIE_BROWSERS,
+        },
     };
+    static readonly settingsRows = cookiesSettingsRows;
+    static readonly settingsStatus = cookiesSettingsStatus;
     static readonly cellComponent = YtDlpCell;
 
     public compatibleMetadataProviders: APIProvider[] = ["youtube", "soundcloud"];
@@ -208,9 +220,14 @@ export class YtDlpService extends DownloadService {
                     matchFilter: TRACK_MATCH_FILTER,
                 };
 
-                // Add cookies if the file exists. yt-dlp rewrites the file it is given when it exits, so every run
-                // works on its own copy (see `copyCookiesForRun`); the user's file is only read.
-                if (
+                // A signed-in browser's cookies, read by yt-dlp itself, when the user chose one; otherwise the imported
+                // cookies.txt, if there is one. yt-dlp rewrites the file it is given when it exits, so every run works on
+                // its own copy (see `copyCookiesForRun`); the user's file is only read.
+                const cookiesBrowser = cookiesBrowserFrom(getDownloadProviderSettings("ytdlp").cookiesBrowser);
+                if (cookiesBrowser) {
+                    note(`Using the cookies of ${cookiesBrowser}`, "debug");
+                    downloadOptions.cookiesFromBrowser = cookiesBrowser;
+                } else if (
                     await fs.promises.access(cookiesPath).then(
                         () => true,
                         () => false
@@ -370,11 +387,17 @@ export class YtDlpService extends DownloadService {
             // The partial files of a run that failed (named after a name no later attempt reuses) go with it.
             if (runStem) await this.removeLeftovers(runStem);
             this.logger.error(`Error downloading track: ${trackMetadata.trackName}`, { error });
+            const failure = error instanceof Error ? error.message : String(error);
+            // yt-dlp's own words name command-line switches: say what they mean here, and where the fix is.
+            const help = explainYtDlpFailure(failure);
             this.status.set({
                 type: StatusType.Error,
-                message: `Failed to download ${trackMetadata.trackName}`,
+                message: help
+                    ? `${help.short}: ${trackMetadata.trackName}`
+                    : `Failed to download ${trackMetadata.trackName}`,
             });
-            log.push(`Failed: ${error instanceof Error ? error.message : String(error)}`);
+            log.push(`Failed: ${failure}`);
+            if (help) log.push(help.advice);
             publish("failed");
             throw error;
         } finally {

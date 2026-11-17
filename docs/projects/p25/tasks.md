@@ -1,8 +1,10 @@
 # P25 — Per-Service Status: Tasks
 
+> **Dropped (2026-11-17):** the row was removed from the TODO and nothing below is planned. The plan is kept in case it comes back.
+
 ## Context
 
-**Release blocker**: _"Status per service (Spotify, Ytdlp, etc…) instead of per task"_ (TODO.md).
+**Release blocker** (until it was dropped): _"Status per service (Spotify, Ytdlp, etc…) instead of per task"_ (TODO.md).
 
 The root cause is one line: `ServiceBase` wires every service to the **same** status object — `this.status = this.task.getStatus()` ([service-base.ts](../../../src/base/service-base.ts):26). When a task runs Spotify fetch, Songlink discovery, MusicBrainz discovery, and a yt-dlp download (some concurrently under the P20 stage limiters), they all write to one `TaskStatus` — the STATUS column shows whichever service wrote last, and a failed provider's error is overwritten by the next provider's progress. The user cannot answer "which provider failed?" or "what is _this_ provider doing?" without opening the logs.
 

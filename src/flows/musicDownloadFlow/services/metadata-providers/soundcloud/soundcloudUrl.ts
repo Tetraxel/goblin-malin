@@ -50,7 +50,9 @@ const NON_TRACK_SEGMENTS = new Set([
 /**
  * Reads a SoundCloud link. A track is `soundcloud.com/<user>/<track>`, plus `/s-<token>` when it is private.
  * The id is that permalink (`<user>/<track>`): readable, stable enough to dedupe on, and what the track's URL is built
- * from (`soundcloudTrackUrl`). Playlists (`/sets/`), profiles, and every other page are not tracks: `null`.
+ * from (`soundcloudTrackUrl`). A playlist or album (SoundCloud calls both a "set") is `soundcloud.com/<user>/sets/<name>`,
+ * plus `/s-<token>` when it is private; its id is that permalink (`soundcloudPlaylistUrl`). Profiles and every other
+ * page are neither: `null`.
  */
 export function parseSoundCloudUrl(url: string): ParsedUrl | null {
     let parsed: URL;
@@ -70,9 +72,26 @@ export function parseSoundCloudUrl(url: string): ParsedUrl | null {
     if (host !== "soundcloud.com" && host !== "m.soundcloud.com") return null;
 
     const segments = parsed.pathname.split("/").filter(Boolean);
-    if (segments.length < 2 || segments.length > 3) return null;
-    const [user, track, secret] = segments;
+    if (segments.length < 2 || segments.length > 4) return null;
+    const [user] = segments;
     if (RESERVED_USER_SEGMENTS.has(user.toLowerCase())) return null;
+
+    // `<user>/sets/<name>[/s-<token>]`: a playlist or an album. (`<user>/sets` alone is a tab of the profile.)
+    if (segments[1].toLowerCase() === "sets") {
+        if (segments.length < 3) return null;
+        const [, , name, setSecret] = segments;
+        if (setSecret !== undefined && !/^s-[A-Za-z0-9]+$/.test(setSecret)) return null;
+        return {
+            platform: "soundcloud",
+            type: "playlist",
+            id: [user.toLowerCase(), "sets", name.toLowerCase(), ...(setSecret !== undefined ? [setSecret] : [])].join(
+                "/"
+            ),
+        };
+    }
+
+    if (segments.length > 3) return null;
+    const [, track, secret] = segments;
     if (NON_TRACK_SEGMENTS.has(track.toLowerCase())) return null;
     // The third segment only exists for a private link (`s-AbCd123`); anything else is a page under the track.
     if (secret !== undefined && !/^s-[A-Za-z0-9]+$/.test(secret)) return null;
@@ -89,6 +108,11 @@ export function parseSoundCloudUrl(url: string): ParsedUrl | null {
 /** The app's `uri` of a track given its id (see `parseSoundCloudUrl`). */
 export function soundcloudTrackUri(id: string): TrackUri<"soundcloud"> {
     return `SOUNDCLOUD::TRACK::${id}` as TrackUri<"soundcloud">;
+}
+
+/** The canonical URL of a playlist or album given its id (see `parseSoundCloudUrl`). */
+export function soundcloudPlaylistUrl(id: string): string {
+    return `https://soundcloud.com/${id}`;
 }
 
 /** The canonical URL of a track given its id (see `parseSoundCloudUrl`). */
