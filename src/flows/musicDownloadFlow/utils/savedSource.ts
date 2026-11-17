@@ -25,6 +25,14 @@ export function isSavedFrom(saved: SavedFile | undefined, source: TrackDownloadS
     return !!saved?.downloadPath && !!downloadPath && samePath(saved.downloadPath, downloadPath);
 }
 
+/**
+ * Whether the user pointed the saved file somewhere else than where the app wrote it ("Relocate"). Such a file is the
+ * user's own (another copy, another tool's library): saving the track again must not delete it unasked.
+ */
+export function isRelocatedSavedFile(saved: SavedFile): boolean {
+    return !!saved.writtenPath && !samePath(saved.writtenPath, saved.path);
+}
+
 /** What `releaseSavedFile` needs from a task (any `Task` of the music flow fits). */
 export interface SavedFileHolder {
     getId(): string;

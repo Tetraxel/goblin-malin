@@ -30,6 +30,7 @@ import {
 } from "#flows/musicDownloadFlow/types";
 import { runWithoutCache, isCacheSkipped } from "#utils/cache";
 import { overwriteConfirmBridge } from "#base/bridges/overwriteConfirmBridge";
+import { dialogBridge } from "#base/bridges/dialogBridge";
 import { SafeAction } from "#utils/decorators";
 import { metadataLimiter, downloadLimiter } from "./stageLimiters";
 import { computeConfidenceBreakdown, computeConfidenceScore, MIN_SEARCH_CONFIDENCE } from "./confidence";
@@ -42,7 +43,7 @@ import { compiledMetadataToTags } from "./compiledMetadataToTags";
 import { computeOutputPath, isOutputPathTaken, samePath } from "./computeOutputPath";
 import { convertAudioInto } from "./convertAudio";
 import { extensionOf, parseOutputFormat, planSave } from "./outputFormat";
-import { isSavedFrom, releaseSavedFile } from "./savedSource";
+import { isRelocatedSavedFile, isSavedFrom, releaseSavedFile } from "./savedSource";
 import { tagAudioFile } from "./tagAudioFile";
 import { createSingleFlight } from "./singleFlight";
 import { acquireDestinationLock, writeViaStaging } from "./writeViaStaging";
@@ -325,6 +326,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 this.updateAttributes({
                     state: "pending",
                     metadataGroups: [],
+                    // Rebuilt with the groups they were found for: the cells must not show an old result.
+                    discoveryAnchors: undefined,
                     downloadSources: [],
                     primaryMetadataFetched: false,
                     metadataDiscovered: false,
@@ -451,6 +454,9 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
                 for (const discoveryService of this.discoveryServices.getAllServices()) {
                     throwIfAborted(signal);
+                    // A last-resort service (Claude) works from a real track: with this empty one it would spend a
+                    // slow, costly call on a question with no content.
+                    if (this.isLastResortService(discoveryService)) continue;
                     try {
                         const { tracks: discovered } = await untilAborted(
                             discoveryService.discoverFromUri(stubMetadata),
@@ -593,18 +599,11 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             const services = this.metadataServices.getAllServices();
             for (const service of services) {
                 if (run.skipped) return;
-                // Skip the service that owns the primary metadata
-                if (
-                    primaryMetadata.platform === service.id.toLowerCase() ||
-                    primaryMetadata.apiProvider === service.id.toLowerCase()
-                )
-                    continue;
-
                 // Find the registry key for this service
                 const serviceKey = this.findServiceKey(service.id);
                 if (!serviceKey) continue;
 
-                // Skip primary service by registry key
+                // Skip the service that owns the primary metadata (by registry key: a service id is a class name)
                 const primaryGroup = (this.getAttributes()?.metadataGroups ?? []).find((g) =>
                     g.results.some((r) => r.isPrimaryInput)
                 );
@@ -676,7 +675,12 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         };
 
         try {
-            await Promise.race([discoverEverywhere(), skippedSignal]);
+            const everywhere = discoverEverywhere();
+            // After a skip it goes on in the background: a failure that comes late is noted, never left unhandled.
+            everywhere.catch((error) => {
+                if (run.skipped) this.logger.debug("Discovery failed after it was skipped", { error });
+            });
+            await Promise.race([everywhere, skippedSignal]);
         } finally {
             options?.signal?.removeEventListener("abort", onAbort);
             if (this.discoveryRun === run) this.discoveryRun = undefined;
@@ -706,6 +710,9 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 }),
             });
         }
+        // A stage that was stopped did not discover anything: the flag stays down so it is run again. One the user
+        // skipped is over by their choice (the sources found so far are kept).
+        if (options?.signal?.aborted) return;
         this.updateAttributes({ metadataDiscovered: true });
     }
 
@@ -726,7 +733,9 @@ export class DownloadTask extends Task<TrackDownloadTask> {
     ): Promise<void> {
         const lastResort = this.isLastResortService(discoveryService);
         try {
-            const discover = () => discoveryService.discoverFromUri(primaryMetadata, { wantedPlatforms });
+            // A last-resort call is slow (minutes) and calls no metadata provider: it holds no slot while it runs.
+            const ask = () => discoveryService.discoverFromUri(primaryMetadata, { wantedPlatforms });
+            const discover = () => (lastResort ? metadataLimiter.whileWaiting(ask) : ask());
             const {
                 tracks: allDiscovered,
                 anchor,
@@ -1020,7 +1029,10 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             this.status.set({ type: StatusType.PendingUserAction, message: `Waiting for your answer: ${label}` });
         }
         try {
-            return await ensureDiscoveryConsent(key);
+            // A person answering holds no metadata slot: the others go on working meanwhile.
+            return mustAsk
+                ? await metadataLimiter.whileWaiting(() => ensureDiscoveryConsent(key))
+                : await ensureDiscoveryConsent(key);
         } finally {
             if (mustAsk) this.status.clear();
         }
@@ -1494,6 +1506,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.updateAttributes({
             state: "pending",
             metadataGroups: [],
+            // What discovery found for those groups (the Songlink and MusicBrainz cells): rebuilt with them.
+            discoveryAnchors: undefined,
             musicBrainzIdentity: kept?.userChoice
                 ? {
                       ...unknownIdentity("Checking again after the restart", kept),
@@ -1873,6 +1887,19 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         return undefined;
     }
 
+    /** Asks whether the saved file the user relocated may be deleted now that a new one replaces it. Nobody answers: no. */
+    private async confirmDeleteRelocated(filePath: string): Promise<boolean> {
+        const answer = await dialogBridge.confirm({
+            title: "Delete the relocated file?",
+            message: `You relocated this track's saved file to:\n${filePath}\n\nThe new file replaces it. Keep that file where it is, or delete it?`,
+            choices: [
+                { label: "Keep it", tone: "primary" },
+                { label: "Delete it", tone: "danger" },
+            ],
+        });
+        return answer === 1;
+    }
+
     private async runSave(options: { fromSaved?: boolean }): Promise<void> {
         const attrs = this.getAttributes();
         const sources = attrs?.downloadSources ?? [];
@@ -1915,6 +1942,14 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 globalLogger.info("Save cancelled: the file name is taken and the user kept the existing file");
                 return;
             }
+
+            // The file this one replaces is deleted once the new one is in place, except one the user relocated: that
+            // is a file they keep elsewhere, and it goes only if they say so (asked now, before any work starts).
+            const deleteReplaced =
+                !!saved &&
+                plan.mode === "fromDownload" &&
+                !samePath(saved.path, outputPath) &&
+                (!isRelocatedSavedFile(saved) || (await this.confirmDeleteRelocated(saved.path)));
 
             this.status.update({
                 type: StatusType.Processing,
@@ -1968,7 +2003,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
                 // Only now that the new file is in place is the one it replaces deleted (a file that was updated in
                 // place, or kept its name, is the new file itself).
-                if (existingSavedPath && plan.mode === "fromDownload" && !samePath(existingSavedPath, outputPath)) {
+                if (existingSavedPath && deleteReplaced) {
                     await fs.unlink(existingSavedPath).catch((e: NodeJS.ErrnoException) => {
                         if (e.code !== "ENOENT") throw e;
                     });
@@ -1984,6 +2019,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 this.updateAttributes({
                     savedFile: {
                         path: outputPath,
+                        writtenPath: outputPath,
                         savedAt: new Date(),
                         provider: origin.provider,
                         track: origin.track,

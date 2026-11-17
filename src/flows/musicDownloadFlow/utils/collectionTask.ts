@@ -152,6 +152,7 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
             ownerName: undefined,
             totalCount: undefined,
             truncated: undefined,
+            alreadyQueued: undefined,
             error: undefined,
         });
         this.status.clear();
@@ -210,7 +211,11 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
         const attrs = this.getAttributes();
         const count = attrs?.totalCount ?? attrs?.childTaskIds.length ?? 0;
         const label = count === 1 ? "track" : "tracks";
-        return attrs?.truncated ? `${count} ${label} (truncated)` : `${count} ${label}`;
+        const notes = [
+            attrs?.truncated ? "truncated" : "",
+            attrs?.alreadyQueued ? `${attrs.alreadyQueued} already in the queue elsewhere` : "",
+        ].filter(Boolean);
+        return notes.length > 0 ? `${count} ${label} (${notes.join(", ")})` : `${count} ${label}`;
     }
 
     // Shared by start() (fresh) and refetch() (idempotent — only childTaskIds already
@@ -252,6 +257,7 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
 
             const newChildren = [];
             const newChildIds: string[] = [];
+            let alreadyQueued = 0;
             for (const trackUrl of cappedUrls) {
                 const id = taskIdFromUrl(trackUrl);
                 if (existingChildIds.has(id)) continue; // already a child (refetch path)
@@ -260,6 +266,7 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
                     // standalone before this collection) — don't duplicate/crash on the
                     // id collision, just leave it where it is.
                     this.logger.debug(`Skipping track already in queue: ${trackUrl}`);
+                    alreadyQueued++;
                     continue;
                 }
                 newChildren.push(
@@ -284,11 +291,15 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
             // The list as it is now, not as it was before the await: the user may have moved tracks of this
             // collection into a group meanwhile, and writing the old list back would put them back.
             const currentChildIds = this.getAttributes()?.childTaskIds ?? attrs.childTaskIds;
+            if (alreadyQueued > 0) {
+                this.logger.info(`${alreadyQueued} track(s) of this list are already in the queue and were left there`);
+            }
             this.updateAttributes({
                 name: expansion.name,
                 ownerName: expansion.ownerName,
                 totalCount: expansion.totalCount,
                 truncated,
+                alreadyQueued: alreadyQueued > 0 ? alreadyQueued : undefined,
                 childTaskIds: [...currentChildIds, ...newChildIds],
                 live:
                     attrs.collectionKind === "playlist"

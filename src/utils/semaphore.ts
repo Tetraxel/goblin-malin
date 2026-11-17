@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "async_hooks";
+
 /**
  * A counting semaphore for bounding concurrency of async work.
  *
@@ -9,6 +11,9 @@
  * scale without hammering metadata providers.
  */
 export class Semaphore {
+    /** The semaphores whose permit the running code holds (so `whileWaiting` knows it has one to give back). */
+    private static readonly held = new AsyncLocalStorage<ReadonlySet<Semaphore>>();
+
     private available: number;
     private readonly waiters: Array<() => void> = [];
 
@@ -21,9 +26,28 @@ export class Semaphore {
     async run<T>(fn: () => Promise<T> | T): Promise<T> {
         await this.acquire();
         try {
-            return await fn();
+            return await Semaphore.held.run(new Set(Semaphore.held.getStore()).add(this), async () => fn());
         } finally {
             this.release();
+        }
+    }
+
+    /**
+     * Inside {@link run}: gives the permit back while `fn` waits for something that is not work (a person answering a
+     * dialog, a slow last-resort call), and takes one again afterwards (it may queue behind others). A few tasks
+     * waiting on a dialog nobody answers must not stop all the work that shares the budget. Outside `run` (the caller
+     * holds no permit) it just calls `fn`.
+     */
+    async whileWaiting<T>(fn: () => Promise<T> | T): Promise<T> {
+        const held = Semaphore.held.getStore();
+        if (!held?.has(this)) return fn();
+        const without = new Set(held);
+        without.delete(this);
+        this.release();
+        try {
+            return await Semaphore.held.run(without, async () => fn());
+        } finally {
+            await this.acquire();
         }
     }
 

@@ -373,6 +373,12 @@ export type FileInfo = {
  */
 export type SavedFile = {
     path: string;
+    /**
+     * Where the app itself wrote the file. `path` follows the file when the user relocates it, this does not: a
+     * `path` that differs from it is a file the user keeps (see `isRelocatedSavedFile`). Absent on files saved
+     * before this was recorded, which count as the app's own.
+     */
+    writtenPath?: string;
     savedAt: Date;
     /** The download provider the file was made from. */
     provider: DownloadProvider;
@@ -600,6 +606,12 @@ export type CollectionDownloadTask = {
     ownerName?: string;
     totalCount?: number;
     truncated?: boolean;
+    /**
+     * How many of the link's tracks were left out because the same track is already in the queue (alone, or in
+     * another album or playlist): a track has one row, wherever it came from first. Shown in the status, so a list
+     * of 50 that holds 47 rows says why.
+     */
+    alreadyQueued?: number;
     /** Ids of child TrackDownloadTasks created by this collection, in discovery order. */
     childTaskIds: string[];
     /** Hides childTaskIds rows in the task list when true. */

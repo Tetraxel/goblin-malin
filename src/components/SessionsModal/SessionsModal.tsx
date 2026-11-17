@@ -116,6 +116,29 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
         });
     }
 
+    /** The copy is not independent of the original: say so before making it. */
+    function requestDuplicate(session: StoredSession) {
+        openConfirmModal({
+            title: "Duplicate session?",
+            message:
+                "The copy shares its files with the original: both keep the same temporary downloads and saved files. " +
+                "Saving again under another name, retrying a download or cleaning up in one can delete or move a file " +
+                "the other still lists. Use it to try other metadata, not to save the same tracks twice.",
+            choices: [
+                { label: "Duplicate", color: theme.action.primary },
+                { label: "Cancel", color: theme.status.error },
+            ],
+            accentColor: theme.action.primary,
+            onConfirm: (i) => {
+                if (i !== 0) return;
+                if (refusedSwitch()) return;
+                manager.duplicateSession(session.id);
+                clearSelection();
+                switchBack();
+            },
+        });
+    }
+
     /** Left-click on a session: select it; clicking the selected one loads it. */
     function clickSession(index: number) {
         if (renamingId) return;
@@ -244,9 +267,7 @@ export const SessionsModal: React.FC<SessionsModalProps> = ({ terminalHeight, te
                     if (renamingId || modalFocus !== "list") return;
                     if (selectedSession) {
                         if (refusedSwitch()) return;
-                        manager.duplicateSession(selectedSession.id);
-                        clearSelection();
-                        switchBack();
+                        requestDuplicate(selectedSession);
                     }
                 },
             },
