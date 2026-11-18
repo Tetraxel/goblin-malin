@@ -61,6 +61,13 @@ export function buildGlobalSettingsItems(
             set: (v) => onChange({ general: { reduceTerminalOutput: v } }),
         },
         {
+            kind: "checkbox",
+            indent: 0,
+            label: "Copy text selected with the mouse (Alt+drag selects a block)",
+            get: () => settings.general.copyOnSelect,
+            set: (v) => onChange({ general: { copyOnSelect: v } }),
+        },
+        {
             kind: "readonlyText",
             indent: 0,
             label: "⌂  App directory",

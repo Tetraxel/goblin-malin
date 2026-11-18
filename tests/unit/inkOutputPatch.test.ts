@@ -205,6 +205,58 @@ describe("patched Ink output.js", () => {
         expect(widestLine("")).toBe(stock(""));
     });
 
+    test("the screen tap holds the cells of the last frame, and a highlight restyles only the rows it asks for", async () => {
+        const [Stock, Patched] = await Promise.all([load("output.stock.js"), load("output.js")]);
+        const { getScreenTap } = await import("../../src/base/selection/screenTap");
+        const tap = getScreenTap();
+        const ops: Op[] = [
+            { kind: "write", x: 0, y: 0, text: "first row", transform: false },
+            { kind: "write", x: 2, y: 1, text: `${ESC}[31mred${ESC}[39m text`, transform: false },
+            { kind: "write", x: 0, y: 2, text: "日本 wide", transform: false },
+        ];
+        const width = 20;
+        const height = 4;
+        const stock = render(Stock, ops, width, height);
+
+        // No highlight: the strings are the stock ones and the tap shows what was painted.
+        tap.highlight = undefined;
+        expect(render(Patched, ops, width, height)).toEqual(stock);
+        expect(tap.frame).toHaveLength(height);
+        expect(
+            tap.frame[0]!.slice(0, 5)
+                .map((cell) => cell!.value)
+                .join("")
+        ).toBe("first");
+        expect(tap.frame[2]!.slice(0, 3).map((cell) => cell!.value)).toEqual(["日", "", "本"]);
+
+        // A highlight on row 1 only: that row changes, the others stay as stock Ink wrote them.
+        const asked: number[] = [];
+        tap.highlight = (y, row) => {
+            asked.push(y);
+            if (y !== 1) return undefined;
+            return row.map((cell) => ({
+                ...cell!,
+                styles: [...cell!.styles, { type: "ansi" as const, code: `${ESC}[7m`, endCode: `${ESC}[27m` }],
+            }));
+        };
+        try {
+            const highlighted = render(Patched, ops, width, height);
+            expect(asked).toEqual([0, 1, 2, 3]);
+            const rows = highlighted.output.split("\n");
+            const stockRows = stock.output.split("\n");
+            expect(rows[1]).toContain(`${ESC}[7m`);
+            expect(rows[1]).not.toEqual(stockRows[1]);
+            for (const y of [0, 2, 3]) expect(rows[y]).toEqual(stockRows[y]);
+            // The cells in the tap are the real ones, not the highlighted copies.
+            expect(tap.frame[1]!.some((cell) => cell!.styles.some((style) => style.code === `${ESC}[7m`))).toBe(false);
+        } finally {
+            tap.highlight = undefined;
+        }
+
+        // And the next frame, without it, goes back to the stock strings (nothing of the highlight was remembered).
+        expect(render(Patched, ops, width, height)).toEqual(stock);
+    });
+
     test("the patched render-node-to-output.js differs from the stock one only in where widestLine comes from", async () => {
         const fs = await import("node:fs");
         const read = (file: string) => fs.readFileSync(path.resolve(__dirname, "../../patches/ink", file), "utf-8");

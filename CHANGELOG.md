@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Select text with the mouse and it is copied.** Drag with the left button over anything on the screen (a task's title, a source, a log line, a dialog's text) and it is highlighted; when you let go, it is on the clipboard (and the footer says how much), like Claude Code's fullscreen mode. No `Shift` needed, which most terminals required for any selection while the app reports the mouse. The selection stays inside the panel it started in (the chat next to the task list, a source list next to the metadata box), the padding between a border and its text is not copied, and `Alt`+drag takes a rectangle. A plain click is still only a click, and a click, a key or the wheel removes the highlight. The copy goes through the terminal's clipboard sequence (OSC 52: it also works over SSH and inside tmux) and through the system clipboard tool where there is one. **Settings → General → "Copy text selected with the mouse"** turns it off.
+
 ## [0.2.4] — 2026-11-17
 
 ### Added

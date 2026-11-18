@@ -18,6 +18,7 @@ import { type UpdateInfo } from "#updater/updateChecker";
 import { Toolbar } from "./Toolbar/Toolbar";
 import { type ColumnDefinition, TaskListPanel } from "./TaskListPanel/TaskListPanel";
 import { SecondaryPanel } from "./SecondaryPanel/SecondaryPanel";
+import { SelectionLayer } from "./SelectionLayer";
 import { ShortcutDispatcher } from "./ShortcutDispatcher";
 import { InputRouter } from "./InputRouter";
 import { ImportActionsProvider } from "#contexts/ImportActionsContext";
@@ -274,6 +275,7 @@ Check your internet connection, then try again.`,
 
     return (
         <ImportActionsProvider openImportFlow={openImportFlow}>
+            <SelectionLayer />
             {/* ShortcutDispatcher: the single useInput in the app */}
             <ShortcutDispatcher />
             {/* InputRouter: registers global + window-specific shortcuts */}
