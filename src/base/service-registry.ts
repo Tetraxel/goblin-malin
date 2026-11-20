@@ -25,6 +25,8 @@ type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> =
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expandCollection?: (url: string, logger: Logger, task: Task<any>) => Promise<CollectionExpansion>;
     defaultSettings?: ProviderSettingsSchema;
+    // One sentence saying what the provider does for the user (shown in the first-run provider picker).
+    summary?: string;
     // The credentials the service needs (read from the app's secrets, see `appSecrets`).
     setupWizard?: SetupWizardConfig;
     // Must be explicitly allowed by the user (once) before the service is ever used.
@@ -41,6 +43,10 @@ type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> =
     // The address that opens one of this service's links (as `parseUrl` read it) in its desktop app, when it has one
     // (`spotify:track:<id>`). Read through `platformRegistry.openUri()`.
     openUri?: (parsed: ParsedUrl) => string | undefined;
+    // Download services: the platforms whose track links the service can download, by the registry key of their
+    // metadata service ("youtube"), or "any" for one that searches every track by its name. Shown next to the provider
+    // (Settings, the first-run picker) and read by `DownloadService.canDownload`.
+    linkPlatforms?: readonly string[] | "any";
     // Extra actions for the service's column in the task list (read generically, e.g. "Review match…"), given the
     // selected task. Called whenever the action bar is built: keep it cheap and free of side effects.
     columnActions?: (task: TTask) => ContextualActions[];

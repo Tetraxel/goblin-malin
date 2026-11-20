@@ -61,9 +61,32 @@ export type ListDialog = ListDialogBody & {
      */
     body?: Promise<ListDialogBody | null>;
     loadingLabel?: string;
+    /**
+     * Makes the list a checklist (one value per item: ticked or not). A key toggles the row under the cursor and
+     * Enter answers `{ checked }` with every row's value. Set by `dialogBridge.checklist`, which also leaves out
+     * `noneLabel` and `body`.
+     */
+    checked?: boolean[];
+    /** The label of the Enter hint ("Choose" by default). */
+    confirmLabel?: string;
 };
 
 export type ListAnswer = { index: number } | { none: true } | null;
+
+/** What the list dialog answers: a row (see `ListAnswer`), or every row's value for a checklist. */
+export type ListDialogAnswer = ListAnswer | { checked: boolean[] };
+
+/** A list the user ticks rows of (e.g. the providers to use). */
+export type ChecklistDialog = {
+    title: string;
+    /** Text above the list. */
+    intro?: string;
+    /** The rows; `checked` is how each starts. */
+    items: (ListItem & { checked: boolean })[];
+    accent?: string;
+    /** The label of the Enter hint (e.g. "Save"). */
+    confirmLabel?: string;
+};
 
 /** A one-line text field (e.g. the name of a group). */
 export type InputDialog = {
@@ -82,7 +105,7 @@ export type InputDialog = {
  * caller gives up on it: see `confirm`'s `signal`).
  */
 type ConfirmOpener = (dialog: ConfirmDialog, resolve: (index: number | null) => void) => void | (() => void);
-type ListOpener = (dialog: ListDialog, resolve: (answer: ListAnswer) => void) => void;
+type ListOpener = (dialog: ListDialog, resolve: (answer: ListDialogAnswer) => void) => void;
 type InputOpener = (dialog: InputDialog, resolve: (value: string | null) => void) => void;
 
 let confirmOpener: ConfirmOpener | null = null;
@@ -206,7 +229,37 @@ export const dialogBridge = {
                     if (!listOpener) return false;
                     listOpener(dialog, (answer) => {
                         done();
-                        resolve(answer);
+                        resolve(answer && "checked" in answer ? null : answer);
+                    });
+                    return true;
+                },
+                cancel: () => resolve(null),
+            });
+            pump();
+        });
+    },
+    /**
+     * Every row's value once the user confirms (Enter), in the order of `items`; null when dismissed / nobody to ask.
+     * Shown one at a time with the other dialogs, like `choose`.
+     */
+    checklist(dialog: ChecklistDialog): Promise<boolean[] | null> {
+        const list: ListDialog = {
+            title: dialog.title,
+            intro: dialog.intro,
+            accent: dialog.accent,
+            confirmLabel: dialog.confirmLabel,
+            items: dialog.items.map(({ checked: _checked, ...item }) => item),
+            checked: dialog.items.map((item) => item.checked),
+        };
+        return new Promise((resolve) => {
+            if (!listOpener) return resolve(null);
+            queue.push({
+                kind: "list",
+                open: (done) => {
+                    if (!listOpener) return false;
+                    listOpener(list, (answer) => {
+                        done();
+                        resolve(answer && "checked" in answer ? answer.checked : null);
                     });
                     return true;
                 },

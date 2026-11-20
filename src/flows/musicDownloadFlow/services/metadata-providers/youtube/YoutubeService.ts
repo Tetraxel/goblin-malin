@@ -67,6 +67,7 @@ export class YoutubeService extends MetadataService {
         colorSubtle: "#7a1500",
         colorBright: "#ff4040",
     };
+    static readonly summary = "Reads YouTube and YouTube Music links and playlists, and searches YouTube.";
     static readonly defaultSettings: ProviderSettingsSchema = {
         enabled: { label: "Enable", defaultValue: true, kind: "checkbox" },
     };

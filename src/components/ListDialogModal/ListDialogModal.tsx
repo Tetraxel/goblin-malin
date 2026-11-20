@@ -8,19 +8,24 @@ import { siteLabel, siteProviderKey } from "#utils/appLinks";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
-import { type DialogLink, type ListAnswer, type ListDialog, type ListDialogBody } from "#base/bridges/dialogBridge";
+import {
+    type DialogLink,
+    type ListDialogAnswer,
+    type ListDialog,
+    type ListDialogBody,
+} from "#base/bridges/dialogBridge";
 import { Hint } from "../Hint";
 
 export type PendingListDialog = {
     dialog: ListDialog;
-    resolve: (answer: ListAnswer) => void;
+    resolve: (answer: ListDialogAnswer) => void;
 };
 
 interface ListDialogModalProps {
     pending: PendingListDialog | null;
     terminalHeight: number;
     terminalWidth: number;
-    onAnswer: (answer: ListAnswer) => void;
+    onAnswer: (answer: ListDialogAnswer) => void;
 }
 
 // Rows the frame, title, intro and hints take around the list.
@@ -77,6 +82,9 @@ const LinkLine = React.memo(function LinkLine({
 /**
  * A pick-one list with detail lines under each row, plus an optional "none of these" row. Opened through
  * `dialogBridge.choose` (e.g. "which MusicBrainz release is this?"). Enter answers, Esc dismisses.
+ *
+ * Opened through `dialogBridge.checklist` (the dialog has `checked`), each row has a box: the toggle key ticks the row
+ * under the cursor, and Enter answers every row's value.
  */
 export const ListDialogModal: React.FC<ListDialogModalProps> = ({
     pending,
@@ -88,10 +96,12 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
     const { switchWindow, switchBack } = useFocusActions();
     const { activeWindow } = useFocusChrome();
     const [selected, setSelected] = useState(0);
+    const [checks, setChecks] = useState<boolean[]>([]);
 
     const [prevPending, setPrevPending] = useState(pending);
     if (prevPending !== pending) {
         setPrevPending(pending);
+        setChecks(pending?.dialog.checked ? [...pending.dialog.checked] : []);
         // Starts on the row the dialog asked for (the current choice), else on the first.
         const start = pending?.dialog.initialIndex ?? 0;
         setSelected(pending && start >= 0 && start < pending.dialog.items.length ? start : 0);
@@ -134,6 +144,7 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
     const dialog = pending ? { ...pending.dialog, ...loadedBody } : undefined;
     const rowCount = loading ? 0 : (dialog?.items.length ?? 0) + (dialog?.noneLabel ? 1 : 0);
     const isActive = pending !== null && activeWindow === "listDialog";
+    const isChecklist = !!dialog?.checked;
 
     useShortcuts({
         id: "listDialog",
@@ -159,7 +170,17 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
                 label: "Choose",
                 handler: () => {
                     if (!dialog || loading) return;
-                    onAnswer(selected < dialog.items.length ? { index: selected } : { none: true });
+                    if (isChecklist) onAnswer({ checked: dialog.items.map((_, i) => checks[i] === true) });
+                    else onAnswer(selected < dialog.items.length ? { index: selected } : { none: true });
+                },
+            },
+            {
+                id: "listDialog.toggle",
+                defaultShortcut: { input: " " },
+                label: "Toggle",
+                handler: () => {
+                    if (!isChecklist || loading) return;
+                    setChecks((current) => current.map((value, i) => (i === selected ? !value : value)));
                 },
             },
             {
@@ -263,6 +284,13 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
                                         <Box width={2} flexShrink={0}>
                                             <Text color={theme.ui.focusIndicator}>{isSelected ? "☛" : ""}</Text>
                                         </Box>
+                                        {isChecklist && i < dialog.items.length && (
+                                            <Box width={4} flexShrink={0}>
+                                                <Text color={checks[i] ? theme.status.success : theme.text.secondary}>
+                                                    {checks[i] ? "[✓]" : "[ ]"}
+                                                </Text>
+                                            </Box>
+                                        )}
                                         <Text bold={isSelected} wrap="truncate-end">
                                             {row.label}
                                         </Text>
@@ -278,7 +306,7 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
                                                 labelWidth={labelWidth}
                                             />
                                         ) : (
-                                            <Box key={d} marginLeft={2}>
+                                            <Box key={d} marginLeft={isChecklist ? 6 : 2}>
                                                 <Text color={theme.text.secondary} wrap="truncate-end">
                                                     {line}
                                                 </Text>
@@ -302,7 +330,8 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
                     </Box>
 
                     <Box marginTop={1} flexDirection="row">
-                        {!loading && <Hint label="Choose" shortcutId="listDialog.confirm" />}
+                        {!loading && <Hint label={dialog.confirmLabel ?? "Choose"} shortcutId="listDialog.confirm" />}
+                        {!loading && isChecklist && <Hint label="Toggle" shortcutId="listDialog.toggle" />}
                         {!loading && <Hint label="Select" shortcutIds={["listDialog.up", "listDialog.down"]} />}
                         {!loading && rows[selected]?.url && (
                             <Hint label="Open in browser" shortcutId="listDialog.open" />

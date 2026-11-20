@@ -7,6 +7,7 @@ import { type SettingsItem } from "#settings/buildSettingsItems";
 import { BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS, type MusicDownloadFlowSettings } from "./settings";
 import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
 import { runTempCleanup } from "./tempCleanupFlow";
+import { describeDownloadLinks, downloadLinkInfo } from "./downloadLinks";
 import { chatStore } from "./agent/chatStore";
 import { DEFAULT_CLAUDE_MODEL } from "./services/apis/claude-client";
 import { AGENT_MODELS } from "./agent/chooseAgentModel";
@@ -437,19 +438,21 @@ export function buildFlowSettingsItems(
 
     if (downloadProviders.length > 0) {
         items.push({ kind: "subHeader", label: "Providers" });
+        const metadataEnabled = (platform: string) => flowSettings.metadata.providers[platform]?.enabled !== false;
         for (const { key, ctor } of downloadProviders) {
-            items.push(
-                ...providerItems(
-                    key,
-                    ctor,
-                    flowSettings.download.providers[key] ?? {},
-                    onChange,
-                    "download",
-                    "providers",
-                    onOpenWizard,
-                    extras.providerStatus?.[key]
-                )
+            const [header, ...rest] = providerItems(
+                key,
+                ctor,
+                flowSettings.download.providers[key] ?? {},
+                onChange,
+                "download",
+                "providers",
+                onOpenWizard,
+                extras.providerStatus?.[key]
             );
+            // Which platforms' links it downloads: a metadata platform the user left off may still be a source of files.
+            const links = describeDownloadLinks(downloadLinkInfo(ctor), metadataEnabled);
+            items.push(header, { kind: "note", indent: 4, text: links }, ...rest);
         }
     }
 

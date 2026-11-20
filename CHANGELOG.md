@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Deezer, Apple Music, Tidal and Amazon Music.** Paste a link of any of them and the track is read like a Spotify one, with its own column in the list:
+    - **Deezer** (`deezer.com/track/…`, `link.deezer.com` short links): title, artists, duration, ISRC, album, track number, through Deezer's public API (no account). **Albums and playlists** are imported too. During discovery Deezer is asked for the track by its ISRC first (the same recording, for sure), else by artist and title. Its albums give MusicBrainz the barcode.
+    - **Apple Music** (`music.apple.com/…/album/…?i=…`, `/song/…`): title, artists, duration, album, genre, through Apple's public iTunes API (no account), in the store the link points into. **Albums** are imported too, and discovery searches Apple's catalogue by artist and title (Apple has no ISRC lookup).
+    - **Tidal** (`tidal.com/track/…`, `listen.tidal.com/…`): title, artists, duration, ISRC and album, read from the track's public page. Tidal cannot be searched without a key: a Tidal link comes from you, or from Songlink / MusicBrainz.
+    - **Amazon Music** (`music.amazon.*/tracks/…`, `/albums/…?trackAsin=…`): Amazon's pages hold no data without a browser and its API is closed, so the track is read through **Songlink**, which means each Amazon link is sent to `api.song.link` and uses its hourly quota. It is **off until you turn it on** (Settings → Metadata, or the first-run list). Songlink's discovery now also keeps the Amazon Music link it finds.
+
+    None of these four can be downloaded from (their streams are protected): **Soulseek** finds their tracks by name, and their ISRC, album and barcode help every other step. Albums of Tidal and Amazon Music, and Apple Music playlists, are not read yet.
+
+- **Choose your providers on the first launch.** After the welcome intro, two lists ask once which metadata providers (platforms) and which download providers to use, each with a line on what it does, what it sends away and its setup. A download provider lists **the platforms whose links it downloads** (yt-dlp: YouTube, SoundCloud; Soulseek: any platform, by name), and says when one of them is switched off: a platform you would not use yourself can still be where your files come from. Space ticks a row, Enter goes on, Esc keeps the providers as they are. Settings → Download now shows the same "Uses links from: …" line under each download provider.
+
+### Changed
+
+- With more than three platforms, the platform columns of the task list get narrower (and shorter headers: DZ, AM, TD, AZ) so the link and the title keep their room.
+
 ## [0.2.4] — 2026-11-17
 
 ### Added
