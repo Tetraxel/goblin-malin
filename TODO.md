@@ -33,7 +33,8 @@
 
 Decide per release whether each is wanted.
 
-- [ ] Import from **Deezer, Apple Music, Tidal** + matching provider toggles in Settings — `P28`
+- [x] Import from **Deezer, Apple Music, Tidal** (and Amazon Music, through Songlink) + matching provider toggles in Settings, and a first-run provider picker — `P28`
+- [ ] Tidal and Amazon Music albums and playlists, Apple Music playlists (no keyless way to list them today); a Tidal search (needs an API key and a setup wizard)
 - [ ] MusicBrainz options: "import files into Picard on save"; `Ctrl+M` opens the saved file in Picard
 - [ ] Auto-save to the output folder; auto-relocate missing files + a "Lost the link to the file" warning (relocation exists as `Ctrl+F` only) — `P23/T23.4`
 - [ ] `[K]` keep this download and delete the others; `[Ctrl+R]` relaunch downloading + a "Source metadata have changed" banner

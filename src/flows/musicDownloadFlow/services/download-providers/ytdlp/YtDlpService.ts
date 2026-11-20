@@ -12,7 +12,6 @@ import { getBinDir } from "#utils/appPaths";
 import { makeAbortError } from "#utils/errors";
 import { killProcessTree } from "#utils/killProcessTree";
 import {
-    type APIProvider,
     type TrackMetadata,
     type TrackDownloadSource,
     type DownloadProgressInfo,
@@ -61,6 +60,7 @@ export class YtDlpService extends DownloadService {
         colorSubtle: "#7a1500",
         colorBright: "#ff4040",
     };
+    static readonly summary = "Downloads the audio of a track's page: lossy (Opus / AAC), almost always found.";
     static readonly defaultSettings: ProviderSettingsSchema = {
         enabled: { label: "Enable", defaultValue: true, kind: "checkbox" },
         autoDownloadBinary: { label: "Auto-download latest binaries", defaultValue: true, kind: "checkbox" },
@@ -77,7 +77,9 @@ export class YtDlpService extends DownloadService {
     static readonly settingsStatus = cookiesSettingsStatus;
     static readonly cellComponent = YtDlpCell;
 
-    public compatibleMetadataProviders: APIProvider[] = ["youtube", "soundcloud"];
+    // The sites the app reads through yt-dlp: a track found there is a page yt-dlp downloads. (Deezer, Apple Music,
+    // Tidal and Amazon Music streams are DRM-protected: yt-dlp cannot read them.)
+    static readonly linkPlatforms = ["youtube", "soundcloud"] as const;
 
     constructor(task: DownloadTask, logger: Logger) {
         super("YtDlpService", task, logger);
@@ -97,7 +99,7 @@ export class YtDlpService extends DownloadService {
         // Check if this service can handle the track's source
         if (!this.canDownload(trackMetadata)) {
             throw new Error(
-                `YtDlpService cannot download from ${trackMetadata.apiProvider}. Compatible providers: ${this.compatibleMetadataProviders.join(", ")}`
+                `YtDlpService cannot download from ${trackMetadata.platform}. It reads: ${YtDlpService.linkPlatforms.join(", ")}`
             );
         }
 

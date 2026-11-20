@@ -49,6 +49,7 @@ export class SoundCloudService extends MetadataService {
         colorSubtle: "#7a2500",
         colorBright: "#ff5500",
     };
+    static readonly summary = "Reads SoundCloud tracks and sets, and searches SoundCloud (through yt-dlp).";
     static readonly defaultSettings: ProviderSettingsSchema = {
         enabled: { label: "Enable", defaultValue: true, kind: "checkbox" },
     };

@@ -55,11 +55,11 @@ A task is a plain serialisable attribute object (`TrackDownloadTask`) plus a sta
 
 Three registries, defined in [registries.ts](../src/flows/musicDownloadFlow/registries.ts):
 
-| Registry                   | Base class                                                                             | Registered today                                                   |
-| -------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `metadataServiceRegistry`  | [MetadataService](../src/flows/musicDownloadFlow/metadataService.ts)                   | `spotify`, `youtube`, `soundcloud`                                 |
-| `discoveryServiceRegistry` | [DiscoveryMetadataService](../src/flows/musicDownloadFlow/discoveryMetadataService.ts) | `songlink` (opt-in), `musicBrainz`, `claude` (opt-in, last resort) |
-| `downloadServiceRegistry`  | [DownloadService](../src/flows/musicDownloadFlow/downloadService.ts)                   | `ytdlp`, `soulseek`                                                |
+| Registry                   | Base class                                                                             | Registered today                                                                            |
+| -------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `metadataServiceRegistry`  | [MetadataService](../src/flows/musicDownloadFlow/metadataService.ts)                   | `spotify`, `youtube`, `soundcloud`, `deezer`, `appleMusic`, `tidal`, `amazonMusic` (opt-in) |
+| `discoveryServiceRegistry` | [DiscoveryMetadataService](../src/flows/musicDownloadFlow/discoveryMetadataService.ts) | `songlink` (opt-in), `musicBrainz`, `claude` (opt-in, last resort)                          |
+| `downloadServiceRegistry`  | [DownloadService](../src/flows/musicDownloadFlow/downloadService.ts)                   | `ytdlp`, `soulseek`                                                                         |
 
 Adding a provider = one service class + one `register()` call in `init.ts`. Display info (`static display`), settings (`defaultSettings`), consent, last-resort, URL parsing and its cell component are all declared on the class and read generically, so the UI and the pipeline never branch on a provider key. The details of these static capabilities are in [CLAUDE.md](../CLAUDE.md#provider-extensibility).
 

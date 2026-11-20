@@ -73,6 +73,11 @@ export type MusicDownloadFlowSettings = {
         /** Keep `agent.log` (in the data folder): everything said to and by Claude, and every tool call, raw. */
         keepLog: boolean;
     };
+    /** What the user has been asked once, on a first launch. */
+    onboarding: {
+        /** The metadata and download providers were offered to pick from, after the welcome intro (answered or not). */
+        providersChosen: boolean;
+    };
     collections: {
         /** How often a live-enabled playlist re-fetches its track list, in seconds. */
         defaultLiveRefreshIntervalSeconds: number;
@@ -149,6 +154,9 @@ export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSetting
         model: "sonnet",
         panelWidth: 42,
         keepLog: true,
+    },
+    onboarding: {
+        providersChosen: false,
     },
     collections: {
         defaultLiveRefreshIntervalSeconds: 120,

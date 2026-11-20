@@ -4,6 +4,7 @@ import { Footer } from "./Footer";
 import { TerminalTooSmall } from "./TerminalTooSmall";
 import { isTerminalTooSmall } from "#utils/terminalSize";
 import { introState } from "#utils/introState";
+import { appReady } from "#base/appReady";
 import { Separator } from "./Separator";
 import { PromptModal } from "./PromptModal/PromptModal";
 import { ImportModal } from "./ImportModal/ImportModal";
@@ -234,6 +235,11 @@ Check your internet connection, then try again.`,
         dialogBridge.setInputOpener(openInputDialog);
         return () => dialogBridge.setInputOpener(null);
     }, [openInputDialog]);
+
+    // The dialogs above are mounted: once the intro is over too, first-run questions may be asked (see `appReady`).
+    useEffect(() => {
+        if (!introOpen) appReady.markReady();
+    }, [introOpen]);
 
     // Bridge: let plain-TS task actions open the start-options modal.
     useEffect(() => {

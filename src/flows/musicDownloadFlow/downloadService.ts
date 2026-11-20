@@ -1,4 +1,5 @@
 import { ServiceBase } from "#base/service-base";
+import { platformRegistry } from "#base/platformRegistry";
 import { type Logger } from "#base/logger/logger";
 import { type TrackMetadata, type TrackDownloadSource, type APIProvider } from "./types";
 import { type DownloadTask } from "./utils/downloadTask";
@@ -32,7 +33,16 @@ export type DownloadUpdateCallback = (source: TrackDownloadSource, options?: Dow
  * Handles downloading tracks from various sources.
  */
 export abstract class DownloadService extends ServiceBase {
-    abstract compatibleMetadataProviders: APIProvider[];
+    /**
+     * The platforms whose track links this service can download, by the registry key of their metadata service
+     * (`"youtube"`, `"soundcloud"`; an alias such as `youtubeMusic` counts as its service's), or `"any"` for a service
+     * that searches every track by its name (Soulseek). Declared once on the class: `canDownload` reads it, and so do
+     * Settings and the first-run provider picker, which show the user which platforms feed which download provider.
+     */
+    static readonly linkPlatforms?: readonly string[] | "any";
+
+    /** For a service that declares no `linkPlatforms` (a test double): the `apiProvider`s of the metadata it can download. */
+    compatibleMetadataProviders: APIProvider[] = [];
 
     /**
      * True for a provider that finds files by free-text search (artist/title) rather
@@ -50,6 +60,9 @@ export abstract class DownloadService extends ServiceBase {
     }
 
     public canDownload(trackMetadata: TrackMetadata): boolean {
+        const platforms = (this.constructor as typeof DownloadService).linkPlatforms;
+        if (platforms === "any") return true;
+        if (platforms) return platforms.includes(platformRegistry.canonical(trackMetadata.platform));
         return this.compatibleMetadataProviders.includes(trackMetadata.apiProvider);
     }
 

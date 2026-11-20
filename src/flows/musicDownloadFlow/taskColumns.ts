@@ -16,6 +16,13 @@ type Column = ColumnDefinition<MusicDownloadTaskAttributes>;
 
 const GenericProviderCell: Column["component"] = () => null;
 
+/** The weight of one platform column, while there are few of them. */
+const PLATFORM_WEIGHT = 20;
+/** Up to this many platform columns, each weighs `PLATFORM_WEIGHT`. */
+const FEW_PLATFORMS = 3;
+/** A platform column never weighs less than this (its acronym still fits: `minWidth`). */
+const MIN_PLATFORM_WEIGHT = 4;
+
 /**
  * Pure derivation: (display mode, current settings) → column list. Callers
  * recompute via useMemo keyed on the mode and a settings version — there is no
@@ -45,9 +52,15 @@ export function computeColumns(mode: PrimaryMode): Column[] {
 
     if (mode === "metadata") {
         const { providers, discoveryProviders } = settings.metadata;
-        const metadataServiceColumns: Column[] = Array.from(
+        const metadataKeys = Array.from(
             metadataServiceRegistry.getEnabledFactories((key) => providers[key]?.enabled !== false).keys()
-        ).map((key) => {
+        );
+        // Past three platforms, each column weighs less, and all of them together too (every column also takes its
+        // acronym's width first): more platforms must not squeeze the link and the title. A platform cell only shows
+        // an id, which is still readable truncated.
+        const crowding = Math.min(1, FEW_PLATFORMS / Math.max(1, metadataKeys.length));
+        const metadataWeight = Math.max(MIN_PLATFORM_WEIGHT, PLATFORM_WEIGHT * crowding * crowding);
+        const metadataServiceColumns: Column[] = metadataKeys.map((key) => {
             const display = providerDisplayRegistry.get(key);
             return {
                 id: `metadataService-${key}`,
@@ -55,7 +68,7 @@ export function computeColumns(mode: PrimaryMode): Column[] {
                 acronym: display.acronym,
                 minWidth: Math.max(2, display.acronym.length + 3),
                 color: display.color,
-                weight: 20,
+                weight: metadataWeight,
                 flexGrow: 0,
                 component:
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any

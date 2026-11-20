@@ -11,7 +11,6 @@ import { makeAbortError, throwIfAborted } from "#utils/errors";
 import { probeAudio } from "#utils/probeAudio";
 import { formatSize } from "#utils/formatBytes";
 import {
-    type APIProvider,
     type TrackMetadata,
     type TrackDownloadSource,
     type DownloadQueryField,
@@ -70,6 +69,7 @@ export class SoulseekService extends DownloadService {
         usesCompiledMetadata: true,
     };
     static readonly cellComponent = SoulseekCell;
+    static readonly summary = "Searches other people's libraries by artist and title: often lossless. Needs a login.";
     static readonly defaultSettings: ProviderSettingsSchema = {
         enabled: { label: "Enable", defaultValue: false, kind: "checkbox" },
         mp3Fallback: { label: "Fall back to MP3 if no FLAC found", defaultValue: true, kind: "checkbox" },
@@ -111,28 +111,7 @@ export class SoulseekService extends DownloadService {
 
     // Soulseek searches by free-text artist/title, so it can serve any metadata
     // source — unlike yt-dlp/etc it isn't tied to a specific platform's URLs.
-    public compatibleMetadataProviders: APIProvider[] = [
-        "musicBrainz",
-        "spotify",
-        "itunes",
-        "youtube",
-        "google",
-        "pandora",
-        "deezer",
-        "tidal",
-        "amazon",
-        "soundcloud",
-        "napster",
-        "yandex",
-        "spinrilla",
-        "audius",
-        "audiomack",
-        "anghami",
-        "boomplay",
-        "bandcamp",
-        "songlink",
-        "spotifyUrlInfo",
-    ];
+    static readonly linkPlatforms = "any" as const;
 
     // The search query is built from free-text artist/title, not tied to whichever
     // metadata group happened to be picked — startDownloads() should hand this

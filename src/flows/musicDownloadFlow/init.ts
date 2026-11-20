@@ -7,6 +7,10 @@ import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegis
 import { SpotifyService } from "./services/metadata-providers/spotify/SpotifyService";
 import { YoutubeService } from "./services/metadata-providers/youtube/YoutubeService";
 import { SoundCloudService } from "./services/metadata-providers/soundcloud/SoundCloudService";
+import { DeezerService } from "./services/metadata-providers/deezer/DeezerService";
+import { AppleMusicService } from "./services/metadata-providers/appleMusic/AppleMusicService";
+import { TidalService } from "./services/metadata-providers/tidal/TidalService";
+import { AmazonMusicService } from "./services/metadata-providers/amazonMusic/AmazonMusicService";
 import { SonglinkService } from "./services/metadata-providers/songlink/SonglinkService";
 import { MusicBrainzDiscoveryService } from "./services/metadata-providers/musicbrainz/MusicBrainzDiscoveryService";
 import { ClaudeDiscoveryService } from "./services/metadata-providers/claude/ClaudeDiscoveryService";
@@ -14,6 +18,7 @@ import { YtDlpService } from "./services/download-providers/ytdlp/YtDlpService";
 import { SoulseekService } from "./services/download-providers/soulseek/SoulseekService";
 import { registerAgentTools } from "./agent/registerAgentTools";
 import { registerActionsMenuItems } from "./actionsMenuItems";
+import { registerProviderOnboarding } from "./providerOnboarding";
 import { taskLocks } from "#base/task/taskLock";
 import { appSecrets, wizardEnvKeys } from "#base/appSecrets";
 import { sweepStaleCookieCopies } from "./services/download-providers/ytdlp/cookiesCopy";
@@ -35,6 +40,10 @@ export function initMusicApp(): void {
     metadataServiceRegistry.register("spotify", SpotifyService);
     metadataServiceRegistry.register("youtube", YoutubeService);
     metadataServiceRegistry.register("soundcloud", SoundCloudService);
+    metadataServiceRegistry.register("deezer", DeezerService);
+    metadataServiceRegistry.register("appleMusic", AppleMusicService);
+    metadataServiceRegistry.register("tidal", TidalService);
+    metadataServiceRegistry.register("amazonMusic", AmazonMusicService);
     // metadataServiceRegistry.register('musicbrainz', MusicBrainzService);
 
     discoveryServiceRegistry.register("songlink", SonglinkService);
@@ -53,6 +62,9 @@ export function initMusicApp(): void {
 
     // Cookie copies a killed download left behind hold the user's session: removed (old ones only).
     void sweepStaleCookieCopies();
+
+    // On a first launch, once the intro is over: which metadata and download providers to use.
+    registerProviderOnboarding();
 
     // What the toolbar's "Actions" menu offers.
     registerActionsMenuItems();

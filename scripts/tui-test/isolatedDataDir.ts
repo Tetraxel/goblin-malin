@@ -104,6 +104,9 @@ function pointMusicFoldersInside(
 
     download.outputDir = outputDir;
     download.outputTemporaryDir = outputTemporaryDir;
+    // The first-run provider picker would open over every scenario: answered already, unless the fixture says otherwise.
+    const onboarding = child(music, "onboarding");
+    if (onboarding.providersChosen === undefined) onboarding.providersChosen = true;
     if (settingsPatch) mergeInto(raw, settingsPatch);
     fs.writeFileSync(settingsPath, JSON.stringify(raw, null, 4));
 }
