@@ -24,10 +24,10 @@ goblin-malin
 
 Then press **`Ctrl+V`** with a Spotify, YouTube, SoundCloud, Deezer, Apple Music or Tidal link on your clipboard. That's it.
 
-- [Why you might like it](#why-you-might-like-it)
+- [At a glance](#at-a-glance)
 - [How it works](#how-it-works)
+- [A closer look](#a-closer-look)
 - [What it can read, search and download](#what-it-can-read-search-and-download)
-- [Screenshots](#screenshots)
 - [Install](#install)
 - [First run](#first-run)
 - [Keyboard](#keyboard)
@@ -36,36 +36,52 @@ Then press **`Ctrl+V`** with a Spotify, YouTube, SoundCloud, Deezer, Apple Music
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing) · [License](#license)
 
-## Why you might like it
+## At a glance
 
-**It starts from the link you already have.** A track, an album or a playlist, from any of six platforms. Short links, links without `https://` and `spotify:track:…` URIs work too. A playlist can keep refreshing itself.
-
-**It cross-checks instead of trusting one source.** The same track is looked up on every other platform (by ISRC when possible, by artist and title otherwise), each platform searched at once and shown in its own group with a confidence score. Title, artists, album, year, ISRC and track number are merged into one set of **compiled metadata** that you can edit field by field. [MusicBrainz](https://musicbrainz.org) tells which release the track is on, and its IDs go into the saved file.
-
-**It is honest about quality.** Downloads from **yt-dlp** (YouTube, SoundCloud) and **Soulseek** (peer-to-peer, searched by artist and title) are listed side by side, with their real codec, bitrate and size, and you can preview each one before choosing. A FLAC that was transcoded from YouTube's Opus is marked `FLAC*`: it is not pretending to be lossless. A genuine lossless file from Soulseek is not.
-
-**It saves the format you want, tagged properly.** FLAC by default; MP3, Ogg, Opus or M4A if your software needs it (rekordbox, say), or keep each download as it came. Tags are written in the form other software reads (iTunes, phones, MusicBrainz Picard).
-
-**It never throws away what you typed.** A link you pasted onto a track, a title you corrected: they live outside everything the pipeline rebuilds. Restarting, re-discovering or stopping a task never removes them, and anything that would discard work asks first.
-
-**Claude can help, only if you let it.** Two opt-in ways, both through your own [Claude Code](https://claude.com/claude-code) CLI and your own plan (no API key needed):
-
-- **Ask Claude** — when a platform is still missing for a track, one button (`A`) asks Claude to find it. Its answer must pass the platform's own metadata fetch and a confidence check.
-- **Chat** (`Ctrl+T`) — talk to Claude about your list: "fix the titles in this playlist", "which of these have no lossless source?". It reads and edits your tracks through a fixed set of typed [tools](docs/agent-tools.md), shows a preview before any batch, can be undone with `/undo`, asks before it downloads anything, and never touches a file itself.
-
-**It is a real keyboard app, and the mouse works too.** Every shortcut can be rebound and the hints on screen always show your live binding. Click, scroll, and drag over any text to copy it. Sessions are saved and re-opened on the next start; you can keep several and archive finished tasks.
-
-**Private by design.** No account, no telemetry. See [Privacy](#privacy) for exactly what is sent where.
+- **One paste, one file.** Tracks, albums and playlists from six platforms. A whole playlist is a single paste.
+- **It finds each track everywhere.** The same song is looked up on the other platforms and the details (title, artists, album, year…) are merged into one set that you can edit.
+- **It tells you the real quality.** Every download is listed with its true format and size, so a FLAC made from a YouTube video is not mistaken for a real lossless file.
+- **Clean, tagged files.** FLAC by default, or MP3, Ogg, Opus or M4A, with tags that iTunes, your phone and MusicBrainz Picard can read.
+- **What you type is yours.** A link you pasted or a title you corrected is never wiped by a restart, and anything that would throw work away asks first.
+- **Private.** No account, no telemetry.
+- **Claude can help, if you want it to.** Entirely optional, through your own Claude account.
+- **Made for the keyboard**, with the mouse working too.
 
 ## How it works
 
-1. **Paste** a track, album or playlist link. The platform is recognised and the track is read (Spotify, YouTube, SoundCloud, Deezer, Apple Music, Tidal).
-2. **Find it elsewhere.** The same track is looked up on every other platform, all at once, through MusicBrainz, plus Songlink if you allowed it. Each platform shows up as a group with a confidence score, and if one is still missing you can ask Claude (opt-in) to look for it.
-3. **Find download sources.** yt-dlp and Soulseek each search for a file, and the candidates are listed side by side with their real quality.
-4. **Pick one.** Preview the candidates, compare them, and keep the best (it is chosen for you by default, and you can change it).
-5. **Save.** The file is converted if you asked for a format (FLAC by default) and written with clean tags and MusicBrainz IDs.
+1. **Paste** a track, album or playlist link. The app recognises the platform and reads the track.
+2. **It looks for the same track elsewhere**, on all the other platforms at once. Each one shows up as a group with a confidence score.
+3. **It searches for files to download** with yt-dlp and Soulseek, and lists the candidates side by side.
+4. **You pick one.** Preview the candidates, compare them, and keep the best (the app suggests one).
+5. **It saves the file** in the format you chose, with clean tags.
 
-Everything runs as a queue with a configurable number of parallel tasks, so a whole playlist is one paste. When a source can't be found (an unofficial re-upload, say), **paste the right link yourself** onto the track or onto a platform's cell: it is kept for good.
+When a source can't be found (an unofficial re-upload, say), **paste the right link yourself** onto the track: it is kept for good.
+
+## A closer look
+
+### Pick the best source
+
+<img src="https://raw.githubusercontent.com/Tetraxel/goblin-malin/main/docs/screenshots/download-view.png" width="100%" alt="The download view: sources from yt-dlp and Soulseek side by side, the saved file pinned on top, and the old and new versions compared"/>
+
+- Candidates from **yt-dlp** (YouTube, SoundCloud) and **Soulseek** are shown with their real format, bitrate and size.
+- A `FLAC*` was converted from a lossy source (YouTube's Opus, for instance): it is not pretending to be lossless.
+- Play any candidate before you choose. When you replace a file you already saved, the old and the new version are shown next to each other.
+
+### Let Claude help (optional)
+
+<img src="https://raw.githubusercontent.com/Tetraxel/goblin-malin/main/docs/screenshots/chat.png" width="100%" alt="The Claude chat docked beside the task list, adding remixes of a track to the list"/>
+
+- **Chat** (`Ctrl+T`): ask for things like "fix the titles in this playlist" or "find remixes of this track". Claude reads and edits your tracks, shows a preview before changing many at once, asks before downloading anything, and you can undo with `/undo`. It never touches a file itself.
+- **Ask Claude** (`A`): when a platform is still missing for a track, one button asks Claude to look for it.
+- It runs through the [Claude Code](https://claude.com/claude-code) CLI on your computer and your own plan, only after you allow it. No API key needed.
+
+### Make it yours
+
+<img src="https://raw.githubusercontent.com/Tetraxel/goblin-malin/main/docs/screenshots/settings.png" width="100%" alt="The settings window: providers, output format, folders and the Claude chat"/>
+
+- Choose the **providers**, the **output format** (or keep each download as it came), the **folders** and how many tracks run at once.
+- Every **keyboard shortcut** can be rebound, and the hints on screen always show your own keys.
+- Your list is saved as a **session** and re-opened next time. Keep several, and archive what is finished.
 
 ## What it can read, search and download
 
@@ -81,18 +97,6 @@ Everything runs as a queue with a configurable number of parallel tasks, so a wh
 Discovery also uses **MusicBrainz** (on by default), **Songlink** (opt-in) and **Claude** (opt-in, on request). Soulseek is off by default: turn it on in Settings → Download.
 
 Platforms whose streams are protected (Spotify, Deezer, Apple Music, Tidal) are used for what they know best, **metadata**; the audio itself comes from yt-dlp or Soulseek.
-
-## Screenshots
-
-<table>
-  <tr>
-    <td width="50%"><img src="https://raw.githubusercontent.com/Tetraxel/goblin-malin/main/docs/screenshots/download-view.png" alt="Download view: yt-dlp and Soulseek sources compared, with the saved file pinned on top"/><br/><sub><b>Pick the best source.</b> Real codec, bitrate and size for every candidate, a preview, and the saved file pinned on top.</sub></td>
-    <td width="50%"><img src="https://raw.githubusercontent.com/Tetraxel/goblin-malin/main/docs/screenshots/chat.png" alt="The Claude chat panel docked beside the task list"/><br/><sub><b>Chat with Claude</b> (opt-in). It reads and fixes your tracks through typed tools, with a preview and an undo.</sub></td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center"><img src="https://raw.githubusercontent.com/Tetraxel/goblin-malin/main/docs/screenshots/settings.png" width="50%" alt="Settings"/><br/><sub><b>Everything is configurable:</b> providers, formats, folders, concurrency, themes, shortcuts.</sub></td>
-  </tr>
-</table>
 
 ## Install
 
