@@ -9,7 +9,7 @@
         { "type": "waitForContent", "text": "Hooked", "timeout": 20000 },
         { "type": "wait", "ms": 2500 },
 
-        { "type": "key", "key": "ArrowRight" },
+        { "type": "key", "key": "ArrowRight", "repeat": 3 },
         { "type": "key", "key": "Enter" },
         { "type": "stable", "quiescenceMs": 500 },
         { "type": "assert", "contains": "Other session" },

@@ -18,9 +18,7 @@ describe("render profile", () => {
             steps: [
                 { type: "stable", timeout: 10000 },
                 { type: "waitForContent", text: "No task to run", timeout: 5000 },
-                { type: "key", key: "ArrowRight" },
-                { type: "stable" },
-                { type: "key", key: "ArrowRight" },
+                { type: "key", key: "ArrowRight", repeat: 4 },
                 { type: "stable" },
                 { type: "key", key: "Enter" },
                 { type: "stable" },
@@ -91,8 +89,8 @@ describe("render profile", () => {
             { type: "stable", timeout: 20000, quiescenceMs: 1000 },
             { type: "waitForContent", text: "Hooked", timeout: 10000 },
             { type: "wait", ms: 1000 },
-            // Focus starts on the toolbar: → then Enter opens the Sessions modal, Escape closes it.
-            { type: "key", key: "ArrowRight" },
+            // Focus starts on the toolbar: 3 × → then Enter opens the Sessions modal, Escape closes it.
+            { type: "key", key: "ArrowRight", repeat: 3 },
             { type: "key", key: "Enter" },
             // Waits for the modal: a fixed pause was not always enough on a slow runner (Windows, node 22).
             { type: "waitForContent", text: "Search sessions", timeout: 10000 },

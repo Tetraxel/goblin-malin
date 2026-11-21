@@ -11,10 +11,10 @@ import { useExitButton } from "./useExitButton";
 // app's life; each hook derives its own live state (labels, progress, colors).
 export const TOOLBAR_BUTTONS: ToolbarButtonHook[] = [
     useRunAllButton,
+    useActionsButton,
+    useChatButton,
     useSessionsButton,
     useArchiveButton,
-    useActionsButton,
     useSettingsButton,
-    useChatButton,
     useExitButton,
 ];

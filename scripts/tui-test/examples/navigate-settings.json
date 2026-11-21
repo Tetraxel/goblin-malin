@@ -6,11 +6,8 @@
         { "type": "waitForContent", "text": "No task to run", "timeout": 5000 },
         { "type": "snapshot", "name": "initial" },
 
-        // Toolbar order: Run, Sessions, Archive, Actions, Settings, Claude, Exit: Settings is 4 presses of → from the start.
-        { "type": "key", "key": "ArrowRight" },
-        { "type": "key", "key": "ArrowRight" },
-        { "type": "key", "key": "ArrowRight" },
-        { "type": "key", "key": "ArrowRight" },
+        // Toolbar order: Run, Actions, Claude, Sessions, Archive, Settings, Exit: Settings is 5 presses of → from the start.
+        { "type": "key", "key": "ArrowRight", "repeat": 5 },
         { "type": "key", "key": "Enter" },
         { "type": "stable" },
         // "Settings" is a permanent toolbar label, so assert on text only the modal shows.

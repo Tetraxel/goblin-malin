@@ -5,8 +5,7 @@
         { "type": "stable", "timeout": 8000 },
         { "type": "waitForContent", "text": "Hooked", "timeout": 5000 },
 
-        { "type": "key", "key": "ArrowRight" },
-        { "type": "key", "key": "ArrowRight" },
+        { "type": "key", "key": "ArrowRight", "repeat": 5 },
         { "type": "key", "key": "Enter" },
         { "type": "stable" },
         { "type": "key", "key": "Tab" },
