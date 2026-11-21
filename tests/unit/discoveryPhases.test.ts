@@ -363,6 +363,18 @@ describe("last-resort discovery (only when the user asks)", () => {
         expect(task.getLastResortOffers()).toEqual([]);
     });
 
+    test("is not offered while the regular search still runs (every platform is empty then)", async () => {
+        const task = await makeTask();
+        task.updateAttributes({ metadataDiscoveringInProgress: true });
+        expect(task.getLastResortOffers()).toEqual([]);
+
+        task.updateAttributes({ metadataDiscoveringInProgress: false, primaryMetadataInProgress: true });
+        expect(task.getLastResortOffers()).toEqual([]);
+
+        task.updateAttributes({ primaryMetadataInProgress: false });
+        expect(task.getLastResortOffers().length).toBeGreaterThan(0);
+    });
+
     test("is not offered when the user has switched it off", async () => {
         const task = await makeTask({ lastResortEnabled: false });
         await task.startMetadataDiscovering();

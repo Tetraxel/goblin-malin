@@ -83,37 +83,50 @@ export async function runProviderOnboarding(): Promise<void> {
     const download = entriesOf(downloadServiceRegistry);
     const { metadata: storedMetadata, download: storedDownload } = getMusicSettings();
 
-    const answer = await dialogBridge.matrix({
-        title: "Choose your providers",
-        intro:
-            "Metadata providers read the links you paste and find each track on the other platforms; download " +
-            "providers fetch the audio file. A platform's links are only used while both are ticked (in color). " +
-            "Settings → Metadata / Download change this later.",
-        columns: {
-            heading: "Download providers",
-            items: download.map(({ key, ctor }) => ({
-                key,
-                label: labelOf(key),
-                color: providerDisplayRegistry.get(key).color,
-                checked: isOn(ctor, storedDownload.providers[key]),
-                detail: downloadItemDetail(ctor),
-                note: describeLinkSources(downloadLinkInfo(ctor), () => true),
-            })),
+    let unanswerable = false;
+    const answer = await dialogBridge.matrix(
+        {
+            title: "Choose your providers",
+            intro:
+                "Metadata providers read the links you paste and find each track on the other platforms; download " +
+                "providers fetch the audio file. A platform's links are only used while both are ticked (in color). " +
+                "Settings → Metadata / Download change this later.",
+            columns: {
+                heading: "Download providers",
+                items: download.map(({ key, ctor }) => ({
+                    key,
+                    label: labelOf(key),
+                    color: providerDisplayRegistry.get(key).color,
+                    checked: isOn(ctor, storedDownload.providers[key]),
+                    detail: downloadItemDetail(ctor),
+                    note: describeLinkSources(downloadLinkInfo(ctor), () => true),
+                })),
+            },
+            rows: {
+                heading: "Metadata providers",
+                items: metadata.map(({ key, ctor }) => ({
+                    key,
+                    label: labelOf(key),
+                    color: providerDisplayRegistry.get(key).color,
+                    checked: isOn(ctor, storedMetadata.providers[key]),
+                    detail: metadataItemDetail(ctor),
+                })),
+            },
+            cells: providerCells(metadata, download),
+            columnLinksLabel: "links from",
         },
-        rows: {
-            heading: "Metadata providers",
-            items: metadata.map(({ key, ctor }) => ({
-                key,
-                label: labelOf(key),
-                color: providerDisplayRegistry.get(key).color,
-                checked: isOn(ctor, storedMetadata.providers[key]),
-                detail: metadataItemDetail(ctor),
-            })),
-        },
-        cells: providerCells(metadata, download),
-        columnLinksLabel: "links from",
-    });
+        {
+            onUnanswerable: () => {
+                unanswerable = true;
+            },
+        }
+    );
     if (!answer) {
+        // The UI went away (the app is closing) before the user saw it: ask again next time.
+        if (unanswerable) {
+            logger.info("Provider picker could not be shown: it will be asked again");
+            return;
+        }
         logger.info("Provider picker dismissed: keeping the current providers");
         markAsked();
         return;

@@ -223,11 +223,16 @@ export class DeezerService extends MetadataService {
             // The ISRC names the recording itself: the answer is the track, no guessing.
             const isrc = sourceTrackMetadata.isrc?.trim();
             if (isrc) {
-                const byIsrc = await this.getTrackByIsrc(isrc);
-                const metadata = byIsrc.track ? convertDeezerToTrack(byIsrc.track) : null;
-                if (metadata) {
-                    this.status.clear();
-                    return [{ metadata, searchKeys: ["isrc"], query: [{ label: "ISRC", value: isrc }] }];
+                try {
+                    const byIsrc = await this.getTrackByIsrc(isrc);
+                    const metadata = byIsrc.track ? convertDeezerToTrack(byIsrc.track) : null;
+                    if (metadata) {
+                        this.status.clear();
+                        return [{ metadata, searchKeys: ["isrc"], query: [{ label: "ISRC", value: isrc }] }];
+                    }
+                } catch (error) {
+                    // A quota error or a timeout on this one call must not cost the track its search by name.
+                    this.logger.warn(`Deezer ISRC lookup failed, searching by name instead: ${isrc}`, { error });
                 }
             }
 

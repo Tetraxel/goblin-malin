@@ -223,4 +223,15 @@ describe("the first-run provider picker", () => {
         await runProviderOnboarding();
         expect(asked).toHaveLength(1);
     });
+
+    test("the UI going away before the user answers does not count as an answer: it is asked again", async () => {
+        const { runProviderOnboarding } = await import("#flows/musicDownloadFlow/providerOnboarding");
+        // The opener leaves the screen without answering (the app is closing).
+        dialogBridge.setMatrixOpener(() => queueMicrotask(() => dialogBridge.setMatrixOpener(null)));
+        await runProviderOnboarding();
+        expect((await settings()).onboarding.providersChosen).toBe(false);
+        // No UI at all when it is called: not asked for good either.
+        await runProviderOnboarding();
+        expect((await settings()).onboarding.providersChosen).toBe(false);
+    });
 });

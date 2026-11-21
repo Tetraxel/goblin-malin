@@ -269,9 +269,14 @@ export const dialogBridge = {
      * Every row's and column's value once the user saves; null when dismissed / nobody to ask. Shown one at a time with
      * the other dialogs, like `choose`.
      */
-    matrix(dialog: MatrixDialog): Promise<MatrixAnswer> {
+    matrix(dialog: MatrixDialog, options: { onUnanswerable?: () => void } = {}): Promise<MatrixAnswer> {
         return new Promise((resolve) => {
-            if (!matrixOpener) return resolve(null);
+            // `onUnanswerable`: the null that follows is "nobody was there to ask" (no UI, or it went away), not a
+            // person pressing Esc: the caller can tell the two apart.
+            if (!matrixOpener) {
+                options.onUnanswerable?.();
+                return resolve(null);
+            }
             queue.push({
                 kind: "matrix",
                 open: (done) => {
@@ -282,7 +287,10 @@ export const dialogBridge = {
                     });
                     return true;
                 },
-                cancel: () => resolve(null),
+                cancel: () => {
+                    options.onUnanswerable?.();
+                    resolve(null);
+                },
             });
             pump();
         });

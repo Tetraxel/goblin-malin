@@ -59,7 +59,12 @@ class UrlParserRegistry {
         const known = this.resolved.get(url);
         if (known) return known;
         for (const resolver of this.resolvers) {
-            const pending = resolver(url);
+            let pending: Promise<string> | null;
+            try {
+                pending = resolver(url);
+            } catch {
+                continue; // a resolver that throws does not read this link: the next one may
+            }
             if (!pending) continue;
             const settled = pending.then(
                 (target) => target || url,

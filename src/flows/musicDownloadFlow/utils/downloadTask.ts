@@ -1210,11 +1210,15 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
     /**
      * The last-resort discovery services (Claude) the user can start for this track right now, each with the platforms
-     * it would look for. None while no platform is missing. A service that asks consent is always offered, even
+     * it would look for. None while no platform is missing, or while the primary fetch / the regular search runs. A service that asks consent is always offered, even
      * after a "no": the click is what asks (again), so the button never disappears for lack of an answer. One without
      * consent is offered while it is switched on. Cheap: called while the panel is drawn.
      */
     getLastResortOffers(): LastResortOffer[] {
+        // While the primary source is read or the regular search runs, every platform "has no result" yet: nothing is
+        // missing until they have answered (the list hides its button for the same reason, and so does the key).
+        const attributes = this.getAttributes();
+        if (attributes?.primaryMetadataInProgress || attributes?.metadataDiscoveringInProgress) return [];
         const missing = this.getMissingPlatforms();
         if (missing.length === 0) return [];
         const offers: LastResortOffer[] = [];

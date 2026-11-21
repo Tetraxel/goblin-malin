@@ -121,19 +121,32 @@ export function useImportFlow(openConfirmModal: (config: ConfirmModalConfig) => 
 
             // Short links still being followed are waited for (each is followed once, so this is usually instant):
             // a short link to an album must become a collection, not a track.
-            void urlParserRegistry.resolveAll(raws).then((urls) => {
-                const tasks = createTasksFromUrls(urls, { toTag: fetchMetadata, toDownload: download });
-                // Task ids derive from the URL, so a re-imported track matches its archived self.
-                const archivedIds = getArchivedTaskIds(SessionManager.getInstance().getCurrentSession());
-                const archivedTasks = tasks.filter((t) => archivedIds.has(t.getId()));
-                if (archivedTasks.length === 0) {
-                    importTasks(tasks);
-                    return;
-                }
-                askAboutArchived(tasks, archivedTasks);
-            });
+            // The dialog already followed them while it was open, so this is normally answered from the cache.
+            void urlParserRegistry
+                .resolveAll(raws)
+                .then((urls) => {
+                    const tasks = createTasksFromUrls(urls, { toTag: fetchMetadata, toDownload: download });
+                    // Task ids derive from the URL, so a re-imported track matches its archived self.
+                    const archivedIds = getArchivedTaskIds(SessionManager.getInstance().getCurrentSession());
+                    const archivedTasks = tasks.filter((t) => archivedIds.has(t.getId()));
+                    if (archivedTasks.length === 0) {
+                        importTasks(tasks);
+                        return;
+                    }
+                    askAboutArchived(tasks, archivedTasks);
+                })
+                .catch((error: unknown) => {
+                    globalLogger.error("Import failed", { error });
+                    openConfirmModal({
+                        title: "Import failed",
+                        message: error instanceof Error ? error.message : "The links could not be imported.",
+                        choices: [{ label: "OK", color: theme.action.primary }],
+                        accentColor: theme.status.warning,
+                        onConfirm: () => {},
+                    });
+                });
         },
-        [pendingImport, askAboutArchived]
+        [pendingImport, askAboutArchived, openConfirmModal, theme]
     );
 
     const handleImportCancel = useCallback(() => {

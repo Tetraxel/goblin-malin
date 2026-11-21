@@ -528,13 +528,17 @@ export const addTasks = defineAgentTool<{ urls: string[] }>({
     run: async ({ urls }, ctx) => {
         // A short link says whether it is a track or an album only once followed (never throws: one that cannot be
         // followed stays as it was).
-        const resolved = await urlParserRegistry.resolveAll(urls.map((raw) => raw.trim()));
+        const given = urls.map((raw) => raw.trim());
+        const resolved = await urlParserRegistry.resolveAll(given);
         const existing = new Set(allTasks().map((t) => t.getId()));
         const archived = getArchivedTaskIds(SessionManager.getInstance().getCurrentSession());
         const seen = new Set<string>();
         const fresh: string[] = [];
         const skipped: { url: string; reason: string }[] = [];
-        for (const url of resolved) {
+        for (const [index, url] of resolved.entries()) {
+            // `skipped` names the link as it was given, so it can be matched to the call's own list.
+            const original = given[index];
+            const skip = (reason: string) => skipped.push({ url: original, reason });
             let parsed: ReturnType<typeof urlParserRegistry.parse> = null;
             try {
                 parsed = /^https?:\/\//i.test(url) ? urlParserRegistry.parse(url) : null;
@@ -542,12 +546,12 @@ export const addTasks = defineAgentTool<{ urls: string[] }>({
                 /* not a link */
             }
             const id = taskIdFromUrl(url);
-            if (!parsed) skipped.push({ url, reason: "not a link of a platform the app reads" });
+            if (!parsed) skip("not a link of a platform the app reads");
             else if (parsed.type !== "track" && parsed.type !== "album" && parsed.type !== "playlist")
-                skipped.push({ url, reason: "only track, album and playlist links can be added" });
-            else if (existing.has(id)) skipped.push({ url, reason: "already in the list" });
-            else if (archived.has(id)) skipped.push({ url, reason: "in the archive (the user can restore it there)" });
-            else if (seen.has(id)) skipped.push({ url, reason: "given twice" });
+                skip("only track, album and playlist links can be added");
+            else if (existing.has(id)) skip("already in the list");
+            else if (archived.has(id)) skip("in the archive (the user can restore it there)");
+            else if (seen.has(id)) skip("given twice");
             else {
                 seen.add(id);
                 fresh.push(url);
