@@ -38,6 +38,7 @@ import { resolveTrackRecognition } from "./resolveTrackRecognition";
 import { formatTrackUri, parseTrackUri } from "./trackUri";
 import { ensureDiscoveryConsent, getUnansweredConsentKeys } from "./discoveryConsent";
 import { computeCompiledMetadata } from "./compiledMetadata";
+import { withSearch } from "./groupSearch";
 import { compiledFieldValues } from "./metadataFields";
 import { compiledMetadataToTags } from "./compiledMetadataToTags";
 import { computeOutputPath, isOutputPathTaken, samePath } from "./computeOutputPath";
@@ -126,8 +127,13 @@ export function runUserEdit(edit: () => unknown): boolean {
     }
 }
 
+/** A last-resort discovery service (Claude) the user can start for a track, and the platforms it would look for. */
+export type LastResortOffer = { key: string; missing: Platform[] };
+
 export class DownloadTask extends Task<TrackDownloadTask> {
     private discoveryRun?: DiscoveryRun;
+    // Ends the wait for one platform's search (the Skip button of its group), by the platform's registry key.
+    private platformSkips = new Map<string, () => void>();
     // The revision of the attributes object it was last computed for (see `getRevision`).
     private revisionFor?: TrackDownloadTask;
     private revisionValue = 0;
@@ -232,6 +238,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
         const group: MetadataGroupState = {
             ...groups[groupIdx],
+            // A group shown while it was being searched had only its key to go by: the first result names its platform.
+            ...(groups[groupIdx].results.length === 0 ? { platform: metadata.platform } : {}),
             results: [...groups[groupIdx].results],
         };
 
@@ -265,6 +273,85 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
         groups[groupIdx] = group;
         this.updateAttributes({ metadataGroups: groups });
+    }
+
+    /**
+     * Shows what became of the search for each of these platforms in its group (see `MetadataGroupState.search`).
+     * `searching` also makes the group appear, empty, when it is not there yet: the groups of a search that starts
+     * together are created here in the order given, so their ranks never depend on which platform answers first.
+     */
+    private markSearch(serviceKeys: readonly string[], search: MetadataGroupState["search"]): void {
+        const groups = [...(this.getAttributes()?.metadataGroups ?? [])];
+        let changed = false;
+        for (const key of serviceKeys) {
+            const idx = groups.findIndex((g) => g.serviceKey === key);
+            if (idx === -1) {
+                if (search !== "searching") continue;
+                groups.push({ platform: key as Platform, serviceKey: key, rank: groups.length, results: [], search });
+                changed = true;
+            } else if (groups[idx].search !== search) {
+                groups[idx] = withSearch(groups[idx], search);
+                changed = true;
+            }
+        }
+        if (changed) this.updateAttributes({ metadataGroups: groups });
+    }
+
+    /**
+     * One platform's search, shown in its group: "searching" (already set by the caller) until it answers, then its
+     * results, or what became of it. Never throws. `cancelled` is read after every wait, and a cancelled search writes
+     * nothing, not even its own state: whoever cancelled it has already said so (skip / the end of the stage), and a
+     * newer search of the same platform may be showing its own.
+     */
+    private async searchPlatform(
+        serviceKey: string,
+        service: MetadataService,
+        primaryMetadata: TrackMetadata,
+        primaryUri: string,
+        run?: DiscoveryRun
+    ): Promise<void> {
+        let skipped = false;
+        let skip: () => void = () => {};
+        const skippedSignal = new Promise<void>((resolve) => {
+            skip = () => {
+                skipped = true;
+                this.markSearch([serviceKey], "skipped");
+                resolve();
+            };
+        });
+        this.platformSkips.set(serviceKey, skip);
+        const cancelled = () => skipped || run?.skipped === true;
+        try {
+            this.logger.debug(`Searching for track using ${serviceKey}`);
+            const asked = service.searchTrack(primaryMetadata);
+            // A search that was skipped may still fail later: nobody is waiting for it any more.
+            asked.catch(() => {});
+            const results = await Promise.race([asked, skippedSignal.then(() => undefined)]);
+            if (!results || cancelled()) return;
+
+            for (const result of results) {
+                this.addResultToGroup(result.metadata, serviceKey, [
+                    {
+                        discoveredBy: serviceKey,
+                        fromUri: primaryUri,
+                        searchKeys: result.searchKeys,
+                        ...(result.query ? { query: result.query } : {}),
+                    },
+                ]);
+            }
+            this.markSearch([serviceKey], undefined);
+            this.logger.info(`Phase A: found ${results.length} result(s) from ${serviceKey}`);
+        } catch (error) {
+            this.logger.warn(`Phase A search failed for ${serviceKey}`, { error });
+            if (!cancelled()) this.markSearch([serviceKey], "failed");
+        } finally {
+            if (this.platformSkips.get(serviceKey) === skip) this.platformSkips.delete(serviceKey);
+        }
+    }
+
+    /** Stops waiting for one platform's search and keeps what was found so far (the Skip button of its group). */
+    skipPlatformSearch(serviceKey: string): void {
+        this.platformSkips.get(serviceKey)?.();
     }
 
     private updateResultInGroup(groupIndex: number, resultIndex: number, patch: Partial<MetadataResultState>): void {
@@ -530,13 +617,13 @@ export class DownloadTask extends Task<TrackDownloadTask> {
     // ── Discovery ─────────────────────────────────────────────────────────────
 
     /**
-     * The whole discovery stage. `skipLastResort` leaves out the slow, costly last-resort services (Claude): only the
-     * user starts those. `signal` ends the stage early when it aborts, like {@link skipDiscovery} (a stage that has
-     * not started yet does not start).
+     * The whole discovery stage. It never runs the slow, costly last-resort services (Claude): only the user starts
+     * those, see {@link startSingleProviderDiscovery}. `signal` ends the stage early when it aborts, like
+     * {@link skipDiscovery} (a stage that has not started yet does not start).
      */
     @TaskScoped()
     @SafeAction("Re-discover metadata providers")
-    async startMetadataDiscovering(options?: { skipLastResort?: boolean; signal?: AbortSignal }): Promise<void> {
+    async startMetadataDiscovering(options?: { signal?: AbortSignal }): Promise<void> {
         // Stopped before it began: nothing may be cleared or rebuilt.
         if (options?.signal?.aborted) return;
         const primaryResult = this.getPrimaryMetadata();
@@ -561,7 +648,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.updateAttributes({
             // Keep all groups and their order, only remove previously discovered (non-primary) results
             metadataGroups: (this.getAttributes()?.metadataGroups ?? []).map((g) => ({
-                ...g,
+                // What became of the last search goes with its results.
+                ...withSearch(g, undefined),
                 // The primary input and the links the user added by hand are theirs: only what the search found goes.
                 results: g.results.filter((r) => r.isPrimaryInput || r.addedByUser),
             })),
@@ -589,49 +677,42 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         const onAbort = () => run.skip();
         options?.signal?.addEventListener("abort", onAbort, { once: true });
 
+        // The platforms Phase A asks: the ones still "searching" when the stage ends are marked skipped (below).
+        let searched: string[] = [];
         const discoverEverywhere = async () => {
             // The user's own links first: they are the most reliable thing this track has, and a platform they
             // cover is no longer "missing" for the last-resort services (no Claude call spent on it).
             await this.applyUserSources();
             if (run.skipped) return;
 
-            // Phase A — MetadataService.searchTrack (like Spotify, Youtube, etc.)
-            const services = this.metadataServices.getAllServices();
-            for (const service of services) {
-                if (run.skipped) return;
+            // Phase A — MetadataService.searchTrack (like Spotify, Youtube, etc.), every platform at once: the platforms
+            // do not depend on each other, so the slowest one sets the pace instead of their sum. Each platform shows
+            // up as a group straight away, "searching" until it answers (or the user skips it).
+            const primaryGroupKey = (this.getAttributes()?.metadataGroups ?? []).find((g) =>
+                g.results.some((r) => r.isPrimaryInput)
+            )?.serviceKey;
+            const toSearch: { key: string; service: MetadataService }[] = [];
+            for (const service of this.metadataServices.getAllServices()) {
                 // Find the registry key for this service
                 const serviceKey = this.findServiceKey(service.id);
                 if (!serviceKey) continue;
-
+                // A service that cannot search (its tracks only come from links) has nothing to find here.
+                if (this.metadataServiceRegistry.getConstructor(serviceKey)?.searchable === false) continue;
                 // Skip the service that owns the primary metadata (by registry key: a service id is a class name)
-                const primaryGroup = (this.getAttributes()?.metadataGroups ?? []).find((g) =>
-                    g.results.some((r) => r.isPrimaryInput)
-                );
-                if (primaryGroup && primaryGroup.serviceKey === serviceKey) continue;
-
-                try {
-                    this.logger.debug(`Searching for track using ${serviceKey}`);
-                    const results = await service.searchTrack(primaryMetadata);
-                    if (run.skipped) return;
-
-                    for (const result of results) {
-                        this.addResultToGroup(result.metadata, serviceKey, [
-                            {
-                                discoveredBy: serviceKey,
-                                fromUri: primaryUri,
-                                searchKeys: result.searchKeys,
-                                ...(result.query ? { query: result.query } : {}),
-                            },
-                        ]);
-                    }
-                    this.logger.info(`Phase A: found ${results.length} result(s) from ${serviceKey}`);
-                } catch (error) {
-                    this.logger.warn(`Phase A search failed for ${serviceKey}`, { error });
-                }
+                if (primaryGroupKey === serviceKey) continue;
+                toSearch.push({ key: serviceKey, service });
             }
+            searched = toSearch.map((s) => s.key);
+            this.markSearch(searched, "searching");
+            await Promise.all(
+                toSearch.map(({ key, service }) => this.searchPlatform(key, service, primaryMetadata, primaryUri, run))
+            );
+            if (run.skipped) return;
 
             // Phase B — DiscoveryMetadataService.discoverFromUri (like Songlink).
-            // Consent-gated services (Songlink) ask the user before their first use.
+            // Consent-gated services (Songlink) ask the user before their first use. A last-resort service (Claude)
+            // is not part of the stage: it is slow and spends the user's quota, so it only runs when they ask
+            // (`startSingleProviderDiscovery`, the button under the sources).
             for (const [key, ctor] of this.discoveryServiceRegistry.getAllConstructors()) {
                 if (run.skipped) return;
                 if (ctor.consent && !ctor.lastResort) await this.awaitDiscoveryConsent(key);
@@ -642,27 +723,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 await this.runDiscoveryService(discoveryService, primaryMetadata, primaryUri, undefined, false, run);
             }
 
-            // Phase C — last-resort services (like Claude): slow and/or costly, so they only run when a
-            // platform is still missing after everything above, and only once the user has allowed them.
-            for (const [key, ctor] of this.discoveryServiceRegistry.getAllConstructors()) {
-                if (run.skipped) return;
-                if (!ctor.lastResort || options?.skipLastResort) continue;
-                const wanted = this.getMissingPlatforms();
-                if (wanted.length === 0) break;
-                if (!(await this.awaitDiscoveryConsent(key))) continue;
-                if (run.skipped) return;
-                if (!this.isDiscoveryServiceEnabled(key)) continue;
-                await this.runDiscoveryService(
-                    this.discoveryServices.get(key),
-                    primaryMetadata,
-                    primaryUri,
-                    wanted,
-                    false,
-                    run
-                );
-            }
-
-            // Phase D — which MusicBrainz release is this track on? (P30) Read-only lookups; the verdict is
+            // Phase C — which MusicBrainz release is this track on? (P30) Read-only lookups; the verdict is
             // stored on the task and never fails it.
             if (run.skipped) return;
             if (getMusicSettings().musicBrainz.matchTracks) {
@@ -684,6 +745,12 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         } finally {
             options?.signal?.removeEventListener("abort", onAbort);
             if (this.discoveryRun === run) this.discoveryRun = undefined;
+            // A search the stage did not wait for (skipped, stopped) must not stay "searching" for ever.
+            const groups = this.getAttributes()?.metadataGroups ?? [];
+            this.markSearch(
+                searched.filter((key) => groups.find((g) => g.serviceKey === key)?.search === "searching"),
+                "skipped"
+            );
             this.status.setFallback("discovery", undefined);
             this.updateAttributes({ metadataDiscoveringInProgress: false });
         }
@@ -1008,12 +1075,15 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         return key ? this.discoveryServiceRegistry.getConstructor(key)?.lastResort === true : false;
     }
 
-    // Platforms whose metadata service is enabled but which still have no result for this track.
+    // Platforms whose metadata service is enabled but which still have no result for this track. A platform that cannot
+    // be searched (`static searchable = false`) is never a gap: it is only reached through links, and asking a
+    // last-resort service for it on every track would spend a call per track.
     private getMissingPlatforms(): Platform[] {
         const groups = this.getAttributes()?.metadataGroups ?? [];
         const missing: Platform[] = [];
-        for (const key of this.metadataServiceRegistry.getAllConstructors().keys()) {
+        for (const [key, ctor] of this.metadataServiceRegistry.getAllConstructors()) {
             if (!this.isMetadataServiceEnabled(key)) continue;
+            if (ctor.searchable === false) continue;
             const group = groups.find((g) => g.serviceKey === key);
             if (!group || group.results.length === 0) missing.push(key as Platform);
         }
@@ -1022,8 +1092,12 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
     // Resolves whether the user lets this discovery service run. The first time, that means showing
     // them a dialog; the task shows "waiting for you" meanwhile instead of looking stuck.
-    private async awaitDiscoveryConsent(key: string): Promise<boolean> {
-        const mustAsk = getUnansweredConsentKeys().includes(key);
+    // `reask`: the user asked for this provider by hand, so an earlier "no" is put to them again.
+    private async awaitDiscoveryConsent(key: string, reask = false): Promise<boolean> {
+        const isConsentGated = this.discoveryServiceRegistry.getConstructor(key)?.consent !== undefined;
+        const mustAsk = reask
+            ? isConsentGated && getMusicSettings().metadata.discoveryProviders[key]?.enabled !== true
+            : getUnansweredConsentKeys().includes(key);
         if (mustAsk) {
             const label = providerDisplayRegistry.get(key).label;
             this.status.set({ type: StatusType.PendingUserAction, message: `Waiting for your answer: ${label}` });
@@ -1031,8 +1105,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         try {
             // A person answering holds no metadata slot: the others go on working meanwhile.
             return mustAsk
-                ? await metadataLimiter.whileWaiting(() => ensureDiscoveryConsent(key))
-                : await ensureDiscoveryConsent(key);
+                ? await metadataLimiter.whileWaiting(() => ensureDiscoveryConsent(key, reask))
+                : await ensureDiscoveryConsent(key, reask);
         } finally {
             if (mustAsk) this.status.clear();
         }
@@ -1076,25 +1150,19 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             return;
         }
         const primaryUri = primaryMetadata.uri ?? primaryMetadata.url;
+        let service: MetadataService;
         try {
-            const service = this.metadataServices.get(serviceKey);
-            const results = await service.searchTrack(primaryMetadata!);
-            for (const result of results) {
-                this.addResultToGroup(result.metadata, serviceKey, [
-                    {
-                        discoveredBy: serviceKey,
-                        fromUri: primaryUri,
-                        searchKeys: result.searchKeys,
-                        ...(result.query ? { query: result.query } : {}),
-                    },
-                ]);
-            }
-            this.logger.info(`Re-search completed for ${serviceKey}`);
+            service = this.metadataServices.get(serviceKey);
         } catch (error) {
             this.logger.warn(
                 `Failed to re-search ${serviceKey}: ${error instanceof Error ? error.message : String(error)}`
             );
+            return;
         }
+        // Shown in the platform's group like the search of the whole stage: "searching", then its results.
+        this.markSearch([serviceKey], "searching");
+        await this.searchPlatform(serviceKey, service, primaryMetadata, primaryUri);
+        this.logger.info(`Re-search completed for ${serviceKey}`);
     }
 
     @TaskScoped()
@@ -1105,16 +1173,19 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             return;
         }
         const primaryUri = primaryMetadata.uri ?? primaryMetadata.url;
+        const lastResort = this.discoveryServiceRegistry.getConstructor(serviceKey)?.lastResort === true;
+        // The panel shows the button of a last-resort service busy from the click on, the consent question included.
+        if (lastResort) this.updateAttributes({ lastResortInProgress: serviceKey });
         try {
-            // Even an explicit [S] still needs the user's OK the first time for a consent-gated service.
-            if (!(await this.awaitDiscoveryConsent(serviceKey))) {
+            // Even an explicit [S] still needs the user's OK for a consent-gated service: asked again if they said no
+            // before, since this time they are the one asking.
+            if (!(await this.awaitDiscoveryConsent(serviceKey, true))) {
                 this.logger.info(`Re-discovery skipped for ${serviceKey}: not allowed by the user`);
                 return;
             }
             const service = this.discoveryServices.get(serviceKey);
             // A last-resort service is told what to look for: whatever is still missing, or — when
             // nothing is — every other enabled platform (the user asked for a fresh look).
-            const lastResort = this.discoveryServiceRegistry.getConstructor(serviceKey)?.lastResort === true;
             let wanted: Platform[] | undefined;
             if (lastResort) {
                 wanted = this.getMissingPlatforms();
@@ -1132,7 +1203,30 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             this.logger.warn(
                 `Failed to re-discover ${serviceKey}: ${error instanceof Error ? error.message : String(error)}`
             );
+        } finally {
+            if (lastResort) this.updateAttributes({ lastResortInProgress: undefined });
         }
+    }
+
+    /**
+     * The last-resort discovery services (Claude) the user can start for this track right now, each with the platforms
+     * it would look for. None while no platform is missing, or while the primary fetch / the regular search runs. A service that asks consent is always offered, even
+     * after a "no": the click is what asks (again), so the button never disappears for lack of an answer. One without
+     * consent is offered while it is switched on. Cheap: called while the panel is drawn.
+     */
+    getLastResortOffers(): LastResortOffer[] {
+        // While the primary source is read or the regular search runs, every platform "has no result" yet: nothing is
+        // missing until they have answered (the list hides its button for the same reason, and so does the key).
+        const attributes = this.getAttributes();
+        if (attributes?.primaryMetadataInProgress || attributes?.metadataDiscoveringInProgress) return [];
+        const missing = this.getMissingPlatforms();
+        if (missing.length === 0) return [];
+        const offers: LastResortOffer[] = [];
+        for (const [key, ctor] of this.discoveryServiceRegistry.getAllConstructors()) {
+            if (!ctor.lastResort) continue;
+            if (ctor.consent || this.isDiscoveryServiceEnabled(key)) offers.push({ key, missing });
+        }
+        return offers;
     }
 
     async refetchResult(groupIndex: number, resultIndex: number): Promise<void> {
@@ -1619,7 +1713,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                     const signal = external ? AbortSignal.any([external, own]) : own;
                     if (signal.aborted) return;
                     if (provider) await this.startSingleProviderDiscovery(provider);
-                    else await this.startMetadataDiscovering({ skipLastResort: true, signal });
+                    else await this.startMetadataDiscovering({ signal });
                 }),
             options
         );

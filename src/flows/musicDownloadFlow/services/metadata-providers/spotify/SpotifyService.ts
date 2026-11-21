@@ -94,6 +94,7 @@ export class SpotifyService extends MetadataService {
         colorSubtle: "#156b30",
         colorBright: "#1db954",
     };
+    static readonly summary = "Reads Spotify links, albums and playlists, and searches Spotify.";
     static readonly defaultSettings: ProviderSettingsSchema = {
         enabled: { label: "Enable", defaultValue: true, kind: "checkbox" },
         fallbackToWeb: {

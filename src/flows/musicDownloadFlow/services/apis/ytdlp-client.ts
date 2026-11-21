@@ -69,7 +69,10 @@ const infoLimiter = new Semaphore(INFO_CONCURRENCY);
 export function readYtDlpInfo<T>(url: string, options: { timeoutMs: number; timeoutMessage: string }): Promise<T> {
     return infoLimiter.run(async () => {
         const client = await getYtDlpClient();
-        const run = client.exec(url, { dumpSingleJson: true, flatPlaylist: true });
+        // `ignoreNoFormatsError`: a DRM-protected or preview-only track (SoundCloud Go+) has public metadata but no
+        // downloadable format, and yt-dlp would exit with an error instead of printing the JSON. Reading a page's
+        // metadata must not depend on being able to download it; the download stage fails on its own if it cannot.
+        const run = client.exec(url, { dumpSingleJson: true, flatPlaylist: true, ignoreNoFormatsError: true });
         try {
             const result = await withTimeout(run.run(), options.timeoutMs, options.timeoutMessage);
             return JSON.parse(result.output) as T;

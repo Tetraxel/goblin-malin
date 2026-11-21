@@ -116,6 +116,19 @@ describe("Semaphore.whileWaiting", () => {
         expect(await peakConcurrency(sem)).toBe(1);
     });
 
+    test("parallel branches of one run waiting together give the one permit back once", async () => {
+        const sem = new Semaphore(1);
+        await sem.run(async () => {
+            await Promise.all([
+                sem.whileWaiting(() => sleep(5)),
+                sem.whileWaiting(() => sleep(15)),
+                sem.whileWaiting(() => sleep(1)),
+            ]);
+        });
+        // A permit lost or made up by the overlap would show as a different peak.
+        expect(await peakConcurrency(sem)).toBe(1);
+    });
+
     test("waiting inside a wait does not give a permit back twice", async () => {
         const sem = new Semaphore(1);
         await sem.run(() => sem.whileWaiting(() => sem.whileWaiting(async () => sleep(5))));

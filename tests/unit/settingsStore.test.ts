@@ -127,7 +127,10 @@ describe("SettingsStore migrations", () => {
             file,
             JSON.stringify({ general: {}, logs: {}, keybindings: {}, flows: { "music-downloader": { a: 1 } } })
         );
-        expect(new SettingsStore(file).getMusicSettings({ a: 0 })).toEqual({ a: 1 });
+        expect(new SettingsStore(file).getMusicSettings({ a: 0 })).toEqual({
+            a: 1,
+            onboarding: { providersChosen: true },
+        });
     });
 
     test("an old file loses its frozen defaults and its orphan keys (the developer's real file)", () => {
@@ -144,12 +147,33 @@ describe("SettingsStore migrations", () => {
         store.setKeybinding("global.other", key("z")); // any write
 
         const saved = onDisk();
-        expect(saved.version).toBe(2);
+        expect(saved.version).toBe(3);
         expect(saved.general).toEqual({ theme: "light" });
         expect(saved.logs).toEqual({});
         expect(Object.keys(saved.keybindings).sort()).toEqual(["global.other", "global.tab"]);
         // The old minutes interval isn't lost, it becomes seconds.
-        expect(saved.music).toEqual({ collections: { defaultLiveRefreshIntervalSeconds: 300 } });
+        expect(saved.music).toEqual({
+            collections: { defaultLiveRefreshIntervalSeconds: 300 },
+            onboarding: { providersChosen: true },
+        });
+    });
+
+    test("someone who used the app before the provider picker is not asked as on a first launch", () => {
+        fs.writeFileSync(file, JSON.stringify(userFile)); // version 2: before the picker
+        const music = new SettingsStore(file).getMusicSettings({ onboarding: { providersChosen: false } });
+        expect(music.onboarding).toEqual({ providersChosen: true });
+    });
+
+    test("a picker answer already in the file is kept, and a new user (no file) is asked", () => {
+        fs.writeFileSync(file, JSON.stringify({ ...userFile, music: { onboarding: { providersChosen: false } } }));
+        expect(new SettingsStore(file).getMusicSettings({ onboarding: { providersChosen: true } }).onboarding).toEqual({
+            providersChosen: false,
+        });
+
+        const fresh = new SettingsStore(path.join(dir, "new.json"));
+        expect(fresh.getMusicSettings({ onboarding: { providersChosen: false } }).onboarding).toEqual({
+            providersChosen: false,
+        });
     });
 
     test("an old minutes interval does not override a seconds value that exists", () => {
@@ -160,7 +184,7 @@ describe("SettingsStore migrations", () => {
             })
         );
         const music = new SettingsStore(file).getMusicSettings({ collections: {} } as Record<string, unknown>);
-        expect(music).toEqual({ collections: { defaultLiveRefreshIntervalSeconds: 30 } });
+        expect(music.collections).toEqual({ defaultLiveRefreshIntervalSeconds: 30 });
     });
 });
 
@@ -170,7 +194,7 @@ describe("SettingsStore only stores what differs from the defaults", () => {
         const current = store.getAppSettings();
         store.writeAppSettings({ ...current, general: { ...current.general, theme: "light" } });
 
-        expect(onDisk()).toEqual({ version: 2, general: { theme: "light" }, logs: {}, keybindings: {}, music: {} });
+        expect(onDisk()).toEqual({ version: 3, general: { theme: "light" }, logs: {}, keybindings: {}, music: {} });
     });
 
     test("a setting put back to its default leaves the file", () => {

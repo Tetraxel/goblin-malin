@@ -22,13 +22,13 @@
         - [Metadata view](#metadata-view)
         - [Download view](#download-view)
 
-A keyboard-driven terminal UI for downloading and tagging music tracks with metadata. Import links from Spotify, YouTube and SoundCloud, the app cross-references metadata across providers, finds the best download source, and saves it to disk as a tagged audio file (a FLAC by default).
+A keyboard-driven terminal UI for downloading and tagging music tracks with metadata. Import links from Spotify, YouTube, SoundCloud, Deezer, Apple Music and Tidal, the app cross-references metadata across providers, finds the best download source, and saves it to disk as a tagged audio file (a FLAC by default).
 
 ## What it does
 
-- **Import** Spotify, YouTube (Music) and SoundCloud links: tracks, **albums and playlists** from Spotify, tracks and playlists from YouTube, tracks, playlists and albums from SoundCloud (a playlist can keep refreshing itself). Plain links, links without `https://` and `spotify:track:…` URIs are understood.
+- **Import** Spotify, YouTube (Music), SoundCloud, Deezer, Apple Music and Tidal links: tracks, **albums and playlists** from Spotify and Deezer, tracks and playlists from YouTube, tracks, playlists and albums from SoundCloud, tracks and albums from Apple Music, tracks from Tidal (a playlist can keep refreshing itself). Plain links, links without `https://` and `spotify:track:…` URIs are understood.
 - **Cross-reference** the same track on other platforms to compare and merge metadata: **MusicBrainz**, plus **Songlink** and **Claude** if you opt in (see [Privacy](#privacy)). Every field can be edited or copied.
-- **Find download sources** from **yt-dlp** (YouTube and SoundCloud) and **Soulseek**, preview them in the app (through `mpv`), compare them, and pick the best one.
+- **Find download sources** from **yt-dlp** (YouTube and SoundCloud links) and **Soulseek** (any track, searched by artist and title), preview them in the app (through `mpv`), compare them, and pick the best one.
 - **Save** the chosen source to your output folder with clean tags, replacing a previously saved file if you want to. Every track is converted to one format, **FLAC** by default; Settings → Download → _Convert every download to one audio format_ lets you pick **MP3**, **Ogg**, **Opus** or **M4A** instead (handy for software that cannot swap a file for another format, like rekordbox), or turn the conversion off to keep each download as it came (Opus or M4A from YouTube, MP3 or FLAC from Soulseek). Converting a lossy source to FLAC does not add quality: the app marks those files `FLAC*`.
 - **Sessions and archive**: your task list is saved and re-opened on the next start; you can keep several sessions and archive finished tasks.
 - **Everything is configurable**: providers, folders, concurrency, themes and every keyboard shortcut (Settings). The mouse works too.
@@ -106,6 +106,7 @@ Linux is **not supported yet**: the app installs and starts, but its automatic `
 ## First run
 
 - A short **welcome tour** plays (when animations are on; turn it off in Settings → _Show welcome tutorial on start-up_).
+- Then, once, one screen asks **which download providers** and **which platforms** (metadata providers) to use. A grid shows, in each platform's color, whose links each download provider will use, so a platform you would not use yourself (SoundCloud, say) shows up as a source of files for `yt-dlp`, and unticking it greys that link out. `Enter` ticks a row, `Ctrl+S` saves. Settings → Metadata / Download change the choice later; Settings → Download repeats under each provider the platforms it uses.
 - The app downloads the tools it needs (`yt-dlp`, `ffmpeg`, `ffprobe`, and on Windows `mpv`) into the [data folder](#where-your-data-lives) and tells you if one cannot be found or downloaded.
 - Credentials are asked for **when a provider needs them** (or run Settings → _⚙ Setup Wizard_):
     - **Spotify** — either your own Spotify API app (client id + secret from the [developer dashboard](https://developer.spotify.com/dashboard); needs a Premium account) for full metadata (album, ISRC, track number), or the no-credentials mode, which reads the public page and gives less.
@@ -121,6 +122,10 @@ Linux is **not supported yet**: the app installs and starts, but its automatic `
 - Import with `Ctrl+V` URLs from compatible streaming platforms :
     - `Spotify` (tracks, albums, playlists)
     - `YouTube` / `YouTube Music` (tracks, playlists)
+    - `SoundCloud` (tracks, playlists, albums)
+    - `Deezer` (tracks, albums, playlists)
+    - `Apple Music` (tracks, albums)
+    - `Tidal` (tracks)
 - System fetches primary metadata from the corresponding URL platform
 - System discovers the same track on other platforms (cross-referencing via ISRC or track/artist name)
 - When it can't find a source (an unofficial re-upload, say), **paste the right link yourself** (`Ctrl+V` in the Metadata Sources list, or on a platform's cell). It is kept for good: a restart, a re-discovery or a stopped task never removes it.
@@ -190,12 +195,15 @@ There is no telemetry and no account. The app talks to these services, and only 
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Spotify, YouTube / YouTube Music          | You import a link of that platform, and whenever a download runs (`yt-dlp` searches and downloads from YouTube; your `cookies.txt`, if you added one, is sent with it) | The link, or a search for the track                                                                                                                                                     |
 | SoundCloud                                | You import a SoundCloud link, and during discovery (`yt-dlp` reads the page and searches SoundCloud for the track; switch it off in Settings → Metadata)               | The link, or a search for the track's artist and title                                                                                                                                  |
+| Deezer (`api.deezer.com`)                 | You import a Deezer link, and during discovery (switch it off in Settings → Metadata)                                                                                  | The link's id, the track's ISRC, or a search for its artist and title                                                                                                                   |
+| Apple Music (`itunes.apple.com`)          | You import an Apple Music link, and during discovery (switch it off in Settings → Metadata)                                                                            | The link's id, or a search for the track's artist and title                                                                                                                             |
+| Tidal (`tidal.com`)                       | You import a Tidal link, or discovery found one (switch it off in Settings → Metadata)                                                                                 | The track's page is read; nothing else                                                                                                                                                  |
 | MusicBrainz                               | Discovery (on by default)                                                                                                                                              | Track title, artists, ISRC                                                                                                                                                              |
 | Soulseek network                          | You enable the Soulseek provider (off by default)                                                                                                                      | Your Soulseek login and the search terms (artist, title). It is a peer-to-peer network: the users you download from can see your IP address                                             |
 | `api.github.com`, `github.com`            | At start-up, to **check for a new version** (turn it off in Settings → _Check for updates on start-up_), and to download `yt-dlp`, `ffmpeg` and (on Windows) `mpv`     | A plain request, no data about you                                                                                                                                                      |
 | `evermeet.cx` (macOS)                     | Downloading `ffmpeg`                                                                                                                                                   | A plain request                                                                                                                                                                         |
 | **Songlink** (`api.song.link`) — _opt-in_ | After you allowed it                                                                                                                                                   | The link of each track                                                                                                                                                                  |
-| **Claude** — _opt-in, last resort_        | After you allowed it, for tracks nothing else found                                                                                                                    | Title, artists, album, release date, ISRC, duration and source link, through the Claude Code CLI installed on your computer and **your own Claude account** (it uses part of your plan) |
+| **Claude** — _opt-in, last resort_        | Only when you click "Ask Claude" on a track that is missing platforms (after allowing it once)                                                                         | Title, artists, album, release date, ISRC, duration and source link, through the Claude Code CLI installed on your computer and **your own Claude account** (it uses part of your plan) |
 
 Songlink and Claude stay off until you allow them in a dialog; you can change your mind in Settings → Metadata → Discovery providers.
 

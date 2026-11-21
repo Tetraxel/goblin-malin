@@ -1,7 +1,8 @@
 import React, { useRef } from "react";
 import { Box, Text, type DOMElement } from "ink";
 import { AnimatedIcon, Icon } from "#components/AnimatedIcon";
-import { useClickTarget, useHoverTarget, useWheelTarget } from "#base/mouse/useMouseTarget";
+import { useWheelTarget } from "#base/mouse/useMouseTarget";
+import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useTheme } from "#base/themeContext";
 import { type MetadataGroupState, type MetadataOverrides } from "#flows/musicDownloadFlow/types";
 import { type CompiledMetadata } from "#flows/musicDownloadFlow/utils/compiledMetadata";
@@ -11,6 +12,14 @@ import { MetadataGroupHeader } from "./MetadataGroupHeader";
 import { MetadataResultRow } from "./MetadataResultRow";
 import { MetadataCompiledRow } from "./MetadataCompiledRow";
 import { MusicBrainzRecheckButton } from "./MusicBrainzRecheckButton";
+import { GroupSearchRow, LastResortButton, SkipButton, emptyGroupText } from "./MetadataGroupStatus";
+
+/** A last-resort service (Claude) the user can ask for the platforms still missing, as the list shows it. */
+export interface LastResortOfferView {
+    key: string;
+    /** The registry keys of the platforms it would look for. */
+    missing: string[];
+}
 
 interface MetadataSourceListProps {
     groups: MetadataGroupState[];
@@ -42,6 +51,14 @@ interface MetadataSourceListProps {
     onRecheckMusicBrainz?: () => void;
     /** Stop discovering and keep the sources found so far. Must be referentially stable. */
     onSkipDiscovery: () => void;
+    /** Stop waiting for one platform's search (its group's Skip). Must be referentially stable. */
+    onSkipSearch: (serviceKey: string) => void;
+    /** The last-resort services the user can start now (empty: no button). */
+    lastResortOffers: LastResortOfferView[];
+    /** The key of the last-resort service that is running for this track, if any. */
+    lastResortBusyKey?: string;
+    /** Ask a last-resort service to look for the missing platforms. Must be referentially stable. */
+    onAskLastResort: (serviceKey: string) => void;
     isFetchingPrimarySource?: boolean;
     isDiscovering?: boolean;
 }
@@ -53,26 +70,6 @@ const getLoadingText = (isFetchingPrimarySource: boolean, isDiscovering: boolean
     if (isDiscovering) return "Discovering on other platforms…";
     return "";
 };
-
-const SkipDiscoveryButton = React.memo(function SkipDiscoveryButton({ onSkip }: { onSkip: () => void }) {
-    const theme = useTheme();
-    const ref = useRef<DOMElement>(null);
-    useClickTarget(ref, onSkip);
-    const isHovered = useHoverTarget(ref);
-    return (
-        <Box
-            ref={ref}
-            marginLeft={1}
-            paddingX={1}
-            flexShrink={0}
-            backgroundColor={isHovered ? theme.ui.rowBackground.regular.hover : undefined}
-        >
-            <Text color={theme.text.active} bold>
-                Skip ⏭
-            </Text>
-        </Box>
-    );
-});
 
 export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
     groups,
@@ -96,6 +93,10 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
     checkingMusicBrainz = false,
     onRecheckMusicBrainz,
     onSkipDiscovery,
+    onSkipSearch,
+    lastResortOffers,
+    lastResortBusyKey,
+    onAskLastResort,
     isFetchingPrimarySource = false,
     isDiscovering = false,
 }) => {
@@ -121,6 +122,8 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
 
     // Skipping only makes sense once there is something to keep.
     const canSkipDiscovery = isDiscovering && !isFetchingPrimarySource && groups.some((g) => g.results.length > 0);
+    // While platforms are being searched each has its own Skip: this one then ends everything that is left.
+    const skipAllLabel = groups.some((g) => g.search === "searching") ? "Skip all ⏭" : undefined;
 
     const overrideCount = Object.keys(overrides).filter(
         (k) => overrides[k as keyof MetadataOverrides] !== undefined
@@ -133,7 +136,8 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
                     {" " + HEADER_LINE}
                 </Text>
             </Box>
-            <Box flexDirection="column" flexGrow={1} gap={1} overflow="hidden">
+            {/* (A blank line between blocks is a margin, not a `gap`: groups with nothing in them stack tightly.) */}
+            <Box flexDirection="column" flexShrink={1} overflow="hidden">
                 {/* Compiled row, and under it the MusicBrainz re-check button when the sources changed */}
                 <Box flexDirection="column" flexShrink={0}>
                     <MetadataCompiledRow
@@ -157,14 +161,29 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
                 {/* Groups */}
                 {sortedGroups.map((group, gIdx) => {
                     const sortedResults = [...group.results].sort((a, b) => a.rank - b.rank);
+                    // Nothing to list in it (yet): a run of such groups is packed, a blank line only before and after.
+                    const previousIsEmpty = gIdx > 0 && sortedGroups[gIdx - 1].results.length === 0;
+                    const marginTop = sortedResults.length === 0 && previousIsEmpty ? 0 : 1;
+                    // (not while the primary source is being fetched: its group is empty until it arrives)
+                    const emptyText =
+                        sortedResults.length === 0 && group.search !== "searching" && !isFetchingPrimarySource
+                            ? emptyGroupText(group.search)
+                            : undefined;
                     return (
-                        <Box key={group.serviceKey} flexDirection="column" overflow="hidden">
+                        <Box
+                            key={group.serviceKey}
+                            flexDirection="column"
+                            flexShrink={0}
+                            marginTop={marginTop}
+                            overflow="hidden"
+                        >
                             <MetadataGroupHeader
                                 group={group}
                                 groupIndex={gIdx}
                                 onSelect={onSelectCursor}
                                 isSelected={cursor.type === "group" && cursor.groupIndex === gIdx}
                                 isActive={isActive}
+                                emptyText={emptyText}
                             />
                             {sortedResults.map((result, rIdx) => (
                                 <MetadataResultRow
@@ -184,11 +203,14 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
                                     showDiscoverySources={showDiscoverySources}
                                 />
                             ))}
+                            {group.search === "searching" && (
+                                <GroupSearchRow serviceKey={group.serviceKey} onSkip={onSkipSearch} />
+                            )}
                         </Box>
                     );
                 })}
                 {(isFetchingPrimarySource || isDiscovering) && (
-                    <Box flexDirection="row" height={1} paddingLeft={3} flexShrink={0} overflow="hidden">
+                    <Box flexDirection="row" height={1} marginTop={1} paddingLeft={3} flexShrink={0} overflow="hidden">
                         <Box flexDirection="row" paddingRight={1} flexShrink={0}>
                             <Text color={theme.text.secondary}>
                                 <AnimatedIcon icon={Icon.Dots} interval={125} color={theme.text.secondary} />
@@ -197,10 +219,24 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
                         <Text color={theme.text.secondary} wrap="truncate-end">
                             {getLoadingText(isFetchingPrimarySource, isDiscovering)}
                         </Text>
-                        {canSkipDiscovery && <SkipDiscoveryButton onSkip={onSkipDiscovery} />}
+                        {canSkipDiscovery && <SkipButton onSkip={onSkipDiscovery} label={skipAllLabel} />}
                     </Box>
                 )}
             </Box>
+            {/* Optional, slow and costly: only on the user's request. Right under the last group; the list above
+                gives way (clips) when the panel is full, so the button is never pushed out of sight. */}
+            {!isFetchingPrimarySource &&
+                !isDiscovering &&
+                lastResortOffers.map((offer) => (
+                    <Box key={offer.key} marginTop={1} paddingLeft={3} flexShrink={0} overflow="hidden">
+                        <LastResortButton
+                            serviceKey={offer.key}
+                            missingText={offer.missing.map((p) => providerDisplayRegistry.get(p).label).join(", ")}
+                            busy={lastResortBusyKey === offer.key}
+                            onAsk={onAskLastResort}
+                        />
+                    </Box>
+                ))}
         </Box>
     );
 };

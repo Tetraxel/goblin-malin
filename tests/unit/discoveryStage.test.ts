@@ -180,14 +180,20 @@ describe("RUN-06: a slot is not held while a last-resort call runs", () => {
         const before = limiter.getLimit();
         limiter.setLimit(1);
         try {
+            const task = await makeTask();
+            await task.start();
+            // The stage never runs a last-resort service: only the user starts it (the button under the sources).
+            expect(lastResortCalls).toEqual([]);
+            expect(task.getAttributes()?.state).toBe("finished");
+
             let open!: () => void;
             lastResortGate = new Promise<void>((resolve) => (open = resolve));
-            const task = await makeTask();
-            const run = task.start();
+            const run = task.rediscoverPart("claude");
 
             // Wait until the last-resort service is called (it blocks on the gate).
             for (let i = 0; i < 100 && lastResortCalls.length === 0; i++) await sleep(10);
             expect(lastResortCalls).toHaveLength(1);
+            expect(task.getAttributes()?.lastResortInProgress).toBe("claude");
 
             // The only metadata slot is free: this does not wait for the slow call.
             const other = await Promise.race([limiter.run(async () => "worked"), sleep(500).then(() => "blocked")]);
@@ -195,7 +201,7 @@ describe("RUN-06: a slot is not held while a last-resort call runs", () => {
 
             open();
             await run;
-            expect(task.getAttributes()?.state).toBe("finished");
+            expect(task.getAttributes()?.lastResortInProgress).toBeUndefined();
         } finally {
             limiter.setLimit(before);
         }

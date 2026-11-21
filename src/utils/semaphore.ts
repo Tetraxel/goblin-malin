@@ -10,9 +10,12 @@ import { AsyncLocalStorage } from "async_hooks";
  * actually allowed to do at the same time — the lever that lets download parallelism
  * scale without hammering metadata providers.
  */
+/** The permit one `run` holds: how many of its branches are waiting (permit given back), and the way back. */
+type Permit = { lent: number; back?: Promise<void> };
+
 export class Semaphore {
     /** The semaphores whose permit the running code holds (so `whileWaiting` knows it has one to give back). */
-    private static readonly held = new AsyncLocalStorage<ReadonlySet<Semaphore>>();
+    private static readonly held = new AsyncLocalStorage<ReadonlyMap<Semaphore, Permit>>();
 
     private available: number;
     private readonly waiters: Array<() => void> = [];
@@ -26,7 +29,11 @@ export class Semaphore {
     async run<T>(fn: () => Promise<T> | T): Promise<T> {
         await this.acquire();
         try {
-            return await Semaphore.held.run(new Set(Semaphore.held.getStore()).add(this), async () => fn());
+            // One permit per run, however many parallel branches of it wait at once (`lent` counts them).
+            return await Semaphore.held.run(
+                new Map(Semaphore.held.getStore()).set(this, { lent: 0 } as Permit),
+                async () => fn()
+            );
         } finally {
             this.release();
         }
@@ -37,17 +44,27 @@ export class Semaphore {
      * dialog, a slow last-resort call), and takes one again afterwards (it may queue behind others). A few tasks
      * waiting on a dialog nobody answers must not stop all the work that shares the budget. Outside `run` (the caller
      * holds no permit) it just calls `fn`.
+     *
+     * Parallel branches of one run (the platform searches of a track) may wait at the same time: the run has one
+     * permit, so it is given back by the first to wait and taken again by the last to finish waiting.
      */
     async whileWaiting<T>(fn: () => Promise<T> | T): Promise<T> {
-        const held = Semaphore.held.getStore();
-        if (!held?.has(this)) return fn();
-        const without = new Set(held);
-        without.delete(this);
-        this.release();
+        const permit = Semaphore.held.getStore()?.get(this);
+        if (!permit) return fn();
+        // The permit is on its way back (the last branch is queueing for it): it is not ours to give away yet.
+        if (permit.back) await permit.back;
+        if (permit.lent++ === 0) this.release();
         try {
-            return await Semaphore.held.run(without, async () => fn());
+            return await fn();
         } finally {
-            await this.acquire();
+            if (--permit.lent === 0) {
+                permit.back = this.acquire();
+                try {
+                    await permit.back;
+                } finally {
+                    permit.back = undefined;
+                }
+            }
         }
     }
 

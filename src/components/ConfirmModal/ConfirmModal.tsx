@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { Box, Text } from "ink";
+import React, { useEffect, useRef, useState } from "react";
+import { Box, Text, type DOMElement } from "ink";
+import { useClickTarget, useHoverTarget } from "#base/mouse/useMouseTarget";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
@@ -9,6 +10,49 @@ import type { FocusableWindow } from "#hooks/useFocusManager";
 
 /** Windows rendered after `ConfirmModal` in `AppInner`, i.e. drawn on top of it. */
 const DRAWN_ABOVE: ReadonlySet<FocusableWindow> = new Set(["tempCleanupModal", "updateModal"]);
+
+/**
+ * One button of the dialog. A click answers with it at once (what Enter does on the selected one); the pointer over
+ * it shows it as selected. Only reacts while this dialog is the focused window, never to the app underneath.
+ */
+const ChoiceButton = React.memo(function ChoiceButton({
+    label,
+    color,
+    selected,
+    onClick,
+    onHover,
+}: {
+    label: string;
+    color: string;
+    selected: boolean;
+    onClick: () => void;
+    onHover: () => void;
+}) {
+    const theme = useTheme();
+    const ref = useRef<DOMElement>(null);
+    useClickTarget(ref, onClick, { window: "confirmModal" });
+    const hovered = useHoverTarget(ref, { window: "confirmModal" });
+    // The pointer takes the selection, so Enter then answers with the button it is over.
+    // Only when the pointer arrives, so the arrow keys still move the selection while it rests there.
+    const latestHover = useRef(onHover);
+    useEffect(() => {
+        latestHover.current = onHover;
+    });
+    useEffect(() => {
+        if (hovered) latestHover.current();
+    }, [hovered]);
+    return (
+        <Box ref={ref} marginRight={2} flexShrink={0}>
+            <Text
+                bold={selected}
+                color={selected ? theme.ui.background : color}
+                backgroundColor={selected ? color : undefined}
+            >
+                {` ${label} `}
+            </Text>
+        </Box>
+    );
+});
 
 interface ConfirmModalProps {
     pendingConfig: ConfirmModalConfig | null;
@@ -121,20 +165,16 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
                     <Text>{pendingConfig.message}</Text>
                 </Box>
                 <Box marginTop={1} flexDirection="row">
-                    {pendingConfig.choices.map((choice, i) => {
-                        const selected = i === choiceIndex;
-                        return (
-                            <Box key={i} marginRight={2} flexShrink={0}>
-                                <Text
-                                    bold={selected}
-                                    color={selected ? theme.ui.background : choice.color}
-                                    backgroundColor={selected ? choice.color : undefined}
-                                >
-                                    {` ${choice.label} `}
-                                </Text>
-                            </Box>
-                        );
-                    })}
+                    {pendingConfig.choices.map((choice, i) => (
+                        <ChoiceButton
+                            key={i}
+                            label={choice.label}
+                            color={choice.color}
+                            selected={i === choiceIndex}
+                            onClick={() => onConfirm(i)}
+                            onHover={() => setChoiceIndex(i)}
+                        />
+                    ))}
                 </Box>
                 <Box marginTop={1} flexDirection="row">
                     {/* A notice has one button: nothing to choose between, and Esc just closes it. */}

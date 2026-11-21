@@ -214,7 +214,8 @@ describe("adding a link to a track", () => {
         const found = catalog[OFFICIAL_SPOTIFY];
         task.updateAttributes({
             metadataGroups: [
-                ...task.getAttributes()!.metadataGroups,
+                // (the search already showed spotify's group, empty: this is what it found there)
+                ...task.getAttributes()!.metadataGroups.filter((g) => g.serviceKey !== "spotify"),
                 {
                     platform: "spotify",
                     serviceKey: "spotify",
@@ -268,13 +269,15 @@ describe("adding a link to a track", () => {
         expect(task.getAttributes()?.userSources ?? []).toEqual([]);
     });
 
-    test("a platform the user covered is no longer 'missing': the last-resort service is not asked about it", async () => {
+    test("a platform the user covered is no longer 'missing': the last-resort service is not offered it", async () => {
         const task = await runTask();
-        expect(lastResortCalls).toEqual([{ wantedPlatforms: ["spotify"] }]); // before: spotify was missing
+        expect(lastResortCalls).toEqual([]); // the pipeline never asks it by itself
+        expect(task.getLastResortOffers()).toEqual([{ key: "claude", missing: ["spotify"] }]); // spotify is missing
 
-        lastResortCalls = [];
         await task.addUserSources([OFFICIAL_SPOTIFY]);
+        expect(task.getLastResortOffers()).toEqual([]);
         await task.startMetadataDiscovering();
+        expect(task.getLastResortOffers()).toEqual([]);
         expect(lastResortCalls).toEqual([]);
     });
 });

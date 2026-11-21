@@ -10,7 +10,7 @@ Design rules, shared by every Claude-backed feature:
 
 - **Ask first.** Nothing is sent to Claude (or Songlink) until the user has said yes once. The answer lives in the provider's settings (`enabled` + `consentAsked`); a provider declares the dialog copy with `static consent`.
 - **Claude proposes, the app verifies.** Claude only returns URLs/decisions; every URL is re-parsed by the app's own URL parsers, fetched through the platform's real metadata service, and must score ≥ 50% against the primary track (`computeConfidenceScore`) or it is dropped. Nothing Claude says about a track is trusted as data.
-- **Last resort, not hot path.** A call takes ~30 s of web research and spends quota. `static lastResort` services only run when a platform is still missing after all regular discovery. Concurrency is capped (2) and a usage-limit error pauses further calls for 10 minutes.
+- **Last resort, not hot path.** A call takes ~30 s of web research and spends quota. `static lastResort` services only run when the user asks (a button under the track's sources, offered while a platform is still missing after the regular discovery); the discovery stage never starts them. Concurrency is capped (2) and a usage-limit error pauses further calls for 10 minutes.
 - **Visible.** Work shows as the animated `· ✢ ✳ ✶ ✻ ✽` icon (`StatusIcon: "agent"`), and results are attributed to `claude` in the "found by" lines.
 
 ## Done
@@ -18,7 +18,7 @@ Design rules, shared by every Claude-backed feature:
 - `ClaudeClient` (`services/apis/claude-client.ts`) — headless runner: prompt over stdin, JSON-schema `structured_output`, minimal system prompt (~1.4k tokens/call instead of ~50k), error classification (`not-installed` / `not-logged-in` / `quota` / `timeout`), timeout + abort, quota cooldown.
 - `ClaudeDiscoveryService` (`metadata-providers/claude/`) — last-resort `DiscoveryMetadataService`; settings: enable (off by default), model (`haiku`/`sonnet`/`opus`/`fable`, default `sonnet`), CLI command/path.
 - Consent gate (`utils/discoveryConsent.ts` + `consentBridge`) — one dialog per provider, one at a time, shared by concurrent tasks; applies to Songlink too (now off until allowed).
-- Discovery phases in `DownloadTask`: regular services → last-resort services (only for missing platforms, verified).
+- Discovery phases in `DownloadTask`: platform searches (at once) → regular discovery services. Last-resort services run apart, when the user asks (only for missing platforms, verified).
 
 ## Next: Claude as an agent
 

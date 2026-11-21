@@ -7,6 +7,7 @@ import {
 } from "#flows/musicDownloadFlow/types";
 import type { IRecording } from "musicbrainz-api";
 import { platformRegistry } from "#base/platformRegistry";
+import { urlParserRegistry } from "#base/urlParser";
 
 // Maps a streaming-platform URL to the Platform key we use internally, extracting the
 // platform-native track id so the produced URI matches what each metadata service emits.
@@ -24,6 +25,10 @@ const PLATFORM_API_PROVIDER: Partial<Record<Platform, APIProvider>> = {
 };
 
 function detectPlatform(rawUrl: string): PlatformMatch | null {
+    // A registered service reads its own links best (and gives the id it puts in its own URIs).
+    const known = urlParserRegistry.parse(rawUrl);
+    if (known?.type === "track" && known.id) return { platform: known.platform as Platform, id: known.id };
+
     let parsed: URL;
     try {
         parsed = new URL(rawUrl);

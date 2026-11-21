@@ -13,6 +13,8 @@ interface MetadataGroupHeaderProps {
     onSelect: (cursor: CursorPosition) => void;
     isSelected: boolean;
     isActive: boolean;
+    /** Said in place of the result count when the platform ended up with nothing ("Nothing found"). */
+    emptyText?: string;
 }
 
 export const MetadataGroupHeader = React.memo(function MetadataGroupHeader({
@@ -21,6 +23,7 @@ export const MetadataGroupHeader = React.memo(function MetadataGroupHeader({
     onSelect,
     isSelected,
     isActive,
+    emptyText,
 }: MetadataGroupHeaderProps) {
     const theme = useTheme();
     const rowRef = useRef<DOMElement>(null);
@@ -38,7 +41,11 @@ export const MetadataGroupHeader = React.memo(function MetadataGroupHeader({
         ? providerDisplayRegistry.get(primaryResult!.metadata.fetchedBy!).label
         : undefined;
 
-    const countLabel = `(${group.results.length} result${group.results.length !== 1 ? "s" : ""})`;
+    // While nothing has come back yet the row under the header says so: "(0 results)" would be a premature verdict.
+    const countLabel =
+        emptyText || (group.search === "searching" && group.results.length === 0)
+            ? ""
+            : `(${group.results.length} result${group.results.length !== 1 ? "s" : ""})`;
     const noteText = isFallback
         ? `ℹ ${display.label} is not available but rudimentary metadata were fetched from ${fetchedByLabel}`
         : undefined;
@@ -69,6 +76,17 @@ export const MetadataGroupHeader = React.memo(function MetadataGroupHeader({
                     {" " + countLabel}
                 </Text>
             </Box>
+            {emptyText && (
+                <Box paddingLeft={1} flexShrink={1} overflow="hidden">
+                    <Text
+                        color={group.search === "failed" ? theme.palette.orange : theme.text.secondary}
+                        italic
+                        wrap="truncate-end"
+                    >
+                        {emptyText}
+                    </Text>
+                </Box>
+            )}
             {noteText && (
                 <Box flexGrow={1} paddingLeft={3} flexShrink={0}>
                     <Text color={theme.palette.blue} italic wrap="truncate-end">

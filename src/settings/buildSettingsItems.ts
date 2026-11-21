@@ -72,27 +72,42 @@ export function filterSettingsItems(items: SettingsItem[], query: string): Setti
     let pendingSubHeader: SettingsItem | null = null;
     let pendingProvider: SettingsItem | null = null;
 
+    // Notes written right under a header ("Uses links from: …" under a provider) belong to it: the header is only
+    // kept once a row below it matches, so they are kept with it, right after it.
+    const headerNotes = new Map<SettingsItem, SettingsItem[]>();
+    let lastHeader: SettingsItem | null = null;
+    const pushHeader = (header: SettingsItem | null) => {
+        if (!header || result.includes(header)) return;
+        result.push(header);
+        result.push(...(headerNotes.get(header) ?? []));
+    };
+
     for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (item.kind === "note") {
-            if (result.includes(items[i - 1])) result.push(item);
+            if (lastHeader) headerNotes.set(lastHeader, [...(headerNotes.get(lastHeader) ?? []), item]);
+            else if (result.includes(items[i - 1])) result.push(item);
             continue;
         }
         if (item.kind === "sectionHeader") {
             pendingSection = item;
             pendingSubHeader = null;
             pendingProvider = null;
+            lastHeader = item;
             continue;
         }
         if (item.kind === "subHeader") {
             pendingSubHeader = item;
             pendingProvider = null;
+            lastHeader = item;
             continue;
         }
         if (item.kind === "providerHeader") {
             pendingProvider = item;
+            lastHeader = item;
             continue;
         }
+        lastHeader = null;
 
         const selfLabel = "label" in item ? item.label.toLowerCase() : "";
         const sectionLbl = pendingSection && "label" in pendingSection ? pendingSection.label.toLowerCase() : "";
@@ -103,9 +118,9 @@ export function filterSettingsItems(items: SettingsItem[], query: string): Setti
             selfLabel.includes(q) || sectionLbl.includes(q) || subLbl.includes(q) || providerLbl.includes(q);
 
         if (matches) {
-            if (pendingSection && !result.includes(pendingSection)) result.push(pendingSection);
-            if (pendingSubHeader && !result.includes(pendingSubHeader)) result.push(pendingSubHeader);
-            if (pendingProvider && !result.includes(pendingProvider)) result.push(pendingProvider);
+            pushHeader(pendingSection);
+            pushHeader(pendingSubHeader);
+            pushHeader(pendingProvider);
             result.push(item);
         }
     }

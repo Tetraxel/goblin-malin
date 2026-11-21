@@ -8,6 +8,7 @@ import { createTasksFromUrls, importTasks, type MusicTask } from "#flows/musicDo
 import { useTheme } from "#base/themeContext";
 import { SessionManager } from "#sessions/sessionManager";
 import { getArchivedTaskIds } from "#sessions/archive";
+import { urlParserRegistry } from "#base/urlParser";
 import { type ConfirmModalConfig } from "#components/ConfirmModal/useConfirmModal";
 
 export function useImportFlow(openConfirmModal: (config: ConfirmModalConfig) => void) {
@@ -34,6 +35,25 @@ export function useImportFlow(openConfirmModal: (config: ConfirmModalConfig) => 
                     if (fresh.length === 0) return prev;
                     return { ...prev, urls: [...prev.urls, ...fresh] };
                 });
+                // A short link says whether it is a track or an album only once followed: the dialog is open
+                // already, and the line changes to what the link leads to when it is known.
+                for (const url of urls) {
+                    void urlParserRegistry.resolve(url.raw).then((target) => {
+                        if (target === url.raw) return;
+                        const parsed = urlParserRegistry.parse(target);
+                        if (!parsed) return;
+                        setPendingImport((prev) => {
+                            if (!prev || !prev.urls.some((u) => u.raw === url.raw)) return prev;
+                            const already = prev.urls.some((u) => u.raw === target);
+                            return {
+                                ...prev,
+                                urls: already
+                                    ? prev.urls.filter((u) => u.raw !== url.raw)
+                                    : prev.urls.map((u) => (u.raw === url.raw ? { ...parsed, raw: target } : u)),
+                            };
+                        });
+                    });
+                }
             };
 
             if (text !== undefined) {
@@ -96,20 +116,37 @@ export function useImportFlow(openConfirmModal: (config: ConfirmModalConfig) => 
                 setPendingImport(null);
                 return;
             }
-            const urls = pendingImport.urls.map((d) => d.raw);
-            const tasks = createTasksFromUrls(urls, { toTag: fetchMetadata, toDownload: download });
+            const raws = pendingImport.urls.map((d) => d.raw);
             setPendingImport(null);
 
-            // Task ids derive from the URL, so a re-imported track matches its archived self.
-            const archivedIds = getArchivedTaskIds(SessionManager.getInstance().getCurrentSession());
-            const archivedTasks = tasks.filter((t) => archivedIds.has(t.getId()));
-            if (archivedTasks.length === 0) {
-                importTasks(tasks);
-                return;
-            }
-            askAboutArchived(tasks, archivedTasks);
+            // Short links still being followed are waited for (each is followed once, so this is usually instant):
+            // a short link to an album must become a collection, not a track.
+            // The dialog already followed them while it was open, so this is normally answered from the cache.
+            void urlParserRegistry
+                .resolveAll(raws)
+                .then((urls) => {
+                    const tasks = createTasksFromUrls(urls, { toTag: fetchMetadata, toDownload: download });
+                    // Task ids derive from the URL, so a re-imported track matches its archived self.
+                    const archivedIds = getArchivedTaskIds(SessionManager.getInstance().getCurrentSession());
+                    const archivedTasks = tasks.filter((t) => archivedIds.has(t.getId()));
+                    if (archivedTasks.length === 0) {
+                        importTasks(tasks);
+                        return;
+                    }
+                    askAboutArchived(tasks, archivedTasks);
+                })
+                .catch((error: unknown) => {
+                    globalLogger.error("Import failed", { error });
+                    openConfirmModal({
+                        title: "Import failed",
+                        message: error instanceof Error ? error.message : "The links could not be imported.",
+                        choices: [{ label: "OK", color: theme.action.primary }],
+                        accentColor: theme.status.warning,
+                        onConfirm: () => {},
+                    });
+                });
         },
-        [pendingImport, askAboutArchived]
+        [pendingImport, askAboutArchived, openConfirmModal, theme]
     );
 
     const handleImportCancel = useCallback(() => {

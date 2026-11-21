@@ -22,15 +22,27 @@ type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> =
     parseUrl?: (url: string) => ParsedUrl | null;
     /** Optional: turn links in another notation (e.g. `spotify:track:<id>`) found in a text into URLs `parseUrl` reads. */
     findLinks?: (text: string) => string[];
+    /**
+     * Optional: the address one of the service's short links leads to (`link.deezer.com/s/…`), which only says whether
+     * it is a track, an album or a playlist once followed; `null` at once (no network) for any other link. The import
+     * follows links through `urlParserRegistry.resolve()` before it decides what they are.
+     */
+    resolveLink?: (url: string) => Promise<string> | null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expandCollection?: (url: string, logger: Logger, task: Task<any>) => Promise<CollectionExpansion>;
     defaultSettings?: ProviderSettingsSchema;
+    // One sentence saying what the provider does for the user (shown in the first-run provider picker).
+    summary?: string;
     // The credentials the service needs (read from the app's secrets, see `appSecrets`).
     setupWizard?: SetupWizardConfig;
     // Must be explicitly allowed by the user (once) before the service is ever used.
     consent?: ProviderConsent;
     // Slow/expensive last resort: only run when the regular services left a gap.
     lastResort?: boolean;
+    // Metadata services: `false` when the service cannot search its catalogue (its tracks only come from a pasted link
+    // or from discovery). Its `searchTrack` is not asked, and a track it has no result for is not a gap a last-resort
+    // service is started for.
+    searchable?: boolean;
     // Other platform keys this service also handles (e.g. YouTube Music links are YouTube videos).
     platformAliases?: readonly string[];
     // Canonical URL of one of this service's tracks, given its platform id.
@@ -41,6 +53,10 @@ type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> =
     // The address that opens one of this service's links (as `parseUrl` read it) in its desktop app, when it has one
     // (`spotify:track:<id>`). Read through `platformRegistry.openUri()`.
     openUri?: (parsed: ParsedUrl) => string | undefined;
+    // Download services: the platforms whose track links the service can download, by the registry key of their
+    // metadata service ("youtube"), or "any" for one that searches every track by its name. Shown next to the provider
+    // (Settings, the first-run picker) and read by `DownloadService.canDownload`.
+    linkPlatforms?: readonly string[] | "any";
     // Extra actions for the service's column in the task list (read generically, e.g. "Review match…"), given the
     // selected task. Called whenever the action bar is built: keep it cheap and free of side effects.
     columnActions?: (task: TTask) => ContextualActions[];
@@ -85,6 +101,7 @@ export class ServiceRegistry<TTask extends Task<any> = Task, TService extends Se
             if (ctor.openUri) platformRegistry.registerOpenUri(name, ctor.openUri);
             if (ctor.parseUrl) urlParserRegistry.register(ctor.parseUrl);
             if (ctor.findLinks) urlParserRegistry.registerNormalizer(ctor.findLinks);
+            if (ctor.resolveLink) urlParserRegistry.registerResolver(ctor.resolveLink);
         } else {
             // Plain factory function path (escape hatch for custom instantiation)
             this.factories.set(name, ctorOrFactory as ServiceFactory<TTask, TService>);

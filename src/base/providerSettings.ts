@@ -34,6 +34,8 @@ export interface ProviderConstructorLike {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     new (...args: any[]): any;
     defaultSettings?: ProviderSettingsSchema;
+    /** One sentence saying what the provider does for the user (shown in the first-run provider picker). */
+    summary?: string;
     /**
      * Extra rows under the provider's settings. `stored` is the provider's settings as being edited; `status` is what
      * `settingsStatus` last answered (undefined until it has).
@@ -46,4 +48,6 @@ export interface ProviderConstructorLike {
     settingsStatus?: () => Promise<string | undefined>;
     setupWizard?: SetupWizardConfig;
     consent?: ProviderConsent;
+    /** Download providers: the platforms whose links they can download, or "any" (see `DownloadService.linkPlatforms`). */
+    linkPlatforms?: readonly string[] | "any";
 }
