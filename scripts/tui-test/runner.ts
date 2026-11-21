@@ -62,6 +62,10 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
     for (const [k, v] of Object.entries(process.env)) {
         if (v !== undefined) ptyEnv[k] = v;
     }
+    // The app runs in a real terminal here, like a user's. On a CI runner (`CI=true`), Ink would otherwise think it
+    // is not interactive and draw nothing until it exits (`is-in-ci`), so every scenario would time out.
+    delete ptyEnv["CI"];
+    delete ptyEnv["CONTINUOUS_INTEGRATION"];
     // The app always runs on a throwaway copy of the fixture, never on the fixture itself (see isolatedDataDir.ts).
     const fixtureDir = path.resolve(ROOT, scenario.dataDir ?? DEFAULT_FIXTURE);
     const isolated = createIsolatedDataDir(fixtureDir, scenario.settings);
