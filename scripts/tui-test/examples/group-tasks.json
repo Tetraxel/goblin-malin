@@ -47,13 +47,13 @@
         { "type": "snapshot", "name": "rename-cancelled" },
 
         { "type": "key", "key": "c" },
+        { "type": "waitForContent", "text": "Expand" },
         { "type": "stable" },
-        { "type": "assert", "contains": "Expand" },
         { "type": "snapshot", "name": "collapsed" },
 
         { "type": "key", "key": "c" },
+        { "type": "waitForContent", "text": "Collapse" },
         { "type": "stable" },
-        { "type": "assert", "contains": "Collapse" },
 
         { "type": "key", "key": "u" },
         { "type": "stable" },

@@ -141,7 +141,9 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
             function check() {
                 const now = Date.now();
                 const elapsed = now - start;
-                const idle = lastDataTime > 0 ? now - lastDataTime : Infinity;
+                // Quiet time counts from the start of the wait at the earliest: output from before a key press is
+                // not an answer to it, and the app may not have started repainting yet.
+                const idle = lastDataTime > 0 ? now - Math.max(lastDataTime, start) : Infinity;
                 const enoughData = totalBytesReceived >= minBytes;
 
                 if (enoughData && idle >= quiescenceMs) {
