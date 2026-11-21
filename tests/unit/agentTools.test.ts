@@ -856,14 +856,14 @@ describe("add_user_source and rediscover", () => {
         }
     });
 
-    test("rediscover of the whole stage leaves out the last-resort services, and does not start once stopped", async () => {
+    test("rediscover of the whole stage gets a signal that follows the turn, and does not start once stopped", async () => {
         const discovery = vi.spyOn(DownloadTask.prototype, "startMetadataDiscovering").mockResolvedValue(undefined);
         try {
             const turn = new AgentTurn();
             expect((await callTool("rediscover", { taskId: "aaa1", revision: a.getRevision() }, turn)).isError).toBe(
                 false
             );
-            expect(discovery).toHaveBeenCalledWith(expect.objectContaining({ skipLastResort: true }));
+            expect(discovery).toHaveBeenCalledWith(expect.objectContaining({ signal: expect.any(AbortSignal) }));
             // The turn's Stop ends a search that is going on (the search gets a signal that follows it, and the
             // task's own stop as well).
             const searchSignal = discovery.mock.calls[0][0]?.signal;

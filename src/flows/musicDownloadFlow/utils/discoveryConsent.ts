@@ -76,14 +76,17 @@ function ask(key: string): Promise<boolean> {
  * Resolves true when the provider may be used: already enabled, or the user just allowed it.
  * Resolves false when the user declined/dismissed (now or earlier), or the provider is simply
  * disabled in Settings. Providers without a declared `consent` are not this gate's business.
+ *
+ * `reask`: the user themself asked for this provider's work (a button), so an earlier "no" (or Esc) is not the last
+ * word: the question is put again.
  */
-export function ensureDiscoveryConsent(key: string): Promise<boolean> {
+export function ensureDiscoveryConsent(key: string, reask = false): Promise<boolean> {
     const ctor = discoveryServiceRegistry.getConstructor(key);
     if (!ctor?.consent) return Promise.resolve(true);
 
     const stored = getMusicSettings().metadata.discoveryProviders[key];
     if (stored?.enabled === true) return Promise.resolve(true);
-    if (stored?.consentAsked === true || dismissedThisSession.has(key)) return Promise.resolve(false);
+    if (!reask && (stored?.consentAsked === true || dismissedThisSession.has(key))) return Promise.resolve(false);
 
     const pending = inFlight.get(key);
     if (pending) return pending;
@@ -92,7 +95,7 @@ export function ensureDiscoveryConsent(key: string): Promise<boolean> {
         // An earlier dialog (or the Settings screen) may have answered while we were queued.
         const now = getMusicSettings().metadata.discoveryProviders[key];
         if (now?.enabled === true) return true;
-        if (now?.consentAsked === true || dismissedThisSession.has(key)) return false;
+        if (!reask && (now?.consentAsked === true || dismissedThisSession.has(key))) return false;
         return ask(key);
     });
     inFlight.set(key, promise);

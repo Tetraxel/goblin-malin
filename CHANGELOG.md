@@ -20,6 +20,8 @@ All notable changes to this project are documented here.
 ### Changed
 
 - With more than three platforms, the platform columns of the task list get narrower (and shorter headers: DZ, AM, TD) so the link and the title keep their room.
+- **The platforms are searched at once, and you see each one at work.** The search for a track on the other platforms used to ask them one after the other (the slowest set the pace of all those after it). Now every platform is asked together, and each one shows up in the track's sources straight away as a group with a spinner and its own **Skip ⏭** (the one below becomes **Skip all ⏭** while platforms are still being asked). A platform that found nothing says so ("Nothing found"), and one that was skipped or could not be asked says that instead, so an empty group is never mistaken for an unfinished one.
+- **Claude no longer runs on every track: you ask it.** It used to look for the platforms still missing at the end of every search of a track (about 30 s and a part of your Claude plan each time, once allowed). Now it never runs by itself: when a platform is still missing, a button pinned at the bottom of the track's sources says "Ask Claude to look for YouTube, Deezer" (key **A**, rebindable). If you have not allowed Claude (or said no before), the click asks you again instead of the button hiding. The result is checked the same way as before.
 
 ## [0.2.4] — 2026-11-17
 

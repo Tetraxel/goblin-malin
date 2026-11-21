@@ -273,7 +273,7 @@ describe("Stop reaches the long tools", () => {
             new Promise<void>((resolve) => {
                 release = resolve;
             });
-        const run = task.startMetadataDiscovering({ skipLastResort: true, signal: controller.signal });
+        const run = task.startMetadataDiscovering({ signal: controller.signal });
         await new Promise((r) => setTimeout(r, 10));
         controller.abort();
         await run;

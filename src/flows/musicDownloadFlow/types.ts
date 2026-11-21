@@ -280,6 +280,12 @@ export type MetadataGroupState = {
     serviceKey: string; // "spotify", "youtube"
     rank: number; // cross-group ordering (lower = higher priority)
     results: MetadataResultState[];
+    /**
+     * What became of the search for this platform, while the group has nothing (or not yet anything) to show:
+     * `searching` (in flight, never saved: a loaded task is not searching), `skipped` (the user cut it short, or the
+     * stage ended before it answered) or `failed` (the platform could not be asked). Unset = it ran and answered.
+     */
+    search?: "searching" | "skipped" | "failed";
 };
 
 // Return type for MetadataService.searchTrack
@@ -532,6 +538,8 @@ export type TrackDownloadTask = {
     parentTaskId?: string;
     primaryMetadataInProgress?: boolean;
     metadataDiscoveringInProgress?: boolean;
+    /** Key of the last-resort discovery service (Claude) the user started on this track and that has not answered yet. */
+    lastResortInProgress?: string;
     primaryMetadataFetched?: boolean;
     metadataDiscovered?: boolean;
     downloadsFetched?: boolean;

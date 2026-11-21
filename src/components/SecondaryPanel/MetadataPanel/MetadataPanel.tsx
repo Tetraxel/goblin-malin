@@ -13,7 +13,9 @@ import { computeCompiledMetadata, pickGroupRepresentative } from "#flows/musicDo
 import { navigableFields } from "#flows/musicDownloadFlow/utils/metadataFields";
 import { pasteRouter } from "#base/pasteRouter";
 import { musicBrainzActionItems } from "#flows/musicDownloadFlow/musicbrainz/columnActions";
-import { type DownloadTask, runUserEdit } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { type DownloadTask, TaskLockedError, runUserEdit } from "#flows/musicDownloadFlow/utils/downloadTask";
+import { globalLogger } from "#base/logger/logger";
+import { providerDisplayRegistry } from "#base/providerDisplay";
 import { addLinkFromClipboard } from "#flows/musicDownloadFlow/utils/addLinkFromClipboard";
 import { canCheckMusicBrainz, isMusicBrainzVerdictStale } from "#flows/musicDownloadFlow/musicbrainz/inputKey";
 import { MetadataSourceList } from "./MetadataSourceList";
@@ -72,9 +74,13 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
     const [prevTypedTask, setPrevTypedTask] = useState(typedTask);
     // A MusicBrainz check is running (shared by the re-check button next to the compiled row and the one in the compiled metadata).
     const [checkingMusicBrainz, setCheckingMusicBrainz] = useState(false);
+    // The last-resort service the user has just asked, until the task takes over (`lastResortInProgress`): the click
+    // may wait for a metadata slot first, and the button must not offer a second click meanwhile.
+    const [askingLastResort, setAskingLastResort] = useState<string | undefined>();
     if (prevTypedTask !== typedTask) {
         setPrevTypedTask(typedTask);
         setCheckingMusicBrainz(false);
+        setAskingLastResort(undefined);
         setSnapshot(typedTask?.get() as TaskSnapshot<MusicDownloadTaskAttributes> | undefined);
     }
 
@@ -264,6 +270,60 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
         [typedTask]
     );
 
+    const handleSkipSearch = useCallback(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (serviceKey: string) => (typedTask as any)?.skipPlatformSearch?.(serviceKey),
+        [typedTask]
+    );
+
+    // The last-resort services (Claude) the user can start for this track, with the platforms they would look for.
+    // Read from the task itself (cheap), and again whenever its attributes change.
+    const lastResortOffers = useMemo(() => {
+        const task = typedTask as unknown as Partial<DownloadTask> | null;
+        if (snapshot?.attributes?.kind !== "track" || typeof task?.getLastResortOffers !== "function") return [];
+        return task.getLastResortOffers();
+    }, [typedTask, snapshot]);
+    const lastResortBusyKey =
+        (snapshot?.attributes?.kind === "track" ? snapshot.attributes.lastResortInProgress : undefined) ??
+        askingLastResort;
+
+    const handleAskLastResort = useCallback(
+        (serviceKey: string) => {
+            const task = typedTask as unknown as Partial<DownloadTask> | null;
+            if (typeof task?.rediscoverPart !== "function") return;
+            setAskingLastResort(serviceKey);
+            task.rediscoverPart(serviceKey)
+                .catch((error: unknown) => {
+                    // "Claude holds this task" is an answer for the user, not a failure to hide.
+                    if (error instanceof TaskLockedError) globalLogger.info(error.message);
+                    else globalLogger.error("Asking a last-resort provider failed", { error });
+                })
+                .finally(() => setAskingLastResort((current) => (current === serviceKey ? undefined : current)));
+        },
+        [typedTask]
+    );
+
+    // The same as the button at the bottom of the list, from the keyboard. Always registered (so its key can be
+    // rebound), active while there is something to ask.
+    const firstOffer = lastResortOffers[0];
+    useShortcuts({
+        id: "metadataPanelLastResort",
+        isActive: isPanelActive && innerFocus === "list" && !isEditingField && !!firstOffer && !lastResortBusyKey,
+        priority: 140,
+        shortcuts: [
+            {
+                id: "sourceList.askLastResort",
+                defaultShortcut: { input: "a" },
+                label: firstOffer
+                    ? `Ask ${providerDisplayRegistry.get(firstOffer.key).label}`
+                    : "Ask last-resort search",
+                handler: () => {
+                    if (firstOffer) handleAskLastResort(firstOffer.key);
+                },
+            },
+        ],
+    });
+
     // Pointer handlers. While a field is being edited the inline input owns the panel, so
     // clicks and wheel notches that would move the cursor or field underneath it are dropped.
     // Stable identities (like the handlers above) so memoized rows keep bailing out.
@@ -353,6 +413,10 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
                     checkingMusicBrainz={checkingMusicBrainz}
                     onRecheckMusicBrainz={handleRecheckMusicBrainz}
                     onSkipDiscovery={handleSkipDiscovery}
+                    onSkipSearch={handleSkipSearch}
+                    lastResortOffers={lastResortOffers}
+                    lastResortBusyKey={lastResortBusyKey}
+                    onAskLastResort={handleAskLastResort}
                     isFetchingPrimarySource={
                         snapshot?.attributes?.kind === "track"
                             ? (snapshot.attributes.primaryMetadataInProgress ?? false)

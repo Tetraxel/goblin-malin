@@ -4,16 +4,23 @@ import {
     type CollectionDownloadTask,
 } from "#flows/musicDownloadFlow/types";
 import { savedFileFromLegacyRows } from "./savedSource";
+import { withSearch } from "./groupSearch";
 
 /** Rows and results that were saved as `null` (holes left by a write to a row that was gone) are dropped. */
 const present = <T>(items: readonly (T | null | undefined)[] | undefined): T[] =>
     (items ?? []).filter((item): item is T => item !== null && item !== undefined);
 
 function reviveTrackDates(raw: TrackDownloadTask): TrackDownloadTask {
+    // Nothing is searching in a task that was just loaded: a search that was cut off ended with the app.
+    const rest = { ...raw };
+    delete rest.lastResortInProgress;
     const attrs: TrackDownloadTask = {
-        ...raw,
+        ...rest,
         downloadSources: present(raw.downloadSources),
-        metadataGroups: present(raw.metadataGroups).map((group) => ({ ...group, results: present(group.results) })),
+        metadataGroups: present(raw.metadataGroups).map((group) => ({
+            ...(group.search === "searching" ? withSearch(group, "skipped") : group),
+            results: present(group.results),
+        })),
     };
     // Older sessions kept the saved file on the download row it was made from.
     const savedFile = attrs.savedFile ?? savedFileFromLegacyRows(attrs.downloadSources);
