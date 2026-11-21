@@ -11,6 +11,7 @@ import { initMusicApp } from "./flows/musicDownloadFlow/init";
 import os from "node:os";
 import { SettingsStore } from "./settings/settingsStore";
 import { textInputFocus } from "./base/textInputFocus";
+import { screenSelection } from "./base/selection/screenSelection";
 import { getAppDataDir } from "./utils/appPaths";
 import { acquireInstanceLock, releaseInstanceLock } from "./utils/instanceLock";
 import { emergencyExit, restoreTerminal } from "./utils/exitApp";
@@ -53,6 +54,8 @@ export function start(): void {
 
     process.stdout.write("\x1b[?1049h"); // enter alternate screen buffer
     process.stdout.write(ENABLE_MOUSE);
+    // Drag to select, release to copy (the terminal's own selection is off while the mouse is reported).
+    screenSelection.install();
     // Safety net for any path that ends in process.exit() without going through exitApp(): give the terminal
     // back (a left-on mouse mode makes the shell print click reports as text) and free the instance lock.
     process.once("exit", () => {
@@ -103,6 +106,8 @@ export function start(): void {
         // otherwise see them as typed text and could fire shortcuts. Anything typed
         // in the same chunk is put back.
         const { events, rest } = extractMouseEvents(str);
+        // A key press ends the selection (its highlight would outlive what it points at).
+        if (rest !== "") screenSelection.clear();
         if (events.length > 0) {
             for (const event of events) mouseRegistry.dispatch(event);
             if (rest !== "") process.stdin.unshift(rest);

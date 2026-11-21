@@ -15,6 +15,9 @@ const INDICATOR_WIDTH = 2;
  * Pointer support for the task list: click a cell to select it (focusing the list),
  * click the header to focus a column header, click the indicator gutter or Ctrl+click
  * to toggle multi-select, Ctrl+Shift+click to select a range, and scroll the wheel to move the selection.
+ *
+ * A plain click acts when the button is let go, on the cell it went down on: pressing is also how a drag selecting
+ * text starts (`ScreenSelection`), and that must not move the focus or run the cell's action on its way.
  */
 export function useTaskListMouse({
     rowsRef,
@@ -67,8 +70,31 @@ export function useTaskListMouse({
     });
 
     useEffect(() => {
+        // The plain left press waiting for its release.
+        let pending: MouseEvent | undefined;
+
         const handle = (event: MouseEvent) => {
-            if (event.type !== "press") return;
+            if (event.type === "release") {
+                const pressed = pending;
+                pending = undefined;
+                if (pressed && event.button === "left" && event.x === pressed.x && event.y === pressed.y)
+                    click(pressed);
+                return;
+            }
+            if (event.type === "move") {
+                // The pointer left the cell with the button down: a drag, not a click.
+                if (pending && (event.x !== pending.x || event.y !== pending.y)) pending = undefined;
+                return;
+            }
+            pending = undefined;
+            if (event.button === "left" && !event.ctrl && !event.shift) {
+                pending = event;
+                return;
+            }
+            click(event);
+        };
+
+        const click = (event: MouseEvent) => {
             const state = latest.current;
             if (!isClickableWindow(state.activeWindow)) return;
 

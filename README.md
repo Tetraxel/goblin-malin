@@ -158,7 +158,7 @@ Every shortcut can be rebound in Settings → _Shortcuts_, and the hints at the 
 | `Ctrl+F`                   | Relocate a saved file that moved                                                                                                                                                                            |
 | `F3`                       | Toggle the stats overlay                                                                                                                                                                                    |
 
-The mouse works as well: click to focus and select, scroll, click the toolbar buttons. The **Actions** button drops down a menu of things to do to the whole list (for now: open every track in MusicBrainz Picard).
+The mouse works as well: click to focus and select, scroll, click the toolbar buttons. **Select any text by dragging over it and it is copied to the clipboard when you let go** (no Shift needed, whatever the text is: a title, a log line, a dialog; `Alt`+drag takes a rectangle; any click or key removes the highlight; Settings → General can turn it off). The **Actions** button drops down a menu of things to do to the whole list (for now: open every track in MusicBrainz Picard).
 
 ## Where your data lives
 

@@ -91,6 +91,8 @@ Everything lives in one folder (`GOBLIN_DATA_DIR`, else the OS default; `<repo>/
 
 ## Input and hints
 
+Mouse input is reported to the app (`src/base/mouse/`), so the terminal's own text selection is off: dragging over text selects and copies it through `src/base/selection/` (the patched Ink output stage hands it the cells it painted and paints the highlight; see [CLAUDE.md](../CLAUDE.md#selecting-text-on-the-screen)).
+
 All keys go through `ShortcutDispatcher` and the `ShortcutRegistry`: components register shortcuts with `useShortcuts` (never `useInput`), users can rebind any of them, and on-screen hints resolve the live binding by shortcut id (`Hint`, `DynamicHintBar`). See the "Shortcuts & hints" section of [CLAUDE.md](../CLAUDE.md).
 
 ## Tests
