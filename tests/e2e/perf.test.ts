@@ -94,6 +94,8 @@ describe("render profile", () => {
             // Focus starts on the toolbar: → then Enter opens the Sessions modal, Escape closes it.
             { type: "key", key: "ArrowRight" },
             { type: "key", key: "Enter" },
+            // Waits for the modal: a fixed pause was not always enough on a slow runner (Windows, node 22).
+            { type: "waitForContent", text: "Search sessions", timeout: 10000 },
             { type: "wait", ms: 700 },
             { type: "snapshot", name: "modal-open" },
             { type: "key", key: "Escape" },
