@@ -13,8 +13,15 @@ import { globalLogger } from "#base/logger/logger";
 import { mouseRegistry, type MouseEvent } from "#base/mouse/mouse";
 import { SettingsStore } from "#settings/settingsStore";
 import { copyToClipboard } from "./clipboardWrite";
-import { clampPoint, highlightRow, isVerticalLine, paneBounds, selectedText, type Selection } from "./selection";
+import { clampPoint, highlightRow, isPaneEdge, paneBounds, selectedText, type Selection } from "./selection";
 import { getScreenTap } from "./screenTap";
+
+/**
+ * The most often a drag repaints the screen. The terminal reports every cell the pointer enters (any-motion tracking),
+ * and every React commit repaints the whole screen, so painting each of them made a drag crawl; the highlight follows
+ * the pointer at this pace and the release always paints the final one.
+ */
+const DRAG_PAINT_INTERVAL_MS = 50;
 
 type Pressed = { anchor: { x: number; y: number }; block: boolean; bounds: { left: number; right: number } };
 
@@ -22,6 +29,8 @@ class ScreenSelection {
     private pressed: Pressed | undefined;
     private selection: Selection | undefined;
     private version = 0;
+    private lastPublishedAt = 0;
+    private publishTimer: ReturnType<typeof setTimeout> | undefined;
     private readonly listeners = new Set<() => void>();
 
     /** The selection on screen, if any. */
@@ -87,11 +96,16 @@ class ScreenSelection {
     private begin(event: MouseEvent): void {
         // Ctrl / Shift + click is the task list's multi-select, not the start of a selection.
         if (event.ctrl || event.shift || !SettingsStore.getInstance().getAppSettings().general.copyOnSelect) return;
-        const row = getScreenTap().frame[event.y];
+        const frame = getScreenTap().frame;
+        const row = frame[event.y];
         if (!row) return;
         // A press on a border is a handle (the chat's edge), not text.
-        if (isVerticalLine(row[event.x])) return;
-        this.pressed = { anchor: { x: event.x, y: event.y }, block: event.alt, bounds: paneBounds(row, event.x) };
+        if (isPaneEdge(frame, event.x, event.y)) return;
+        this.pressed = {
+            anchor: { x: event.x, y: event.y },
+            block: event.alt,
+            bounds: paneBounds(frame, event.x, event.y),
+        };
     }
 
     private drag(pressed: Pressed, event: MouseEvent): void {
@@ -102,7 +116,18 @@ class ScreenSelection {
         if (!previous && focus.x === pressed.anchor.x && focus.y === pressed.anchor.y) return;
         if (previous && previous.focus.x === focus.x && previous.focus.y === focus.y) return;
         this.selection = { anchor: pressed.anchor, focus, block: pressed.block, bounds: pressed.bounds };
-        this.publish();
+        this.publishPaced();
+    }
+
+    /** `publish()`, but at most once per `DRAG_PAINT_INTERVAL_MS`: the first at once, the others after the wait. */
+    private publishPaced(): void {
+        const wait = this.lastPublishedAt + DRAG_PAINT_INTERVAL_MS - Date.now();
+        if (wait <= 0) {
+            this.publish();
+            return;
+        }
+        // The timer reads the selection when it fires, so a pointer that moved on meanwhile is painted where it is.
+        this.publishTimer ??= setTimeout(() => this.publish(), wait);
     }
 
     private finish(): void {
@@ -115,10 +140,18 @@ class ScreenSelection {
             this.clear();
             return;
         }
-        void copyToClipboard(text).then(() => globalLogger.info(`Copied ${describeCopy(text)} to the clipboard`));
+        // The highlight the user let go of is the last pointer position, not the last one that was painted.
+        if (this.publishTimer) this.publish();
+        void copyToClipboard(text).then((copied) => {
+            if (copied) globalLogger.info(`Copied ${describeCopy(text)} to the clipboard`);
+            else globalLogger.warn(`Could not copy ${describeCopy(text)}: no clipboard took it`);
+        });
     }
 
     private publish(): void {
+        clearTimeout(this.publishTimer);
+        this.publishTimer = undefined;
+        this.lastPublishedAt = Date.now();
         const tap = getScreenTap();
         const selection = this.selection;
         tap.highlight = selection ? (y, row) => highlightRow(selection, y, row) : undefined;

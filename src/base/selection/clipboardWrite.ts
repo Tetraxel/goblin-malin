@@ -19,13 +19,16 @@ export function osc52Sequence(text: string, env: NodeJS.ProcessEnv = process.env
 /**
  * Puts `text` on the user's clipboard, by both ways there are: the terminal's (OSC 52) and this machine's tool
  * (pbcopy, clip, wl-copy, xclip…). A terminal that ignores the first, or a machine with no tool, is covered by the
- * other, so neither failure is an error. Resolves to whether the system tool took it.
+ * other, so neither failure is an error. Resolves to whether a way took it: the terminal's sequence was written (the
+ * terminal may still ignore it: nothing tells) or this machine's tool took the text. `false` means neither could.
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
     const sequence = osc52Sequence(text);
+    let sentToTerminal = false;
     if (sequence !== "" && process.stdout.isTTY) {
         try {
             process.stdout.write(sequence);
+            sentToTerminal = true;
         } catch (error) {
             globalLogger.debug("Could not write the clipboard sequence to the terminal", { error });
         }
@@ -35,6 +38,6 @@ export async function copyToClipboard(text: string): Promise<boolean> {
         return true;
     } catch (error) {
         globalLogger.debug("No system clipboard tool took the selection", { error });
-        return false;
+        return sentToTerminal;
     }
 }

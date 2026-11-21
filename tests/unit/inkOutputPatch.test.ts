@@ -257,6 +257,58 @@ describe("patched Ink output.js", () => {
         expect(render(Patched, ops, width, height)).toEqual(stock);
     });
 
+    test("a highlighted row whose restyled cells are those of the last frame is not stringified again", async () => {
+        const Patched = await load("output.js");
+        const { getScreenTap } = await import("../../src/base/selection/screenTap");
+        const tap = getScreenTap();
+        const ops: Op[] = [
+            { kind: "write", x: 0, y: 0, text: "first row", transform: false },
+            { kind: "write", x: 0, y: 1, text: "second row", transform: false },
+        ];
+        const firstRow = (frame: { output: string }) => frame.output.split(/\r?\n/)[0] ?? "";
+        // Each cell is restyled once (as the app does), and every read of a restyled cell's value is counted: the
+        // output stage reads it when it builds the row's string, and only then.
+        let reads = 0;
+        const looks = new WeakMap<object, object>();
+        const look = (cell: { value: string; styles: readonly unknown[] }) => {
+            let made = looks.get(cell);
+            if (!made) {
+                made = {
+                    ...cell,
+                    get value() {
+                        reads++;
+                        return cell.value;
+                    },
+                    styles: [...cell.styles, { type: "ansi", code: `${ESC}[7m`, endCode: `${ESC}[27m` }],
+                };
+                looks.set(cell, made);
+            }
+            return made;
+        };
+        tap.highlight = (y, row) => (y === 0 ? row.map((cell) => look(cell!) as never) : undefined);
+        try {
+            const first = render(Patched, ops, 20, 3);
+            expect(firstRow(first)).toContain(`${ESC}[7m`);
+            expect(reads).toBeGreaterThan(0);
+            reads = 0;
+            // Same screen, a new frame: the highlighted row is the same restyled cells, so its string is reused.
+            expect(render(Patched, ops, 20, 3)).toEqual(first);
+            expect(reads).toBe(0);
+            // The row's text changed: it is built again, and shows the new text.
+            const changed = render(
+                Patched,
+                [{ kind: "write", x: 0, y: 0, text: "other text", transform: false }],
+                20,
+                3
+            );
+            expect(reads).toBeGreaterThan(0);
+            expect(firstRow(changed)).toContain("other");
+            expect(firstRow(changed)).not.toContain("first");
+        } finally {
+            tap.highlight = undefined;
+        }
+    });
+
     test("the patched render-node-to-output.js differs from the stock one only in where widestLine comes from", async () => {
         const fs = await import("node:fs");
         const read = (file: string) => fs.readFileSync(path.resolve(__dirname, "../../patches/ink", file), "utf-8");

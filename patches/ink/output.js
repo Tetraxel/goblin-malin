@@ -182,11 +182,18 @@ export const widestLine = (text) => sharedCaches.getWidestLine(text);
 //   - `highlight`: when set, `highlight(y, row)` may return a restyled copy of the row `y`, painted instead of it
 //     (the selection). The row it replaces never enters the previous-frame cache, so the next frame, without the
 //     highlight, rebuilds that row from the cells it really has. Returning `undefined` leaves the row alone.
+//     A highlighted row has a cache of its own (`highlightedRows`): the same restyled cells as in the last frame
+//     give the same string, so moving the end of a selection restringifies the rows it changed, not all of them.
 // With no `highlight` the strings `get()` returns are those of stock Ink.
+// Only the main screen is tapped. Ink also builds an `Output` for `<Static>` content, which would write its own rows
+// into `frame` and take the highlight by row number; the app has no `<Static>`, and one added later must skip this
+// (e.g. by tapping only the `Output` whose height is the terminal's).
 const screenTap = (globalThis[Symbol.for('goblin-malin.screenTap')] ??= {
     frame: [],
     highlight: undefined,
 });
+// [5] The highlighted rows of the previous frame, by row number: { cells: the restyled cells, text: their string }.
+const highlightedRows = [];
 // [3] The rows of the previous frame (cells + the string made from them), per output size, so a frame that
 // changed two rows stringifies two rows. Correctness never depends on it: a row is reused only when every cell
 // is the same object as before.
@@ -414,12 +421,22 @@ export default class Output {
         // [5] What this frame holds, before any highlight.
         screenTap.frame = output;
         const highlight = screenTap.highlight;
+        if (highlight === undefined) {
+            highlightedRows.length = 0;
+        }
         const generatedOutput = output
             .map((line, y) => {
-            // [5] A highlighted row is built from restyled copies of its cells and is not remembered.
+            // [5] A highlighted row is built from restyled copies of its cells (the same copies for the same cells:
+            // the app makes each once), so a row whose restyled cells are those of the last frame keeps its string.
             const highlighted = highlight?.(y, line);
             if (highlighted !== undefined) {
-                return styledCharsToString(highlighted.filter(item => item !== undefined)).trimEnd();
+                const remembered = highlightedRows[y];
+                if (remembered !== undefined && sameCells(remembered.cells, highlighted)) {
+                    return remembered.text;
+                }
+                const text = styledCharsToString(highlighted.filter(item => item !== undefined)).trimEnd();
+                highlightedRows[y] = { cells: highlighted, text };
+                return text;
             }
             // [3] Same cells as the row at this place in the previous frame: same string.
             const previous = previousFrame[y];

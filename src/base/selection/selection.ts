@@ -31,22 +31,42 @@ export function isVerticalLine(cell: ScreenCell | undefined): boolean {
     return cell !== undefined && VERTICAL_LINES.has(cell.value);
 }
 
+/** Any of the box-drawing characters (lines, corners, tees): what a panel's border is made of. */
+const BOX_DRAWING = /^[─-╿]$/u;
+/** The box-drawing characters where lines meet (corners, tees, crosses): never part of a plain rule or a bar. */
+const BOX_JOINT = /[┌-╋╒-╰]/u;
+
+function isBoxDrawing(cell: ScreenCell | undefined): boolean {
+    return cell !== undefined && BOX_DRAWING.test(cell.value);
+}
+
 /**
- * The columns of the pane around column `x` of `row`: between the vertical lines on each side of it (or the screen's
+ * Whether the cell at (`x`, `y`) is the edge of a panel, not a `│` that is part of some text: a vertical line is an
+ * edge when the row above or below has a border character in the same column (the line goes on, or a corner starts
+ * or ends it).
+ */
+export function isPaneEdge(frame: readonly ScreenRow[], x: number, y: number): boolean {
+    if (!isVerticalLine(frame[y]?.[x])) return false;
+    return isBoxDrawing(frame[y - 1]?.[x]) || isBoxDrawing(frame[y + 1]?.[x]);
+}
+
+/**
+ * The columns of the pane around column `x` of row `y`: between the panel edges on each side of it (or the screen's
  * edge). A selection that starts there stays there, so dragging down a panel next to another one (the task list and
  * the chat, a source list and the metadata box) never takes the other's text along.
  */
-export function paneBounds(row: ScreenRow, x: number): ColumnBounds {
+export function paneBounds(frame: readonly ScreenRow[], x: number, y: number): ColumnBounds {
+    const row = frame[y] ?? [];
     let left = 0;
     for (let i = Math.min(x, row.length - 1); i >= 0; i--) {
-        if (isVerticalLine(row[i])) {
+        if (isPaneEdge(frame, i, y)) {
             left = i + 1;
             break;
         }
     }
     let right = row.length;
     for (let i = Math.max(x, 0); i < row.length; i++) {
-        if (isVerticalLine(row[i])) {
+        if (isPaneEdge(frame, i, y)) {
             right = i;
             break;
         }
@@ -102,8 +122,20 @@ export function rowSpan(selection: Selection, y: number, row: ScreenRow): [numbe
     return [from, to];
 }
 
-/** A line made only of the box-drawing characters of a border (and spaces): not text. */
+/** A line made only of box-drawing characters (and spaces). */
 const BORDER_LINE = /^[\s─-╿]+$/u;
+
+/**
+ * A row that is a panel's top, bottom or divider border: made only of box-drawing characters AND joined to a corner
+ * or a tee, in the row itself or just outside the selectable columns. A bare run of `━` (a progress bar, a rule the
+ * user chose to select) is text and is kept.
+ */
+function isBorderRow(text: string, row: ScreenRow, bounds: ColumnBounds): boolean {
+    if (!BORDER_LINE.test(text)) return false;
+    if (BOX_JOINT.test(text)) return true;
+    const outside = [row[bounds.left - 1], row[bounds.right]];
+    return outside.some((cell) => cell !== undefined && BOX_JOINT.test(cell.value));
+}
 
 /**
  * The text of the selection, as one would paste it: a line per screen row, the blanks at the end of each row cut,
@@ -122,7 +154,7 @@ export function selectedText(frame: readonly ScreenRow[], selection: Selection):
             for (let x = span[0]; x < span[1]; x++) text += row[x]?.value ?? " ";
         }
         text = text.trimEnd();
-        if (text !== "" && BORDER_LINE.test(text)) continue;
+        if (text !== "" && isBorderRow(text, row, selection.bounds)) continue;
         // A row that starts where the selection's left edge is (the pane's, or the block's) carries that edge's
         // indentation; only the first row of a flowing selection starts in the middle of the text.
         lines.push({ text, flush: selection.block || y !== start.y || start.x <= selection.bounds.left });
