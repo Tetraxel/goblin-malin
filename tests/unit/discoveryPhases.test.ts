@@ -38,6 +38,7 @@ let regularResult: DiscoveryResult;
 let lastResortResult: DiscoveryResult;
 let callOrder: string[];
 let lastResortContexts: (DiscoveryContext | undefined)[];
+let linkOnlySearched: number;
 
 type Mods = {
     DownloadTask: typeof DownloadTaskType;
@@ -78,6 +79,20 @@ beforeAll(async () => {
             return youtubeSearch;
         }
     }
+    // A platform read only through links (like Tidal): never searched, never a gap for the last resort.
+    class FakeLinkOnly extends MetadataService {
+        static readonly searchable = false;
+        constructor(task: DownloadTaskType, logger: never) {
+            super("FakeLinkOnly", task, logger);
+        }
+        async getTrackMetadata(url: string) {
+            return catalog[url] ?? Promise.reject(new Error(`unknown ${url}`));
+        }
+        async searchTrack() {
+            linkOnlySearched++;
+            return [];
+        }
+    }
     class FakeRegular extends DiscoveryMetadataService {
         constructor(task: DownloadTaskType, logger: never) {
             super("FakeRegular", task, logger);
@@ -103,7 +118,10 @@ beforeAll(async () => {
         DownloadTask: (await import("#flows/musicDownloadFlow/utils/downloadTask")).DownloadTask,
         registries: () => {
             const metadata = new ServiceRegistry<DownloadTaskType, never>();
-            metadata.register("spotify", FakeSpotify as never).register("youtube", FakeYoutube as never);
+            metadata
+                .register("spotify", FakeSpotify as never)
+                .register("youtube", FakeYoutube as never)
+                .register("linkonly", FakeLinkOnly as never);
             const discovery = new ServiceRegistry<DownloadTaskType, never>();
             discovery.register("regular", FakeRegular as never).register("claude", FakeLastResort as never);
             return { metadata, discovery, download: new ServiceRegistry<DownloadTaskType, never>() };
@@ -120,6 +138,7 @@ beforeEach(() => {
     lastResortResult = { tracks: [] };
     callOrder = [];
     lastResortContexts = [];
+    linkOnlySearched = 0;
 });
 
 async function makeTask(opts: { lastResortEnabled?: boolean } = {}) {
@@ -258,6 +277,17 @@ describe("last-resort discovery (Phase C)", () => {
         const task = await makeTask();
         await task.startMetadataDiscovering();
 
+        expect(lastResortContexts).toEqual([]);
+    });
+
+    test("a platform that cannot be searched is not searched, and is not a gap that starts it", async () => {
+        youtubeSearch = [{ metadata: meta("youtube", "found", "Get Lucky", "Daft Punk"), searchKeys: ["trackName"] }];
+
+        const task = await makeTask();
+        await task.startMetadataDiscovering();
+
+        // "linkonly" has no result, but only youtube could have been missing.
+        expect(linkOnlySearched).toBe(0);
         expect(lastResortContexts).toEqual([]);
     });
 

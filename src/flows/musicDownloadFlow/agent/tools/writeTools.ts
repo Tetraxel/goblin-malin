@@ -525,14 +525,16 @@ export const addTasks = defineAgentTool<{ urls: string[] }>({
     },
     example: { urls: ["https://open.spotify.com/track/4rye8ZgoRgbQPfgBqxjfqG"] },
     describeCall: (input) => `add_tasks (${input.urls.length})`,
-    run: ({ urls }, ctx) => {
+    run: async ({ urls }, ctx) => {
+        // A short link says whether it is a track or an album only once followed (never throws: one that cannot be
+        // followed stays as it was).
+        const resolved = await urlParserRegistry.resolveAll(urls.map((raw) => raw.trim()));
         const existing = new Set(allTasks().map((t) => t.getId()));
         const archived = getArchivedTaskIds(SessionManager.getInstance().getCurrentSession());
         const seen = new Set<string>();
         const fresh: string[] = [];
         const skipped: { url: string; reason: string }[] = [];
-        for (const raw of urls) {
-            const url = raw.trim();
+        for (const url of resolved) {
             let parsed: ReturnType<typeof urlParserRegistry.parse> = null;
             try {
                 parsed = /^https?:\/\//i.test(url) ? urlParserRegistry.parse(url) : null;

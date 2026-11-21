@@ -42,6 +42,8 @@ Optional, all read generically (never branch on the key anywhere else):
 - `static trackUrl = (id) => url`: needed whenever something has only the id (the log prefix, a discovered result).
 - `static openUri = (parsed) => uri | undefined`: the platform's desktop-app address. Without it the link opens in the browser.
 - `static upstreamCodec = "Opus"`: only when every stream of the platform is in one lossy codec (it names what a yt-dlp FLAC was transcoded from). A platform that serves several (SoundCloud) leaves it out.
+- `static searchable = false`: only for a platform that cannot be searched at all (Tidal without a key); its `searchTrack` just returns `[]`. Phase A then skips it, and a track without a result for it does not start a last-resort (Claude) call.
+- `static resolveLink = (url) => Promise<string> | null`: only for short links that say what they lead to (a track, an album) once followed (`link.deezer.com/s/…`). Return `null` at once for every other link; the import follows the others before it decides track or collection.
 - `static platformAliases`, `static consent`, `static expandCollection` (albums and playlists: see `YoutubeService.expandCollection`), `static columnActions`, `static findLinks` (links written another way than a URL).
 - `searchTracks(query, limit)`: a free-text search with no seed and no gating; **the chat agent's `search_music` finds the new platform through it, with no other change**. Do add it when `searchTrack` does a search anyway.
 - `getAlbumDetails`: the whole album (barcode, track list), for the MusicBrainz checks. Only a platform that exposes the barcode needs it.

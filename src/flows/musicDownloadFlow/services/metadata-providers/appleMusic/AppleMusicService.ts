@@ -48,8 +48,29 @@ export class AppleMusicService extends MetadataService {
     static readonly platformAliases = ["itunes"] as const;
     static readonly trackUrl = appleMusicTrackUrl;
 
+    /**
+     * Set while `searchTrack` / `getTrackMetadata` run (they own the track's status): a call that has to wait for
+     * Apple's turn says so on the track instead of looking stuck. The agent's `searchTracks` leaves it unset.
+     */
+    private onAppleWait?: (waitMs: number) => void;
+
     constructor(task: DownloadTask, logger: Logger) {
         super("AppleMusicService", task, logger);
+    }
+
+    /** Runs `fn` with the track's status saying when an Apple call waits for its turn (the caller sets it after). */
+    private async showingWaits<T>(fn: () => Promise<T>): Promise<T> {
+        this.onAppleWait = (waitMs) =>
+            this.status.set({
+                type: StatusType.Processing,
+                message: `Waiting for Apple Music (${Math.ceil(waitMs / 1000)} s): it allows about 20 calls a minute`,
+                timeTracking: true,
+            });
+        try {
+            return await fn();
+        } finally {
+            this.onAppleWait = undefined;
+        }
     }
 
     static parseUrl(url: string): ParsedUrl | null {
@@ -89,7 +110,11 @@ export class AppleMusicService extends MetadataService {
     @Cached({ ttl: (result) => ((result as { found?: boolean }).found ? undefined : NEGATIVE_RESULT_TTL_MS) })
     private async lookupSong(id: string, country: string): Promise<{ found: boolean; song?: ITunesResult }> {
         this.logger.info(`Reading Apple Music track: ${id} (${country})`);
-        const answer = await itunesGet<ITunesAnswer>("lookup", { id, entity: "song", country });
+        const answer = await itunesGet<ITunesAnswer>(
+            "lookup",
+            { id, entity: "song", country },
+            { onWait: this.onAppleWait }
+        );
         const song = (answer.results ?? []).find((r) => r.wrapperType === "track" && String(r.trackId) === id);
         return song ? { found: true, song: slimITunesResult(song) } : { found: false };
     }
@@ -97,13 +122,11 @@ export class AppleMusicService extends MetadataService {
     @Cached({ ttl: (result) => (Array.isArray(result) && result.length === 0 ? NEGATIVE_RESULT_TTL_MS : undefined) })
     private async searchEntries(query: string, count: number): Promise<ITunesResult[]> {
         this.logger.debug(`Searching Apple Music: ${query}`);
-        const answer = await itunesGet<ITunesAnswer>("search", {
-            term: query,
-            media: "music",
-            entity: "song",
-            limit: count,
-            country: DEFAULT_STOREFRONT,
-        });
+        const answer = await itunesGet<ITunesAnswer>(
+            "search",
+            { term: query, media: "music", entity: "song", limit: count, country: DEFAULT_STOREFRONT },
+            { onWait: this.onAppleWait }
+        );
         return (answer.results ?? []).map(slimITunesResult);
     }
 
@@ -114,10 +137,13 @@ export class AppleMusicService extends MetadataService {
 
         this.status.set({ type: StatusType.Processing, message: "Fetching Apple Music track", timeTracking: true });
         try {
-            let { song } = await this.lookupSong(parsed.id, country);
-            // A link from another store may name a song the US store also has (most do).
-            if (!song && country !== DEFAULT_STOREFRONT)
-                ({ song } = await this.lookupSong(parsed.id, DEFAULT_STOREFRONT));
+            const id = parsed.id;
+            const song = await this.showingWaits(async () => {
+                const inStore = await this.lookupSong(id, country);
+                // A link from another store may name a song the US store also has (most do).
+                if (inStore.song || country === DEFAULT_STOREFRONT) return inStore.song;
+                return (await this.lookupSong(id, DEFAULT_STOREFRONT)).song;
+            });
             const metadata = song ? convertAppleMusicToTrack(song) : null;
             if (!metadata) throw new Error(`Apple Music has no track ${parsed.id} (store "${country}")`);
             this.status.clear();
@@ -146,7 +172,7 @@ export class AppleMusicService extends MetadataService {
         this.status.set({ type: StatusType.Processing, message: "Searching Apple Music", timeTracking: true });
         try {
             const searchText = `${artist} ${trackName}`;
-            const entries = await this.searchEntries(searchText, SEARCH_CANDIDATES);
+            const entries = await this.showingWaits(() => this.searchEntries(searchText, SEARCH_CANDIDATES));
             const matches = entries
                 .map(convertAppleMusicToTrack)
                 .filter((track): track is TrackMetadata => track !== null)

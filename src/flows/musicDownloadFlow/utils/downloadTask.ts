@@ -602,6 +602,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 // Find the registry key for this service
                 const serviceKey = this.findServiceKey(service.id);
                 if (!serviceKey) continue;
+                // A service that cannot search (its tracks only come from links) has nothing to find here.
+                if (this.metadataServiceRegistry.getConstructor(serviceKey)?.searchable === false) continue;
 
                 // Skip the service that owns the primary metadata (by registry key: a service id is a class name)
                 const primaryGroup = (this.getAttributes()?.metadataGroups ?? []).find((g) =>
@@ -1008,12 +1010,15 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         return key ? this.discoveryServiceRegistry.getConstructor(key)?.lastResort === true : false;
     }
 
-    // Platforms whose metadata service is enabled but which still have no result for this track.
+    // Platforms whose metadata service is enabled but which still have no result for this track. A platform that cannot
+    // be searched (`static searchable = false`) is never a gap: it is only reached through links, and asking a
+    // last-resort service for it on every track would spend a call per track.
     private getMissingPlatforms(): Platform[] {
         const groups = this.getAttributes()?.metadataGroups ?? [];
         const missing: Platform[] = [];
-        for (const key of this.metadataServiceRegistry.getAllConstructors().keys()) {
+        for (const [key, ctor] of this.metadataServiceRegistry.getAllConstructors()) {
             if (!this.isMetadataServiceEnabled(key)) continue;
+            if (ctor.searchable === false) continue;
             const group = groups.find((g) => g.serviceKey === key);
             if (!group || group.results.length === 0) missing.push(key as Platform);
         }

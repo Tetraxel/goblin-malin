@@ -12,7 +12,13 @@ import { type ProviderAlbum } from "#flows/musicDownloadFlow/musicbrainz/types";
 import { createProviderIdCell } from "../../../columns/ProviderIdCell";
 import { Cached, NEGATIVE_RESULT_TTL_MS } from "#utils/cache";
 import { MetadataService } from "../../../metadataService";
-import { DEEZER_NO_DATA, DeezerApiError, deezerGet, followShortLink } from "../../apis/deezer-client";
+import {
+    DEEZER_NO_DATA,
+    DEEZER_PERMISSION_CODES,
+    DeezerApiError,
+    deezerGet,
+    followShortLink,
+} from "../../apis/deezer-client";
 import { convertDeezerToTrack, slimDeezerTrack, type DeezerArtist, type DeezerTrack } from "./convertDeezerToTrack";
 import { deezerOpenUri, deezerTrackUrl, isDeezerShortLinkId, parseDeezerUrl } from "./deezerUrl";
 
@@ -81,6 +87,20 @@ export class DeezerService extends MetadataService {
         return parseDeezerUrl(url);
     }
 
+    /**
+     * A short link (what Deezer's share button gives, for a track, an album or a playlist) followed to the page it
+     * leads to, so the import knows which it is. `null` for any other link. Must not use `this`: it is called unbound.
+     */
+    static readonly resolveLink = (url: string): Promise<string> | null => {
+        const parsed = parseDeezerUrl(url);
+        if (!parsed?.id || !isDeezerShortLinkId(parsed.id)) return null;
+        return followShortLink(url).then((target) => {
+            const real = parseDeezerUrl(target);
+            if (!real?.id || isDeezerShortLinkId(real.id) || real.type === "unknown") return url;
+            return `https://www.deezer.com/${real.type}/${real.id}`;
+        });
+    };
+
     /** The tracks of an album or a playlist. Not cached: a playlist must show its new tracks on every refresh. */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     static async expandCollection(url: string, logger: Logger, _task: Task<any>): Promise<CollectionExpansion> {
@@ -111,7 +131,13 @@ export class DeezerService extends MetadataService {
             }
             return { kind: parsed.type, name, ownerName, trackUrls, totalCount: trackUrls.length };
         } catch (error) {
-            if (error instanceof DeezerApiError) {
+            // Only "not there" and "not for you" mean private or deleted. Any other error (too many requests, Deezer
+            // busy) keeps its own message: the list is fine, it is worth trying again later.
+            const noAccess =
+                error instanceof DeezerApiError &&
+                error.code !== undefined &&
+                (error.code === DEEZER_NO_DATA || DEEZER_PERMISSION_CODES.includes(error.code));
+            if (noAccess) {
                 throw new CollectionAccessError(
                     `Deezer would not show this ${parsed.type}: ${parsed.id}`,
                     `Deezer did not let the app read this ${parsed.type}. A playlist must be public to be read without an account; it may also have been deleted.`
@@ -157,6 +183,12 @@ export class DeezerService extends MetadataService {
             if (isDeezerShortLinkId(parsed.id)) {
                 const target = await followShortLink(deezerTrackUrl(parsed.id));
                 parsed = parseDeezerUrl(target);
+                if (parsed?.type === "album" || parsed?.type === "playlist") {
+                    // The import follows short links first: only one it could not follow then (offline) gets here.
+                    throw new Error(
+                        `This Deezer link leads to ${parsed.type === "album" ? "an album" : "a playlist"}: import it again to read its tracks (${url})`
+                    );
+                }
                 if (parsed?.type !== "track" || !parsed.id || isDeezerShortLinkId(parsed.id)) {
                     throw new Error(`This Deezer link does not lead to a track: ${url}`);
                 }
@@ -234,9 +266,20 @@ export class DeezerService extends MetadataService {
         const listed = await readTrackList(`/album/${album.id}/tracks`);
         const isrcs = new Map<number, string>();
         if (options.withIsrcs) {
-            // An album's track list carries the ISRC already; only the ones it left out are asked for.
+            // An album's track list carries the ISRC already; only the ones it left out are asked for, one by one (a
+            // failure leaves that track without one, as before).
             for (const track of listed) {
-                if (track.id !== undefined && track.isrc) isrcs.set(track.id, track.isrc);
+                if (track.id === undefined) continue;
+                if (track.isrc) {
+                    isrcs.set(track.id, track.isrc);
+                    continue;
+                }
+                try {
+                    const isrc = (await this.getTrackInfo(String(track.id))).isrc;
+                    if (isrc) isrcs.set(track.id, isrc);
+                } catch (error) {
+                    this.logger.debug(`Deezer: no ISRC for track ${track.id}`, { error });
+                }
             }
         }
         const artistOf = (a: DeezerArtist) => ({

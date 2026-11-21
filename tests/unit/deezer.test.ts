@@ -192,6 +192,36 @@ describe("DeezerService", () => {
         expect(track.id).toBe("3135556");
     });
 
+    test("resolveLink follows a short link to the album or playlist it leads to, and leaves other links alone", async () => {
+        const { DeezerService } =
+            await import("#flows/musicDownloadFlow/services/metadata-providers/deezer/DeezerService");
+        followShortLink.mockResolvedValue("https://www.deezer.com/fr/album/302127?host=1&utm_campaign=share");
+        await expect(DeezerService.resolveLink("https://link.deezer.com/s/30xyz")).resolves.toBe(
+            "https://www.deezer.com/album/302127"
+        );
+        followShortLink.mockResolvedValue("https://www.deezer.com/en/playlist/908622995");
+        await expect(DeezerService.resolveLink("https://deezer.page.link/AbCd")).resolves.toBe(
+            "https://www.deezer.com/playlist/908622995"
+        );
+        // Somewhere Deezer's parser does not read (its home page): the link stays as it was.
+        followShortLink.mockResolvedValue("https://www.deezer.com/fr/");
+        await expect(DeezerService.resolveLink("https://link.deezer.com/s/gone")).resolves.toBe(
+            "https://link.deezer.com/s/gone"
+        );
+        followShortLink.mockClear();
+        expect(DeezerService.resolveLink("https://www.deezer.com/track/3135556")).toBeNull();
+        expect(DeezerService.resolveLink("https://open.spotify.com/track/x")).toBeNull();
+        expect(followShortLink).not.toHaveBeenCalled();
+    });
+
+    test("a short link that turns out to be an album says so", async () => {
+        followShortLink.mockResolvedValue("https://www.deezer.com/fr/album/302127");
+        await expect((await makeService()).getTrackMetadata("https://link.deezer.com/s/abc")).rejects.toThrow(
+            /leads to an album/
+        );
+        expect(deezerGet).not.toHaveBeenCalled();
+    });
+
     test("an album link is not a track", async () => {
         await expect((await makeService()).getTrackMetadata("https://www.deezer.com/album/302127")).rejects.toThrow();
         expect(deezerGet).not.toHaveBeenCalled();
@@ -237,6 +267,48 @@ describe("DeezerService", () => {
         deezerGet.mockResolvedValue({ data: [HBFS, SEARCH_ENTRY, { title: "no id" }] });
         const tracks = await (await makeService()).searchTracks("daft punk", 5);
         expect(tracks.map((t) => t.id)).toEqual(["3135556", "3428967"]);
+    });
+
+    test("expandCollection: only 'no data' and permission errors read as a private or deleted list", async () => {
+        const { DeezerService } =
+            await import("#flows/musicDownloadFlow/services/metadata-providers/deezer/DeezerService");
+        const { DeezerApiError } = await import("#flows/musicDownloadFlow/services/apis/deezer-client");
+        const { CollectionAccessError } = await import("#base/collectionAccessError");
+        const expand = () =>
+            DeezerService.expandCollection(
+                "https://www.deezer.com/playlist/908622995",
+                { info: vi.fn() } as never,
+                {} as never
+            );
+
+        deezerGet.mockRejectedValue(new DeezerApiError("Deezer: no data (/playlist/908622995)", 800));
+        await expect(expand()).rejects.toBeInstanceOf(CollectionAccessError);
+
+        deezerGet.mockRejectedValue(new DeezerApiError("Deezer: Quota limit exceeded (/playlist/908622995)", 4));
+        const quota = await expand().catch((error: unknown) => error);
+        expect(quota).not.toBeInstanceOf(CollectionAccessError);
+        expect((quota as Error).message).toMatch(/Quota limit exceeded/);
+    });
+
+    test("getAlbumDetails asks for the ISRC of the tracks the album list left without one", async () => {
+        deezerGet.mockImplementation(async (path: string) => {
+            if (path === "/album/302127") return { id: 302127, title: "Discovery", upc: "724384960650" };
+            if (path === "/album/302127/tracks") {
+                return {
+                    data: [
+                        { id: 1, title: "One More Time", isrc: "GBDUW0000053" },
+                        { id: 2, title: "Aerodynamic" },
+                    ],
+                };
+            }
+            if (path === "/track/2") return { id: 2, title: "Aerodynamic", isrc: "GBDUW0000054" };
+            throw new Error(`unexpected ${path}`);
+        });
+        const album = await (
+            await makeService()
+        ).getAlbumDetails({ id: "302127", url: "https://www.deezer.com/album/302127" }, { withIsrcs: true });
+        expect(album?.tracks.map((t) => t.isrc)).toEqual(["GBDUW0000053", "GBDUW0000054"]);
+        expect(deezerGet).not.toHaveBeenCalledWith("/track/1", undefined);
     });
 
     test("expandCollection lists an album's tracks page after page", async () => {

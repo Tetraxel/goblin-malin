@@ -13,7 +13,7 @@ import { globalLogger } from "#base/logger/logger";
 export const SETTINGS_PATH = path.join(DEFAULT_APP_DATA_DIR, "settings.json");
 
 /** Bump when the stored shape changes, and add the `SETTINGS_MIGRATIONS[oldVersion]` step that upgrades a file. */
-export const SETTINGS_FILE_VERSION = 2;
+export const SETTINGS_FILE_VERSION = 3;
 
 /**
  * Shape of the JSON file on disk. It holds only what the user changed: every section is an override layer
@@ -64,6 +64,16 @@ const SETTINGS_MIGRATIONS: Record<number, (file: StoredSettings) => StoredSettin
             keybindings,
             music,
         };
+    },
+    // v2 → v3: the first-run provider picker arrived. A settings file from before it belongs to someone who has used
+    // the app already and chose their providers in Settings: they are not asked as if it were their first launch.
+    // (A new user has no file at all, so the picker's default, "not asked yet", applies to them.)
+    2: (file) => {
+        const music = { ...file.music };
+        const onboarding = isPlainObject(music.onboarding) ? { ...music.onboarding } : {};
+        if (onboarding.providersChosen === undefined) onboarding.providersChosen = true;
+        music.onboarding = onboarding;
+        return { ...file, music };
     },
 };
 

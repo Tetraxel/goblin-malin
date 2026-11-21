@@ -106,9 +106,48 @@ describe("convertAppleMusicToTrack", () => {
         ]);
     });
 
-    test("several credited artists are split", () => {
-        const track = convertAppleMusicToTrack({ ...HBFS, artistName: "Kanye West, Jay-Z & Frank Ocean" });
+    test("several credited artists are split when the artist page is the first one's", () => {
+        const track = convertAppleMusicToTrack({
+            ...HBFS,
+            artistName: "Kanye West, Jay-Z & Frank Ocean",
+            artistId: 2715720,
+            artistViewUrl: "https://music.apple.com/us/artist/kanye-west/2715720?uo=4",
+        });
         expect(track?.artists.map((a) => a.name)).toEqual(["Kanye West", "Jay-Z", "Frank Ocean"]);
+        expect(track?.artists[0]).toMatchObject({ id: "2715720" });
+        expect(track?.artists[1]).not.toHaveProperty("id");
+    });
+
+    test("a band whose name has '&' or ',' stays one artist, with its page", () => {
+        const ewf = convertAppleMusicToTrack({
+            ...HBFS,
+            artistName: "Earth, Wind & Fire",
+            artistId: 112979,
+            artistViewUrl: "https://music.apple.com/us/artist/earth-wind-fire/112979?uo=4",
+        });
+        expect(ewf?.artists).toEqual([
+            {
+                type: "artist",
+                name: "Earth, Wind & Fire",
+                id: "112979",
+                url: "https://music.apple.com/us/artist/earth-wind-fire/112979",
+            },
+        ]);
+        const sg = convertAppleMusicToTrack({
+            ...HBFS,
+            artistName: "Simon & Garfunkel",
+            artistViewUrl: "https://music.apple.com/us/artist/simon-garfunkel/1505",
+        });
+        expect(sg?.artists.map((a) => a.name)).toEqual(["Simon & Garfunkel"]);
+    });
+
+    test("without an artist page to tell, a credit is never split", () => {
+        const track = convertAppleMusicToTrack({
+            ...HBFS,
+            artistName: "Simon & Garfunkel",
+            artistViewUrl: undefined,
+        });
+        expect(track?.artists.map((a) => a.name)).toEqual(["Simon & Garfunkel"]);
     });
 
     test("an album, a video or a song without id or title is not a track", () => {

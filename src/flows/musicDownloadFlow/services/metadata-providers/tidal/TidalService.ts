@@ -33,6 +33,8 @@ export class TidalService extends MetadataService {
     static readonly cellComponent = createProviderIdCell("tidal");
     static readonly trackUrl = tidalTrackUrl;
     static readonly openUri = tidalOpenUri;
+    /** No keyless search: a track without a Tidal link is not a gap worth a last-resort (Claude) call. */
+    static readonly searchable = false;
 
     constructor(task: DownloadTask, logger: Logger) {
         super("TidalService", task, logger);

@@ -22,6 +22,12 @@ type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> =
     parseUrl?: (url: string) => ParsedUrl | null;
     /** Optional: turn links in another notation (e.g. `spotify:track:<id>`) found in a text into URLs `parseUrl` reads. */
     findLinks?: (text: string) => string[];
+    /**
+     * Optional: the address one of the service's short links leads to (`link.deezer.com/s/…`), which only says whether
+     * it is a track, an album or a playlist once followed; `null` at once (no network) for any other link. The import
+     * follows links through `urlParserRegistry.resolve()` before it decides what they are.
+     */
+    resolveLink?: (url: string) => Promise<string> | null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expandCollection?: (url: string, logger: Logger, task: Task<any>) => Promise<CollectionExpansion>;
     defaultSettings?: ProviderSettingsSchema;
@@ -33,6 +39,10 @@ type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> =
     consent?: ProviderConsent;
     // Slow/expensive last resort: only run when the regular services left a gap.
     lastResort?: boolean;
+    // Metadata services: `false` when the service cannot search its catalogue (its tracks only come from a pasted link
+    // or from discovery). Its `searchTrack` is not asked, and a track it has no result for is not a gap a last-resort
+    // service is started for.
+    searchable?: boolean;
     // Other platform keys this service also handles (e.g. YouTube Music links are YouTube videos).
     platformAliases?: readonly string[];
     // Canonical URL of one of this service's tracks, given its platform id.
@@ -91,6 +101,7 @@ export class ServiceRegistry<TTask extends Task<any> = Task, TService extends Se
             if (ctor.openUri) platformRegistry.registerOpenUri(name, ctor.openUri);
             if (ctor.parseUrl) urlParserRegistry.register(ctor.parseUrl);
             if (ctor.findLinks) urlParserRegistry.registerNormalizer(ctor.findLinks);
+            if (ctor.resolveLink) urlParserRegistry.registerResolver(ctor.resolveLink);
         } else {
             // Plain factory function path (escape hatch for custom instantiation)
             this.factories.set(name, ctorOrFactory as ServiceFactory<TTask, TService>);

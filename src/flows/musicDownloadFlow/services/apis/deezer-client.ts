@@ -15,6 +15,8 @@ export class DeezerApiError extends Error {
 
 /** Deezer's "no data" (an id that does not exist, or that is not available). */
 export const DEEZER_NO_DATA = 800;
+/** Deezer's "permission" errors: the item is there but not for this caller (a private playlist, an account-only one). */
+export const DEEZER_PERMISSION_CODES: readonly number[] = [200, 300, 901];
 
 /**
  * One call to Deezer's public API (no key, no account): `path` is under `https://api.deezer.com`, `params` its query.
