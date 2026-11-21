@@ -204,7 +204,14 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
                         await takeSnapshot(`timeout_stable_${stableIdx}`);
                         const { plain, ansi } = snapshots[`timeout_stable_${stableIdx}`]!;
                         emit({ type: "snapshot", name: `timeout_stable_${stableIdx}`, plain, ansi });
-                        throw new Error(`stable step ${stableIdx} timed out after ${ms}ms`);
+                        // What the app showed, so a failure on CI (where nobody sees the terminal) can be read.
+                        const screen = plain.replace(/\s+$/, "");
+                        const raw = rawBuffer.slice(-2000).split("\u001b").join("\\e");
+                        throw new Error(
+                            `stable step ${stableIdx} timed out after ${ms}ms ` +
+                                `(${totalBytesReceived} bytes received, exit code ${appExitCode ?? "none"})\n` +
+                                `--- screen ---\n${screen || "(empty)"}\n--- last raw output ---\n${raw || "(none)"}`
+                        );
                     }
                     stableIdx++;
                     break;

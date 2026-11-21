@@ -38,7 +38,11 @@
             "#assets": ["./src/assets"],
             "#assets/*": ["./src/assets/*"],
             "#types": ["./src/types"],
-            "#types/*": ["./src/types/*"]
+            "#types/*": ["./src/types/*"],
+            // ytmusic-api's typings are written for zod 3, but it runs on zod 4 (package.json "resolutions": the zod 3
+            // line has an open advisory). zod 4 still ships the zod 3 typings under "zod/v3"; without this, every
+            // ytmusic-api type would turn into `any`. Nothing else in the project imports zod.
+            "zod": ["./node_modules/zod/v3"]
         }
     },
     "include": ["src/**/*"], // Only compile files inside the 'src' folder

@@ -83,9 +83,9 @@ jobs:
               env:
                   GOBLIN_NO_AUDIO: "1"
 
-    # Known advisories in what ships (`dependencies`, not the dev tools). Reported, not blocking: the one open today
-    # (zod, through ytmusic-api) cannot be fixed from here, and a new advisory must not stop an unrelated change or a
-    # release. The job turns red-with-a-warning in the checks list, which is the reminder (DEP-01).
+    # Known advisories in what ships (`dependencies`, not the dev tools). Reported, not blocking: a new advisory must
+    # not stop an unrelated change or a release (zod, through ytmusic-api, is forced to the fixed line by
+    # package.json "resolutions"). The job turns red-with-a-warning in the checks list, which is the reminder (DEP-01).
     audit:
         name: yarn audit (production dependencies)
         runs-on: ubuntu-latest

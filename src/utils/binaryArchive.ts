@@ -127,6 +127,11 @@ export function parseSevenZipListing(listing: string): string[] {
 
 async function extractWithSevenZip(zipPath: string, entrySuffix: string, stage: string): Promise<string> {
     const { path7za } = await import("7zip-bin");
+    // The package manager does not always keep the binary's execute bit (Yarn 1 drops it), which makes the spawn fail
+    // with EACCES on Linux and macOS. Put it back; a read-only install keeps the in-process fallback.
+    if (process.platform !== "win32") {
+        await fs.chmod(path7za, 0o755).catch(() => {});
+    }
     const run = (args: string[]) =>
         execFileAsync(path7za, args, { windowsHide: true, maxBuffer: 64 * 1024 * 1024 }).then(({ stdout }) => stdout);
 
