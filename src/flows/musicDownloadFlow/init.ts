@@ -10,7 +10,6 @@ import { SoundCloudService } from "./services/metadata-providers/soundcloud/Soun
 import { DeezerService } from "./services/metadata-providers/deezer/DeezerService";
 import { AppleMusicService } from "./services/metadata-providers/appleMusic/AppleMusicService";
 import { TidalService } from "./services/metadata-providers/tidal/TidalService";
-import { AmazonMusicService } from "./services/metadata-providers/amazonMusic/AmazonMusicService";
 import { SonglinkService } from "./services/metadata-providers/songlink/SonglinkService";
 import { MusicBrainzDiscoveryService } from "./services/metadata-providers/musicbrainz/MusicBrainzDiscoveryService";
 import { ClaudeDiscoveryService } from "./services/metadata-providers/claude/ClaudeDiscoveryService";
@@ -43,7 +42,6 @@ export function initMusicApp(): void {
     metadataServiceRegistry.register("deezer", DeezerService);
     metadataServiceRegistry.register("appleMusic", AppleMusicService);
     metadataServiceRegistry.register("tidal", TidalService);
-    metadataServiceRegistry.register("amazonMusic", AmazonMusicService);
     // metadataServiceRegistry.register('musicbrainz', MusicBrainzService);
 
     discoveryServiceRegistry.register("songlink", SonglinkService);

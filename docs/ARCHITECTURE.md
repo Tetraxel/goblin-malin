@@ -57,7 +57,7 @@ Three registries, defined in [registries.ts](../src/flows/musicDownloadFlow/regi
 
 | Registry                   | Base class                                                                             | Registered today                                                                            |
 | -------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `metadataServiceRegistry`  | [MetadataService](../src/flows/musicDownloadFlow/metadataService.ts)                   | `spotify`, `youtube`, `soundcloud`, `deezer`, `appleMusic`, `tidal`, `amazonMusic` (opt-in) |
+| `metadataServiceRegistry`  | [MetadataService](../src/flows/musicDownloadFlow/metadataService.ts)                   | `spotify`, `youtube`, `soundcloud`, `deezer`, `appleMusic`, `tidal` |
 | `discoveryServiceRegistry` | [DiscoveryMetadataService](../src/flows/musicDownloadFlow/discoveryMetadataService.ts) | `songlink` (opt-in), `musicBrainz`, `claude` (opt-in, last resort)                          |
 | `downloadServiceRegistry`  | [DownloadService](../src/flows/musicDownloadFlow/downloadService.ts)                   | `ytdlp`, `soulseek`                                                                         |
 
@@ -90,6 +90,8 @@ A second, separate way to use Claude (the first is the last-resort discovery pro
 Everything lives in one folder (`GOBLIN_DATA_DIR`, else the OS default; `<repo>/data` when running from source): `settings.json`, `sessions.json` (+ `.bak`), `.env` (credentials), `cache/`, `bin/` (downloaded tools, `cookies.txt`), `app.log` (+ `app.prev.log`). The folder is derived at start-up and never read back from `settings.json` ([utils/appPaths.ts](../src/utils/appPaths.ts)). A lock file keeps a second instance out of the same folder.
 
 ## Input and hints
+
+Mouse input is reported to the app (`src/base/mouse/`), so the terminal's own text selection is off: dragging over text selects and copies it through `src/base/selection/` (the patched Ink output stage hands it the cells it painted and paints the highlight; see [CLAUDE.md](../CLAUDE.md#selecting-text-on-the-screen)).
 
 All keys go through `ShortcutDispatcher` and the `ShortcutRegistry`: components register shortcuts with `useShortcuts` (never `useInput`), users can rebind any of them, and on-screen hints resolve the live binding by shortcut id (`Hint`, `DynamicHintBar`). See the "Shortcuts & hints" section of [CLAUDE.md](../CLAUDE.md).
 

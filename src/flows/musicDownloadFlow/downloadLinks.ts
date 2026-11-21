@@ -27,20 +27,24 @@ export function downloadLinkInfo(ctor: { linkPlatforms?: readonly string[] | "an
     };
 }
 
+/** What a download provider takes, in a few words (the "any platform" / "not declared" / "none" cases). */
+export function describeLinkSources(info: DownloadLinkInfo, isEnabled: (platformKey: string) => boolean): string {
+    switch (info.kind) {
+        case "any":
+            return "any platform (it searches each track by artist and title)";
+        case "unknown":
+            return "not declared";
+        case "platforms": {
+            if (info.platforms.length === 0) return "none";
+            return info.platforms.map((p) => (isEnabled(p.key) ? p.label : `${p.label} (off in Metadata)`)).join(", ");
+        }
+    }
+}
+
 /**
  * One line saying which links a download provider uses, and which of those platforms are switched off in Metadata
  * (`isEnabled`): a platform the user does not use is still where this provider finds its files.
  */
 export function describeDownloadLinks(info: DownloadLinkInfo, isEnabled: (platformKey: string) => boolean): string {
-    switch (info.kind) {
-        case "any":
-            return "Uses links from: any platform (it searches each track by artist and title)";
-        case "unknown":
-            return "Uses links from: not declared";
-        case "platforms": {
-            if (info.platforms.length === 0) return "Uses links from: none";
-            const names = info.platforms.map((p) => (isEnabled(p.key) ? p.label : `${p.label} (off in Metadata)`));
-            return `Uses links from: ${names.join(", ")}`;
-        }
-    }
+    return `Uses links from: ${describeLinkSources(info, isEnabled)}`;
 }

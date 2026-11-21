@@ -12,6 +12,12 @@ export type AppSettings = {
          * Terminal pay for every byte), off elsewhere.
          */
         reduceTerminalOutput: boolean;
+        /**
+         * Drag the mouse over any text on the screen and it is copied to the clipboard when the button is released
+         * (Alt+drag: a rectangle). Off: the app leaves the mouse drag alone (the terminal's own selection, usually
+         * Shift+drag, still works).
+         */
+        copyOnSelect: boolean;
         theme: string;
         showWelcomeTutorial: boolean;
         checkForUpdates: boolean;
@@ -44,6 +50,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
         reopenLastSession: true,
         animationsEnabled: true,
         reduceTerminalOutput: process.platform === "win32",
+        copyOnSelect: true,
         theme: "dark",
         showWelcomeTutorial: true,
         checkForUpdates: true,

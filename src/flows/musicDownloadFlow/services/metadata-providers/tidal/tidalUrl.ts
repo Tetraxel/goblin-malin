@@ -21,6 +21,9 @@ export function parseTidalUrl(url: string): ParsedUrl | null {
     if (!HOSTS.has(host)) return null;
 
     const segments = parsed.pathname.split("/").filter(Boolean);
+    // A link from the "Share" button ends in `/u` (`tidal.com/track/<id>/u`), and a page may carry a region (`/us/…`).
+    if (segments.at(-1)?.toLowerCase() === "u") segments.pop();
+    if (/^[a-z]{2}$/i.test(segments[0] ?? "") && segments.length > 2) segments.shift();
     if (segments[0]?.toLowerCase() === "browse") segments.shift();
     // `/album/<albumId>/track/<id>`: the track inside an album page.
     if (segments.length === 4 && segments[0].toLowerCase() === "album") segments.splice(0, 2);

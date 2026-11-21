@@ -19,6 +19,7 @@ import { type UpdateInfo } from "#updater/updateChecker";
 import { Toolbar } from "./Toolbar/Toolbar";
 import { type ColumnDefinition, TaskListPanel } from "./TaskListPanel/TaskListPanel";
 import { SecondaryPanel } from "./SecondaryPanel/SecondaryPanel";
+import { SelectionLayer } from "./SelectionLayer";
 import { ShortcutDispatcher } from "./ShortcutDispatcher";
 import { InputRouter } from "./InputRouter";
 import { ImportActionsProvider } from "#contexts/ImportActionsContext";
@@ -37,6 +38,8 @@ import { dialogBridge, type ConfirmDialog, type DialogTone } from "#base/bridges
 import { ConfirmModal } from "./ConfirmModal/ConfirmModal";
 import { ListDialogModal } from "./ListDialogModal/ListDialogModal";
 import { useListDialog } from "./ListDialogModal/useListDialog";
+import { MatrixDialogModal } from "./MatrixDialogModal/MatrixDialogModal";
+import { useMatrixDialog } from "./MatrixDialogModal/useMatrixDialog";
 import { InputDialogModal } from "./InputDialogModal/InputDialogModal";
 import { useInputDialog } from "./InputDialogModal/useInputDialog";
 import { ClosingModal } from "./ClosingModal/ClosingModal";
@@ -198,6 +201,7 @@ Check your internet connection, then try again.`,
     // answering, so a confirm waits for a free slot rather than replacing it.
     const { pending: pendingList, open: openListDialog, answer: answerListDialog } = useListDialog();
     const { pending: pendingInput, open: openInputDialog, answer: answerInputDialog } = useInputDialog();
+    const { pending: pendingMatrix, open: openMatrixDialog, answer: answerMatrixDialog } = useMatrixDialog();
     const handleDialogConfirm = useCallback(
         (dialog: ConfirmDialog, resolve: (index: number | null) => void) => {
             const colors: Record<DialogTone, string> = {
@@ -235,6 +239,11 @@ Check your internet connection, then try again.`,
         dialogBridge.setInputOpener(openInputDialog);
         return () => dialogBridge.setInputOpener(null);
     }, [openInputDialog]);
+
+    useEffect(() => {
+        dialogBridge.setMatrixOpener(openMatrixDialog);
+        return () => dialogBridge.setMatrixOpener(null);
+    }, [openMatrixDialog]);
 
     // The dialogs above are mounted: once the intro is over too, first-run questions may be asked (see `appReady`).
     useEffect(() => {
@@ -280,6 +289,7 @@ Check your internet connection, then try again.`,
 
     return (
         <ImportActionsProvider openImportFlow={openImportFlow}>
+            <SelectionLayer />
             {/* ShortcutDispatcher: the single useInput in the app */}
             <ShortcutDispatcher />
             {/* InputRouter: registers global + window-specific shortcuts */}
@@ -400,6 +410,13 @@ Check your internet connection, then try again.`,
                         terminalHeight={terminalHeight}
                         terminalWidth={terminalWidth}
                         onAnswer={answerInputDialog}
+                    />
+
+                    <MatrixDialogModal
+                        pending={pendingMatrix}
+                        terminalHeight={terminalHeight}
+                        terminalWidth={terminalWidth}
+                        onAnswer={answerMatrixDialog}
                     />
 
                     <TempCleanupModal terminalHeight={terminalHeight} terminalWidth={terminalWidth} />

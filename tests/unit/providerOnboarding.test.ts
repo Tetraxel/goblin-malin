@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
-import { dialogBridge, type ListDialog, type ListDialogAnswer } from "#base/bridges/dialogBridge";
+import { dialogBridge, type MatrixAnswer, type MatrixDialog } from "#base/bridges/dialogBridge";
 import { appReady } from "#base/appReady";
 import { metadataServiceRegistry, downloadServiceRegistry } from "#flows/musicDownloadFlow/registries";
 import { describeDownloadLinks, downloadLinkInfo } from "#flows/musicDownloadFlow/downloadLinks";
@@ -12,15 +12,31 @@ beforeAll(async () => {
     const { SoundCloudService } =
         await import("#flows/musicDownloadFlow/services/metadata-providers/soundcloud/SoundCloudService");
     const { DeezerService } = await import("#flows/musicDownloadFlow/services/metadata-providers/deezer/DeezerService");
-    const { AmazonMusicService } =
-        await import("#flows/musicDownloadFlow/services/metadata-providers/amazonMusic/AmazonMusicService");
+    const { MetadataService } = await import("#flows/musicDownloadFlow/metadataService");
     const { YtDlpService } = await import("#flows/musicDownloadFlow/services/download-providers/ytdlp/YtDlpService");
     const { SoulseekService } =
         await import("#flows/musicDownloadFlow/services/download-providers/soulseek/SoulseekService");
     metadataServiceRegistry.register("youtube", YoutubeService);
     metadataServiceRegistry.register("soundcloud", SoundCloudService);
     metadataServiceRegistry.register("deezer", DeezerService);
-    metadataServiceRegistry.register("amazonMusic", AmazonMusicService);
+    // No real metadata provider is consent-gated any more: a stand-in that sends data to a third party.
+    class CloudService extends MetadataService {
+        static readonly display = { label: "Cloud Music", acronym: "CM", color: "#25d1da" };
+        static readonly defaultSettings = {
+            enabled: { label: "Enable", defaultValue: false, kind: "checkbox" },
+        } as const;
+        static readonly consent = { title: "Read Cloud Music links?", message: "Each link is sent to a third party." };
+        static parseUrl() {
+            return null;
+        }
+        getTrackMetadata(): Promise<TrackMetadata> {
+            throw new Error("not used");
+        }
+        searchTrack(): Promise<never[]> {
+            return Promise.resolve([]);
+        }
+    }
+    metadataServiceRegistry.register("cloudMusic", CloudService as never);
     downloadServiceRegistry.register("ytdlp", YtDlpService);
     downloadServiceRegistry.register("soulseek", SoulseekService);
 });
@@ -52,14 +68,14 @@ describe("which links a download provider uses", () => {
         expect(ytdlp.canDownload(track("youtube"))).toBe(true);
         expect(ytdlp.canDownload(track("youtubeMusic", "youtube"))).toBe(true);
         expect(ytdlp.canDownload(track("soundcloud"))).toBe(true);
-        for (const platform of ["deezer", "appleMusic", "tidal", "amazonMusic", "spotify"]) {
+        for (const platform of ["deezer", "appleMusic", "tidal", "spotify"]) {
             expect(ytdlp.canDownload(track(platform))).toBe(false);
         }
     });
 
     test("Soulseek takes any platform's track (it searches by name)", () => {
         const soulseek = makeDownloader("soulseek");
-        for (const platform of ["deezer", "appleMusic", "tidal", "amazonMusic", "spotify", "youtube"]) {
+        for (const platform of ["deezer", "appleMusic", "tidal", "spotify", "youtube"]) {
             expect(soulseek.canDownload(track(platform))).toBe(true);
         }
     });
@@ -95,90 +111,106 @@ describe("Settings → Download", () => {
     });
 });
 
-describe("dialogBridge.checklist", () => {
-    afterEach(() => dialogBridge.setListOpener(null));
+describe("dialogBridge.matrix", () => {
+    afterEach(() => dialogBridge.setMatrixOpener(null));
 
-    test("opens a list with a box per row and answers every row's value", async () => {
-        let shown: ListDialog | undefined;
-        dialogBridge.setListOpener((dialog, resolve) => {
+    test("hands the dialog to the UI and answers every row's and column's value", async () => {
+        let shown: MatrixDialog | undefined;
+        dialogBridge.setMatrixOpener((dialog, resolve) => {
             shown = dialog;
-            resolve({ checked: [false, true] });
+            resolve({ rows: [false, true], columns: [true] });
         });
-        const answer = await dialogBridge.checklist({
+        const dialog: MatrixDialog = {
             title: "Pick",
-            items: [
-                { label: "A", checked: true },
-                { label: "B", checked: false },
-            ],
-        });
-        expect(shown?.checked).toEqual([true, false]);
-        expect(shown?.items.map((i) => i.label)).toEqual(["A", "B"]);
-        expect(answer).toEqual([false, true]);
+            columns: { heading: "C", items: [{ key: "c", label: "C1", checked: false }] },
+            rows: {
+                heading: "R",
+                items: [
+                    { key: "a", label: "A", checked: true },
+                    { key: "b", label: "B", checked: false },
+                ],
+            },
+            cells: [{ row: "a", column: "c", mark: "x", strong: true }],
+        };
+        expect(await dialogBridge.matrix(dialog)).toEqual({ rows: [false, true], columns: [true] });
+        expect(shown).toBe(dialog);
     });
 
     test("dismissed, or nobody to ask: null", async () => {
-        expect(await dialogBridge.checklist({ title: "x", items: [] })).toBeNull();
-        dialogBridge.setListOpener((_dialog, resolve) => resolve(null));
-        expect(await dialogBridge.checklist({ title: "x", items: [] })).toBeNull();
+        const dialog: MatrixDialog = {
+            title: "x",
+            columns: { heading: "", items: [] },
+            rows: { heading: "", items: [] },
+            cells: [],
+        };
+        expect(await dialogBridge.matrix(dialog)).toBeNull();
+        dialogBridge.setMatrixOpener((_dialog, resolve) => resolve(null));
+        expect(await dialogBridge.matrix(dialog)).toBeNull();
     });
 });
 
 describe("the first-run provider picker", () => {
-    const asked: ListDialog[] = [];
-    let answers: ListDialogAnswer[] = [];
+    const asked: MatrixDialog[] = [];
+    let answers: MatrixAnswer[] = [];
 
     beforeEach(async () => {
         asked.length = 0;
         answers = [];
-        dialogBridge.setListOpener((dialog, resolve) => {
+        dialogBridge.setMatrixOpener((dialog, resolve) => {
             asked.push(dialog);
             resolve(answers.shift() ?? null);
         });
         const { SettingsStore } = await import("#settings/settingsStore");
         SettingsStore.getInstance().patchMusicSettings({
             onboarding: { providersChosen: false },
-            metadata: { providers: { soundcloud: { enabled: true }, amazonMusic: { enabled: false } } },
+            metadata: { providers: { soundcloud: { enabled: true }, cloudMusic: { enabled: false } } },
             download: { providers: { ytdlp: { enabled: true }, soulseek: { enabled: true } } },
         });
     });
-    afterEach(() => dialogBridge.setListOpener(null));
+    afterEach(() => dialogBridge.setMatrixOpener(null));
 
     async function settings() {
         const { getMusicSettings } = await import("#flows/musicDownloadFlow/settings");
         return getMusicSettings();
     }
 
-    test("waits for the app to be ready, then asks once: metadata, then download", async () => {
+    test("waits for the app to be ready, then asks once, metadata and download on one screen", async () => {
         appReady.reset();
         const { registerProviderOnboarding } = await import("#flows/musicDownloadFlow/providerOnboarding");
-        answers = [{ checked: [true, false, true, true] }, { checked: [true, false] }];
+        answers = [{ rows: [true, false, true, true], columns: [true, false] }];
         registerProviderOnboarding();
         expect(asked).toHaveLength(0);
         appReady.markReady();
         await vi.waitFor(async () => expect((await settings()).onboarding.providersChosen).toBe(true));
 
-        expect(asked.map((d) => d.title)).toEqual(["Which platforms do you use?", "How should tracks be downloaded?"]);
-        expect(asked[0].items.map((i) => i.label)).toEqual(["YouTube", "SoundCloud", "Deezer", "Amazon Music"]);
-        expect(asked[0].checked).toEqual([true, true, true, false]);
+        expect(asked).toHaveLength(1);
+        expect(asked[0].rows.items.map((i) => i.label)).toEqual(["YouTube", "SoundCloud", "Deezer", "Cloud Music"]);
+        expect(asked[0].rows.items.map((i) => i.checked)).toEqual([true, true, true, false]);
+        expect(asked[0].columns.items.map((i) => i.label)).toEqual(["YtDlp", "Soulseek"]);
 
         const s = await settings();
         expect(s.metadata.providers.soundcloud.enabled).toBe(false);
         // Ticking a provider that sends data away is the user's answer to it.
-        expect(s.metadata.providers.amazonMusic).toMatchObject({ enabled: true, consentAsked: true });
+        expect(s.metadata.providers.cloudMusic).toMatchObject({ enabled: true, consentAsked: true });
         expect(s.download.providers.soulseek.enabled).toBe(false);
     });
 
-    test("the download step shows the platforms each provider uses, and which were just left off", async () => {
+    test("the grid says whose links each download provider uses, in the platform's color", async () => {
         const { runProviderOnboarding } = await import("#flows/musicDownloadFlow/providerOnboarding");
-        answers = [{ checked: [true, false, true, false] }, null];
+        answers = [null];
         await runProviderOnboarding();
-        const ytdlp = asked[1].items[0];
-        expect(ytdlp.label).toBe("YtDlp");
-        expect(ytdlp.detail).toContain("Uses links from: YouTube, SoundCloud (off in Metadata)");
-        expect(ytdlp.detail?.some((line) => /Turn SoundCloud on in Metadata/.test(line))).toBe(true);
-        // A metadata row says who downloads its tracks.
-        expect(asked[0].items[2].detail).toContain("No download from its links; found by name by: Soulseek");
-        expect(asked[0].items[1].detail).toContain("Its links are downloaded by: YtDlp");
+        const { cells, rows } = asked[0];
+        const strong = cells.filter((c) => c.strong).map((c) => `${c.row}→${c.column}`);
+        expect(strong).toEqual(["youtube→ytdlp", "soundcloud→ytdlp"]);
+        // Soulseek searches every platform's tracks by name: a plain cell in every row.
+        expect(cells.filter((c) => c.column === "soulseek").map((c) => c.row)).toEqual(rows.items.map((i) => i.key));
+        expect(cells.find((c) => c.column === "soulseek")).toEqual({
+            row: "youtube",
+            column: "soulseek",
+            mark: "by name",
+        });
+        expect(rows.items.find((i) => i.key === "youtube")?.color).toBe("#ff0033");
+        expect(asked[0].columns.items[1].note).toMatch(/any platform/);
     });
 
     test("Esc keeps the providers as they are and is not asked again", async () => {

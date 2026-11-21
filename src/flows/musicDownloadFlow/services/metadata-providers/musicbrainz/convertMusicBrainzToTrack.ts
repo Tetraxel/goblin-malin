@@ -21,7 +21,6 @@ const PLATFORM_API_PROVIDER: Partial<Record<Platform, APIProvider>> = {
     deezer: "deezer",
     tidal: "tidal",
     appleMusic: "itunes",
-    amazonMusic: "amazon",
     soundcloud: "soundcloud",
 };
 

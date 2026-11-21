@@ -464,7 +464,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
 
     if (!isVisible) return null;
 
-    const modalWidth = Math.min(90, Math.max(60, terminalWidth - 6));
+    const modalWidth = Math.min(120, Math.max(60, terminalWidth - 6));
     const innerWidth = modalWidth - 6;
     const listHeight = Math.max(3, terminalHeight - MODAL_OVERHEAD);
 

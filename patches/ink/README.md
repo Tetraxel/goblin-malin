@@ -10,7 +10,7 @@ the header of `output.js` and `tests/unit/inkOutputPatch.test.ts`.
   them (or an older version of our own patch), and `tests/unit/inkOutputPatch.test.ts` renders the same random frames
   through the stock and the patched `output.js` and compares the strings, and checks that the patched
   `render-node-to-output.js` differs from the stock one only in where `widestLine` comes from.
-- `output.js` — the patched output stage. Every change is marked with `[1]` … `[4]` in its header comment.
+- `output.js` — the patched output stage. Every change is marked with `[1]` … `[5]` in its header comment. [5] is not a speed-up: it is the _screen tap_ that lets the app select text on the screen (`src/base/selection/`): `get()` leaves the cells of the frame it painted in an object shared through `globalThis`, and paints a restyled copy of any row the app asks to highlight (a highlighted row has its own cache, so a drag restringifies only the rows whose highlight changed). Without a highlight the strings are those of stock Ink (the test compares them).
 - `render-node-to-output.js` — one changed import: `widestLine` comes from the cache of `output.js` ([4]).
 
 ## Who uses it

@@ -62,6 +62,10 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
     for (const [k, v] of Object.entries(process.env)) {
         if (v !== undefined) ptyEnv[k] = v;
     }
+    // The app runs in a real terminal here, like a user's. On a CI runner (`CI=true`), Ink would otherwise think it
+    // is not interactive and draw nothing until it exits (`is-in-ci`), so every scenario would time out.
+    delete ptyEnv["CI"];
+    delete ptyEnv["CONTINUOUS_INTEGRATION"];
     // The app always runs on a throwaway copy of the fixture, never on the fixture itself (see isolatedDataDir.ts).
     const fixtureDir = path.resolve(ROOT, scenario.dataDir ?? DEFAULT_FIXTURE);
     const isolated = createIsolatedDataDir(fixtureDir, scenario.settings);
@@ -137,7 +141,9 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
             function check() {
                 const now = Date.now();
                 const elapsed = now - start;
-                const idle = lastDataTime > 0 ? now - lastDataTime : Infinity;
+                // Quiet time counts from the start of the wait at the earliest: output from before a key press is
+                // not an answer to it, and the app may not have started repainting yet.
+                const idle = lastDataTime > 0 ? now - Math.max(lastDataTime, start) : Infinity;
                 const enoughData = totalBytesReceived >= minBytes;
 
                 if (enoughData && idle >= quiescenceMs) {
@@ -204,7 +210,14 @@ export async function runScenario(scenario: Scenario, options: RunOptions = {}):
                         await takeSnapshot(`timeout_stable_${stableIdx}`);
                         const { plain, ansi } = snapshots[`timeout_stable_${stableIdx}`]!;
                         emit({ type: "snapshot", name: `timeout_stable_${stableIdx}`, plain, ansi });
-                        throw new Error(`stable step ${stableIdx} timed out after ${ms}ms`);
+                        // What the app showed, so a failure on CI (where nobody sees the terminal) can be read.
+                        const screen = plain.replace(/\s+$/, "");
+                        const raw = rawBuffer.slice(-2000).split("\u001b").join("\\e");
+                        throw new Error(
+                            `stable step ${stableIdx} timed out after ${ms}ms ` +
+                                `(${totalBytesReceived} bytes received, exit code ${appExitCode ?? "none"})\n` +
+                                `--- screen ---\n${screen || "(empty)"}\n--- last raw output ---\n${raw || "(none)"}`
+                        );
                     }
                     stableIdx++;
                     break;

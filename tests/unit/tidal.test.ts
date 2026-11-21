@@ -22,6 +22,10 @@ describe("parseTidalUrl", () => {
             "https://listen.tidal.com/track/77646168?u",
             "https://listen.tidal.com/album/77646153/track/77646168",
             "https://embed.tidal.com/tracks/77646168",
+            "https://tidal.com/track/77646168/u",
+            "https://tidal.com/browse/track/77646168/u?foo=1",
+            "https://tidal.com/us/track/77646168",
+            "https://tidal.com/album/77646153/track/77646168/u",
         ]) {
             expect(parseTidalUrl(url)).toEqual({ platform: "tidal", type: "track", id: "77646168" });
         }

@@ -179,12 +179,6 @@ export type AppleMusicTrackMetadata = BaseTrackMetadata & {
     uri: TrackUri<"appleMusic">; // "APPLEMUSIC::TRACK::697195787"
 };
 
-export type AmazonMusicTrackMetadata = BaseTrackMetadata & {
-    platform: "amazonMusic";
-    apiProvider: "amazon";
-    uri: TrackUri<"amazonMusic">; // "AMAZONMUSIC::TRACK::B07DN7XVCC"
-};
-
 export type YoutubeTrackMetadata = BaseTrackMetadata & {
     platform: "youtube";
     apiProvider: "youtube";
@@ -214,7 +208,6 @@ export type TrackMetadata =
     | SpotifyTrackMetadata
     | DeezerTrackMetadata
     | AppleMusicTrackMetadata
-    | AmazonMusicTrackMetadata
     | YoutubeTrackMetadata
     | YoutubeMusicTrackMetadata
     | SoundcloudTrackMetadata

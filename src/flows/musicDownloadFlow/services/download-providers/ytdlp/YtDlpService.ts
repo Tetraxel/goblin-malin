@@ -77,8 +77,8 @@ export class YtDlpService extends DownloadService {
     static readonly settingsStatus = cookiesSettingsStatus;
     static readonly cellComponent = YtDlpCell;
 
-    // The sites the app reads through yt-dlp: a track found there is a page yt-dlp downloads. (Deezer, Apple Music,
-    // Tidal and Amazon Music streams are DRM-protected: yt-dlp cannot read them.)
+    // The sites the app reads through yt-dlp: a track found there is a page yt-dlp downloads. (Deezer, Apple Music
+    // and Tidal streams are DRM-protected: yt-dlp cannot read them.)
     static readonly linkPlatforms = ["youtube", "soundcloud"] as const;
 
     constructor(task: DownloadTask, logger: Logger) {

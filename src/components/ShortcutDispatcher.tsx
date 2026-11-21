@@ -27,6 +27,7 @@ const NO_IMPORT_PASTE_WINDOWS: ReadonlySet<FocusableWindow> = new Set([
     "confirmModal",
     "listDialog",
     "inputDialog",
+    "matrixDialog",
     "tempCleanupModal",
     "actionsMenu",
 ]);

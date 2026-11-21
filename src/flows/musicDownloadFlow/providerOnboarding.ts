@@ -1,10 +1,10 @@
 import { appReady } from "#base/appReady";
-import { dialogBridge, type ListItem } from "#base/bridges/dialogBridge";
+import { dialogBridge, type MatrixCell } from "#base/bridges/dialogBridge";
 import { globalLogger } from "#base/logger/logger";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { type ProviderConstructorLike } from "#base/providerSettings";
 import { SettingsStore } from "#settings/settingsStore";
-import { describeDownloadLinks, downloadLinkInfo } from "./downloadLinks";
+import { describeLinkSources, downloadLinkInfo } from "./downloadLinks";
 import { downloadServiceRegistry, metadataServiceRegistry } from "./registries";
 import { getMusicSettings, type StoredProviderSettings } from "./settings";
 
@@ -29,116 +29,106 @@ function answerPatch(ctor: ProviderConstructorLike, enabled: boolean): StoredPro
     return ctor.consent ? { enabled, consentAsked: true } : { enabled };
 }
 
-/** The download providers that can download a platform's tracks: by its links, or by searching its tracks' names. */
-function downloadersOf(platform: string): { byLink: string[]; byName: string[] } {
-    const byLink: string[] = [];
-    const byName: string[] = [];
-    for (const { key, ctor } of entriesOf(downloadServiceRegistry)) {
-        const label = providerDisplayRegistry.get(key).label || key;
-        if (ctor.linkPlatforms === "any") byName.push(label);
-        else if (ctor.linkPlatforms?.includes(platform)) byLink.push(label);
-    }
-    return { byLink, byName };
-}
-
-/** The lines under a metadata provider: what it does, what it sends away, and who can download its tracks. */
-export function metadataItemDetail(key: string, ctor: ProviderConstructorLike): string[] {
+/** The lines under the grid for a metadata provider: what it does, what it sends away, its setup. */
+export function metadataItemDetail(ctor: ProviderConstructorLike): string[] {
     const lines: string[] = [];
     if (ctor.summary) lines.push(ctor.summary);
     if (ctor.consent) lines.push(`Off by default: ${ctor.consent.title}`);
     if (ctor.setupWizard) lines.push("Asks for its setup (an account or a key) the first time it is needed.");
-    const { byLink, byName } = downloadersOf(key);
-    if (byLink.length > 0) lines.push(`Its links are downloaded by: ${byLink.join(", ")}`);
-    else if (byName.length > 0) lines.push(`No download from its links; found by name by: ${byName.join(", ")}`);
     return lines;
 }
 
-/** The lines under a download provider: what it does, and the platforms whose links it uses (and which are off). */
-export function downloadItemDetail(
-    ctor: ProviderConstructorLike,
-    isPlatformOn: (platform: string) => boolean
-): string[] {
+/** The lines under the grid for a download provider: what it does, its setup. */
+export function downloadItemDetail(ctor: ProviderConstructorLike): string[] {
     const lines: string[] = [];
     if (ctor.summary) lines.push(ctor.summary);
     if (ctor.setupWizard) lines.push("Asks for its setup (an account) the first time it is needed.");
-    const info = downloadLinkInfo(ctor);
-    lines.push(describeDownloadLinks(info, isPlatformOn));
-    if (info.kind === "platforms") {
-        const off = info.platforms.filter((p) => !isPlatformOn(p.key)).map((p) => p.label);
-        if (off.length > 0) {
-            lines.push(`Turn ${off.join(" / ")} on in Metadata to give it more to download, even unused.`);
-        }
-    }
     return lines;
 }
 
 /**
- * The first-run question, asked once after the welcome intro: which metadata providers to use, then which download
- * providers, each with what it does and — for a download provider — the platforms whose links it uses, so a platform
- * the user would not pick for itself shows up as a source of files. The answers are written to the providers'
- * settings (Settings → Metadata / Download change them later). Esc keeps what is set and is not asked again.
+ * What joins each platform to each download provider (its `static linkPlatforms`): "link" when the provider downloads
+ * the platform's own links (strong: drawn in the platform's color), "by name" when it searches the platform's tracks
+ * by artist and title.
+ */
+export function providerCells(metadata: Entry[], download: Entry[]): MatrixCell[] {
+    const cells: MatrixCell[] = [];
+    for (const { key: column, ctor } of download) {
+        const info = downloadLinkInfo(ctor);
+        for (const { key: row } of metadata) {
+            if (info.kind === "any") cells.push({ row, column, mark: "by name" });
+            else if (info.kind === "platforms" && info.platforms.some((p) => p.key === row)) {
+                cells.push({ row, column, mark: "● link", strong: true });
+            }
+        }
+    }
+    return cells;
+}
+
+const labelOf = (key: string) => providerDisplayRegistry.get(key).label || key;
+
+/**
+ * The first-run question, asked once after the welcome intro, on one screen: which download providers and which
+ * metadata providers (platforms) to use, and — in a grid, in each platform's color — whose links each download
+ * provider will use, so a platform the user would not pick for itself shows up as a source of files and unticking it
+ * greys out what is lost. The answers are written to the providers' settings (Settings → Metadata / Download change
+ * them later). Esc keeps what is set and is not asked again.
  */
 export async function runProviderOnboarding(): Promise<void> {
     if (getMusicSettings().onboarding?.providersChosen) return;
     const store = SettingsStore.getInstance();
     const markAsked = () => store.patchMusicSettings({ onboarding: { providersChosen: true } });
 
-    // ── Metadata providers ──
     const metadata = entriesOf(metadataServiceRegistry);
-    const storedMetadata = getMusicSettings().metadata.providers;
-    const metadataItems: (ListItem & { checked: boolean })[] = metadata.map(({ key, ctor }) => ({
-        label: providerDisplayRegistry.get(key).label || key,
-        detail: metadataItemDetail(key, ctor),
-        checked: isOn(ctor, storedMetadata[key]),
-    }));
-    const metadataAnswer = await dialogBridge.checklist({
-        title: "Which platforms do you use?",
+    const download = entriesOf(downloadServiceRegistry);
+    const { metadata: storedMetadata, download: storedDownload } = getMusicSettings();
+
+    const answer = await dialogBridge.matrix({
+        title: "Choose your providers",
         intro:
-            "Metadata providers read your links and find each track on the other platforms. " +
-            "Tick the ones to use; Settings → Metadata changes this later.",
-        items: metadataItems,
-        confirmLabel: "Next",
+            "Metadata providers read the links you paste and find each track on the other platforms; download " +
+            "providers fetch the audio file. A platform's links are only used while both are ticked (in color). " +
+            "Settings → Metadata / Download change this later.",
+        columns: {
+            heading: "Download providers",
+            items: download.map(({ key, ctor }) => ({
+                key,
+                label: labelOf(key),
+                color: providerDisplayRegistry.get(key).color,
+                checked: isOn(ctor, storedDownload.providers[key]),
+                detail: downloadItemDetail(ctor),
+                note: describeLinkSources(downloadLinkInfo(ctor), () => true),
+            })),
+        },
+        rows: {
+            heading: "Metadata providers",
+            items: metadata.map(({ key, ctor }) => ({
+                key,
+                label: labelOf(key),
+                color: providerDisplayRegistry.get(key).color,
+                checked: isOn(ctor, storedMetadata.providers[key]),
+                detail: metadataItemDetail(ctor),
+            })),
+        },
+        cells: providerCells(metadata, download),
+        columnLinksLabel: "links from",
     });
-    if (!metadataAnswer) {
+    if (!answer) {
         logger.info("Provider picker dismissed: keeping the current providers");
         markAsked();
         return;
     }
     store.patchMusicSettings({
         metadata: {
+            providers: Object.fromEntries(metadata.map(({ key, ctor }, i) => [key, answerPatch(ctor, answer.rows[i])])),
+        },
+        download: {
             providers: Object.fromEntries(
-                metadata.map(({ key, ctor }, i) => [key, answerPatch(ctor, metadataAnswer[i])])
+                download.map(({ key, ctor }, i) => [key, answerPatch(ctor, answer.columns[i])])
             ),
         },
+        onboarding: { providersChosen: true },
     });
-    const platformOn = new Map(metadata.map(({ key }, i) => [key, metadataAnswer[i]]));
-    const isPlatformOn = (platform: string) => platformOn.get(platform) ?? false;
-
-    // ── Download providers ──
-    const download = entriesOf(downloadServiceRegistry);
-    const storedDownload = getMusicSettings().download.providers;
-    const downloadAnswer = await dialogBridge.checklist({
-        title: "How should tracks be downloaded?",
-        intro:
-            "Download providers fetch the audio file, each from the links of some platforms. " +
-            "A platform you left off can still be where a file comes from.",
-        items: download.map(({ key, ctor }) => ({
-            label: providerDisplayRegistry.get(key).label || key,
-            detail: downloadItemDetail(ctor, isPlatformOn),
-            checked: isOn(ctor, storedDownload[key]),
-        })),
-        confirmLabel: "Save",
-    });
-    if (downloadAnswer) {
-        store.patchMusicSettings({
-            download: {
-                providers: Object.fromEntries(
-                    download.map(({ key, ctor }, i) => [key, answerPatch(ctor, downloadAnswer[i])])
-                ),
-            },
-        });
-    }
-    markAsked();
     logger.info("Providers chosen on first launch");
 }
 

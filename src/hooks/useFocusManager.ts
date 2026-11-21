@@ -48,6 +48,7 @@ export type FocusableWindow =
     | "confirmModal"
     | "listDialog"
     | "inputDialog"
+    | "matrixDialog"
     | "tempCleanupModal"
     | "actionsMenu"
     | "chatPanel";

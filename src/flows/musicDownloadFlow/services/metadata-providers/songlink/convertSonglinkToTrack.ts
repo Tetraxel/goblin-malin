@@ -12,7 +12,6 @@ const SUPPORTED_PLATFORMS = new Set<string>([
     "soundcloud",
     "appleMusic",
     "itunes",
-    "amazonMusic",
 ]);
 
 function parseArtistNames(artistName: string | undefined): string[] {

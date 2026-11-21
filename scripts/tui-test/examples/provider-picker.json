@@ -1,0 +1,30 @@
+{
+    // The first-run provider picker: one screen with the download providers, then the platforms against them.
+    "terminal": { "cols": 120, "rows": 40 },
+    "dataDir": "scripts/tui-test/fixtures/empty",
+    "settings": { "music": { "onboarding": { "providersChosen": false } } },
+    "steps": [
+        { "type": "waitForContent", "text": "Choose your providers", "timeout": 10000 },
+        { "type": "stable" },
+        { "type": "snapshot", "name": "picker" },
+
+        // Untick SoundCloud (the 2nd download provider, then Spotify, YouTube, SoundCloud): yt-dlp's line greys it out.
+        { "type": "key", "key": "↓" },
+        { "type": "key", "key": "↓" },
+        { "type": "key", "key": "↓" },
+        { "type": "key", "key": "↓" },
+        { "type": "key", "key": "Enter" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "Choose your providers" },
+        { "type": "snapshot", "name": "soundcloud-off" },
+        { "type": "screenshot-powershell", "name": "provider-picker" },
+
+        // Space does nothing here; Ctrl+S saves.
+        { "type": "key", "key": "Space" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "Choose your providers" },
+        { "type": "key", "key": "Ctrl+S" },
+        { "type": "stable" },
+        { "type": "waitForContent", "text": "Providers chosen on first launch", "timeout": 5000 }
+    ]
+}
