@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-11-22
+
 ### Added
 
 - **Deezer, Apple Music and Tidal.** Paste a link of any of them and the track is read like a Spotify one, with its own column in the list:
@@ -25,6 +27,7 @@ All notable changes to this project are documented here.
 - **Songlink works like Claude: a button, or every track if you choose.** It used to run on every track once allowed (and its quota is about 19 lookups an hour). Now a button under a track's sources asks it ("Ask Songlink to look for YouTube, Deezer"), next to Claude's; the **A** key asks the first one, or stops the one running. Both have a new setting, off by default, to **search automatically** instead: Songlink on every track, Claude after every other source and only for the platforms still missing.
 - **Settings are easier to read.** Every row has an icon column (a box, ≡ for a choice, ✎ for a text, › for an action…), so the labels of a block always line up; the values of a block sit in one column (`◀ dark ▶`, `[ 8000 ]`); the selected row is highlighted, and section and provider titles carry a rule. A click on a row now only selects it: a second click (or Enter) acts. The checkbox itself and a choice's ◀ / ▶ still act on one click.
 - A platform column of the task list can be narrowed down to its acronym (YT, SC…) with Shift+←.
+- The toolbar's buttons are now in the order Run, Actions, Claude, Sessions, Archive, Settings, Exit.
 - The import dialog's choices say what they do: "Add, to tag and download", "Add, to tag only", "Add only (choose later)", with "Nothing starts until you press Run" under them.
 - An imported cookies.txt keeps only YouTube's and Google's cookies (many exporters write every cookie of the browser); the dialog says how many others were left out.
 - Apple Music: a search that is skipped or stopped leaves Apple's queue at once instead of still calling Apple when its turn comes, and when Apple refuses (too many calls) every search waits, not only the refused one.
@@ -33,6 +36,7 @@ All notable changes to this project are documented here.
 
 ### Fixed
 
+- **SoundCloud tracks that are DRM-protected (preview-only, Go+) can be read again.** Their metadata failed with "No metadata service could fetch metadata" because yt-dlp refuses to print a track it cannot download; reading a track no longer depends on it being downloadable (the download itself still says why it cannot).
 - **With yt-dlp switched off, the app no longer downloads yt-dlp and ffmpeg to read a SoundCloud page.** A SoundCloud link found by MusicBrainz or Songlink stays a plain link; a pasted one says that SoundCloud is read through yt-dlp. Reading a SoundCloud page with yt-dlp on no longer needs ffmpeg (about 340 MB), ignores your own `yt-dlp.conf`, and a skipped or stopped search ends its yt-dlp process.
 - An `on.soundcloud.com` short link to a playlist or album is imported as a playlist (it was read as a track and failed).
 - A `deezer.page.link` link (a kind Google shut down in 2025) fails with the reason instead of "not found".
