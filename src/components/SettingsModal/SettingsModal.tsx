@@ -17,6 +17,7 @@ import { type DeepPartial } from "#utils/types";
 import { shortcutRegistry } from "#base/shortcuts/ShortcutRegistry";
 import { ShortcutsTab, buildShortcutsTabItems, buildShortcutFromKey } from "./ShortcutsTab";
 import { SettingsTab } from "./SettingsTab";
+import { type SettingsClick } from "./SettingsItemRow";
 import { Hint } from "../Hint";
 import { type ConfirmModalConfig } from "../ConfirmModal/useConfirmModal";
 
@@ -213,14 +214,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
         });
     }
 
-    /** Left-click on a settings row: select it and act on it like Enter would (a select steps with ◀/▶). */
-    function clickSettingsItem(index: number, step?: 1 | -1) {
+    /**
+     * Left-click on a settings row. A click on a row only selects it, so a stray click never changes a setting or
+     * runs an action; a second click on the row already selected acts like Enter. The controls act at once: the
+     * checkbox cell ticks, a select's ◀ / ▶ steps.
+     */
+    function clickSettingsItem(index: number, click: SettingsClick) {
         if (rebindingId || editingIndex === index) return;
         const item = filteredItems[index];
         if (!item || !isInteractive(item)) return;
+        const alreadySelected = modalFocus === "list" && selectedIndex === index;
         setEditingIndex(null);
         setSelectedIndex(index);
         setModalFocus("list");
+        if (click.kind === "toggle" && item.kind === "checkbox") {
+            item.set(!item.get());
+            return;
+        }
+        if (click.kind === "step" && item.kind === "select") {
+            const curr = item.options.indexOf(item.get());
+            const n = item.options.length;
+            item.set(item.options[(curr + click.step + n) % n]);
+            return;
+        }
+        if (!alreadySelected) return;
         if (item.kind === "checkbox") item.set(!item.get());
         else if (item.kind === "textInput") {
             setEditValue(item.get());
@@ -229,7 +246,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
         else if (item.kind === "select") {
             const curr = item.options.indexOf(item.get());
             const n = item.options.length;
-            item.set(item.options[(curr + (step ?? 1) + n) % n]);
+            item.set(item.options[(curr + 1) % n]);
         }
     }
 

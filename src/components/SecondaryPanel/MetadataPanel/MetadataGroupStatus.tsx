@@ -71,30 +71,38 @@ export function emptyGroupText(search: MetadataGroupState["search"]): string {
 }
 
 /**
- * The button at the bottom of the sources that asks a last-resort service (Claude) to look for the platforms still
- * missing. In the provider's own colors (brighter under the pointer), with the live key of its shortcut. While `busy`
- * it shows a spinner and ignores clicks.
+ * A button at the bottom of the sources that asks an on-request discovery service (Songlink, Claude) to look for the
+ * platforms still missing. In the provider's own colors (brighter under the pointer), with the live key of its shortcut. While `busy`
+ * it shows a spinner, and a click (or the same key) stops the service.
  */
 export const LastResortButton = React.memo(function LastResortButton({
     serviceKey,
     missingText,
+    showKey = true,
     busy,
     onAsk,
+    onStop,
 }: {
     serviceKey: string;
     /** The platforms it would look for, as one text ("YouTube, Deezer"): a primitive, so the memo holds. */
     missingText: string;
+    /** Whether the shortcut acts on this button (it asks the first one, or stops the one running). */
+    showKey?: boolean;
     busy: boolean;
     /** Must be referentially stable so the memo holds. */
     onAsk: (serviceKey: string) => void;
+    /** Must be referentially stable so the memo holds. */
+    onStop: () => void;
 }) {
     const brand = providerDisplayRegistry.get(serviceKey);
     const ref = useRef<DOMElement>(null);
     useClickTarget(ref, () => {
-        if (!busy) onAsk(serviceKey);
+        if (busy) onStop();
+        else onAsk(serviceKey);
     });
     const hovered = useHoverTarget(ref);
-    const key = useShortcutLiteral("sourceList.askLastResort");
+    const literal = useShortcutLiteral("sourceList.askLastResort");
+    const key = showKey ? literal : undefined;
 
     return (
         <Box flexDirection="row" height={1} flexShrink={0} overflow="hidden">
@@ -102,11 +110,12 @@ export const LastResortButton = React.memo(function LastResortButton({
                 ref={ref}
                 paddingX={1}
                 flexShrink={1}
-                backgroundColor={busy ? brand.colorSubtle : hovered ? brand.colorBright : brand.color}
+                backgroundColor={busy && !hovered ? brand.colorSubtle : hovered ? brand.colorBright : brand.color}
             >
                 {busy ? (
                     <Text color="white" wrap="truncate-end">
                         <AnimatedIcon icon={Icon.Dots} interval={125} color="white" /> {brand.label} is looking…
+                        {`  Stop${key ? ` [${key}]` : ""}`}
                     </Text>
                 ) : (
                     <Text color="white" bold wrap="truncate-end">

@@ -56,3 +56,17 @@ export async function confirmRestartCollection(collection: CollectionTask): Prom
     });
     return answer === 1 ? "archive" : answer === 2 ? "delete" : null;
 }
+
+/**
+ * Says why an album or playlist cannot be restarted now: some of its tracks are still being worked on, and a restart
+ * would take them out of the list while they run. A dialog, so the key that asked never looks like it did nothing.
+ */
+export async function explainBusyRestart(busy: number): Promise<void> {
+    await dialogBridge.confirm({
+        title: "Not restarted",
+        message:
+            `${busy} of its track${busy === 1 ? " is" : "s are"} still being worked on. ` +
+            `Stop ${busy === 1 ? "it" : "them"} first (or wait for ${busy === 1 ? "it" : "them"} to finish), then restart.`,
+        choices: [{ label: "OK", tone: "primary" }],
+    });
+}

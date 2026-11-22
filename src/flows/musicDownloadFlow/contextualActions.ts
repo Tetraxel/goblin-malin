@@ -1,4 +1,4 @@
-import clipboard from "clipboardy";
+import { copyToClipboard } from "#base/selection/clipboardWrite";
 import open from "open";
 import { TaskOrchestrator } from "#base/task/orchestrator";
 import { providerDisplayRegistry } from "#base/providerDisplay";
@@ -11,7 +11,7 @@ import { TaskLockedError, runUserEdit, type DownloadTask } from "./utils/downloa
 import { type CollectionTask } from "./utils/collectionTask";
 import { askGroupName, groupAndName, isGroupTask, removeFromGroups, ungroup } from "./utils/groupTasks";
 import { explainRefusedRun, runSelected } from "./runController";
-import { confirmRestartCollection, confirmRestartTracks } from "./utils/confirmReset";
+import { confirmRestartCollection, confirmRestartTracks, explainBusyRestart } from "./utils/confirmReset";
 import { withoutBusy } from "./utils/busyTasks";
 import { toAppUri as toOpenableUri } from "#utils/appLinks";
 import { addLinkFromClipboard } from "./utils/addLinkFromClipboard";
@@ -83,7 +83,7 @@ function runBatch(
 /** One value per line, nothing else — empty values are skipped. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function copyLines(tasks: Task<any>[], valueOf: (t: DownloadTask) => string): void {
-    clipboard.writeSync(
+    void copyToClipboard(
         tasks
             .filter(isTrackTask)
             .map(valueOf)
@@ -97,7 +97,7 @@ function copyAction(label: string, task: DownloadTask, valueOf: (t: DownloadTask
         shortcuts: [{ input: "c", ctrl: true }],
         label,
         multiSelectAllowed: true,
-        onClick: () => clipboard.writeSync(valueOf(task)),
+        onClick: () => void copyToClipboard(valueOf(task)),
         onClickBatch: (tasks) => copyLines(tasks, valueOf),
     };
 }
@@ -653,20 +653,23 @@ function buildCollectionContextualActionBar(task: CollectionTask, attributes: Ba
     };
     // A restart takes the tracks out of the list: ask first, and archive them (reversible) unless told to delete.
     const restartCollection = async (c: CollectionTask): Promise<void> => {
-        const childIds = c.getAttributes()?.childTaskIds ?? [];
         // The restart removes every track (and stops it): one that is still being worked on would be neither archived
-        // nor kept, so the restart waits until they are stopped.
-        const running = childIds.filter((id) => orchestrator.getTask(id)?.isBusy()).length;
-        if (running > 0) {
+        // nor kept, so the restart waits until they are stopped. Counted again once the dialog is answered: a "Run
+        // all" going on meanwhile may have started one of them.
+        const busyChildren = () =>
+            (c.getAttributes()?.childTaskIds ?? []).filter((id) => orchestrator.getTask(id)?.isBusy()).length;
+        const refuse = async (busy: number) => {
             globalLogger.warn(
-                `Restart: ${running} track${running === 1 ? " is" : "s are"} still running. Stop ${running === 1 ? "it" : "them"} first.`
+                `Restart: ${busy} track${busy === 1 ? " is" : "s are"} still running. Stop ${busy === 1 ? "it" : "them"} first.`
             );
-            return;
-        }
-        if (childIds.length > 0) {
+            await explainBusyRestart(busy);
+        };
+        if (busyChildren() > 0) return refuse(busyChildren());
+        if ((c.getAttributes()?.childTaskIds.length ?? 0) > 0) {
             const choice = await confirmRestartCollection(c);
             if (choice === null) return;
-            if (choice === "archive") archive([...childIds]);
+            if (busyChildren() > 0) return refuse(busyChildren());
+            if (choice === "archive") archive([...(c.getAttributes()?.childTaskIds ?? [])]);
         }
         await c.restart();
     };
@@ -803,9 +806,9 @@ function buildCollectionContextualActionBar(task: CollectionTask, attributes: Ba
             shortcuts: [{ input: "c", ctrl: true }],
             label: "Copy source URL",
             multiSelectAllowed: true,
-            onClick: () => clipboard.writeSync(url),
+            onClick: () => void copyToClipboard(url),
             onClickBatch: (tasks) =>
-                clipboard.writeSync(
+                void copyToClipboard(
                     tasks
                         .map((t) => (t.getAttributes() as MusicDownloadTaskAttributes | undefined)?.userInput.url ?? "")
                         .filter((u) => u !== "")

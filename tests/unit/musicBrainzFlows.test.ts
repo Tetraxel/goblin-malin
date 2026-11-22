@@ -866,6 +866,16 @@ describe("talking to Picard directly", () => {
         expect(await sendToPicard(`http://127.0.0.1:${fake.port}/openalbum?id=x`)).toBe(false);
     });
 
+    test("another program on Picard's port (it answers 'not found') is not taken for Picard (PICARD-01)", async () => {
+        const { sendToPicard } = await import("#flows/musicDownloadFlow/musicbrainz/picard");
+        const other = await startFakePicard(404);
+        expect(await sendToPicard(`http://127.0.0.1:${other.port}/openalbum?id=x`)).toBe(false);
+        await other.close();
+        const redirecting = await startFakePicard(302);
+        expect(await sendToPicard(`http://127.0.0.1:${redirecting.port}/openalbum?id=x`)).toBe(true);
+        await redirecting.close();
+    });
+
     test("a Picard that does not answer in time is reported as unreachable, not waited for", async () => {
         const { sendToPicard } = await import("#flows/musicDownloadFlow/musicbrainz/picard");
         const silent = http.createServer(() => {}); // accepts the request and never answers

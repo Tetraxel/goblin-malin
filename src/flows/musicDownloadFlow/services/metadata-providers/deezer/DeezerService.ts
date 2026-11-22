@@ -20,7 +20,14 @@ import {
     followShortLink,
 } from "../../apis/deezer-client";
 import { convertDeezerToTrack, slimDeezerTrack, type DeezerArtist, type DeezerTrack } from "./convertDeezerToTrack";
-import { deezerOpenUri, deezerTrackUrl, isDeezerShortLinkId, parseDeezerUrl } from "./deezerUrl";
+import {
+    DEAD_SHORT_LINK_MESSAGE,
+    deezerOpenUri,
+    deezerTrackUrl,
+    isDeadDeezerShortLinkId,
+    isDeezerShortLinkId,
+    parseDeezerUrl,
+} from "./deezerUrl";
 
 /** How many search results `searchTrack` asks Deezer for before judging them. */
 const SEARCH_CANDIDATES = 10;
@@ -93,7 +100,8 @@ export class DeezerService extends MetadataService {
      */
     static readonly resolveLink = (url: string): Promise<string> | null => {
         const parsed = parseDeezerUrl(url);
-        if (!parsed?.id || !isDeezerShortLinkId(parsed.id)) return null;
+        // A dead host is not followed (it answers 404): the track's fetch says why it fails.
+        if (!parsed?.id || !isDeezerShortLinkId(parsed.id) || isDeadDeezerShortLinkId(parsed.id)) return null;
         return followShortLink(url).then((target) => {
             const real = parseDeezerUrl(target);
             if (!real?.id || isDeezerShortLinkId(real.id) || real.type === "unknown") return url;
@@ -124,12 +132,27 @@ export class DeezerService extends MetadataService {
             const tracks = await readTrackList(`/${parsed.type}/${parsed.id}/tracks`);
             const seen = new Set<number>();
             const trackUrls: string[] = [];
+            // A track Deezer will not play here (blocked in the user's country) is left out, and counted: a 14-track
+            // album that shows 12 says why.
+            let unavailable = 0;
             for (const track of tracks) {
-                if (track.id === undefined || seen.has(track.id) || track.readable === false) continue;
+                if (track.id === undefined || seen.has(track.id)) continue;
                 seen.add(track.id);
+                if (track.readable === false) {
+                    unavailable++;
+                    continue;
+                }
                 trackUrls.push(deezerTrackUrl(String(track.id)));
             }
-            return { kind: parsed.type, name, ownerName, trackUrls, totalCount: trackUrls.length };
+            if (unavailable > 0) logger.info(`Deezer: ${unavailable} track(s) not available in your country`);
+            return {
+                kind: parsed.type,
+                name,
+                ownerName,
+                trackUrls,
+                totalCount: trackUrls.length,
+                ...(unavailable > 0 ? { unavailable } : {}),
+            };
         } catch (error) {
             // Only "not there" and "not for you" mean private or deleted. Any other error (too many requests, Deezer
             // busy) keeps its own message: the list is fine, it is worth trying again later.
@@ -180,6 +203,7 @@ export class DeezerService extends MetadataService {
 
         this.status.set({ type: StatusType.Processing, message: "Fetching Deezer track", timeTracking: true });
         try {
+            if (isDeadDeezerShortLinkId(parsed.id)) throw new Error(DEAD_SHORT_LINK_MESSAGE);
             if (isDeezerShortLinkId(parsed.id)) {
                 const target = await followShortLink(deezerTrackUrl(parsed.id));
                 parsed = parseDeezerUrl(target);

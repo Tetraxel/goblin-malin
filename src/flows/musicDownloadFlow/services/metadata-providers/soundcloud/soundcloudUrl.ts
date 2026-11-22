@@ -105,6 +105,11 @@ export function parseSoundCloudUrl(url: string): ParsedUrl | null {
     };
 }
 
+/** True for an id that is a short link still to follow (see `parseSoundCloudUrl`). */
+export function isSoundCloudShortLinkId(id: string): boolean {
+    return id.startsWith(`${SHORT_LINK_HOST}/`);
+}
+
 /** The app's `uri` of a track given its id (see `parseSoundCloudUrl`). */
 export function soundcloudTrackUri(id: string): TrackUri<"soundcloud"> {
     return `SOUNDCLOUD::TRACK::${id}` as TrackUri<"soundcloud">;

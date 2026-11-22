@@ -3,7 +3,7 @@
 ## Quick orientation
 
 - **What this is:** A keyboard-driven terminal UI (Ink/React) for downloading and tagging music tracks from streaming platforms.
-- **Current state:** Working pipeline (v0.2.3 released; the next changes are under "Unreleased" in [CHANGELOG.md](CHANGELOG.md)) — Spotify / YouTube links, albums and playlists → cross-platform discovery → yt-dlp / Soulseek download → tagged audio file (FLAC by default, other formats or none via Settings → Download). See [README.md](README.md) for what a user gets and [TODO.md](TODO.md) for what is left.
+- **Current state:** Working pipeline (v0.2.4 released; the next changes are under "Unreleased" in [CHANGELOG.md](CHANGELOG.md)) — links, albums and playlists of Spotify, YouTube, SoundCloud, Deezer, Apple Music and Tidal → cross-platform discovery → yt-dlp / Soulseek download → tagged audio file (FLAC by default, other formats or none via Settings → Download). See [README.md](README.md) for what a user gets and [TODO.md](TODO.md) for what is left.
     - Run the local script [scripts/TREE.ps1](scripts/TREE.ps1) to get the full project tree
 - **Target state:** [docs/designs/](docs/designs/) (screenshots contain the most detail) and the "Promised … but not built yet" list in [TODO.md](TODO.md).
 
@@ -11,6 +11,7 @@
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — Short architecture map: layers, the task pipeline, provider registries, data on disk. Read this before exploring the codebase.
 - [docs/RELEASING.md](docs/RELEASING.md) — How to release a version (changelog → bump → tag) and how the GitHub release page is built.
+- [docs/audits/](docs/audits/) — Code audits, one per release (`AUDIT-v<version>.md`): findings with evidence, suggested fixes and what became of each. `TODO.md` refers to their IDs (`DL-01`, `YTDLP-01`…).
 - [docs/projects/README.md](docs/projects/README.md) — High-level technical projects (roadmap and history). Older projects may describe code that has since been removed; they say so at the top.
 
 ## Provider extensibility
@@ -25,7 +26,8 @@ Adding a new provider should require changes in only two places:
 Optional static capabilities a service class can declare (all read generically — never branch on a provider key):
 
 - `static consent: { title, message }` — the provider sends data to a third party or spends the user's quota, so it is **off until the user allows it, once** (a confirm dialog shown on first use; `utils/discoveryConsent.ts`). Its `enabled` default must be `false`. Used by Songlink and Claude.
-- `static lastResort = true` (discovery services) — slow/costly; **never part of the discovery stage**: it only runs when the user asks (a button under the track's sources and its `sourceList.askLastResort` shortcut, offered by `DownloadTask.getLastResortOffers()` while a platform is still missing; the call is `rediscoverPart(key)` → `startSingleProviderDiscovery`), and its results must pass the platform's own metadata fetch + a confidence check. Used by Claude.
+- `static onRequest = true` (discovery services) — **not part of the discovery stage** unless the user turns on its `autoSearch` setting (a checkbox the service declares in its `defaultSettings`, default `false`; read generically): it runs when the user asks, with a button under the track's sources and its `sourceList.askLastResort` shortcut (which asks the first offer, or stops the one running), offered by `DownloadTask.getLastResortOffers()` while a platform is still missing; the call is `rediscoverPart(key)` → `startSingleProviderDiscovery`, and `stopLastResort()` stops it. Used by Songlink (its hourly quota is small).
+- `static lastResort = true` (discovery services) — slow/costly; runs on request like `onRequest` (and, with `autoSearch`, after every other source and only for the platforms still missing), and its results must pass the platform's own metadata fetch + a confidence check. Used by Claude.
 - `static searchable = false` (metadata services) — the service cannot search its catalogue (Tidal without a key): its tracks only come from a pasted link or from discovery. Phase A does not ask its `searchTrack`, and a track with no result for it is not a "missing platform" a last-resort service is started for.
 - `static platformAliases = ["youtubeMusic"]` (metadata services) — other platform keys whose tracks the service handles; read through `platformRegistry.canonical()` (`src/base/platformRegistry.ts`). Never compare a platform to `"youtubeMusic"` in core code.
 - `static upstreamCodec = "Opus"` (metadata services) — the lossy codec every stream of the platform is in, when it is always the same (what a yt-dlp FLAC was transcoded from); leave it out when the platform serves several. Read through `platformRegistry.upstreamCodec()`.
@@ -113,7 +115,7 @@ How it fits together:
 
 ## Active vs. disabled code
 
-Registered metadata services: `spotify`, `youtube`, `soundcloud`, `deezer`, `appleMusic` (alias `itunes`), `tidal`. Discovery services: `songlink` (opt-in), `musicBrainz`, `claude` (opt-in, last resort — see [docs/projects/p29/tasks.md](docs/projects/p29/tasks.md)). Download services: `ytdlp`, `soulseek`.
+Registered metadata services: `spotify`, `youtube`, `soundcloud`, `deezer`, `appleMusic` (alias `itunes`), `tidal`. Discovery services: `songlink` (opt-in, on request), `musicBrainz`, `claude` (opt-in, last resort, on request — see [docs/projects/p29/tasks.md](docs/projects/p29/tasks.md)). Download services: `ytdlp`, `soulseek`.
 
 ## Dev commands
 

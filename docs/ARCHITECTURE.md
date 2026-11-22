@@ -8,10 +8,11 @@ A keyboard-driven terminal UI (Ink / React) that turns streaming-platform links 
 
 ```
 import URL ──► primary metadata ──► discovery on other platforms ──► download sources ──► pick one ──► tag + save
-(Spotify,      (Spotify /           (Songlink*, MusicBrainz,        (yt-dlp, Soulseek)                (tagged file in
- YouTube,       YouTube)             Claude*, last resort)                                             output folder)
- albums,                                                          * opt-in, asks once
- playlists)
+(a track,      (the platform of    (every other platform's search, (yt-dlp, Soulseek)                (tagged file in
+ album or       the link: Spotify,  then MusicBrainz; Songlink*                                       output folder)
+ playlist)      YouTube, SoundCloud, and Claude* on request)
+                Deezer, Apple Music,
+                Tidal)                                            * opt-in, asks once
 ```
 
 ## Entry points
@@ -42,7 +43,7 @@ import URL ──► primary metadata ──► discovery on other platforms ─
 `TaskOrchestrator` is a generic, completion-driven queue under a global concurrency cap (`maxParallelTasks`). It only calls `task.start(signal)`. A `DownloadTask` then runs three stages, with two limiters (`utils/stageLimiters.ts`): metadata and discovery share `maxParallelMetadata`, downloads use `maxParallelDownloads`:
 
 1. **Primary metadata** — the service whose `parseUrl()` recognised the URL fetches the track.
-2. **Discovery** — look for the same track on the other platforms (ISRC or name match). The platforms' searches run at once, each shown in its own group (`MetadataGroupState.search`: searching / skipped / failed; an empty group says "Nothing found"). Services marked `lastResort` are not part of the stage: the user asks for them (a button under the sources) when a platform is still missing, and their results must pass the platform's own metadata fetch plus a confidence check ([utils/confidence.ts](../src/flows/musicDownloadFlow/utils/confidence.ts)). The compiled metadata merges all sources and the user's overrides.
+2. **Discovery** — look for the same track on the other platforms (ISRC or name match). The platforms' searches run at once, each shown in its own group (`MetadataGroupState.search`: searching / skipped / failed; an empty group says "Nothing found"). Services marked `onRequest` (Songlink) or `lastResort` (Claude) are not part of the stage unless their "search automatically" setting is on: the user asks for them (a button under the sources) when a platform is still missing. A last resort's results must pass the platform's own metadata fetch plus a confidence check ([utils/confidence.ts](../src/flows/musicDownloadFlow/utils/confidence.ts)). The compiled metadata merges all sources and the user's overrides.
 3. **Download sources** — enabled download services search or resolve candidates, as many files as the _download strategy_ (Settings → Download) allows: `best` stops at the first provider that downloads a file (the others get a "not needed" row, still runnable by hand), `each` (default) takes one file per provider, `all` lets a provider with several candidates download up to 5 files (`MAX_DOWNLOADS_PER_PROVIDER`; passed to services as `downloadTrack(…, { maxDownloads })`, see [utils/downloadStrategy.ts](../src/flows/musicDownloadFlow/utils/downloadStrategy.ts)). The best downloaded file is auto-selected ([utils/sourceSelection.ts](../src/flows/musicDownloadFlow/utils/sourceSelection.ts)) and the user can preview and change it. Saving tags the file and moves it to the output folder.
 
 Links the user pastes onto a track (the source the search could not find) are kept in `userSources` and re-applied whenever the sources are rebuilt (P31); the track's own link (`userInput`) and those are the user's data, not the pipeline's.
@@ -55,11 +56,11 @@ A task is a plain serialisable attribute object (`TrackDownloadTask`) plus a sta
 
 Three registries, defined in [registries.ts](../src/flows/musicDownloadFlow/registries.ts):
 
-| Registry                   | Base class                                                                             | Registered today                                                                            |
-| -------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Registry                   | Base class                                                                             | Registered today                                                    |
+| -------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | `metadataServiceRegistry`  | [MetadataService](../src/flows/musicDownloadFlow/metadataService.ts)                   | `spotify`, `youtube`, `soundcloud`, `deezer`, `appleMusic`, `tidal` |
-| `discoveryServiceRegistry` | [DiscoveryMetadataService](../src/flows/musicDownloadFlow/discoveryMetadataService.ts) | `songlink` (opt-in), `musicBrainz`, `claude` (opt-in, last resort)                          |
-| `downloadServiceRegistry`  | [DownloadService](../src/flows/musicDownloadFlow/downloadService.ts)                   | `ytdlp`, `soulseek`                                                                         |
+| `discoveryServiceRegistry` | [DiscoveryMetadataService](../src/flows/musicDownloadFlow/discoveryMetadataService.ts) | `songlink` (opt-in, on request), `musicBrainz`, `claude` (opt-in, last resort) |
+| `downloadServiceRegistry`  | [DownloadService](../src/flows/musicDownloadFlow/downloadService.ts)                   | `ytdlp`, `soulseek`                                                 |
 
 Adding a provider = one service class + one `register()` call in `init.ts`. Display info (`static display`), settings (`defaultSettings`), consent, last-resort, URL parsing and its cell component are all declared on the class and read generically, so the UI and the pipeline never branch on a provider key. The details of these static capabilities are in [CLAUDE.md](../CLAUDE.md#provider-extensibility).
 

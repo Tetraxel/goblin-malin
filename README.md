@@ -49,7 +49,7 @@ Then press **`Ctrl+V`** with a Spotify, YouTube, SoundCloud, Deezer, Apple Music
 
 ## How it works
 
-1. **Paste** a track, album or playlist link. The app recognises the platform and reads the track.
+1. **Paste** a track, album or playlist link, choose whether to tag and download it, and press **Run**. The app recognises the platform and reads the track.
 2. **It looks for the same track elsewhere**, on all the other platforms at once. Each one shows up as a group with a confidence score.
 3. **It searches for files to download** with yt-dlp and Soulseek, and lists the candidates side by side.
 4. **You pick one.** Preview the candidates, compare them, and keep the best (the app suggests one).
@@ -94,7 +94,7 @@ When a source can't be found (an unofficial re-upload, say), **paste the right l
 | **Apple Music**             | track, album           | yes                                        | — (Soulseek by name)                |
 | **Tidal**                   | track                  | via a pasted link, Songlink or MusicBrainz | — (Soulseek by name)                |
 
-Discovery also uses **MusicBrainz** (on by default), **Songlink** (opt-in) and **Claude** (opt-in, on request). Soulseek is off by default: turn it on in Settings → Download.
+Discovery also uses **MusicBrainz** (on by default), **Songlink** and **Claude** (both opt-in and on request: a button under the track's sources asks them, or turn on "search automatically" in their settings). Soulseek is off by default: turn it on in Settings → Download.
 
 Platforms whose streams are protected (Spotify, Deezer, Apple Music, Tidal) are used for what they know best, **metadata**; the audio itself comes from yt-dlp or Soulseek.
 
@@ -235,7 +235,7 @@ You are in the no-credentials mode. Run Settings → _⚙ Setup Wizard_ and ente
 <details>
 <summary><b>Songlink stops answering</b></summary>
 
-Its free quota is about 19 lookups per hour. Wait, or leave Songlink off for big imports.
+Its free quota is about 19 lookups per hour. Wait, or keep its "search every track automatically" setting off for big imports (the default: it then only runs when you press its button).
 
 </details>
 

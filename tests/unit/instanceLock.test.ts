@@ -22,6 +22,12 @@ describe("instance lock", () => {
         expect(fs.existsSync(getLockPath())).toBe(false);
     });
 
+    test("the lock appears with its pid already in it, and leaves no staging file behind (LOCK-02)", () => {
+        expect(acquireInstanceLock()).toEqual({ acquired: true });
+        expect(fs.readFileSync(getLockPath(), "utf-8")).toBe(String(process.pid));
+        expect(fs.readdirSync(dataDir).filter((name) => name.endsWith(".new"))).toEqual([]);
+    });
+
     test("refuses while another live process holds it", () => {
         // The parent process (the test runner) is certainly alive and is not us.
         fs.writeFileSync(getLockPath(), String(process.ppid));

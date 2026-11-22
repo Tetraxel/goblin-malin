@@ -36,9 +36,10 @@ export async function explainPicardUnreachable(port: number): Promise<void> {
     await dialogBridge.confirm({
         title: "MusicBrainz Picard did not answer",
         message:
-            `Nothing is listening on 127.0.0.1:${port}.\n\n` +
+            `Picard is not answering on 127.0.0.1:${port}: nothing listens there, or another program does.\n\n` +
             "Start MusicBrainz Picard and turn on Options → Network → Browser integration (note the port it uses: " +
-            "it can be changed in Goblin Malin's Settings → MusicBrainz).",
+            "it can be changed in Goblin Malin's Settings → MusicBrainz). If another program uses that port, give " +
+            "Picard a different one in both places.",
         choices: [{ label: "OK", tone: "primary" }],
         accent: PICARD_ACCENT,
     });
@@ -116,9 +117,15 @@ export function describePicardBatch(plan: PicardBatchPlan): string {
     return lines.join("\n\n");
 }
 
+/** From this many releases on, a batch shows a dialog with a Stop button while it sends them. */
+const PROGRESS_DIALOG_FROM = 10;
+/** How often the footer says how far a batch is. */
+const PROGRESS_LOG_EVERY = 25;
+
 /**
  * "Open all tracks in MusicBrainz Picard": asks first (it can be hundreds of releases), then sends them one after the
- * other. Stops at the first one Picard does not answer, and says so.
+ * other. Stops at the first one Picard does not answer, and says so. A long batch shows a dialog whose Stop (or Esc)
+ * ends it, and the footer says how far it is.
  */
 export async function openAllInPicard(): Promise<void> {
     const port = picardPort(getMusicSettings().musicBrainz.picardPort);
@@ -146,14 +153,44 @@ export async function openAllInPicard(): Promise<void> {
     });
     if (answer !== 0) return;
 
+    const total = plan.targets.length;
+    const stop = new AbortController();
+    const withdraw = new AbortController();
+    if (total >= PROGRESS_DIALOG_FROM) {
+        void dialogBridge
+            .confirm(
+                {
+                    title: "Sending to MusicBrainz Picard",
+                    message: `${total} releases / recordings are being sent to Picard, one after the other. The footer says how far it is.`,
+                    choices: [{ label: "Stop", tone: "danger" }],
+                    accent: PICARD_ACCENT,
+                },
+                { signal: withdraw.signal }
+            )
+            // Stop, or Esc (no answer): the user ends the batch. A dialog withdrawn at the end is not an answer.
+            .then(() => {
+                if (!withdraw.signal.aborted) stop.abort();
+            });
+    }
+
     let sent = 0;
-    for (const target of plan.targets) {
-        if (!(await sendToPicard(target.url))) {
-            logger.warn(`Picard did not answer after ${sent} of ${plan.targets.length}`);
-            await explainPicardUnreachable(port);
-            return;
+    try {
+        for (const target of plan.targets) {
+            if (stop.signal.aborted) {
+                logger.info(`Stopped sending to Picard after ${sent} of ${total}`);
+                return;
+            }
+            if (!(await sendToPicard(target.url))) {
+                logger.warn(`Picard did not answer after ${sent} of ${total}`);
+                withdraw.abort();
+                await explainPicardUnreachable(port);
+                return;
+            }
+            sent++;
+            if (sent % PROGRESS_LOG_EVERY === 0 && sent < total) logger.info(`Picard: ${sent} of ${total} sent`);
         }
-        sent++;
+    } finally {
+        withdraw.abort();
     }
     logger.info(`Sent ${sent} release(s)/recording(s) to Picard`);
 }

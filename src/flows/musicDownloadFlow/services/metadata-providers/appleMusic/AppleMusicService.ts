@@ -119,13 +119,14 @@ export class AppleMusicService extends MetadataService {
         return song ? { found: true, song: slimITunesResult(song) } : { found: false };
     }
 
+    /** `signal`: a search nobody waits for leaves Apple's queue (it is not part of the cache key). */
     @Cached({ ttl: (result) => (Array.isArray(result) && result.length === 0 ? NEGATIVE_RESULT_TTL_MS : undefined) })
-    private async searchEntries(query: string, count: number): Promise<ITunesResult[]> {
+    private async searchEntries(query: string, count: number, signal?: AbortSignal): Promise<ITunesResult[]> {
         this.logger.debug(`Searching Apple Music: ${query}`);
         const answer = await itunesGet<ITunesAnswer>(
             "search",
             { term: query, media: "music", entity: "song", limit: count, country: DEFAULT_STOREFRONT },
-            { onWait: this.onAppleWait }
+            { onWait: this.onAppleWait, signal }
         );
         return (answer.results ?? []).map(slimITunesResult);
     }
@@ -164,7 +165,10 @@ export class AppleMusicService extends MetadataService {
             .slice(0, count);
     }
 
-    async searchTrack(sourceTrackMetadata: TrackMetadata): Promise<SearchTrackResult[]> {
+    async searchTrack(
+        sourceTrackMetadata: TrackMetadata,
+        options?: { signal?: AbortSignal }
+    ): Promise<SearchTrackResult[]> {
         const artist = sourceTrackMetadata.artists?.[0]?.name;
         const trackName = sourceTrackMetadata.trackName;
         if (!artist || !trackName) throw new Error("Artist name and track name are required for search");
@@ -172,7 +176,9 @@ export class AppleMusicService extends MetadataService {
         this.status.set({ type: StatusType.Processing, message: "Searching Apple Music", timeTracking: true });
         try {
             const searchText = `${artist} ${trackName}`;
-            const entries = await this.showingWaits(() => this.searchEntries(searchText, SEARCH_CANDIDATES));
+            const entries = await this.showingWaits(() =>
+                this.searchEntries(searchText, SEARCH_CANDIDATES, options?.signal)
+            );
             const matches = entries
                 .map(convertAppleMusicToTrack)
                 .filter((track): track is TrackMetadata => track !== null)
@@ -191,6 +197,11 @@ export class AppleMusicService extends MetadataService {
             ];
             return matches.map(({ metadata }) => ({ metadata, searchKeys: ["trackName+artistName"], query }));
         } catch (error) {
+            // Skipped or stopped: nobody waits for this search, and it did not fail.
+            if (options?.signal?.aborted) {
+                this.status.clear();
+                throw error;
+            }
             this.logger.error(`Error searching Apple Music for: ${trackName}`, { error });
             this.status.set({ type: StatusType.Error, message: "Error searching Apple Music" });
             throw error;

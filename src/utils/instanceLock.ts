@@ -131,6 +131,30 @@ function removeStale(lockPath: string, judgedOwner: number | null): boolean {
     return true;
 }
 
+/**
+ * Creates the lock holding this pid, or throws `EEXIST` when there is one. The pid is written to a file of its own
+ * first and then hard-linked to the lock's name (the link fails if the name exists): the lock never exists empty, so
+ * another instance starting at the same moment can never read it as "unreadable, stale" and take it from under us.
+ * On a file system without hard links (FAT, some network shares) it falls back to an exclusive create.
+ */
+function createLock(lockPath: string): void {
+    const staging = `${lockPath}.${process.pid}.new`;
+    try {
+        fs.writeFileSync(staging, String(process.pid));
+        try {
+            fs.linkSync(staging, lockPath);
+            return;
+        } catch (error) {
+            const code = (error as NodeJS.ErrnoException).code;
+            if (code === "EEXIST") throw error;
+            // No hard links here: the exclusive create below.
+        }
+    } finally {
+        fs.rmSync(staging, { force: true });
+    }
+    fs.writeFileSync(lockPath, String(process.pid), { flag: "wx" });
+}
+
 /** Takes the lock for this process. If another live instance holds it, says so instead of taking it. */
 export function acquireInstanceLock({ graceMs = RESUME_GRACE_MS }: { graceMs?: number } = {}): LockResult {
     const lockPath = getLockPath();
@@ -138,7 +162,7 @@ export function acquireInstanceLock({ graceMs = RESUME_GRACE_MS }: { graceMs?: n
         fs.mkdirSync(path.dirname(lockPath), { recursive: true });
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
-                fs.writeFileSync(lockPath, String(process.pid), { flag: "wx" });
+                createLock(lockPath);
                 held = lockPath;
                 startHeartbeat(lockPath);
                 return { acquired: true };

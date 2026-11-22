@@ -44,7 +44,17 @@ export class SonglinkService extends DiscoveryMetadataService {
     };
     static readonly defaultSettings: ProviderSettingsSchema = {
         enabled: { label: "Enable", defaultValue: false, kind: "checkbox" },
+        autoSearch: {
+            label: "Search every track automatically (off: a button under the track's sources asks Songlink)",
+            defaultValue: false,
+            kind: "checkbox",
+        },
     };
+    /**
+     * Its hourly quota is small (about 19 lookups): it runs when the user asks, with the button under a track's sources,
+     * unless `autoSearch` makes it part of every track's discovery.
+     */
+    static readonly onRequest = true;
     static readonly consent: ProviderConsent = {
         title: "Use Songlink to find tracks?",
         message:

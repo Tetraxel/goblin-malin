@@ -107,11 +107,33 @@ describe("importCookiesFile", () => {
 
         const result = await importCookiesFile(`"${source}"`, NOW);
 
-        expect(result).toMatchObject({ cookies: 2, youtube: 1, destination: cookiesFilePath() });
-        expect(fs.readFileSync(cookiesFilePath(), "utf8")).toBe(fs.readFileSync(source, "utf8"));
+        expect(result).toMatchObject({ cookies: 2, youtube: 1, dropped: 0, destination: cookiesFilePath() });
+        expect(parseCookiesFile(fs.readFileSync(cookiesFilePath(), "utf8"), NOW)).toMatchObject({
+            cookies: 2,
+            youtube: 1,
+        });
         expect(fs.existsSync(source)).toBe(true);
         // No staging file is left beside it.
         expect(fs.readdirSync(binDir)).toEqual(["cookies.txt"]);
+    });
+
+    test("keeps only YouTube's and Google's cookies, and says how many others it left out (COOKIE-02)", async () => {
+        const source = write(
+            file(
+                line(".youtube.com", FUTURE),
+                line("accounts.google.com", FUTURE),
+                line(".mybank.example", FUTURE),
+                `#HttpOnly_${line(".mail.example", FUTURE)}`
+            )
+        );
+
+        const result = await importCookiesFile(source, NOW);
+
+        expect(result).toMatchObject({ cookies: 2, youtube: 1, dropped: 2 });
+        const copy = fs.readFileSync(cookiesFilePath(), "utf8");
+        expect(copy).not.toContain("mybank");
+        expect(copy).not.toContain("mail.example");
+        expect(copy.split("\n")[0]).toBe(HEADER);
     });
 
     test("adds the first line yt-dlp insists on when the export left it out", async () => {
@@ -191,10 +213,10 @@ describe("what the settings say about the imported file", () => {
 describe("the cookies rows of the YtDlp settings", () => {
     test("offer import and remove, with the status between them", () => {
         const rows = cookiesSettingsRows({}, "cookies.txt imported today: 2 YouTube cookies");
-        expect(rows.map((row) => (row.kind === "action" ? row.label : row.text))).toEqual([
-            "⇩  Import cookies.txt…",
+        expect(rows.map((row) => (row.kind === "action" ? `${row.icon} ${row.label}` : row.text))).toEqual([
+            "⇩ Import cookies.txt…",
             "cookies.txt imported today: 2 YouTube cookies",
-            "✕  Remove the imported cookies.txt…",
+            "✕ Remove the imported cookies.txt…",
         ]);
         expect(cookiesSettingsRows({}, undefined)[1]).toMatchObject({ kind: "note", text: "Looking for cookies.txt…" });
     });

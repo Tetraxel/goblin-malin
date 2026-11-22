@@ -200,7 +200,7 @@ describe("DeezerService", () => {
             "https://www.deezer.com/album/302127"
         );
         followShortLink.mockResolvedValue("https://www.deezer.com/en/playlist/908622995");
-        await expect(DeezerService.resolveLink("https://deezer.page.link/AbCd")).resolves.toBe(
+        await expect(DeezerService.resolveLink("https://link.deezer.com/s/40abc")).resolves.toBe(
             "https://www.deezer.com/playlist/908622995"
         );
         // Somewhere Deezer's parser does not read (its home page): the link stays as it was.
@@ -211,7 +211,17 @@ describe("DeezerService", () => {
         followShortLink.mockClear();
         expect(DeezerService.resolveLink("https://www.deezer.com/track/3135556")).toBeNull();
         expect(DeezerService.resolveLink("https://open.spotify.com/track/x")).toBeNull();
+        // A deezer.page.link host is dead (Firebase Dynamic Links, shut down in 2025): never followed.
+        expect(DeezerService.resolveLink("https://deezer.page.link/AbCd")).toBeNull();
         expect(followShortLink).not.toHaveBeenCalled();
+    });
+
+    test("a deezer.page.link link fails with the reason, without a request (audit v0.2.4 DEEZER-01)", async () => {
+        await expect((await makeService()).getTrackMetadata("https://deezer.page.link/AbCd")).rejects.toThrow(
+            /no longer work/
+        );
+        expect(followShortLink).not.toHaveBeenCalled();
+        expect(deezerGet).not.toHaveBeenCalled();
     });
 
     test("a short link that turns out to be an album says so", async () => {
@@ -331,5 +341,51 @@ describe("DeezerService", () => {
         );
         expect(expansion).toMatchObject({ kind: "album", name: "Discovery", ownerName: "Daft Punk", totalCount: 103 });
         expect(expansion.trackUrls[0]).toBe("https://www.deezer.com/track/1");
+    });
+
+    test("expandCollection counts the tracks Deezer will not play here instead of losing them silently (DEEZER-02)", async () => {
+        const { DeezerService } =
+            await import("#flows/musicDownloadFlow/services/metadata-providers/deezer/DeezerService");
+        deezerGet.mockImplementation(async (path: string) => {
+            if (path === "/album/302127") return { id: 302127, title: "Discovery" };
+            return {
+                data: [
+                    { id: 1, title: "A", readable: true },
+                    { id: 2, title: "B", readable: false },
+                    { id: 3, title: "C", readable: false },
+                    { id: 4, title: "D" },
+                ],
+            };
+        });
+        const expansion = await DeezerService.expandCollection(
+            "https://www.deezer.com/album/302127",
+            { info: vi.fn(), warn: vi.fn() } as never,
+            {} as never
+        );
+        expect(expansion).toMatchObject({ totalCount: 2, unavailable: 2 });
+    });
+});
+
+describe("deezerGet pacing (DEEZER-02)", () => {
+    test("a quota refusal (code 4) is waited out and tried again", async () => {
+        vi.useFakeTimers();
+        const { deezerGet: realGet, resetDeezerPacing } = await vi.importActual<
+            typeof import("#flows/musicDownloadFlow/services/apis/deezer-client")
+        >("#flows/musicDownloadFlow/services/apis/deezer-client");
+        resetDeezerPacing();
+        const answers = [{ error: { type: "Exception", message: "Quota limit exceeded", code: 4 } }, { id: 7 }];
+        const fetchMock = vi.fn(async () => new Response(JSON.stringify(answers.shift())));
+        vi.stubGlobal("fetch", fetchMock);
+        try {
+            const call = realGet<{ id: number }>("/track/7");
+            await vi.advanceTimersByTimeAsync(4_000);
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+            await vi.advanceTimersByTimeAsync(1_500);
+            await expect(call).resolves.toEqual({ id: 7 });
+            expect(fetchMock).toHaveBeenCalledTimes(2);
+        } finally {
+            vi.unstubAllGlobals();
+            vi.useRealTimers();
+        }
     });
 });

@@ -40,13 +40,21 @@ let searchCalls: string[];
 // What the fake discovery services return, and how they were called.
 let regularResult: DiscoveryResult;
 let lastResortResult: DiscoveryResult;
+let onRequestResult: DiscoveryResult;
 let callOrder: string[];
 let lastResortContexts: (DiscoveryContext | undefined)[];
+// When set, the fake last-resort service answers only once the test settles this (a slow CLI call).
+let lastResortHold: Promise<void> | undefined;
+// Links whose platform refuses to read them by the user's choice (a `ProviderUnavailableError`).
+let unavailable: Set<string>;
 let linkOnlySearched: number;
 
 type Mods = {
     DownloadTask: typeof DownloadTaskType;
-    registries: (withSlow?: boolean) => {
+    registries: (
+        withSlow?: boolean,
+        withOnRequest?: boolean
+    ) => {
         metadata: import("#base/service-registry").ServiceRegistry<DownloadTaskType, never>;
         discovery: import("#base/service-registry").ServiceRegistry<DownloadTaskType, never>;
         download: import("#base/service-registry").ServiceRegistry<DownloadTaskType, never>;
@@ -72,11 +80,13 @@ beforeAll(async () => {
             return [];
         }
     }
+    const { ProviderUnavailableError } = await import("#base/providerUnavailableError");
     class FakeYoutube extends MetadataService {
         constructor(task: DownloadTaskType, logger: never) {
             super("FakeYoutube", task, logger);
         }
         async getTrackMetadata(url: string) {
+            if (unavailable.has(url)) throw new ProviderUnavailableError("switched off");
             return catalog[url] ?? Promise.reject(new Error(`unknown ${url}`));
         }
         async searchTrack() {
@@ -129,13 +139,26 @@ beforeAll(async () => {
         async discoverFromUri(_src: TrackMetadata, context?: DiscoveryContext) {
             callOrder.push("lastResort");
             lastResortContexts.push(context);
+            if (lastResortHold) await lastResortHold;
             return lastResortResult;
+        }
+    }
+
+    // Runs only when asked, like Songlink (no verification of its results).
+    class FakeOnRequest extends DiscoveryMetadataService {
+        static readonly onRequest = true;
+        constructor(task: DownloadTaskType, logger: never) {
+            super("FakeOnRequest", task, logger);
+        }
+        async discoverFromUri() {
+            callOrder.push("onRequest");
+            return onRequestResult;
         }
     }
 
     m = {
         DownloadTask: (await import("#flows/musicDownloadFlow/utils/downloadTask")).DownloadTask,
-        registries: (withSlow = false) => {
+        registries: (withSlow = false, withOnRequest = false) => {
             const metadata = new ServiceRegistry<DownloadTaskType, never>();
             metadata
                 .register("spotify", FakeSpotify as never)
@@ -143,7 +166,9 @@ beforeAll(async () => {
                 .register("linkonly", FakeLinkOnly as never);
             if (withSlow) metadata.register("slow", FakeSlow as never);
             const discovery = new ServiceRegistry<DownloadTaskType, never>();
-            discovery.register("regular", FakeRegular as never).register("claude", FakeLastResort as never);
+            discovery.register("regular", FakeRegular as never);
+            if (withOnRequest) discovery.register("linker", FakeOnRequest as never);
+            discovery.register("claude", FakeLastResort as never);
             return { metadata, discovery, download: new ServiceRegistry<DownloadTaskType, never>() };
         },
     };
@@ -159,14 +184,19 @@ beforeEach(() => {
     searchCalls = [];
     regularResult = { tracks: [] };
     lastResortResult = { tracks: [] };
+    onRequestResult = { tracks: [] };
     callOrder = [];
     lastResortContexts = [];
     linkOnlySearched = 0;
+    lastResortHold = undefined;
+    unavailable = new Set();
 });
 
-async function makeTask(opts: { lastResortEnabled?: boolean; slow?: boolean } = {}) {
+async function makeTask(
+    opts: { lastResortEnabled?: boolean; slow?: boolean; onRequest?: boolean; autoSearch?: string[] } = {}
+) {
     const { globalLogger } = await import("#base/logger/logger");
-    const r = m.registries(opts.slow);
+    const r = m.registries(opts.slow, opts.onRequest);
     const task = new m.DownloadTask({
         id: "t1",
         initialInput: PRIMARY.url,
@@ -195,6 +225,9 @@ async function makeTask(opts: { lastResortEnabled?: boolean; slow?: boolean } = 
             downloadSources: [],
             toTag: true,
             toDownload: false,
+            // Read and searched once already: a last-resort service is only offered for such a track.
+            primaryMetadataFetched: true,
+            metadataDiscovered: true,
         },
         logger: globalLogger,
         metadataServiceRegistry: r.metadata,
@@ -203,6 +236,7 @@ async function makeTask(opts: { lastResortEnabled?: boolean; slow?: boolean } = 
         isMetadataServiceEnabled: () => true,
         isDiscoveryServiceEnabled: (key) => key !== "claude" || opts.lastResortEnabled !== false,
         isDownloadServiceEnabled: () => true,
+        discoveryAutoSearch: (key) => opts.autoSearch?.includes(key) === true,
     });
     return task;
 }
@@ -237,7 +271,7 @@ describe("last-resort discovery (only when the user asks)", () => {
         const task = await makeTask();
         await discoverThenAsk(task);
 
-        expect(lastResortContexts).toEqual([{ wantedPlatforms: ["youtube"] }]);
+        expect(lastResortContexts).toEqual([{ wantedPlatforms: ["youtube"], signal: expect.any(AbortSignal) }]);
         const results = youtubeResults(task);
         expect(results).toHaveLength(1);
         expect(results[0].metadata.trackName).toBe("Get Lucky"); // the real, enriched metadata
@@ -560,5 +594,138 @@ describe("regular discovery (Phase B) is unchanged", () => {
         expect(results).toHaveLength(1);
         expect(results[0].fetchState).toBe("error");
         expect(results[0].discoverySources[0]).toMatchObject({ discoveredBy: "songlink", searchKeys: ["url"] });
+    });
+});
+
+describe("a link its platform cannot read by the user's choice (yt-dlp off for SoundCloud)", () => {
+    test("stays a bare link, not a failed one", async () => {
+        const url = "https://youtube.test/yt9";
+        unavailable.add(url);
+        regularResult = {
+            tracks: [{ ...meta("youtube", "yt9", "Get Lucky", "Daft Punk"), fetchedBy: "songlink" } as TrackMetadata],
+        };
+
+        const task = await makeTask();
+        await task.startMetadataDiscovering();
+
+        const results = youtubeResults(task);
+        expect(results).toHaveLength(1);
+        expect(results[0].fetchState).toBeUndefined();
+        expect(results[0].metadata.url).toBe(url);
+    });
+});
+
+describe("the last-resort offer waits for the track to be read and searched", () => {
+    test("a track imported but not run yet is offered nothing", async () => {
+        const task = await makeTask();
+        task.updateAttributes({ primaryMetadataFetched: false, metadataDiscovered: false });
+        expect(task.getLastResortOffers()).toEqual([]);
+
+        // Read, but its search was stopped: still nothing known to be missing.
+        task.updateAttributes({ primaryMetadataFetched: true });
+        expect(task.getLastResortOffers()).toEqual([]);
+    });
+
+    test("never offers the track's own platform, even when its group is empty", async () => {
+        const task = await makeTask();
+        await task.startMetadataDiscovering();
+        // The primary result stays where it is; an empty "spotify" group would still not be a gap.
+        const offers = task.getLastResortOffers();
+        expect(offers).toEqual([{ key: "claude", missing: ["youtube"] }]);
+        expect(offers[0].missing).not.toContain("spotify");
+    });
+});
+
+describe("stopping a last-resort run (the busy button's Stop)", () => {
+    test("ends the run at once, aborts the service's signal and merges nothing it answers later", async () => {
+        const url = "https://youtube.test/yt1";
+        catalog[url] = meta("youtube", "yt1", "Get Lucky", "Daft Punk");
+        lastResortResult = { tracks: [claudeFound(url)] };
+        let answer!: () => void;
+        lastResortHold = new Promise((resolve) => (answer = resolve));
+
+        const task = await makeTask();
+        await task.startMetadataDiscovering();
+        const asked = task.rediscoverPart("claude");
+        await vi.waitFor(() => expect(callOrder).toContain("lastResort"));
+        expect(task.getAttributes()?.lastResortInProgress).toBe("claude");
+
+        task.stopLastResort();
+        await asked;
+
+        expect(lastResortContexts[0]?.signal?.aborted).toBe(true);
+        expect(task.getAttributes()?.lastResortInProgress).toBeUndefined();
+
+        // The service answers after all: too late, nothing is added.
+        answer();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        expect(youtubeResults(task)).toHaveLength(0);
+    });
+
+    test("a stop pressed while the run waits for its turn means it never starts", async () => {
+        const task = await makeTask();
+        await task.startMetadataDiscovering();
+        const asked = task.rediscoverPart("claude");
+        task.stopLastResort();
+        await asked;
+        expect(callOrder).not.toContain("lastResort");
+    });
+});
+
+describe("on-request discovery services (Songlink: a button, or every track when set to search automatically)", () => {
+    test("one that runs on request is not part of the stage, and is offered with the last resort, first", async () => {
+        const task = await makeTask({ onRequest: true });
+        await task.startMetadataDiscovering();
+
+        expect(callOrder).toEqual(["regular"]);
+        expect(task.getLastResortOffers().map((o) => o.key)).toEqual(["linker", "claude"]);
+    });
+
+    test("asked, its results are added as it found them (no confidence check), and its button is busy meanwhile", async () => {
+        // Not in the catalog: a last-resort result that cannot be read would be dropped, this one is kept.
+        onRequestResult = {
+            tracks: [
+                {
+                    ...meta("youtube", "yt5", "Get Lucky", "Daft Punk"),
+                    fetchedBy: "linker",
+                } as unknown as TrackMetadata,
+            ],
+        };
+        const task = await makeTask({ onRequest: true });
+        await task.startMetadataDiscovering();
+
+        const asked = task.rediscoverPart("linker");
+        await vi.waitFor(() => expect(callOrder).toContain("onRequest"));
+        await asked;
+
+        expect(youtubeResults(task)).toHaveLength(1);
+        expect(youtubeResults(task)[0].discoverySources[0]).toMatchObject({ discoveredBy: "linker" });
+        expect(task.getAttributes()?.lastResortInProgress).toBeUndefined();
+    });
+
+    test("set to search automatically, it runs in the stage like the others", async () => {
+        const task = await makeTask({ onRequest: true, autoSearch: ["linker"] });
+        await task.startMetadataDiscovering();
+        expect(callOrder).toEqual(["regular", "onRequest"]);
+    });
+
+    test("a last resort set to search automatically runs last, only for what is still missing", async () => {
+        const task = await makeTask({ autoSearch: ["claude"] });
+        await task.startMetadataDiscovering();
+        expect(callOrder).toEqual(["regular", "lastResort"]);
+        expect(lastResortContexts[0]?.wantedPlatforms).toEqual(["youtube"]);
+    });
+
+    test("...and not at all when nothing is missing, or when it is switched off", async () => {
+        youtubeSearch = [{ metadata: meta("youtube", "found", "Get Lucky", "Daft Punk"), searchKeys: ["trackName"] }];
+        const task = await makeTask({ autoSearch: ["claude"] });
+        await task.startMetadataDiscovering();
+        expect(callOrder).toEqual(["regular"]);
+
+        youtubeSearch = [];
+        callOrder = [];
+        const off = await makeTask({ autoSearch: ["claude"], lastResortEnabled: false });
+        await off.startMetadataDiscovering();
+        expect(callOrder).toEqual(["regular"]);
     });
 });

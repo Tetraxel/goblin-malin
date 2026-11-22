@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, type RefObject } from "react";
 import wrapAnsi from "wrap-ansi";
 import { Box, Text, useBoxMetrics, type DOMElement } from "ink";
-import clipboard from "clipboardy";
+import { copyToClipboard } from "#base/selection/clipboardWrite";
+import { readClipboard } from "#components/ImportModal/clipboard";
 import * as path from "path";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { useWheelTarget } from "#base/mouse/useMouseTarget";
@@ -519,10 +520,13 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
         else stopEditing();
     }
 
-    function pasteIntoCurrent() {
+    // The clipboard is read and written asynchronously: a synchronous call starts the system's tool and freezes the
+    // screen while it runs (about 300 ms on Windows).
+    async function pasteIntoCurrent() {
+        const target = current;
         let text = "";
         try {
-            text = clipboard.readSync();
+            text = await readClipboard();
         } catch {
             /* clipboard unavailable */
         }
@@ -530,19 +534,14 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
             setNotice("The clipboard is empty");
             return;
         }
-        const error = applyText(current, text);
+        const error = applyText(target, text);
         if (error) setNotice(`Clipboard: ${error.toLowerCase()}`);
     }
 
     function copyCurrent() {
         const text = textOf(current);
         if (!text) return;
-        try {
-            clipboard.writeSync(text);
-            setNotice("Copied");
-        } catch {
-            setNotice("Could not reach the clipboard");
-        }
+        void copyToClipboard(text).then((copied) => setNotice(copied ? "Copied" : "Could not reach the clipboard"));
     }
 
     function resetCurrent() {
@@ -668,7 +667,7 @@ export const DownloadSourceDetail: React.FC<DownloadSourceDetailProps> = ({
                 defaultShortcut: { input: "v", ctrl: true },
                 label: "Paste",
                 handler: () => {
-                    if (!isEditing && isTextTarget) pasteIntoCurrent();
+                    if (!isEditing && isTextTarget) void pasteIntoCurrent();
                 },
             },
             {

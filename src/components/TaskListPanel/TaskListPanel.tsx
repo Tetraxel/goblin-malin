@@ -199,7 +199,13 @@ export const TaskListPanel: React.FC<{
         const col = calculatedColumns[selectedColIndex];
         if (!col) return;
         const availableWidth = width - RESERVED_WIDTH;
-        const colNatMin = (c: CalculatedColumn) => Math.max(2, c.label.length + 4);
+        // The narrowest a column can be made: its own minimum, else room for its acronym (a platform column shrinks
+        // to "YT"), else for its label. Read from the column definitions: the computed ones carry their current width
+        // as their minimum.
+        const minById = new Map(
+            columns.map((c) => [c.id, c.minWidth ?? Math.max(2, (c.acronym ?? c.label).length + 3)])
+        );
+        const colNatMin = (c: CalculatedColumn) => minById.get(c.id) ?? Math.max(2, c.label.length + 3);
         const naturalMin = colNatMin(col);
 
         // Use right columns; fall back to left columns when on the last resizable column

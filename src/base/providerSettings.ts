@@ -25,7 +25,13 @@ export interface ProviderConsent {
  */
 export type ProviderSettingsRow =
     /** Runs at once when chosen (not part of the Save / Cancel draft); a failure is logged by the settings. */
-    | { kind: "action"; label: string; run: () => void | Promise<void> }
+    | {
+          kind: "action";
+          label: string;
+          /** One glyph shown before the label (default `›`). */
+          icon?: string;
+          run: () => void | Promise<void>;
+      }
     /** A dim line under the row above it. */
     | { kind: "note"; text: string };
 

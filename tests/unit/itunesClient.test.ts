@@ -50,4 +50,34 @@ describe("itunesGet pacing", () => {
         await apple;
         expect(fetchMock).toHaveBeenCalledTimes(2);
     });
+
+    test("a call whose caller gives up leaves the queue without using a turn (APPLE-01)", async () => {
+        await itunesGet("search", { term: "a" });
+        const skipped = new AbortController();
+        const gone = itunesGet("search", { term: "skipped" }, { signal: skipped.signal }).catch((e: Error) => e);
+        const next = itunesGet("search", { term: "next" });
+        await vi.advanceTimersByTimeAsync(0);
+        skipped.abort();
+        expect(await gone).toMatchObject({ name: "AbortError" });
+
+        // The next call takes the first turn (3 s), not the one after the skipped call (6 s).
+        await vi.advanceTimersByTimeAsync(3000);
+        await next;
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(String(fetchMock.mock.calls[1][0])).toContain("term=next");
+    });
+
+    test("a refusal makes every caller wait, not only the one refused (APPLE-01)", async () => {
+        fetchMock.mockImplementationOnce(async () => new Response("", { status: 403 }));
+        const refused = itunesGet("search", { term: "a" });
+        await vi.advanceTimersByTimeAsync(0);
+        const other = itunesGet("search", { term: "b" });
+
+        // Without the shared back-off, "b" would go 3 s after "a".
+        await vi.advanceTimersByTimeAsync(9000);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        await vi.advanceTimersByTimeAsync(5000);
+        await Promise.all([refused, other]);
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
 });

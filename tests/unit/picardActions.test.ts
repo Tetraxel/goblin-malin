@@ -176,6 +176,30 @@ describe("opening the whole list in Picard", () => {
         expect(confirm).toHaveBeenCalledTimes(2);
         expect(confirm.mock.calls[1][0].title).toBe("MusicBrainz Picard did not answer");
     });
+
+    test("a long batch can be stopped from its progress dialog (PICARD-01)", async () => {
+        tasks = Array.from({ length: 30 }, (_, i) => matched(`r${i}`));
+        let stopNow!: (answer: number) => void;
+        confirm.mockImplementationOnce(async () => 0); // "Open 30"
+        confirm.mockImplementationOnce(() => new Promise<number>((resolve) => (stopNow = resolve)));
+        sendToPicard.mockImplementation(async () => {
+            if (sendToPicard.mock.calls.length === 5) stopNow(0); // the user presses Stop meanwhile
+            return true;
+        });
+
+        await openAllInPicard();
+
+        expect(confirm.mock.calls[1][0]).toMatchObject({ title: "Sending to MusicBrainz Picard" });
+        expect(sendToPicard.mock.calls.length).toBeLessThan(30);
+    });
+
+    test("a short batch shows no progress dialog", async () => {
+        tasks = [matched("a"), matched("b")];
+        answers = [0];
+        await openAllInPicard();
+        expect(confirm).toHaveBeenCalledTimes(1);
+        expect(sendToPicard).toHaveBeenCalledTimes(2);
+    });
 });
 
 describe("the actions menu registry", () => {

@@ -142,8 +142,15 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
         // A group's tracks are the user's own: tearing them down would delete what the user put together.
         if (this.isGroup()) return;
         const attrs = this.getAttributes();
+        const orchestrator = TaskOrchestrator.getInstance();
+        // A track still being worked on would keep running detached from the list: never tear one down.
+        const busy = (attrs?.childTaskIds ?? []).filter((id) => orchestrator.getTask(id)?.isBusy()).length;
+        if (busy > 0) {
+            this.logger.warn(`Not restarted: ${busy} of its tracks ${busy === 1 ? "is" : "are"} still running`);
+            return;
+        }
         if (attrs?.childTaskIds.length) {
-            TaskOrchestrator.getInstance().removeTasks(attrs.childTaskIds);
+            orchestrator.removeTasks(attrs.childTaskIds);
         }
         this.updateAttributes({
             state: "pending",
@@ -153,6 +160,7 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
             totalCount: undefined,
             truncated: undefined,
             alreadyQueued: undefined,
+            unavailable: undefined,
             error: undefined,
         });
         this.status.clear();
@@ -214,6 +222,7 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
         const notes = [
             attrs?.truncated ? "truncated" : "",
             attrs?.alreadyQueued ? `${attrs.alreadyQueued} already in the queue elsewhere` : "",
+            attrs?.unavailable ? `${attrs.unavailable} not available in your country` : "",
         ].filter(Boolean);
         return notes.length > 0 ? `${count} ${label} (${notes.join(", ")})` : `${count} ${label}`;
     }
@@ -300,6 +309,7 @@ export class CollectionTask extends Task<CollectionDownloadTask> {
                 totalCount: expansion.totalCount,
                 truncated,
                 alreadyQueued: alreadyQueued > 0 ? alreadyQueued : undefined,
+                unavailable: expansion.unavailable ? expansion.unavailable : undefined,
                 childTaskIds: [...currentChildIds, ...newChildIds],
                 live:
                     attrs.collectionKind === "playlist"

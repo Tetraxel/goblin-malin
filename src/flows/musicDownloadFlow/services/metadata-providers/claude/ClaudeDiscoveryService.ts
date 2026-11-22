@@ -55,6 +55,11 @@ export class ClaudeDiscoveryService extends DiscoveryMetadataService {
             defaultValue: true,
             kind: "checkbox",
         },
+        autoSearch: {
+            label: "Search automatically when a platform is still missing (off: a button under the track's sources asks Claude)",
+            defaultValue: false,
+            kind: "checkbox",
+        },
     };
     static readonly consent: ProviderConsent = {
         title: "Let Claude help find tracks?",
@@ -96,7 +101,7 @@ export class ClaudeDiscoveryService extends DiscoveryMetadataService {
             explain: settings.explain !== false,
         };
 
-        const answer = normalizeAnswer(await this.lookup(query));
+        const answer = normalizeAnswer(await this.lookup(query, context?.signal));
         const { tracks, explanations, summaries } = claudeLinksToResults(answer.links, wanted);
 
         const searchKeys: SearchKey[] = [query.isrc ? "trackName+artistName+isrc" : "trackName+artistName"];
@@ -117,8 +122,9 @@ export class ClaudeDiscoveryService extends DiscoveryMetadataService {
     // Cached on the plain query (title/artists/ISRC/wanted/model) rather than the source metadata
     // object, whose fetch timestamp would make every refetch a cache miss — this call is expensive.
     // Short TTL (vs the 90-day default): a "nothing found" shouldn't stick for months.
+    // `signal` (the user's Stop) ends the CLI process; it is not part of the cache key.
     @Cached({ ttl: CACHE_TTL_MS })
-    private async lookup(query: ClaudeTrackQuery): Promise<ClaudeAnswer> {
+    private async lookup(query: ClaudeTrackQuery, signal?: AbortSignal): Promise<ClaudeAnswer> {
         const settings = getMusicSettings().metadata.discoveryProviders[PROVIDER_KEY] ?? {};
         const command = typeof settings.command === "string" ? settings.command : DEFAULT_CLAUDE_COMMAND;
         const label = `"${query.trackName}" by ${query.artists.join(", ")}`;
@@ -139,6 +145,7 @@ export class ClaudeDiscoveryService extends DiscoveryMetadataService {
                 jsonSchema: buildClaudeDiscoverySchema(query.wanted, query.explain === true),
                 tools: ["WebSearch", "WebFetch"],
                 command,
+                signal,
             });
             const links = Array.isArray(data.links) ? data.links : [];
             this.logger.info(
@@ -158,6 +165,11 @@ export class ClaudeDiscoveryService extends DiscoveryMetadataService {
             this.status.clear();
             return { links, reasoning };
         } catch (error) {
+            if (signal?.aborted) {
+                this.logger.info(`Stopped asking Claude about ${label}`);
+                this.status.clear();
+                throw error;
+            }
             this.logger.error(`Error asking Claude about ${label}`, { error });
             this.status.set({ type: StatusType.Error, message: describeFailure(error) });
             throw error;

@@ -1,6 +1,6 @@
 import React from "react";
 import open from "open";
-import clipboard from "clipboardy";
+import { copyToClipboard } from "#base/selection/clipboardWrite";
 import { type MetadataGroupState } from "#flows/musicDownloadFlow/types";
 import { type CursorPosition } from "#hooks/useFocusManager";
 import { useShortcuts } from "#hooks/useShortcuts";
@@ -310,12 +310,7 @@ export function useSourceListInput({
                 handler: () => {
                     if (cursor.type !== "result") return;
                     const url = sortedGroups[cursor.groupIndex]?.results[cursor.resultIndex]?.metadata.url;
-                    if (url)
-                        try {
-                            clipboard.writeSync(url);
-                        } catch {
-                            /* ignored */
-                        }
+                    if (url) void copyToClipboard(url);
                 },
             },
             {

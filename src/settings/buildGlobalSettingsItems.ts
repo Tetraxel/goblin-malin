@@ -70,7 +70,8 @@ export function buildGlobalSettingsItems(
         {
             kind: "readonlyText",
             indent: 0,
-            label: "⌂  App directory",
+            icon: "⌂",
+            label: "App directory",
             value: getAppDataDir(),
         },
         {
@@ -83,7 +84,8 @@ export function buildGlobalSettingsItems(
         {
             kind: "action",
             indent: 0,
-            label: "✕  Clear cache",
+            icon: "✕",
+            label: "Clear cache",
             run: () => clearCache(),
         },
         {

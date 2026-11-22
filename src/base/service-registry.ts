@@ -37,7 +37,11 @@ type ServiceConstructor<TTask extends Task<any>, TService extends ServiceBase> =
     setupWizard?: SetupWizardConfig;
     // Must be explicitly allowed by the user (once) before the service is ever used.
     consent?: ProviderConsent;
-    // Slow/expensive last resort: only run when the regular services left a gap.
+    // Discovery services: only runs when the user asks (a button under the track's sources, offered while a platform
+    // is missing), unless its `autoSearch` setting makes it part of the discovery stage.
+    onRequest?: boolean;
+    // Slow/expensive last resort: runs on request like `onRequest`, after the others when it searches automatically,
+    // and its results must pass the platform's own fetch + a confidence check.
     lastResort?: boolean;
     // Metadata services: `false` when the service cannot search its catalogue (its tracks only come from a pasted link
     // or from discovery). Its `searchTrack` is not asked, and a track it has no result for is not a gap a last-resort

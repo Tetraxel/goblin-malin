@@ -59,6 +59,9 @@ export async function importCookiesInteractively(): Promise<void> {
             title: "Cookies imported",
             message:
                 `${imported.cookies} cookies, ${imported.youtube} of them for YouTube, copied to:\n${imported.destination}\n\n` +
+                (imported.dropped > 0
+                    ? `${imported.dropped} cookie${imported.dropped === 1 ? "" : "s"} of other sites ${imported.dropped === 1 ? "was" : "were"} left out: only YouTube's and Google's are kept.\n\n`
+                    : "") +
                 "yt-dlp uses them from the next download. You can delete the file you exported: it holds your session.\n" +
                 "YouTube signs sessions out after a while: if downloads ask for a sign-in again, import a fresh file.",
             choices: [{ label: "OK", tone: "primary" }],
@@ -109,7 +112,7 @@ export function cookiesSettingsRows(
 ): ProviderSettingsRow[] {
     const browser = cookiesBrowserFrom(stored.cookiesBrowser);
     const rows: ProviderSettingsRow[] = [
-        { kind: "action", label: "⇩  Import cookies.txt…", run: importCookiesInteractively },
+        { kind: "action", icon: "⇩", label: "Import cookies.txt…", run: importCookiesInteractively },
         {
             kind: "note",
             text: browser
@@ -118,7 +121,7 @@ export function cookiesSettingsRows(
                     : `yt-dlp reads ${browser}'s cookies; the imported file is ignored.`
                 : (status ?? "Looking for cookies.txt…"),
         },
-        { kind: "action", label: "✕  Remove the imported cookies.txt…", run: removeCookiesInteractively },
+        { kind: "action", icon: "✕", label: "Remove the imported cookies.txt…", run: removeCookiesInteractively },
     ];
     return rows;
 }

@@ -15,7 +15,7 @@ const columns: ColumnDefinition[] = ["toTag", "toDownload", "url", "artist", "tr
 }));
 const indexOf = (id: string) => columns.findIndex((c) => c.id === id);
 
-beforeEach(() => vi.mocked(clipboard.writeSync).mockClear());
+beforeEach(() => vi.mocked(clipboard.write).mockClear());
 
 /** A YouTube video whose channel ("Moonflower") is not the artist the platforms agree on. */
 function lyricsUpload() {
@@ -49,16 +49,16 @@ function copy(task: ReturnType<typeof lyricsUpload>, column: string): void {
 describe("copying a cell", () => {
     test("copies what the cell shows: the compiled artist, not the uploader's channel", () => {
         copy(lyricsUpload(), "artist");
-        expect(clipboard.writeSync).toHaveBeenCalledWith("Patrick Sébastien");
+        expect(clipboard.write).toHaveBeenCalledWith("Patrick Sébastien");
     });
 
     test("copies the compiled title too, with the user's override on top", () => {
         const task = lyricsUpload();
         copy(task, "track");
-        expect(clipboard.writeSync).toHaveBeenLastCalledWith("Toc toc");
+        expect(clipboard.write).toHaveBeenLastCalledWith("Toc toc");
 
         task.setMetadataOverride({ trackName: "Toc Toc (Remix)" }, { actor: "user" });
         copy(task, "track");
-        expect(clipboard.writeSync).toHaveBeenLastCalledWith("Toc Toc (Remix)");
+        expect(clipboard.write).toHaveBeenLastCalledWith("Toc Toc (Remix)");
     });
 });

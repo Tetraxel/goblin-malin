@@ -67,13 +67,16 @@ export function picardUrlFor(
 /**
  * Asks the running Picard to load `url` (one of the addresses above) — directly, without a browser. True when Picard
  * answered; false when nothing listens there (Picard is not running, its browser integration is off, or it is on
- * another port) or it did not answer in time. Any HTTP answer counts: Picard replies with a redirect or an empty page.
+ * another port), it did not answer in time, or what answers is not Picard. Picard replies to these addresses with a
+ * page or a redirect; another program on the port (`python -m http.server`, a development server, both on 8000 by
+ * default) answers them "not found" or with an error, and is not taken for Picard.
  */
 export async function sendToPicard(url: string, timeoutMs = 3000): Promise<boolean> {
     try {
         const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(timeoutMs) });
         await response.body?.cancel();
-        return true;
+        // `redirect: "manual"` gives an opaque redirect (status 0) in some runtimes: a redirect is Picard's answer too.
+        return response.status < 400;
     } catch {
         return false;
     }

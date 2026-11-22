@@ -24,7 +24,10 @@ function isOn(ctor: ProviderConstructorLike, stored: StoredProviderSettings | un
     return def?.kind === "checkbox" ? def.defaultValue : true;
 }
 
-/** The settings patch of one provider's answer. Ticking a consent-gated provider is the user's answer to it. */
+/**
+ * The settings patch of one provider's answer. None of the providers the picker lists asks consent today (Songlink and
+ * Claude are discovery services, not listed); a listed provider that did would take the tick as its answer.
+ */
 function answerPatch(ctor: ProviderConstructorLike, enabled: boolean): StoredProviderSettings {
     return ctor.consent ? { enabled, consentAsked: true } : { enabled };
 }

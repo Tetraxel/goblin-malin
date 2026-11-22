@@ -621,6 +621,8 @@ export type CollectionDownloadTask = {
      * of 50 that holds 47 rows says why.
      */
     alreadyQueued?: number;
+    /** How many of the link's tracks the platform would not play here (region-blocked): left out, said in the status. */
+    unavailable?: number;
     /** Ids of child TrackDownloadTasks created by this collection, in discovery order. */
     childTaskIds: string[];
     /** Hides childTaskIds rows in the task list when true. */

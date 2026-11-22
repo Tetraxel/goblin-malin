@@ -6,6 +6,7 @@ import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { type MatrixAnswer, type MatrixDialog, type MatrixItem } from "#base/bridges/dialogBridge";
 import { Hint } from "../Hint";
+import { wrapText } from "#utils/wrapText";
 
 export type PendingMatrixDialog = {
     dialog: MatrixDialog;
@@ -204,15 +205,21 @@ export const MatrixDialogModal: React.FC<MatrixDialogModalProps> = ({
     // columns' heading and lines (margin + 1 + n), the grid's header (margin + 1), the details (margin + n), the hints
     // (margin + 1). The grid scrolls when the terminal is shorter than that.
     const textWidth = modalWidth - 6;
-    // Word wrapping leaves the end of most lines empty: count on a shorter line than the frame's.
-    const introLines = dialog.intro ? 1 + Math.ceil(dialog.intro.length / Math.max(10, textWidth - 10)) : 0;
-    const chrome = 4 + 1 + introLines + 2 + columns.length + 2 + 2 + 2;
+    // Wrapped here, between words, so its height is known exactly and no line starts with a space.
+    const intro = dialog.intro ? wrapText(dialog.intro, textWidth, Number.MAX_SAFE_INTEGER) : [];
+    const chromeWithout = 4 + 1 + 2 + columns.length + 2 + 2 + 2;
+    const rowsFit = (withIntro: boolean, withDetail: boolean) =>
+        terminalHeight - chromeWithout - (withIntro ? 1 + intro.length : 0) - (withDetail ? 1 + detailHeight : 0);
+    // The grid is the point of the screen: on a short terminal the intro goes first, then the details, so every row
+    // can be seen at once (only when even that is not enough does the grid scroll).
+    let showIntro = intro.length > 0;
     let showDetail = detailHeight > 0;
-    let budget = terminalHeight - chrome - (showDetail ? 1 + detailHeight : 0);
-    if (budget < 3 && showDetail) {
+    if (showIntro && rowsFit(showIntro, showDetail) < rows.length) showIntro = false;
+    if (showDetail && rowsFit(showIntro, showDetail) < Math.min(rows.length, 3)) showDetail = false;
+    if (showDetail && rowsFit(showIntro, false) >= rows.length && rowsFit(showIntro, true) < rows.length) {
         showDetail = false;
-        budget = terminalHeight - chrome;
     }
+    let budget = rowsFit(showIntro, showDetail);
     // At least one row is always drawn: the cursor's (a list of "more" markers alone would be toggled blind).
     budget = Math.max(3, budget);
     // When the rows do not fit, a line goes to each "more" marker.
@@ -249,9 +256,11 @@ export const MatrixDialogModal: React.FC<MatrixDialogModalProps> = ({
                     <Text bold color={accent}>
                         {dialog.title}
                     </Text>
-                    {dialog.intro && (
-                        <Box marginTop={1}>
-                            <Text>{dialog.intro}</Text>
+                    {showIntro && (
+                        <Box marginTop={1} flexDirection="column" flexShrink={0}>
+                            {intro.map((line, i) => (
+                                <Text key={i}>{line}</Text>
+                            ))}
                         </Box>
                     )}
 

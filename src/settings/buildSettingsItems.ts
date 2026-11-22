@@ -1,27 +1,97 @@
 import stringWidth from "string-width";
 import wrapAnsi from "wrap-ansi";
 
+/**
+ * One row of the settings list. Every row that is not a header is drawn the same way (`SettingsItemRow`):
+ * `indent`, the cursor (2 columns), an icon (1 glyph + 2 spaces), the label, then the value. The icon column is
+ * always there, so the labels of a block line up whatever their kind: a row without an icon of its own gets its
+ * kind's (`ITEM_ICONS`). `icon` replaces it (⌂ for a folder, ✕ for something that deletes).
+ */
 export type SettingsItem =
     | { kind: "sectionHeader"; label: string }
     | { kind: "subHeader"; label: string }
     | { kind: "providerHeader"; label: string; color: string; missingCredentials?: boolean }
     | { kind: "checkbox"; label: string; indent: number; get: () => boolean; set: (v: boolean) => void }
-    | { kind: "textInput"; label: string; indent: number; get: () => string; set: (v: string) => void }
+    | {
+          kind: "textInput";
+          label: string;
+          indent: number;
+          icon?: string;
+          get: () => string;
+          set: (v: string) => void;
+      }
     | {
           kind: "select";
           label: string;
           indent: number;
+          icon?: string;
           options: readonly string[];
           get: () => string;
           set: (v: string) => void;
       }
-    | { kind: "action"; label: string; indent: number; run: () => void }
-    | { kind: "readonlyText"; label: string; indent: number; value: string }
+    | { kind: "action"; label: string; indent: number; icon?: string; run: () => void }
+    | { kind: "readonlyText"; label: string; indent: number; icon?: string; value: string }
     /** A dim line of information under the row above it (never selectable). It stays with that row when searching. */
     | { kind: "note"; indent: number; text: string };
 
+/** The icon of a row that names none, by kind (a checkbox shows its box instead). */
+export const ITEM_ICONS = { textInput: "✎", select: "≡", action: "›", readonlyText: "·" } as const;
+
+/** Columns before a row's label: cursor (2) + icon (1) + gap (2). A note lines up with the label above it. */
+export const LABEL_OFFSET = 5;
+/** Columns between a label's column and its value. */
+export const VALUE_GAP = 2;
+
 export function isInteractive(item: SettingsItem): boolean {
     return item.kind === "checkbox" || item.kind === "textInput" || item.kind === "select" || item.kind === "action";
+}
+
+/** Whether a row shows a value after its label (in the value column of its block). */
+export function hasValue(
+    item: SettingsItem
+): item is Extract<SettingsItem, { kind: "textInput" | "select" | "readonlyText" }> {
+    return item.kind === "textInput" || item.kind === "select" || item.kind === "readonlyText";
+}
+
+/** The value a row shows, as text (what its width is counted from). */
+export function valueText(item: SettingsItem): string {
+    if (item.kind === "select") return `◀ ${item.get()} ▶`;
+    if (item.kind === "textInput") return `[ ${item.get() || "empty"} ]`;
+    if (item.kind === "readonlyText") return item.value;
+    return "";
+}
+
+/**
+ * The width of the label column of each row that has a value, so the values of a block (the rows between two
+ * headers, at the same indent) start in one column. A label longer than half the row keeps its own width and pushes
+ * its value right: aligning on it would leave the others' values far from their labels.
+ */
+export function valueColumns(items: SettingsItem[], width: number): Map<number, number> {
+    const result = new Map<number, number>();
+    let block: number[] = [];
+    const flush = () => {
+        const byIndent = new Map<number, number[]>();
+        for (const i of block) {
+            const indent = (items[i] as { indent: number }).indent;
+            byIndent.set(indent, [...(byIndent.get(indent) ?? []), i]);
+        }
+        for (const [indent, rows] of byIndent) {
+            const cap = Math.floor((width - indent - LABEL_OFFSET) / 2);
+            const fitting = rows.map((i) => stringWidth((items[i] as { label: string }).label)).filter((w) => w <= cap);
+            const column = fitting.length > 0 ? Math.max(...fitting) : 0;
+            for (const i of rows) {
+                const own = stringWidth((items[i] as { label: string }).label);
+                result.set(i, own <= cap ? column : own);
+            }
+        }
+        block = [];
+    };
+    items.forEach((item, i) => {
+        if (item.kind === "sectionHeader" || item.kind === "subHeader" || item.kind === "providerHeader") flush();
+        else if (hasValue(item)) block.push(i);
+    });
+    flush();
+    return result;
 }
 
 /** Number of terminal lines `text` takes in `width` columns, wrapped the way Ink wraps a `<Text>`. */
@@ -36,23 +106,24 @@ function wrappedLines(text: string, width: number): number {
  * pass `width` (the list's width) or the scroll logic counts it as one line and clips the last rows.
  * Notes and provider headers are cut to one line, never wrapped.
  *
- * The text counted here mirrors what `SettingsItemRow` renders: cursor (2) + icon/label + value.
+ * The text counted here mirrors what `SettingsItemRow` renders: cursor + icon (`LABEL_OFFSET`), the label, and for a
+ * row with a value the label's column (`labelWidth`, see `valueColumns`) + a gap + the value.
  */
-export function itemRowHeight(item: SettingsItem, width?: number): number {
+export function itemRowHeight(item: SettingsItem, width?: number, labelWidth?: number): number {
     if (item.kind === "sectionHeader" || item.kind === "subHeader") return 2;
     if (width === undefined) return 1;
 
-    const available = width - ("indent" in item ? item.indent : 0);
+    const available = width - ("indent" in item ? item.indent : 0) - LABEL_OFFSET;
     switch (item.kind) {
         case "checkbox":
-            return wrappedLines(`${"  "}✔${"  "}${item.label}`, available);
         case "action":
-            return wrappedLines(`${"  "}${item.label}`, available);
-        // The label and the value are two `<Text>`s in a row: the value keeps its width, the label wraps in the rest.
+            return wrappedLines(item.label, available);
+        // The label and the value sit side by side: the value keeps its width, the label wraps in its column.
         case "textInput":
-            return wrappedLines(`${"  "}${item.label}: `, available - stringWidth(`[${item.get()}]`));
-        case "select":
-            return wrappedLines(`${"  "}${item.label}: `, available - stringWidth(`[${item.get()} ◀ ▶]`));
+        case "select": {
+            const room = available - VALUE_GAP - stringWidth(valueText(item));
+            return wrappedLines(item.label, Math.max(1, Math.min(labelWidth ?? room, room)));
+        }
         default:
             return 1;
     }

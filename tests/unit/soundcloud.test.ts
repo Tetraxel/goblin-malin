@@ -240,10 +240,18 @@ describe("convertSoundCloudToTrack", () => {
 // The service itself, with yt-dlp replaced by a fake that answers like the real thing.
 const getInfoAsync = vi.fn();
 const ytdlp = { enabled: true };
-vi.mock("#flows/musicDownloadFlow/services/apis/ytdlp-client", () => ({
-    readYtDlpInfo: async (url: string) => getInfoAsync(url),
-    isYtDlpEnabled: () => ytdlp.enabled,
-}));
+vi.mock("#flows/musicDownloadFlow/services/apis/ytdlp-client", async () => {
+    const { ProviderUnavailableError } = await import("#base/providerUnavailableError");
+    return {
+        readYtDlpInfo: async (url: string) => getInfoAsync(url),
+        isYtDlpEnabled: () => ytdlp.enabled,
+        YtDlpDisabledError: class YtDlpDisabledError extends ProviderUnavailableError {
+            constructor(site: string) {
+                super(`${site} is read through yt-dlp, which is switched off`);
+            }
+        },
+    };
+});
 
 type Service =
     import("#flows/musicDownloadFlow/services/metadata-providers/soundcloud/SoundCloudService").SoundCloudService;
@@ -356,6 +364,16 @@ describe("SoundCloudService", () => {
         ytdlp.enabled = false;
         const service = await makeService();
         expect(await service.searchTrack(seed("Never Be Like You", "Flume"))).toEqual([]);
+        expect(getInfoAsync).not.toHaveBeenCalled();
+    });
+
+    test("getTrackMetadata does not start yt-dlp when it is switched off, and says why", async () => {
+        ytdlp.enabled = false;
+        const service = await makeService();
+        const { ProviderUnavailableError } = await import("#base/providerUnavailableError");
+        await expect(service.getTrackMetadata("https://soundcloud.com/flume/never-be-like-you")).rejects.toBeInstanceOf(
+            ProviderUnavailableError
+        );
         expect(getInfoAsync).not.toHaveBeenCalled();
     });
 
@@ -530,5 +548,40 @@ describe("the codec a platform serves", () => {
         expect(platformRegistry.upstreamCodec("youtube")).toBe("Opus");
         expect(platformRegistry.upstreamCodec("youtubeMusic")).toBe("Opus");
         expect(platformRegistry.upstreamCodec("soundcloud")).toBeUndefined();
+    });
+});
+
+describe("SoundCloudService.resolveLink (short links, audit v0.2.4 SC-01)", () => {
+    const followTo = (target: string) =>
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => ({ url: target, body: null }))
+        );
+
+    test("an on.soundcloud.com link to a set becomes the set's address, so it is imported as a playlist", async () => {
+        const { SoundCloudService } =
+            await import("#flows/musicDownloadFlow/services/metadata-providers/soundcloud/SoundCloudService");
+        followTo("https://soundcloud.com/Flume/sets/Palaces?si=abc&utm_source=clipboard");
+        try {
+            expect(await SoundCloudService.resolveLink("https://on.soundcloud.com/AbCd123")).toBe(
+                "https://soundcloud.com/flume/sets/palaces"
+            );
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    test("one to a track becomes the track's address; any other link is not followed", async () => {
+        const { SoundCloudService } =
+            await import("#flows/musicDownloadFlow/services/metadata-providers/soundcloud/SoundCloudService");
+        followTo("https://soundcloud.com/flume/never-be-like-you?si=1");
+        try {
+            expect(await SoundCloudService.resolveLink("https://on.soundcloud.com/XyZ")).toBe(
+                "https://soundcloud.com/flume/never-be-like-you"
+            );
+            expect(SoundCloudService.resolveLink("https://soundcloud.com/flume/never-be-like-you")).toBeNull();
+        } finally {
+            vi.unstubAllGlobals();
+        }
     });
 });

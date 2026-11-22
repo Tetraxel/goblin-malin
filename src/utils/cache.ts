@@ -196,7 +196,10 @@ export function Cached(options: CacheOptions = {}) {
         const className = target.constructor.name;
 
         descriptor.value = function (this: unknown, ...args: unknown[]) {
-            const cacheKey = `${className}:${propertyKey}:${JSON.stringify(args)}`;
+            // A caller's stop signal is not part of what is asked: the same question with or without one is one entry.
+            const keyArgs = args.filter((arg) => !(arg instanceof AbortSignal));
+            while (keyArgs.length > 0 && keyArgs[keyArgs.length - 1] === undefined) keyArgs.pop();
+            const cacheKey = `${className}:${propertyKey}:${JSON.stringify(keyArgs)}`;
             return cachedCall(cacheKey, () => originalMethod.apply(this, args), options);
         };
 

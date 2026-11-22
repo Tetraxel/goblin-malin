@@ -56,7 +56,8 @@ function providerItems(
         items.push({
             kind: "action",
             indent: 4,
-            label: "⚙  Setup Wizard",
+            icon: "⚙",
+            label: "Setup Wizard",
             run: () =>
                 onOpenWizard(wizard, () =>
                     onChange({
@@ -128,6 +129,7 @@ function providerItems(
                 kind: "action",
                 indent: 4,
                 label: row.label,
+                icon: row.icon,
                 run: () => {
                     Promise.resolve()
                         .then(() => row.run())
@@ -371,7 +373,8 @@ export function buildFlowSettingsItems(
     items.push({
         kind: "textInput",
         indent: 0,
-        label: "⌂  Default output directory",
+        icon: "⌂",
+        label: "Default output directory",
         get: () => flowSettings.download.outputDir,
         set: (v) => onChange({ download: { outputDir: v } }),
     });
@@ -386,7 +389,7 @@ export function buildFlowSettingsItems(
         const format = parseOutputFormat(flowSettings.download.convertFormat);
         items.push({
             kind: "select",
-            // Cursor (2) + icon (1) + gap (2) = 5 columns before the checkbox label; the select's cursor takes 2 of them.
+            // Nested under the checkbox above it: its label starts 3 columns right of the checkbox label.
             indent: 3,
             label: "Convert to",
             options: OUTPUT_FORMAT_KEYS,
@@ -410,14 +413,16 @@ export function buildFlowSettingsItems(
     items.push({
         kind: "textInput",
         indent: 0,
-        label: "⌂  Temporary download directory",
+        icon: "⌂",
+        label: "Temporary download directory",
         get: () => flowSettings.download.outputTemporaryDir,
         set: (v) => onChange({ download: { outputTemporaryDir: v } }),
     });
     items.push({
         kind: "action",
         indent: 0,
-        label: "✕  Clear temporary downloads…",
+        icon: "✕",
+        label: "Clear temporary downloads…",
         run: () => void runTempCleanup("manual", flowSettings.download.outputTemporaryDir),
     });
     items.push({ kind: "note", indent: 0, text: extras.tempUsageText ?? "calculating…" });

@@ -8,6 +8,9 @@ export type DiscoveryContext = {
     // Platforms that still have no result for this track (and whose metadata service is enabled).
     // A text-based service can restrict its search to these; URL-based ones (Songlink) ignore it.
     wantedPlatforms?: Platform[];
+    // Aborts when nobody waits for the answer any more (the user's Stop, the stage skipped). A slow service (a CLI
+    // process, a web search) ends its work; a single quick request may ignore it.
+    signal?: AbortSignal;
 };
 
 export abstract class DiscoveryMetadataService extends ServiceBase {

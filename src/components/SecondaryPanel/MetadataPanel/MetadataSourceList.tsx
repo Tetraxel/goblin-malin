@@ -59,6 +59,8 @@ interface MetadataSourceListProps {
     lastResortBusyKey?: string;
     /** Ask a last-resort service to look for the missing platforms. Must be referentially stable. */
     onAskLastResort: (serviceKey: string) => void;
+    /** Stops the last-resort service running for this track (the busy button's click). Must be stable. */
+    onStopLastResort: () => void;
     isFetchingPrimarySource?: boolean;
     isDiscovering?: boolean;
 }
@@ -97,6 +99,7 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
     lastResortOffers,
     lastResortBusyKey,
     onAskLastResort,
+    onStopLastResort,
     isFetchingPrimarySource = false,
     isDiscovering = false,
 }) => {
@@ -227,13 +230,16 @@ export const MetadataSourceList: React.FC<MetadataSourceListProps> = ({
                 gives way (clips) when the panel is full, so the button is never pushed out of sight. */}
             {!isFetchingPrimarySource &&
                 !isDiscovering &&
-                lastResortOffers.map((offer) => (
-                    <Box key={offer.key} marginTop={1} paddingLeft={3} flexShrink={0} overflow="hidden">
+                lastResortOffers.map((offer, i) => (
+                    <Box key={offer.key} marginTop={i === 0 ? 1 : 0} paddingLeft={3} flexShrink={0} overflow="hidden">
                         <LastResortButton
                             serviceKey={offer.key}
                             missingText={offer.missing.map((p) => providerDisplayRegistry.get(p).label).join(", ")}
+                            // The key asks the first service (or stops the one running): only that button shows it.
+                            showKey={lastResortBusyKey ? lastResortBusyKey === offer.key : i === 0}
                             busy={lastResortBusyKey === offer.key}
                             onAsk={onAskLastResort}
+                            onStop={onStopLastResort}
                         />
                     </Box>
                 ))}

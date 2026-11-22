@@ -27,6 +27,8 @@ export type CollectionExpansion = {
     trackUrls: string[];
     totalCount: number;
     truncated?: boolean;
+    /** Tracks the list holds but the platform will not play here (blocked in the user's country): left out, counted. */
+    unavailable?: number;
 };
 
 class UrlParserRegistry {

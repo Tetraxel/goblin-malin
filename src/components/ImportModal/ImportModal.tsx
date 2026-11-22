@@ -27,10 +27,12 @@ type ActionOption = {
     download: boolean;
 };
 
+// What each choice sets on the new tasks (their TAG? / DL? columns). Nothing starts until Run: the words say so, so
+// "Fetch Metadata" is never read as "it is being fetched" while the rows say "No status".
 const OPTIONS: ActionOption[] = [
-    { label: "Fetch Metadata & Download", fetchMetadata: true, download: true },
-    { label: "Fetch Metadata", fetchMetadata: true, download: false },
-    { label: "Do nothing", fetchMetadata: false, download: false },
+    { label: "Add, to tag and download", fetchMetadata: true, download: true },
+    { label: "Add, to tag only", fetchMetadata: true, download: false },
+    { label: "Add only (choose later)", fetchMetadata: false, download: false },
 ];
 
 function platformBadge(platform: SupportedPlatform): {
@@ -131,9 +133,9 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     const modalWidth = Math.min(80, Math.max(40, terminalWidth - 10));
 
     // Fixed rows consumed by the modal shell: border(2) + paddingY(2) + title(1)
-    // + margin+urls-section-header(1) + margin+options(1+3) + margin+hint(1+1) = 12
+    // + margin+urls-section-header(1) + margin+options(1+3) + the "press Run" note(1) + margin+hint(1+1) = 13
     // Plus the outer paddingTop={3}.
-    const FIXED_ROWS = 15;
+    const FIXED_ROWS = 16;
     const MAX_URL_ROWS = 30;
     const BOTTOM_PADDING = 3;
     const availableRows = Math.max(1, terminalHeight - FIXED_ROWS - BOTTOM_PADDING);
@@ -210,6 +212,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                                 </Box>
                             );
                         })}
+                        <Text color={theme.text.secondary}>Nothing starts until you press Run in the toolbar.</Text>
                     </Box>
 
                     <Box marginTop={1} flexDirection="row">

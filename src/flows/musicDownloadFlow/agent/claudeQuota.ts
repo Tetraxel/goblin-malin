@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { globalLogger } from "#base/logger/logger";
 import { getAppDataDir } from "#utils/appPaths";
+import { renameReplacing } from "#utils/dataFile";
 import { type QuotaWindow, type QuotaWindows } from "../services/apis/claude-agent-client";
 
 const logger = globalLogger.createChild({ service: "ClaudeQuota" });
@@ -84,6 +85,10 @@ export class ClaudeQuotaStore {
 
 const filePath = (): string => path.join(getAppDataDir(), CLAUDE_QUOTA_FILE);
 
+/** The save in flight: the next one waits for it. Never rejects. */
+let saving: Promise<void> = Promise.resolve();
+let saveCount = 0;
+
 export const claudeQuota = new ClaudeQuotaStore({
     async load() {
         try {
@@ -100,19 +105,27 @@ export const claudeQuota = new ClaudeQuotaStore({
             return undefined;
         }
     },
-    async save(snapshot) {
-        const target = filePath();
-        const temp = `${target}.tmp`;
-        try {
-            await fs.mkdir(path.dirname(target), { recursive: true });
-            await fs.writeFile(temp, JSON.stringify(snapshot), "utf8");
-            await fs.rename(temp, target);
-        } catch (error) {
-            logger.warn(`Could not save the plan usage: ${(error as Error).message}`);
-            await fs.rm(temp, { force: true }).catch(() => undefined);
-        }
+    // Saves one after the other (two answers that report usage close together would otherwise race on the file),
+    // each through its own temp name, renamed with the Windows retry of `renameReplacing`.
+    save(snapshot) {
+        const run = saving.then(() => writeSnapshot(snapshot));
+        saving = run;
+        return run;
     },
 });
+
+async function writeSnapshot(snapshot: QuotaSnapshot): Promise<void> {
+    const target = filePath();
+    const temp = `${target}.${process.pid}-${++saveCount}.tmp`;
+    try {
+        await fs.mkdir(path.dirname(target), { recursive: true });
+        await fs.writeFile(temp, JSON.stringify(snapshot), "utf8");
+        await renameReplacing(temp, target);
+    } catch (error) {
+        logger.warn(`Could not save the plan usage: ${(error as Error).message}`);
+        await fs.rm(temp, { force: true }).catch(() => undefined);
+    }
+}
 
 // ── What the panel shows ──────────────────────────────────────────────────
 

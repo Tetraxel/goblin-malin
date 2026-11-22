@@ -11,7 +11,12 @@ import { AsyncLocalStorage } from "async_hooks";
  * scale without hammering metadata providers.
  */
 /** The permit one `run` holds: how many of its branches are waiting (permit given back), and the way back. */
-type Permit = { lent: number; back?: Promise<void> };
+type Permit = {
+    lent: number;
+    back?: Promise<void>;
+    /** The run has ended: a branch still waiting must not take a permit again when it finishes (nobody would give it back). */
+    over?: boolean;
+};
 
 export class Semaphore {
     /** The semaphores whose permit the running code holds (so `whileWaiting` knows it has one to give back). */
@@ -28,14 +33,20 @@ export class Semaphore {
     /** Acquire a permit, run `fn`, and always release — even if `fn` throws. */
     async run<T>(fn: () => Promise<T> | T): Promise<T> {
         await this.acquire();
+        // One permit per run, however many parallel branches of it wait at once (`lent` counts them).
+        const permit: Permit = { lent: 0 };
         try {
-            // One permit per run, however many parallel branches of it wait at once (`lent` counts them).
-            return await Semaphore.held.run(
-                new Map(Semaphore.held.getStore()).set(this, { lent: 0 } as Permit),
-                async () => fn()
-            );
+            return await Semaphore.held.run(new Map(Semaphore.held.getStore()).set(this, permit), async () => fn());
         } finally {
-            this.release();
+            permit.over = true;
+            if (permit.back) {
+                // The last waiting branch is taking the permit again: it is given back as soon as it has it.
+                void permit.back.then(() => this.release());
+            } else if (permit.lent === 0) {
+                this.release();
+            }
+            // Otherwise branches still wait with the permit given back (their run returned without them): it is
+            // released already, and none of them takes it again (`over`).
         }
     }
 
@@ -50,14 +61,16 @@ export class Semaphore {
      */
     async whileWaiting<T>(fn: () => Promise<T> | T): Promise<T> {
         const permit = Semaphore.held.getStore()?.get(this);
-        if (!permit) return fn();
+        // No permit, or the run that held it has ended (a branch it did not wait for): nothing to give back or take.
+        if (!permit || permit.over) return fn();
         // The permit is on its way back (the last branch is queueing for it): it is not ours to give away yet.
         if (permit.back) await permit.back;
+        if (permit.over) return fn();
         if (permit.lent++ === 0) this.release();
         try {
             return await fn();
         } finally {
-            if (--permit.lent === 0) {
+            if (--permit.lent === 0 && !permit.over) {
                 permit.back = this.acquire();
                 try {
                     await permit.back;

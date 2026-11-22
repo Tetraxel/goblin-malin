@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useState } from "react";
 import { Box, Text, type DOMElement } from "ink";
-import clipboard from "clipboardy";
+import { copyToClipboard } from "#base/selection/clipboardWrite";
 import { useWheelTarget } from "#base/mouse/useMouseTarget";
 import type { Updater } from "#hooks/useFocusManager";
 import { type MetadataResultState, type MetadataOverrides } from "#flows/musicDownloadFlow/types";
@@ -147,12 +147,7 @@ export const MetadataDetailPanel: React.FC<MetadataSourceDetailProps> = ({
                     const value = isCompiled
                         ? field.getCompiledValue(compiled)
                         : field.getSourceValue(source as MetadataResultState);
-                    if (value !== "—")
-                        try {
-                            clipboard.writeSync(value);
-                        } catch {
-                            /* ignored */
-                        }
+                    if (value !== "—") void copyToClipboard(value);
                 },
             },
         ],

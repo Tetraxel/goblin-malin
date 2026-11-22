@@ -10,10 +10,16 @@ import { computeConfidenceScore, MIN_SEARCH_CONFIDENCE } from "#flows/musicDownl
 import { type TrackMetadata, type SearchTrackResult } from "#flows/musicDownloadFlow/types";
 import { Cached, NEGATIVE_RESULT_TTL_MS } from "#utils/cache";
 import { MetadataService } from "../../../metadataService";
-import { isYtDlpEnabled, readYtDlpInfo } from "../../apis/ytdlp-client";
+import { isYtDlpEnabled, readYtDlpInfo, YtDlpDisabledError } from "../../apis/ytdlp-client";
 import { SoundCloudCell } from "./SoundCloudCell";
 import { convertSoundCloudToTrack, slimSoundCloudInfo, type SoundCloudInfo } from "./convertSoundCloudToTrack";
-import { parseSoundCloudUrl, soundcloudPlaylistUrl, soundcloudTrackUrl } from "./soundcloudUrl";
+import { followLink } from "#utils/followLink";
+import {
+    isSoundCloudShortLinkId,
+    parseSoundCloudUrl,
+    soundcloudPlaylistUrl,
+    soundcloudTrackUrl,
+} from "./soundcloudUrl";
 
 /** yt-dlp is a process that talks to SoundCloud: a hung one must not hold the whole metadata stage. */
 const YTDLP_TIMEOUT_MS = 60_000;
@@ -56,6 +62,21 @@ export class SoundCloudService extends MetadataService {
     static readonly cellComponent = SoundCloudCell;
     static readonly trackUrl = soundcloudTrackUrl;
 
+    /**
+     * A short link (`on.soundcloud.com/<code>`, what SoundCloud's share button gives, for a track or a set) followed to
+     * the page it leads to, so the import knows whether it is a track or a playlist. `null` for any other link. Must
+     * not use `this`: it is called unbound.
+     */
+    static readonly resolveLink = (url: string): Promise<string> | null => {
+        const parsed = parseSoundCloudUrl(url);
+        if (!parsed?.id || !isSoundCloudShortLinkId(parsed.id)) return null;
+        return followLink(url).then((target) => {
+            const real = parseSoundCloudUrl(target);
+            if (!real?.id || isSoundCloudShortLinkId(real.id)) return url;
+            return real.type === "playlist" ? soundcloudPlaylistUrl(real.id) : soundcloudTrackUrl(real.id);
+        });
+    };
+
     constructor(task: DownloadTask, logger: Logger) {
         super("SoundCloudService", task, logger);
     }
@@ -80,8 +101,15 @@ export class SoundCloudService extends MetadataService {
             listing = await readYtDlpInfo<SoundCloudSetInfo>(soundcloudPlaylistUrl(parsed.id), {
                 timeoutMs: PLAYLIST_TIMEOUT_MS,
                 timeoutMessage: "SoundCloud took too long to answer",
+                site: "SoundCloud",
             });
         } catch (error) {
+            if (error instanceof YtDlpDisabledError) {
+                throw new CollectionAccessError(
+                    error.message,
+                    "SoundCloud is read through yt-dlp, which is switched off. Turn it on in Settings → Download to import this playlist."
+                );
+            }
             // A private set (or one that was deleted) answers 403 / 404 to a reader with no sign-in.
             if (/\b(403|404)\b|private|not found|does not exist/i.test(error instanceof Error ? error.message : "")) {
                 throw new CollectionAccessError(
@@ -122,19 +150,25 @@ export class SoundCloudService extends MetadataService {
         const info = await readYtDlpInfo<SoundCloudInfo>(url, {
             timeoutMs: YTDLP_TIMEOUT_MS,
             timeoutMessage: "SoundCloud took too long to answer",
+            site: "SoundCloud",
         });
         // A short link can lead to a playlist or a profile: this service only reads tracks.
         if (info._type === "playlist") throw new Error(`Not a SoundCloud track: ${url}`);
         return slimSoundCloudInfo(info);
     }
 
-    /** The entries of a SoundCloud search: yt-dlp's flat listing already carries title, uploader, duration and page. */
+    /**
+     * The entries of a SoundCloud search: yt-dlp's flat listing already carries title, uploader, duration and page.
+     * `signal` kills the yt-dlp process when the search is skipped or stopped (it is not part of the cache key).
+     */
     @Cached({ ttl: (result) => (Array.isArray(result) && result.length === 0 ? NEGATIVE_RESULT_TTL_MS : undefined) })
-    private async searchEntries(query: string, count: number): Promise<SoundCloudInfo[]> {
+    private async searchEntries(query: string, count: number, signal?: AbortSignal): Promise<SoundCloudInfo[]> {
         this.logger.debug(`Searching SoundCloud: ${query}`);
         const listing = await readYtDlpInfo<FlatSearch>(`scsearch${count}:${query}`, {
             timeoutMs: YTDLP_TIMEOUT_MS,
             timeoutMessage: "SoundCloud took too long to answer",
+            site: "SoundCloud",
+            signal,
         });
         return (listing.entries ?? []).map(slimSoundCloudInfo);
     }
@@ -142,6 +176,9 @@ export class SoundCloudService extends MetadataService {
     async getTrackMetadata(url: string): Promise<TrackMetadata> {
         const parsed = parseSoundCloudUrl(url);
         if (parsed?.type !== "track" || !parsed.id) throw new Error(`Invalid SoundCloud track URL: ${url}`);
+        // Reading the page would download yt-dlp for a user who switched it off (a Soulseek-only setup). A link found
+        // by discovery stays a bare link; a pasted one fails with the reason.
+        if (!isYtDlpEnabled()) throw new YtDlpDisabledError("SoundCloud");
 
         this.status.set({
             type: StatusType.Processing,
@@ -173,7 +210,10 @@ export class SoundCloudService extends MetadataService {
             .slice(0, count);
     }
 
-    async searchTrack(sourceTrackMetadata: TrackMetadata): Promise<SearchTrackResult[]> {
+    async searchTrack(
+        sourceTrackMetadata: TrackMetadata,
+        options?: { signal?: AbortSignal }
+    ): Promise<SearchTrackResult[]> {
         const artist = sourceTrackMetadata.artists?.[0]?.name;
         const trackName = sourceTrackMetadata.trackName;
         if (!artist || !trackName) {
@@ -194,7 +234,7 @@ export class SoundCloudService extends MetadataService {
         });
         try {
             const searchText = `${artist} ${trackName}`;
-            const entries = await this.searchEntries(searchText, SEARCH_CANDIDATES);
+            const entries = await this.searchEntries(searchText, SEARCH_CANDIDATES, options?.signal);
             const matches = entries
                 .map((entry) => convertSoundCloudToTrack(entry))
                 .filter((track): track is TrackMetadata => track !== null)
@@ -215,6 +255,11 @@ export class SoundCloudService extends MetadataService {
             ];
             return matches.map(({ metadata }) => ({ metadata, searchKeys: ["trackName+artistName"], query }));
         } catch (error) {
+            // Skipped or stopped: nobody waits for this search, and it did not fail.
+            if (options?.signal?.aborted) {
+                this.status.clear();
+                throw error;
+            }
             this.logger.error(`Error searching SoundCloud for: ${trackName}`, { error });
             this.status.set({ type: StatusType.Error, message: "Error searching SoundCloud" });
             throw error;

@@ -36,7 +36,14 @@ export abstract class MetadataService extends ServiceBase {
     }
 
     abstract getTrackMetadata(url: string): Promise<TrackMetadata>;
-    abstract searchTrack(sourceTrackMetadata: TrackMetadata): Promise<SearchTrackResult[]>;
+    /**
+     * @param options.signal Aborts when nobody waits for the answer any more (the platform's Skip, the stage ended or
+     *   was stopped). A service whose search holds a process or a place in a queue lets it go; others may ignore it.
+     */
+    abstract searchTrack(
+        sourceTrackMetadata: TrackMetadata,
+        options?: { signal?: AbortSignal }
+    ): Promise<SearchTrackResult[]>;
 
     /**
      * Optional capability: a free-text search of the service's catalogue ("Neverender Justice remix"), as its own

@@ -129,6 +129,35 @@ describe("Semaphore.whileWaiting", () => {
         expect(await peakConcurrency(sem)).toBe(1);
     });
 
+    test("a branch still waiting when its run ends never puts the stage over its cap (SEM-01)", async () => {
+        const sem = new Semaphore(1);
+        let finishWait!: () => void;
+        const waiting = new Promise<void>((resolve) => (finishWait = resolve));
+        let branch!: Promise<void>;
+        // The run returns without waiting for its branch (a skipped platform search, still in Apple's queue).
+        await sem.run(async () => {
+            branch = sem.whileWaiting(() => waiting);
+        });
+
+        // While the branch still waits, the stage is at most at its cap...
+        let active = 0;
+        let peak = 0;
+        const jobs = Array.from({ length: 3 }, () =>
+            sem.run(async () => {
+                peak = Math.max(peak, ++active);
+                await sleep(5);
+                active--;
+            })
+        );
+        await sleep(2);
+        finishWait();
+        await Promise.all([branch, ...jobs]);
+        expect(peak).toBe(1);
+        // ...and once it is over, no permit is lost or made up.
+        expect(await peakConcurrency(sem)).toBe(1);
+        await expect(Promise.race([sem.run(async () => "free"), sleep(50).then(() => "stuck")])).resolves.toBe("free");
+    });
+
     test("waiting inside a wait does not give a permit back twice", async () => {
         const sem = new Semaphore(1);
         await sem.run(() => sem.whileWaiting(() => sem.whileWaiting(async () => sleep(5))));

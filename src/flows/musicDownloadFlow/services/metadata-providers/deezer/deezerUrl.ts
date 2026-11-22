@@ -38,6 +38,21 @@ export function parseDeezerUrl(url: string): ParsedUrl | null {
     return { platform: "deezer", type, id };
 }
 
+/**
+ * Short-link hosts that no longer lead anywhere: `deezer.page.link` was a Firebase Dynamic Link, a service Google shut
+ * down in August 2025 (every link answers 404). Still recognised, so the user is told why it fails.
+ */
+const DEAD_SHORT_LINK_HOSTS = new Set(["deezer.page.link"]);
+
+/** True for a short link of a host that no longer works (see `DEAD_SHORT_LINK_HOSTS`). */
+export function isDeadDeezerShortLinkId(id: string): boolean {
+    return [...DEAD_SHORT_LINK_HOSTS].some((host) => id.startsWith(`${host}/`));
+}
+
+/** What the user is told about such a link. */
+export const DEAD_SHORT_LINK_MESSAGE =
+    "deezer.page.link links no longer work (Google shut that service down in 2025): share the track again from Deezer to get a link.deezer.com one";
+
 /** True for an id that is a short link still to follow (see `parseDeezerUrl`). */
 export function isDeezerShortLinkId(id: string): boolean {
     return [...SHORT_LINK_HOSTS].some((host) => id.startsWith(`${host}/`));

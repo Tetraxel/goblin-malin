@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { itemRowHeight, type SettingsItem } from "#settings/buildSettingsItems";
-import { SettingsItemRow } from "./SettingsItemRow";
+import { itemRowHeight, valueColumns, type SettingsItem } from "#settings/buildSettingsItems";
+import { SettingsItemRow, type SettingsClick } from "./SettingsItemRow";
 import { SearchBar } from "../SearchBar";
 
 // marginTop(1) + border+content height(3)
@@ -21,8 +21,8 @@ interface SettingsTabProps {
     onEditChange: (v: string) => void;
     onEditSubmit: (item: SettingsItem, v: string) => void;
     onSearchClick: () => void;
-    /** Left-click on an interactive row; `step` is set when a select's ◀/▶ was hit. */
-    onItemClick: (index: number, step?: 1 | -1) => void;
+    /** Left-click on an interactive row: what it asks for (see `SettingsClick`). */
+    onItemClick: (index: number, click: SettingsClick) => void;
 }
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({
@@ -43,7 +43,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 }) => {
     const listAreaH = Math.max(3, height - SEARCH_H);
     // Heights count wrapped lines: a long label takes 2+ rows, and counting it as one clips the last rows.
-    const heights = items.map((item) => itemRowHeight(item, width));
+    // The values of a block start in one column; the label column is also what a long label wraps in.
+    const labelWidths = valueColumns(items, width);
+    const heights = items.map((item, i) => itemRowHeight(item, width, labelWidths.get(i)));
     const rowStarts: number[] = [];
     let cumRows = 0;
     for (const h of heights) {
@@ -96,7 +98,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                             onEditChange={onEditChange}
                             onEditSubmit={(v) => onEditSubmit(item, v)}
                             innerWidth={width}
-                            onClick={(step) => onItemClick(idx, step)}
+                            labelWidth={labelWidths.get(idx)}
+                            onClick={(click) => onItemClick(idx, click)}
                         />
                     );
                 })}

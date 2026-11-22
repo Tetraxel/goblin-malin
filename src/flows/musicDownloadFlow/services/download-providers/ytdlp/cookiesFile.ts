@@ -18,6 +18,8 @@ const MAX_COOKIES_BYTES = 5 * 1024 * 1024;
 const NETSCAPE_HEADER = "# Netscape HTTP Cookie File";
 /** YouTube keeps its login in cookies of these domains. */
 const YOUTUBE_DOMAIN = /(^|\.)youtube\.com$/i;
+/** The cookies kept from an import: YouTube's, and Google's (the account YouTube signs in with). The rest is dropped. */
+const KEPT_DOMAIN = /(^|\.)(youtube|google)\.com$/i;
 /** After this many days YouTube has usually rotated the session the cookies came from. */
 export const COOKIES_STALE_DAYS = 30;
 
@@ -121,8 +123,28 @@ export function cleanPastedPath(input: string, platform: NodeJS.Platform = proce
     return text;
 }
 
-/** What importing a cookies.txt did. */
-export type CookiesImport = CookiesSummary & { destination: string };
+/**
+ * The same cookies.txt with only the cookies yt-dlp needs for YouTube (`KEPT_DOMAIN`), under the header yt-dlp insists
+ * on. Many exporters write every cookie of the browser (banks, mail…): they have no use here, and would otherwise sit
+ * in the app's folder. Comments are dropped too; `#HttpOnly_` lines are cookies and follow the same rule.
+ */
+export function keepYouTubeCookies(text: string): { text: string; dropped: number } {
+    const clean = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+    const kept: string[] = [];
+    let dropped = 0;
+    for (const raw of clean.split(/\r?\n/)) {
+        if (raw.trim() === "") continue;
+        const cookie = raw.startsWith("#HttpOnly_") ? raw.slice("#HttpOnly_".length) : raw.startsWith("#") ? null : raw;
+        if (cookie === null) continue;
+        const fields = cookie.split("\t");
+        if (fields.length >= 7 && KEPT_DOMAIN.test(fields[0].trim())) kept.push(raw);
+        else dropped++;
+    }
+    return { text: `${NETSCAPE_HEADER}\n${kept.join("\n")}\n`, dropped };
+}
+
+/** What importing a cookies.txt did. `dropped`: the cookies of other sites, left out of the copy. */
+export type CookiesImport = CookiesSummary & { destination: string; dropped: number };
 
 /**
  * Checks the file the user pointed at and, only if it is a usable cookies.txt for YouTube, puts a copy at
@@ -145,8 +167,8 @@ export async function importCookiesFile(source: string, now = Date.now()): Promi
         throw new CookiesImportError("This file is too big to be a cookies.txt.");
     }
 
-    let text = await fs.promises.readFile(from, "utf8");
-    const summary = parseCookiesFile(text, now);
+    const original = await fs.promises.readFile(from, "utf8");
+    const summary = parseCookiesFile(original, now);
     if (summary.youtube === 0) {
         throw new CookiesImportError(
             "This file has no youtube.com cookies. Open youtube.com (signed in) in your browser, then export from there."
@@ -157,8 +179,8 @@ export async function importCookiesFile(source: string, now = Date.now()): Promi
             "Every YouTube cookie in this file has expired. Sign in to YouTube again and export a fresh file."
         );
     }
-    // yt-dlp refuses a file without the first line; many exports leave it out.
-    if (!summary.hasHeader) text = `${NETSCAPE_HEADER}\n${text.replace(/^\uFEFF/, "")}`;
+    // Only YouTube's (and Google's) cookies are kept, under the first line yt-dlp insists on (many exports leave it out).
+    const { text, dropped } = keepYouTubeCookies(original);
 
     const destination = cookiesFilePath();
     await fs.promises.mkdir(path.dirname(destination), { recursive: true });
@@ -170,7 +192,7 @@ export async function importCookiesFile(source: string, now = Date.now()): Promi
     } finally {
         await fs.promises.rm(staging, { force: true });
     }
-    return { ...summary, hasHeader: true, destination };
+    return { ...summary, cookies: summary.cookies - dropped, hasHeader: true, destination, dropped };
 }
 
 /** The imported file, as the settings show it. */

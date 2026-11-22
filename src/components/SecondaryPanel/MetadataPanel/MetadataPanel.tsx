@@ -303,22 +303,30 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
         [typedTask]
     );
 
-    // The same as the button at the bottom of the list, from the keyboard. Always registered (so its key can be
-    // rebound), active while there is something to ask.
+    const handleStopLastResort = useCallback(() => {
+        const task = typedTask as unknown as Partial<DownloadTask> | null;
+        task?.stopLastResort?.();
+    }, [typedTask]);
+
+    // The same as the button at the bottom of the list, from the keyboard: asks, or stops the one running. Always
+    // registered (so its key can be rebound), active while there is something to ask or to stop.
     const firstOffer = lastResortOffers[0];
     useShortcuts({
         id: "metadataPanelLastResort",
-        isActive: isPanelActive && innerFocus === "list" && !isEditingField && !!firstOffer && !lastResortBusyKey,
+        isActive: isPanelActive && innerFocus === "list" && !isEditingField && (!!firstOffer || !!lastResortBusyKey),
         priority: 140,
         shortcuts: [
             {
                 id: "sourceList.askLastResort",
                 defaultShortcut: { input: "a" },
-                label: firstOffer
-                    ? `Ask ${providerDisplayRegistry.get(firstOffer.key).label}`
-                    : "Ask last-resort search",
+                label: lastResortBusyKey
+                    ? `Stop ${providerDisplayRegistry.get(lastResortBusyKey).label}`
+                    : firstOffer
+                      ? `Ask ${providerDisplayRegistry.get(firstOffer.key).label}`
+                      : "Ask last-resort search",
                 handler: () => {
-                    if (firstOffer) handleAskLastResort(firstOffer.key);
+                    if (lastResortBusyKey) handleStopLastResort();
+                    else if (firstOffer) handleAskLastResort(firstOffer.key);
                 },
             },
         ],
@@ -417,6 +425,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = React.memo(function M
                     lastResortOffers={lastResortOffers}
                     lastResortBusyKey={lastResortBusyKey}
                     onAskLastResort={handleAskLastResort}
+                    onStopLastResort={handleStopLastResort}
                     isFetchingPrimarySource={
                         snapshot?.attributes?.kind === "track"
                             ? (snapshot.attributes.primaryMetadataInProgress ?? false)

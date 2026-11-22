@@ -13,6 +13,7 @@ import { urlParserRegistry } from "#base/urlParser";
 import { type StatusAttributes, StatusType } from "#base/task/task-status";
 import { taskLocks, type LockHolder } from "#base/task/taskLock";
 import { throwIfAborted, untilAborted } from "#utils/errors";
+import { ProviderUnavailableError } from "#base/providerUnavailableError";
 import { withTimeout } from "#utils/withTimeout";
 import {
     type TrackDownloadTask,
@@ -79,6 +80,8 @@ const LAST_RESORT_MIN_CONFIDENCE = MIN_SEARCH_CONFIDENCE;
 interface DiscoveryRun {
     skipped: boolean;
     skip: () => void;
+    /** Aborts when the run is skipped or stopped: a search still in flight lets its process or its queue place go. */
+    signal: AbortSignal;
 }
 
 /** `DownloadTask.checkMusicBrainz` options: the lookups' own, plus a way to change the user's decisions safely. */
@@ -147,6 +150,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
     private isMetadataServiceEnabled: (key: string) => boolean;
     private isDiscoveryServiceEnabled: (key: string) => boolean;
     private isDownloadServiceEnabled: (key: string) => boolean;
+    // Whether an on-request discovery service is set to search automatically (its `autoSearch` setting).
+    private discoveryAutoSearch: (key: string) => boolean;
     // Download providers whose search + download is being re-run by the user right now.
     private retryingProviders = new Set<string>();
     // Cancel handle for whichever download source row is currently in flight, keyed
@@ -173,6 +178,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         isMetadataServiceEnabled,
         isDiscoveryServiceEnabled,
         isDownloadServiceEnabled,
+        discoveryAutoSearch,
     }: {
         id: string;
         initialInput?: string;
@@ -185,6 +191,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         isMetadataServiceEnabled: (key: string) => boolean;
         isDiscoveryServiceEnabled: (key: string) => boolean;
         isDownloadServiceEnabled: (key: string) => boolean;
+        /** Default: the provider's stored `autoSearch` setting. */
+        discoveryAutoSearch?: (key: string) => boolean;
     }) {
         super({ id, initialInput, attributes, logger, initialStatus });
 
@@ -193,6 +201,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.isMetadataServiceEnabled = isMetadataServiceEnabled;
         this.isDiscoveryServiceEnabled = isDiscoveryServiceEnabled;
         this.isDownloadServiceEnabled = isDownloadServiceEnabled;
+        this.discoveryAutoSearch =
+            discoveryAutoSearch ?? ((key) => getMusicSettings().metadata.discoveryProviders[key]?.autoSearch === true);
         this.metadataServices = metadataServiceRegistry.createScope(this, this.logger, isMetadataServiceEnabled);
         this.discoveryServices = discoveryServiceRegistry.createScope(this, this.logger, isDiscoveryServiceEnabled);
         this.downloadServices = downloadServiceRegistry.createScope(this, this.logger, isDownloadServiceEnabled);
@@ -312,18 +322,22 @@ export class DownloadTask extends Task<TrackDownloadTask> {
     ): Promise<void> {
         let skipped = false;
         let skip: () => void = () => {};
+        const own = new AbortController();
         const skippedSignal = new Promise<void>((resolve) => {
             skip = () => {
                 skipped = true;
+                own.abort();
                 this.markSearch([serviceKey], "skipped");
                 resolve();
             };
         });
+        // The service lets its process or queue place go when nobody waits for the answer any more.
+        const signal = run ? AbortSignal.any([run.signal, own.signal]) : own.signal;
         this.platformSkips.set(serviceKey, skip);
         const cancelled = () => skipped || run?.skipped === true;
         try {
             this.logger.debug(`Searching for track using ${serviceKey}`);
-            const asked = service.searchTrack(primaryMetadata);
+            const asked = service.searchTrack(primaryMetadata, { signal });
             // A search that was skipped may still fail later: nobody is waiting for it any more.
             asked.catch(() => {});
             const results = await Promise.race([asked, skippedSignal.then(() => undefined)]);
@@ -666,10 +680,12 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         // The user can end this stage early with skipDiscovery(). The run stops waiting at once; any
         // request still in flight finishes in the background, and `run.skipped` keeps it from adding to
         // the results afterwards.
-        const run: DiscoveryRun = { skipped: false, skip: () => {} };
+        const runAbort = new AbortController();
+        const run: DiscoveryRun = { skipped: false, skip: () => {}, signal: runAbort.signal };
         const skippedSignal = new Promise<void>((resolve) => {
             run.skip = () => {
                 run.skipped = true;
+                runAbort.abort();
                 resolve();
             };
         });
@@ -709,18 +725,38 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             );
             if (run.skipped) return;
 
-            // Phase B — DiscoveryMetadataService.discoverFromUri (like Songlink).
-            // Consent-gated services (Songlink) ask the user before their first use. A last-resort service (Claude)
-            // is not part of the stage: it is slow and spends the user's quota, so it only runs when they ask
-            // (`startSingleProviderDiscovery`, the button under the sources).
+            // Phase B — DiscoveryMetadataService.discoverFromUri (MusicBrainz).
+            // A service that runs on request (Songlink, Claude) is not part of the stage unless the user turned on its
+            // "search automatically" setting: otherwise it only runs when they ask (`startSingleProviderDiscovery`,
+            // the button under the sources). Consent-gated services ask the user before their first use.
             for (const [key, ctor] of this.discoveryServiceRegistry.getAllConstructors()) {
                 if (run.skipped) return;
-                if (ctor.consent && !ctor.lastResort) await this.awaitDiscoveryConsent(key);
+                if (ctor.consent && !ctor.lastResort && this.runsInStage(key)) await this.awaitDiscoveryConsent(key);
             }
-            for (const discoveryService of this.discoveryServices.getAllServices()) {
+            for (const [key, discoveryService] of this.discoveryServices.getAllEntries()) {
                 if (run.skipped) return;
-                if (this.isLastResortService(discoveryService)) continue;
+                // A last-resort service set to search automatically runs after the others (below).
+                if (!this.runsInStage(key) || this.isLastResortService(discoveryService)) continue;
                 await this.runDiscoveryService(discoveryService, primaryMetadata, primaryUri, undefined, false, run);
+            }
+
+            // A last-resort service (Claude) set to search automatically: after every other source, only for the
+            // platforms still missing, and only once the user has allowed it.
+            for (const [key, ctor] of this.discoveryServiceRegistry.getAllConstructors()) {
+                if (run.skipped) return;
+                if (!ctor.lastResort || !this.runsInStage(key)) continue;
+                const missing = this.getMissingPlatforms();
+                if (missing.length === 0) continue;
+                if (!(await this.awaitDiscoveryConsent(key))) continue;
+                if (run.skipped || !this.isDiscoveryServiceEnabled(key)) continue;
+                await this.runDiscoveryService(
+                    this.discoveryServices.get(key),
+                    primaryMetadata,
+                    primaryUri,
+                    missing,
+                    false,
+                    run
+                );
             }
 
             // Phase C — which MusicBrainz release is this track on? (P30) Read-only lookups; the verdict is
@@ -801,7 +837,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         const lastResort = this.isLastResortService(discoveryService);
         try {
             // A last-resort call is slow (minutes) and calls no metadata provider: it holds no slot while it runs.
-            const ask = () => discoveryService.discoverFromUri(primaryMetadata, { wantedPlatforms });
+            const signal = run?.signal;
+            const ask = () => discoveryService.discoverFromUri(primaryMetadata, { wantedPlatforms, signal });
             const discover = () => (lastResort ? metadataLimiter.whileWaiting(ask) : ask());
             const {
                 tracks: allDiscovered,
@@ -810,7 +847,9 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 query,
                 explanations,
                 summaries,
-            } = normalizeDiscoveryResult(await (bypassCache ? runWithoutCache(discover) : discover()));
+            } = normalizeDiscoveryResult(
+                await untilAborted(bypassCache ? runWithoutCache(discover) : discover(), signal)
+            );
             if (run?.skipped) return;
 
             // Store the anchor for Copy/Open contextual actions
@@ -884,12 +923,17 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                     if (this.isMetadataServiceEnabled(targetServiceKey) && rudimentary.url) {
                         try {
                             const service = this.metadataServices.get(targetServiceKey);
-                            finalMetadata = await service.getTrackMetadata(rudimentary.url);
+                            finalMetadata = await untilAborted(service.getTrackMetadata(rudimentary.url), run?.signal);
                             enriched = true;
-                        } catch {
-                            fetchState = "error";
-                            fetchError = "Enrichment failed";
+                        } catch (error) {
+                            if (run?.skipped) return;
                             finalMetadata = rudimentary;
+                            // Not readable this way by the user's own choice (yt-dlp off for SoundCloud): a bare
+                            // link, not a failure.
+                            if (!(error instanceof ProviderUnavailableError)) {
+                                fetchState = "error";
+                                fetchError = "Enrichment failed";
+                            }
                         }
                     }
 
@@ -925,6 +969,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 }
             }
         } catch (error) {
+            // Stopped or skipped: nobody waits for it, and it did not fail.
+            if (run?.skipped) return;
             this.logger.warn(`Phase B discovery failed for ${discoveryService.id}`, { error });
         }
     }
@@ -1070,6 +1116,17 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         return identity;
     }
 
+    /** A discovery service the user starts with a button (`static onRequest`, or a last-resort one). */
+    private isOnRequest(key: string): boolean {
+        const ctor = this.discoveryServiceRegistry.getConstructor(key);
+        return ctor?.onRequest === true || ctor?.lastResort === true;
+    }
+
+    /** Whether the discovery stage runs this service: always, unless it runs on request and searches only when asked. */
+    private runsInStage(key: string): boolean {
+        return !this.isOnRequest(key) || this.discoveryAutoSearch(key);
+    }
+
     private isLastResortService(service: DiscoveryMetadataService): boolean {
         const key = this.findDiscoveryServiceKey(service.id);
         return key ? this.discoveryServiceRegistry.getConstructor(key)?.lastResort === true : false;
@@ -1077,13 +1134,18 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
     // Platforms whose metadata service is enabled but which still have no result for this track. A platform that cannot
     // be searched (`static searchable = false`) is never a gap: it is only reached through links, and asking a
-    // last-resort service for it on every track would spend a call per track.
+    // last-resort service for it on every track would spend a call per track. The track's own platform is never
+    // missing, whatever its group holds.
     private getMissingPlatforms(): Platform[] {
         const groups = this.getAttributes()?.metadataGroups ?? [];
+        const primaryKey = groups.find((g) => g.results.some((r) => r.isPrimaryInput))?.serviceKey;
+        const primaryPlatform = this.getPrimaryMetadata()?.metadata.platform;
         const missing: Platform[] = [];
         for (const [key, ctor] of this.metadataServiceRegistry.getAllConstructors()) {
             if (!this.isMetadataServiceEnabled(key)) continue;
             if (ctor.searchable === false) continue;
+            if (key === primaryKey || (primaryPlatform && platformRegistry.canonical(primaryPlatform) === key))
+                continue;
             const group = groups.find((g) => g.serviceKey === key);
             if (!group || group.results.length === 0) missing.push(key as Platform);
         }
@@ -1165,8 +1227,13 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         this.logger.info(`Re-search completed for ${serviceKey}`);
     }
 
+    /**
+     * Runs one discovery service for this track. `signal` stops it: the service's own work ends (a last-resort
+     * service's CLI process is killed) and nothing it found afterwards is merged. A last-resort run can also be
+     * stopped on its own with {@link stopLastResort} (the busy button's Stop).
+     */
     @TaskScoped()
-    async startSingleProviderDiscovery(serviceKey: string): Promise<void> {
+    async startSingleProviderDiscovery(serviceKey: string, options?: { signal?: AbortSignal }): Promise<void> {
         const primaryMetadata = this.getPrimaryMetadata()?.metadata;
         if (!primaryMetadata) {
             this.logger.warn("No primary metadata available for re-discovery");
@@ -1174,8 +1241,16 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         }
         const primaryUri = primaryMetadata.uri ?? primaryMetadata.url;
         const lastResort = this.discoveryServiceRegistry.getConstructor(serviceKey)?.lastResort === true;
-        // The panel shows the button of a last-resort service busy from the click on, the consent question included.
-        if (lastResort) this.updateAttributes({ lastResortInProgress: serviceKey });
+        // A service started from its button (Songlink, Claude): the button is busy meanwhile, and stops it.
+        const onRequest = this.isOnRequest(serviceKey);
+        const ownStop = new AbortController();
+        const outerStop = this.lastResortStop;
+        if (onRequest) this.lastResortStop = ownStop;
+        const signal = options?.signal ? AbortSignal.any([options.signal, ownStop.signal]) : ownStop.signal;
+        const run: DiscoveryRun = { skipped: signal.aborted, skip: () => ownStop.abort(), signal };
+        signal.addEventListener("abort", () => (run.skipped = true), { once: true });
+        // The panel shows the button of an on-request service busy from the click on, the consent question included.
+        if (onRequest) this.updateAttributes({ lastResortInProgress: serviceKey });
         try {
             // Even an explicit [S] still needs the user's OK for a consent-gated service: asked again if they said no
             // before, since this time they are the one asking.
@@ -1197,33 +1272,57 @@ export class DownloadTask extends Task<TrackDownloadTask> {
             }
             // Bypass the disk cache so [S] Re-search always fetches fresh data and stores
             // a valid anchor (stale cache entries from old code have the wrong shape).
-            await this.runDiscoveryService(service, primaryMetadata, primaryUri, wanted, true);
-            this.logger.info(`Re-discovery completed for ${serviceKey}`);
+            if (run.skipped) return;
+            await this.runDiscoveryService(service, primaryMetadata, primaryUri, wanted, true, run);
+            if (run.skipped) this.logger.info(`Re-discovery of ${serviceKey} stopped`);
+            else this.logger.info(`Re-discovery completed for ${serviceKey}`);
         } catch (error) {
             this.logger.warn(
                 `Failed to re-discover ${serviceKey}: ${error instanceof Error ? error.message : String(error)}`
             );
         } finally {
-            if (lastResort) this.updateAttributes({ lastResortInProgress: undefined });
+            if (onRequest) {
+                // Back to the stop of the `rediscoverPart` that started this run, if any (it clears its own).
+                if (this.lastResortStop === ownStop) this.lastResortStop = outerStop;
+                this.updateAttributes({ lastResortInProgress: undefined });
+            }
         }
     }
 
     /**
-     * The last-resort discovery services (Claude) the user can start for this track right now, each with the platforms
-     * it would look for. None while no platform is missing, or while the primary fetch / the regular search runs. A service that asks consent is always offered, even
+     * Stops the on-request service (Songlink, Claude) running for this track, if one is: its work ends (Claude's
+     * process is killed) and nothing it answers afterwards is merged.
+     */
+    stopLastResort(): void {
+        this.lastResortStop?.abort();
+    }
+
+    /** The stop of the last-resort run in flight ({@link startSingleProviderDiscovery}). */
+    private lastResortStop?: AbortController;
+
+    /**
+     * The on-request discovery services (Songlink, Claude: `static onRequest` / `lastResort`) the user can start for
+     * this track right now, each with the platforms still missing, in the registry's order (the `A` key asks the
+     * first). None while no platform is missing, or while the primary fetch / the regular search runs. Offered even
+     * when the service searches automatically: the user may ask again. A service that asks consent is always offered, even
      * after a "no": the click is what asks (again), so the button never disappears for lack of an answer. One without
      * consent is offered while it is switched on. Cheap: called while the panel is drawn.
      */
     getLastResortOffers(): LastResortOffer[] {
         // While the primary source is read or the regular search runs, every platform "has no result" yet: nothing is
         // missing until they have answered (the list hides its button for the same reason, and so does the key).
+        // Before the track was read and searched (imported, not run yet; its own fetch failed; the search stopped)
+        // nothing is known to be missing either, and a last-resort service would have nothing to search with.
         const attributes = this.getAttributes();
         if (attributes?.primaryMetadataInProgress || attributes?.metadataDiscoveringInProgress) return [];
+        if (!attributes?.primaryMetadataFetched || !attributes.metadataDiscovered || !this.getPrimaryMetadata()) {
+            return [];
+        }
         const missing = this.getMissingPlatforms();
         if (missing.length === 0) return [];
         const offers: LastResortOffer[] = [];
         for (const [key, ctor] of this.discoveryServiceRegistry.getAllConstructors()) {
-            if (!ctor.lastResort) continue;
+            if (!this.isOnRequest(key)) continue;
             if (ctor.consent || this.isDiscoveryServiceEnabled(key)) offers.push({ key, missing });
         }
         return offers;
@@ -1701,22 +1800,35 @@ export class DownloadTask extends Task<TrackDownloadTask> {
      * stage otherwise. Counts as a run of a part (see {@link partRunning}): while it goes on, the pipeline and the
      * agent see the task as busy, because it rebuilds `metadataGroups` under whoever writes to them.
      *
-     * Never runs a last-resort service (Claude): it is slow and spends the user's quota, so only the user starts it.
-     * `signal` (the chat turn's Stop): a run still waiting for its turn does not start, and a whole-stage search ends
-     * early. A search of one provider is a single request and finishes by itself.
+     * The whole stage never runs a last-resort service (Claude): it is slow and spends the user's quota, so only the
+     * user starts it, by naming it as `provider` (the button under the sources). `signal` (the chat turn's Stop), the
+     * task's own stop ({@link abortRun}) and, for a last-resort service, {@link stopLastResort} end the run: one still
+     * waiting for its turn does not start, and one in flight ends its work (a CLI process is killed).
      */
     async rediscoverPart(provider?: string, options?: WriteOptions & { signal?: AbortSignal }): Promise<void> {
         const external = options?.signal;
-        return this.trackPartRun(
-            (own) =>
-                metadataLimiter.run(async () => {
-                    const signal = external ? AbortSignal.any([external, own]) : own;
-                    if (signal.aborted) return;
-                    if (provider) await this.startSingleProviderDiscovery(provider);
-                    else await this.startMetadataDiscovering({ signal });
-                }),
-            options
-        );
+        // A last-resort run can be stopped from the click on (its button is busy while it waits for its turn).
+        const lastResortStop = provider && this.isOnRequest(provider) ? new AbortController() : undefined;
+        if (lastResortStop) this.lastResortStop = lastResortStop;
+        try {
+            return await this.trackPartRun(
+                (own) =>
+                    metadataLimiter.run(async () => {
+                        const signals = [
+                            own,
+                            ...(external ? [external] : []),
+                            ...(lastResortStop ? [lastResortStop.signal] : []),
+                        ];
+                        const signal = signals.length > 1 ? AbortSignal.any(signals) : own;
+                        if (signal.aborted) return;
+                        if (provider) await this.startSingleProviderDiscovery(provider, { signal });
+                        else await this.startMetadataDiscovering({ signal });
+                    }),
+                options
+            );
+        } finally {
+            if (lastResortStop && this.lastResortStop === lastResortStop) this.lastResortStop = undefined;
+        }
     }
 
     /**
