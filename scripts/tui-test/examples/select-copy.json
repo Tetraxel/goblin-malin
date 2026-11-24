@@ -31,6 +31,8 @@
             "alt": true
         },
         { "type": "assertClipboard", "equals": "NOTIO\nDaft\nOppid" },
+        // Same as above: the last row of the rectangle is painted a moment after the copy (slow on a loaded CI runner).
+        { "type": "stable" },
         { "type": "snapshot", "name": "block" },
 
         // A drag from the first row of the source list, on which the metadata box beside it starts (`d…┌── Compiled`),

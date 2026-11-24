@@ -17,6 +17,7 @@
 
         { "type": "key", "key": "Ctrl+G" },
         { "type": "waitForContent", "text": "Name this group" },
+        { "type": "stable" },
         { "type": "assert", "contains": "Group 1" },
         { "type": "snapshot", "name": "name-dialog" },
 
