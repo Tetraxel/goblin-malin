@@ -13,7 +13,8 @@ const STDERR_TAIL_CHARS = 600;
 
 let ffmpegPathPromise: Promise<string> | null = null;
 
-function getFfmpegPath(): Promise<string> {
+/** The path of the app's ffmpeg (downloaded first when missing). */
+export function getFfmpegPath(): Promise<string> {
     if (!ffmpegPathPromise) {
         // Same rule as the yt-dlp download: binaries are only updated when the user left that on, and a missing
         // one is always downloaded. A failed setup is not remembered, so the next conversion tries again.

@@ -1,11 +1,15 @@
 import React, { useRef } from "react";
 import { Box, Text, type DOMElement } from "ink";
 import { useTheme } from "#base/themeContext";
+import { useShortcutLiterals } from "#hooks/useShortcutLiteral";
 import { useTabBarMouse } from "./useTabBarMouse";
 
 export interface TabDef {
+    /** Identifies the tab (`activeTabKey`, `onSelect`); shown in brackets when it has no `shortcutId`. */
     key: string;
     label: string;
+    /** The shortcut that opens the tab: its live key (the user's own binding) is what the brackets show. */
+    shortcutId?: string;
 }
 
 interface TabBarProps {
@@ -38,8 +42,11 @@ export const TabBar: React.FC<TabBarProps> = ({
         tabs.map((tab) => tab.key),
         onSelect
     );
+    const literals = useShortcutLiterals(tabs.map((tab) => tab.shortcutId ?? ""));
+    const keyText = (i: number) => literals[i] || tabs[i].key;
     const tabsWidth =
-        tabs.reduce((sum, tab) => sum + tab.key.length + tab.label.length + 3, 0) + Math.max(0, tabs.length - 1) * 2;
+        tabs.reduce((sum, tab, i) => sum + keyText(i).length + tab.label.length + 3, 0) +
+        Math.max(0, tabs.length - 1) * 2;
     const lineLen = splitPos !== undefined ? splitPos + 1 : 1;
     const fill = Math.max(0, width - lineLen - 2 - tabsWidth - 3);
 
@@ -64,7 +71,7 @@ export const TabBar: React.FC<TabBarProps> = ({
                                 tabRefs.current[i] = node;
                             }}
                         >
-                            <Text color={theme.text.primary} bold={isActive}>{`[${tab.key}] `}</Text>
+                            <Text color={theme.text.primary} bold={isActive}>{`[${keyText(i)}] `}</Text>
                             <Text
                                 color={
                                     isActive

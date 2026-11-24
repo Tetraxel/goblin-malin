@@ -4,6 +4,7 @@ import { batchTools } from "./tools/batchTools";
 import { writeTools, archiveTasks } from "./tools/writeTools";
 import { runTools } from "./tools/runTools";
 import { reportTools } from "./tools/reportTools";
+import { stemTools } from "./tools/stemTools";
 import { findTask } from "./taskAccess";
 
 /**
@@ -19,6 +20,7 @@ export function registerAgentTools(): void {
         ...reportTools,
         ...writeTools.filter((t) => t !== archiveTasks),
         ...runTools,
+        ...stemTools,
         ...batchTools,
         archiveTasks,
     ];

@@ -11,10 +11,32 @@
 
         { "type": "key", "key": "r" },
         { "type": "waitForContent", "text": "Restart this track?" },
+        { "type": "assert", "contains": "Cancel" },
         { "type": "snapshot", "name": "asked" },
 
         { "type": "key", "key": "Escape" },
         { "type": "stable" },
-        { "type": "snapshot", "name": "cancelled" }
+        { "type": "snapshot", "name": "cancelled" },
+        { "type": "assertNot", "contains": "Restart this track?" },
+        { "type": "assert", "contains": "Task 1/50" },
+        {
+            "type": "assertJson",
+            "file": "sessions.json",
+            "path": "sessions[0].tasks[0].attributes.state",
+            "equals": "finished"
+        },
+        {
+            "type": "assertJson",
+            "file": "sessions.json",
+            "path": "sessions[0].tasks[0].attributes.metadataGroups",
+            "length": 2
+        },
+        {
+            "type": "assertJson",
+            "file": "sessions.json",
+            "path": "sessions[0].tasks[0].attributes.discoveryAnchors",
+            "exists": true
+        },
+        { "type": "assertNoErrors" }
     ]
 }

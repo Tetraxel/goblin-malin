@@ -43,7 +43,9 @@ are created readable by your user only.
 The app talks to the services whose links you paste or search: Spotify, YouTube, SoundCloud,
 Deezer, Apple Music (iTunes API), Tidal (public pages), Soulseek and MusicBrainz. It also contacts
 GitHub to check for a new version of the app (Settings → General switches this off) and to download
-yt-dlp, ffmpeg and mpv.
+yt-dlp, ffmpeg and mpv. Stem separation, only once you install it (Settings → Stems), downloads uv,
+Python, audio-separator and PyTorch (GitHub, PyPI, `download.pytorch.org`) and the models you pick
+(their authors' hosts); the separation itself runs offline and sends nothing.
 
 Two features send data to a third party or use your quota, so they are **off until you allow them,
 once**, in a confirmation dialog:
@@ -59,6 +61,12 @@ once**, in a confirmation dialog:
   a compromised release; an archive that cannot be checked is refused.
 - **mpv and the macOS ffmpeg build** are downloaded from third-party sites that publish no
   checksums, so they are **not verified**. This is a known limitation.
+- **Stem separation** (off by default, installed only from Settings → Stems): the pinned `uv`
+  binary is checked against the SHA-256 published with its release and refused otherwise. uv then
+  installs a pinned audio-separator release and its Python packages from PyPI and PyTorch's index,
+  and a Python of its own, into `stems/` in the data folder, verified by uv as it installs them but
+  not pinned by hash. Model files come from their authors' hosts and are **not verified**: they are
+  loaded by PyTorch, so only download models you trust. Your own Python is never used or changed.
 - The programs live in the data folder, writable by your user: normal for a per-user tool. Nothing
   is run through a shell, except the package manager when you update the app on Windows (with a
   version number checked first).
@@ -77,6 +85,6 @@ Two short-lived HTTP servers listen on `127.0.0.1` only, on a random port:
 ## Scope
 
 The app runs locally with your rights and talks to the services above. Reports about how it handles
-downloaded files, spawned tools (yt-dlp, ffmpeg, mpv), the local servers, stored settings,
+downloaded files, spawned tools (yt-dlp, ffmpeg, mpv, uv, audio-separator), the local servers, stored settings,
 cookies or credentials are in scope. Problems in those third-party services or tools themselves
 should be reported to their own projects.

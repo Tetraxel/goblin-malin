@@ -1,18 +1,41 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { runScenario } from "./runner.ts";
+import { runSuite, type SuiteResult } from "./suite.ts";
 import { parseScenario } from "./parseScenario.ts";
 import { formatProfile } from "./profiling/format.ts";
 import type { HarnessEvent, HarnessResult } from "./types.ts";
 
-const [, , scenarioPath, ...flags] = process.argv;
+const args = process.argv.slice(2);
+const flags = args.filter((a) => a.startsWith("--"));
+const positional = args.filter((a, i) => !a.startsWith("--") && !flagTakesValue(args[i - 1]));
 const pretty = flags.includes("--pretty");
 const profile = flags.includes("--profile");
 const updateBaseline = flags.includes("--update-baseline");
+const updateGolden = flags.includes("--update-golden");
+const all = flags.includes("--all");
+const scenarioPath = positional[0];
 
-if (!scenarioPath) {
+/** Flags followed by a value (`--parallel 4`). */
+function flagTakesValue(flag: string | undefined): boolean {
+    return flag === "--parallel" || flag === "--filter" || flag === "--timeout" || flag === "--dir";
+}
+
+function flagValue(name: string): string | undefined {
+    const i = args.indexOf(name);
+    return i >= 0 ? args[i + 1] : undefined;
+}
+
+if (!scenarioPath && !all) {
     process.stderr.write(
-        "Usage: tsx scripts/tui-test/cli.ts <scenario.json> [--pretty] [--profile] [--update-baseline]\n"
+        [
+            "Usage: tsx scripts/tui-test/cli.ts <scenario.json> [--pretty] [--profile] [--update-baseline] [--update-golden]",
+            "       tsx scripts/tui-test/cli.ts --all [--filter a,b] [--parallel 2] [--include-perf] [--screenshots] [--update-golden] [--json]",
+            "",
+            "--all runs every scenario of scripts/tui-test/examples (not perf-* / profile-*) and prints a pass/fail table.",
+            "Interactive sessions (one app kept running, a command at a time): tsx scripts/tui-test/sessionCli.ts help",
+            "",
+        ].join("\n")
     );
     process.exit(1);
 }
@@ -46,7 +69,8 @@ function printMetrics(result: HarnessResult): void {
         process.stdout.write(`  ${GRAY}${key.padEnd(40)}${R}${color}${valStr}${R}\n`);
     }
     const code = result.exitCode;
-    const codeStr = code === null ? `${GREEN}null${R}${GRAY} (clean harness kill)${R}` : `${RED}${code}${R}`;
+    const codeStr =
+        code === null ? `${GREEN}null${R}${GRAY} (clean harness kill)${R}` : `${code === 0 ? GREEN : RED}${code}${R}`;
     process.stdout.write(`\n  ${GRAY}exit code${R.padEnd(0)}  ${" ".repeat(31)}${codeStr}\n`);
 }
 
@@ -96,25 +120,69 @@ function makeLiveHandler(): (event: HarnessEvent) => void {
     };
 }
 
+async function runAll(): Promise<void> {
+    const json = flags.includes("--json");
+    const filter = flagValue("--filter")?.split(",").filter(Boolean);
+    const results = await runSuite({
+        dir: flagValue("--dir"),
+        filter,
+        includePerf: flags.includes("--include-perf"),
+        parallel: Number(flagValue("--parallel") ?? 2),
+        updateGolden,
+        screenshots: flags.includes("--screenshots"),
+        timeoutMs: flagValue("--timeout") ? Number(flagValue("--timeout")) * 1000 : undefined,
+        onResult: json ? undefined : printSuiteLine,
+    });
+    const failed = results.filter((r) => !r.ok);
+    if (json) {
+        process.stdout.write(JSON.stringify(results) + "\n");
+    } else {
+        for (const r of failed) {
+            process.stdout.write("\n" + sep(`FAILED: ${r.name}`) + "\n" + (r.error ?? "") + "\n");
+        }
+        const passed = results.filter((r) => r.ok && !r.skipped).length;
+        const skipped = results.filter((r) => r.skipped).length;
+        process.stdout.write(
+            `
+${failed.length ? RED : GREEN}${passed} passed, ${failed.length} failed${R}${skipped ? `${GRAY}, ${skipped} skipped${R}` : ""}
+`
+        );
+    }
+    process.exit(failed.length > 0 ? 1 : 0);
+}
+
+function printSuiteLine(r: SuiteResult): void {
+    const mark = r.skipped ? `${GRAY}-${R}` : r.ok ? `${GREEN}✓${R}` : `${RED}✗${R}`;
+    const detail = r.skipped
+        ? `${GRAY}${r.skipped}${R}`
+        : r.ok
+          ? `${GRAY}${(r.ms / 1000).toFixed(1)}s${R}`
+          : `${RED}${(r.error ?? "").split("\n")[1] ?? (r.error ?? "").split("\n")[0]}${R}`;
+    process.stdout.write(`  ${mark} ${r.name.padEnd(34)} ${detail}
+`);
+}
+
 try {
-    const raw = readFileSync(scenarioPath, "utf-8");
+    if (all) await runAll();
+    const raw = readFileSync(scenarioPath!, "utf-8");
     const scenario = parseScenario(raw);
 
-    if (!scenario.name) scenario.name = path.basename(scenarioPath).replace(/\.json$/, "");
+    if (!scenario.name) scenario.name = path.basename(scenarioPath!).replace(/\.json$/, "");
     if (profile || updateBaseline) {
         scenario.profile = { ...(scenario.profile ?? { enabled: true }), enabled: true };
         if (updateBaseline) scenario.profile.updateBaseline = true;
     }
 
     if (pretty) {
-        process.stdout.write(sep(scenarioPath, "─") + "\n\n");
-        const result = await runScenario(scenario, { onEvent: makeLiveHandler() });
+        process.stdout.write(sep(scenarioPath!, "─") + "\n\n");
+        const result = await runScenario(scenario, { onEvent: makeLiveHandler(), updateGolden });
         printMetrics(result);
-        process.stdout.write("\n");
+        // Exit once the output is flushed: a pseudo-terminal whose app quit by itself can keep Node alive on Windows.
+        process.stdout.write("\n", () => process.exit(0));
     } else {
-        const result = await runScenario(scenario);
+        const result = await runScenario(scenario, { updateGolden });
         process.stdout.write(JSON.stringify(result));
-        process.stdout.write("\n");
+        process.stdout.write("\n", () => process.exit(0));
     }
 } catch (err) {
     process.stderr.write(`${RED}Error:${R} ${err instanceof Error ? err.message : String(err)}\n`);

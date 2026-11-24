@@ -84,8 +84,13 @@ function mergeInto(target: Json, patch: Json): void {
     }
 }
 
-/** Settings live under `music` (current) or `flows["music-downloader"]` (the pre-P20b shape some fixtures keep). */
-function pointMusicFoldersInside(
+/**
+ * Settings live under `music` (current) or `flows["music-downloader"]` (the pre-P20b shape most fixtures keep). The
+ * app reads the old place only when there is no `music` at all (`settingsStore.ts`), so the old section is moved to
+ * `music` first, as the app itself does on load: a scenario's `settings` patch that adds a `music` key must never hide
+ * the folders set here (the app would then scan the real `~/Music/GoblinMalin/tmp`, and offer to clean it).
+ */
+export function pointMusicFoldersInside(
     settingsPath: string,
     outputDir: string,
     outputTemporaryDir: string,
@@ -97,16 +102,20 @@ function pointMusicFoldersInside(
         if (isObject(parsed)) raw = parsed;
     }
 
-    const legacy =
-        isObject(raw.flows) && isObject(raw.flows["music-downloader"]) ? raw.flows["music-downloader"] : undefined;
-    const music = isObject(raw.music) ? raw.music : (legacy ?? child(raw, "music"));
-    const download = child(music, "download");
-
-    download.outputDir = outputDir;
-    download.outputTemporaryDir = outputTemporaryDir;
+    if (isObject(raw.flows)) {
+        const { "music-downloader": legacy, ...otherFlows } = raw.flows;
+        if (!isObject(raw.music) && isObject(legacy)) raw.music = legacy;
+        if (Object.keys(otherFlows).length > 0) raw.flows = otherFlows;
+        else delete raw.flows;
+    }
     // The first-run provider picker would open over every scenario: answered already, unless the fixture says otherwise.
-    const onboarding = child(music, "onboarding");
+    const onboarding = child(child(raw, "music"), "onboarding");
     if (onboarding.providersChosen === undefined) onboarding.providersChosen = true;
     if (settingsPatch) mergeInto(raw, settingsPatch);
+
+    // Last, so that nothing above (the patch included) points the app at the user's real folders.
+    const download = child(child(raw, "music"), "download");
+    download.outputDir = outputDir;
+    download.outputTemporaryDir = outputTemporaryDir;
     fs.writeFileSync(settingsPath, JSON.stringify(raw, null, 4));
 }

@@ -164,7 +164,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
                 <Box marginTop={1}>
                     <Text>{pendingConfig.message}</Text>
                 </Box>
-                <Box marginTop={1} flexDirection="row">
+                {/* Buttons that do not fit on one line go on the next, instead of running off the dialog's edge. */}
+                <Box marginTop={1} flexDirection="row" flexWrap="wrap" rowGap={1}>
                     {pendingConfig.choices.map((choice, i) => (
                         <ChoiceButton
                             key={i}

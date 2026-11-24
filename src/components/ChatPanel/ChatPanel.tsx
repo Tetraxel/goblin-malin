@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Box, Text, type DOMElement } from "ink";
-import clipboard from "clipboardy";
+import { writeSystemClipboard } from "#base/systemClipboard";
 import { useTheme } from "#base/themeContext";
 import { useClickTarget, useWheelTarget } from "#base/mouse/useMouseTarget";
 import { mouseRegistry } from "#base/mouse/mouse";
@@ -155,7 +155,7 @@ export const ChatPanel: React.FC<Props> = ({ tasks, width, height, variant, term
             showFlash("Nothing to copy yet", false);
             return;
         }
-        clipboard.write(text).then(
+        writeSystemClipboard(text).then(
             () => showFlash(`Copied Claude's answer (${text.length} characters)`, true),
             () => showFlash("Could not reach the clipboard", false)
         );

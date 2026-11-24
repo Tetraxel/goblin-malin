@@ -19,3 +19,9 @@ export function applyStageConcurrency(maxParallelMetadata: number, maxParallelDo
     metadataLimiter.setLimit(maxParallelMetadata);
     downloadLimiter.setLimit(maxParallelDownloads);
 }
+
+/**
+ * Stem separations (P33) running at once: one, since a separation takes the whole graphics card (or every core of
+ * the processor). Not a pipeline stage: only runs the user asked for wait here.
+ */
+export const stemLimiter = new Semaphore(1);

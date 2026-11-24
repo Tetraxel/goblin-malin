@@ -1,0 +1,55 @@
+{
+    // A tour of what the harness can check, on the empty fixture: text by regular expression or row, a style, a golden
+    // snapshot of a screen region, a mouse click and hover, a resize, waiting for text to go, the log, and the exit.
+    // Run it with --update-golden once to write golden/harness-features/*.txt.
+    "terminal": { "cols": 128, "rows": 40 },
+    "dataDir": "scripts/tui-test/fixtures/empty",
+    "steps": [
+        { "type": "stable", "timeout": 20000 },
+
+        // Text: by row, by regular expression, and its absence.
+        { "type": "assert", "contains": "Exit", "row": 2 },
+        { "type": "assert", "matches": "v\\d+\\.\\d+\\.\\d+", "count": 1 },
+        { "type": "assertNot", "contains": "SETTINGS" },
+
+        // Style: the version is dim; the toolbar text is not.
+        { "type": "assertStyle", "matches": "v\\d+\\.\\d+\\.\\d+", "dim": true },
+        { "type": "assertStyle", "contains": "Exit", "dim": false },
+
+        // A golden snapshot of the toolbar (the version is masked: it changes at every release).
+        {
+            "type": "assertSnapshot",
+            "name": "toolbar",
+            "region": { "row": 1, "col": 1, "width": 128, "height": 3 },
+            "mask": ["v\\d+\\.\\d+\\.\\d+"]
+        },
+
+        // Mouse: hover, then click a toolbar button by its text.
+        { "type": "hover", "text": "Archive" },
+        { "type": "click", "text": "Settings" },
+        { "type": "waitForContent", "contains": "SETTINGS", "timeout": 5000 },
+        { "type": "key", "key": "Esc" },
+        { "type": "waitForGone", "contains": "SETTINGS", "timeout": 5000 },
+
+        // Keys until some text shows up: nothing to press when it is already there.
+        { "type": "pressUntil", "key": "Tab", "contains": "Exit", "max": 3 },
+
+        // Resize: the toolbar still fits at 90 columns, then the window grows back.
+        { "type": "resize", "cols": 90, "rows": 24 },
+        { "type": "wait", "ms": 600 },
+        { "type": "assert", "contains": "Exit", "row": 2 },
+        { "type": "resize", "cols": 128, "rows": 40 },
+        { "type": "wait", "ms": 600 },
+        { "type": "assert", "contains": "Metadata view" },
+
+        // The log: the app says it started, and nothing went wrong.
+        { "type": "assertLog", "contains": "Initializing music downloader" },
+        { "type": "assertNoErrors" },
+        { "type": "assertFile", "path": "settings.json", "contains": "providersChosen" },
+
+        // Quit: the first Ctrl+Q asks, the second one closes the app.
+        { "type": "key", "key": "Ctrl+Q" },
+        { "type": "waitForContent", "contains": "Quit Goblin Malin?", "timeout": 3000 },
+        { "type": "exit", "key": "Ctrl+Q", "timeout": 8000 }
+    ]
+}

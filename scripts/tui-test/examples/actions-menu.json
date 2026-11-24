@@ -1,0 +1,45 @@
+{
+    // The toolbar's Actions menu (src/base/actionsMenu.ts): an item that cannot be used yet stays listed, with the
+    // reason, and choosing it does nothing. On the empty list both items are unavailable, so nothing outside the app
+    // (MusicBrainz Picard, a stem separation) can be started by this scenario.
+    "terminal": { "cols": 128, "rows": 40 },
+    "dataDir": "scripts/tui-test/fixtures/empty",
+    "network": { "mode": "offline" },
+    "steps": [
+        { "type": "stable", "timeout": 20000 },
+        { "type": "waitForContent", "contains": "No task to run", "timeout": 5000 },
+
+        // Opened with the mouse: it hangs under its button, the first item under the cursor, each with its reason.
+        { "type": "click", "text": "Actions" },
+        { "type": "waitForContent", "contains": "Open all tracks in MusicBrainz Picard", "timeout": 3000 },
+        { "type": "assert", "matches": "☛ Open all tracks in MusicBrainz Picard" },
+        { "type": "assert", "contains": "No track has a MusicBrainz match yet" },
+        { "type": "assert", "contains": "Stem separation is off (Settings → Stems)" },
+        { "type": "assert", "contains": "[Esc] Close" },
+        { "type": "snapshot", "name": "menu" },
+
+        // ↓ selects the next item; Enter on an unavailable one does nothing and keeps the menu open.
+        { "type": "key", "key": "↓" },
+        { "type": "stable" },
+        { "type": "assert", "matches": "☛ Separate stems of every downloaded track" },
+        { "type": "key", "key": "Enter" },
+        { "type": "stable" },
+        { "type": "assert", "matches": "☛ Separate stems of every downloaded track" },
+        { "type": "assertNot", "contains": "Separate stems?" },
+        { "type": "key", "key": "↑" },
+        { "type": "stable" },
+        { "type": "assert", "matches": "☛ Open all tracks in MusicBrainz Picard" },
+        { "type": "key", "key": "Enter" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "No track has a MusicBrainz match yet" },
+
+        // Esc closes it and leaves the keyboard on its toolbar button: Enter opens it again.
+        { "type": "key", "key": "Esc" },
+        { "type": "waitForGone", "contains": "Open all tracks in MusicBrainz Picard", "timeout": 3000 },
+        { "type": "key", "key": "Enter" },
+        { "type": "waitForContent", "contains": "Open all tracks in MusicBrainz Picard", "timeout": 3000 },
+        { "type": "key", "key": "Esc" },
+        { "type": "waitForGone", "contains": "Open all tracks in MusicBrainz Picard", "timeout": 3000 },
+        { "type": "assertNoErrors" }
+    ]
+}

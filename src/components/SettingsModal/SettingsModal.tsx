@@ -591,6 +591,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
                                 isActive={isActive}
                                 selectedIndex={shortcutsSelectedIndex}
                                 rebindingId={rebindingId}
+                                keybindings={appDraft.keybindings}
                                 width={innerWidth}
                                 height={listHeight}
                                 searchQuery={shortcutsSearchQuery}

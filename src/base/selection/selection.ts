@@ -51,22 +51,79 @@ export function isPaneEdge(frame: readonly ScreenRow[], x: number, y: number): b
 }
 
 /**
+ * The box-drawing glyphs (U+2500..U+257F, any weight: light, heavy, double, and their mixes) whose vertical arm goes
+ * down (`┌ ┬ ├ ┼ ╒ ╔ ╭`…) and those whose arm goes up (`└ ┴ ┤ ╧ ╚ ╰`…), as ranges of code points from the Unicode chart.
+ * Plain vertical lines are not here: `isVerticalLine` knows them.
+ */
+const ARM_DOWN_RANGES: readonly (readonly [number, number])[] = [
+    [0x250c, 0x2513], // down + right / left
+    [0x251c, 0x2533], // up + down + right / left, down + left + right
+    [0x253c, 0x254b], // all four arms
+    [0x2552, 0x2557], // double ┌ ┐
+    [0x255e, 0x2566], // double ├ ┤ ┬
+    [0x256a, 0x256e], // double crosses, ╭ ╮
+];
+const ARM_UP_RANGES: readonly (readonly [number, number])[] = [
+    [0x2514, 0x251b], // up + right / left
+    [0x251c, 0x252b], // up + down + right / left
+    [0x2534, 0x254b], // up + left + right, all four arms
+    [0x2558, 0x2563], // double └ ┘ ├ ┤
+    [0x2567, 0x256c], // double ┴ and crosses
+    [0x256f, 0x2570], // ╯ ╰
+];
+
+function inRanges(value: string, ranges: readonly (readonly [number, number])[]): boolean {
+    const code = value.codePointAt(0);
+    if (code === undefined || value.length !== 1) return false;
+    return ranges.some(([from, to]) => code >= from && code <= to);
+}
+
+/** Whether the cell is a line that goes on downward from the row above: a vertical line, or a glyph with an arm up. */
+function continuesUp(cell: ScreenCell | undefined): boolean {
+    return cell !== undefined && (isVerticalLine(cell) || inRanges(cell.value, ARM_UP_RANGES));
+}
+
+/** Whether the cell is a line that goes on upward from the row below: a vertical line, or a glyph with an arm down. */
+function continuesDown(cell: ScreenCell | undefined): boolean {
+    return cell !== undefined && (isVerticalLine(cell) || inRanges(cell.value, ARM_DOWN_RANGES));
+}
+
+/**
+ * Whether the cell is where a panel's side starts or ends on this row: a corner or tee whose vertical arm goes on into
+ * a vertical line (or another corner / tee joined to it) above or below (the `┌` of a box whose top is on the same row
+ * as some text of the pane beside it). A tee over a plain horizontal rule (`┬` above `─`) is not a side.
+ */
+function isPaneCorner(frame: readonly ScreenRow[], x: number, y: number): boolean {
+    const value = frame[y]?.[x]?.value;
+    if (value === undefined) return false;
+    return (
+        (inRanges(value, ARM_DOWN_RANGES) && continuesUp(frame[y + 1]?.[x])) ||
+        (inRanges(value, ARM_UP_RANGES) && continuesDown(frame[y - 1]?.[x]))
+    );
+}
+
+/** Whether the cell is a limit of the pane on its row: a panel's side, or the corner / tee where a side starts or ends. */
+export const isPaneLimit = (frame: readonly ScreenRow[], x: number, y: number): boolean =>
+    isPaneEdge(frame, x, y) || isPaneCorner(frame, x, y);
+
+/**
  * The columns of the pane around column `x` of row `y`: between the panel edges on each side of it (or the screen's
  * edge). A selection that starts there stays there, so dragging down a panel next to another one (the task list and
- * the chat, a source list and the metadata box) never takes the other's text along.
+ * the chat, a source list and the metadata box) never takes the other's text along — also from the row where the other
+ * panel's top border is (`text…┌── Title ──┐`).
  */
 export function paneBounds(frame: readonly ScreenRow[], x: number, y: number): ColumnBounds {
     const row = frame[y] ?? [];
     let left = 0;
     for (let i = Math.min(x, row.length - 1); i >= 0; i--) {
-        if (isPaneEdge(frame, i, y)) {
+        if (isPaneLimit(frame, i, y)) {
             left = i + 1;
             break;
         }
     }
     let right = row.length;
     for (let i = Math.max(x, 0); i < row.length; i++) {
-        if (isPaneEdge(frame, i, y)) {
+        if (isPaneLimit(frame, i, y)) {
             right = i;
             break;
         }

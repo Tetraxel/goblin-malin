@@ -1,21 +1,33 @@
 {
+    // Settings → Shortcuts: the list scrolls under its search field and keeps the cursor in view (the order of the
+    // shortcuts changes as shortcuts are added, so the checks do not name the rows).
     "terminal": { "cols": 128, "rows": 50 },
     "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
     "steps": [
         { "type": "stable", "timeout": 8000 },
         { "type": "waitForContent", "text": "Hooked", "timeout": 5000 },
 
+        // Settings is the 6th toolbar button (Run, Actions, Claude, Sessions, Archive, Settings).
         { "type": "key", "key": "ArrowRight", "repeat": 5 },
         { "type": "key", "key": "Enter" },
-        { "type": "stable" },
+        { "type": "waitForContent", "contains": "Search settings", "timeout": 5000 },
         { "type": "key", "key": "Tab" },
-        { "type": "stable" },
+        { "type": "waitForContent", "contains": "Search shortcuts", "timeout": 3000 },
         { "type": "key", "key": "ArrowDown" },
         { "type": "stable" },
+        { "type": "assert", "matches": "☛ global\\.quit\\s+Quit" },
         { "type": "snapshot", "name": "shortcuts-list" },
 
         { "type": "key", "key": "ArrowDown", "repeat": 20, "delayMs": 35 },
         { "type": "stable" },
-        { "type": "snapshot", "name": "shortcuts-scrolled" }
+        { "type": "assertNot", "contains": "global.quit" },
+        { "type": "assert", "matches": "☛ \\w+\\.\\w+", "count": 1 },
+        { "type": "assert", "contains": "Search shortcuts" },
+        { "type": "assert", "contains": "[Enter] Rebind" },
+        { "type": "snapshot", "name": "shortcuts-scrolled" },
+
+        // Esc discards: nothing was changed, so the modal just closes.
+        { "type": "key", "key": "Esc" },
+        { "type": "waitForGone", "contains": "Search shortcuts", "timeout": 3000 }
     ]
 }

@@ -10,13 +10,15 @@
         { "type": "snapshot", "name": "asked" },
 
         { "type": "key", "key": "Esc" },
-        { "type": "wait", "ms": 400 },
+        { "type": "waitForGone", "text": "Quit Goblin Malin?", "timeout": 3000 },
+        { "type": "assert", "contains": "No task to run" },
         { "type": "snapshot", "name": "stayed" },
 
         { "type": "key", "key": "Ctrl+Q" },
         { "type": "waitForContent", "text": "Quit Goblin Malin?", "timeout": 3000 },
         { "type": "key", "key": "Ctrl+Q" },
         { "type": "waitForContent", "text": "Goblin Malin is closed", "timeout": 5000 },
-        { "type": "snapshot", "name": "closed" }
+        { "type": "snapshot", "name": "closed" },
+        { "type": "exit", "code": 0, "timeout": 8000 }
     ]
 }

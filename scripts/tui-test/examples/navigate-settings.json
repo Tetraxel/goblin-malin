@@ -13,18 +13,23 @@
         // "Settings" is a permanent toolbar label, so assert on text only the modal shows.
         { "type": "assert", "contains": "Search settings" },
         { "type": "snapshot", "name": "settings-open" },
+        { "type": "screenshot", "name": "settings-open" },
+        { "type": "screenshot-powershell", "name": "settings-open-powershell" },
 
-        { "type": "key", "key": "ArrowDown" },
+        // ↓ leaves the search field for the list: the cursor is on the first setting, then on the next one.
         { "type": "key", "key": "ArrowDown" },
         { "type": "stable" },
+        { "type": "assert", "matches": "☛\\s*≡\\s+Theme" },
+        { "type": "key", "key": "ArrowDown" },
+        { "type": "stable" },
+        { "type": "assert", "matches": "☛\\s*☐\\s+Show welcome tutorial" },
         { "type": "assert", "contains": "Search settings" },
         { "type": "snapshot", "name": "settings-navigated" },
 
+        // Nothing was changed: Esc just closes it.
         { "type": "key", "key": "Escape" },
-        { "type": "stable" },
-        { "type": "snapshot", "name": "settings-closed" },
-        { "type": "screenshot", "name": "settings-open" },
-        { "type": "screenshot-browser", "name": "settings-open-browser" },
-        { "type": "screenshot-powershell", "name": "settings-open-powershell" }
+        { "type": "waitForGone", "text": "Search settings", "timeout": 3000 },
+        { "type": "assert", "contains": "No task to run" },
+        { "type": "snapshot", "name": "settings-closed" }
     ]
 }

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { setMouseActiveWindow } from "#base/mouse/clickableWindows";
 import { useFocusManager, type FocusState } from "#hooks/useFocusManager";
+import { type PrimaryMode } from "#types/focus";
 
 type FocusManager = ReturnType<typeof useFocusManager>;
 
@@ -43,8 +44,8 @@ export const FocusProvider: React.FC<{
     toolbarButtonCount: number;
     taskIds: string[];
     taskColumnCount: number;
-    primaryMode: "metadata" | "download";
-    onPrimaryModeChange: (mode: "metadata" | "download") => void;
+    primaryMode: PrimaryMode;
+    onPrimaryModeChange: (mode: PrimaryMode) => void;
 }> = ({ children, ...config }) => {
     const fm = useFocusManager(config);
     const fs = fm.focusState;

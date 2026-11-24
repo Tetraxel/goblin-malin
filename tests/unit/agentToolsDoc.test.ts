@@ -30,19 +30,32 @@ describe("the agent tool catalogue", () => {
                 "run_task",
                 "select_source",
                 "set_metadata_override",
+                // Stems (P33): choose a run's file (undoable), separate (asks first), stop a separation.
+                "pick_stem",
+                "separate_stems",
+                "stop_stems",
             ].sort()
         );
         // What the user cannot take back with /undo must go through a dialog or be slow and explicit.
         for (const tool of writes.filter((t) => !t.undoable)) {
-            expect(["archive_tasks", "rediscover", "run_metadata", "run_download", "run_task"]).toContain(tool.name);
+            expect([
+                "archive_tasks",
+                "rediscover",
+                "run_metadata",
+                "run_download",
+                "run_task",
+                "separate_stems",
+                "stop_stems",
+            ]).toContain(tool.name);
         }
         // Anything that downloads asks first.
-        for (const name of ["run_download", "run_task"]) {
+        // So does a stem separation: it takes the user's graphics card (or every core) for a while.
+        for (const name of ["run_download", "run_task", "separate_stems"]) {
             expect(tools.find((t) => t.name === name)?.kind, name).toBe("confirm");
         }
         // Claude starts tasks, but never saves a file to the music folder and never deletes.
         const names = tools.map((t) => t.name);
-        for (const forbidden of ["save_tasks", "delete_tasks", "save_track"]) {
+        for (const forbidden of ["save_tasks", "delete_tasks", "save_track", "save_stems", "install_stems"]) {
             expect(names).not.toContain(forbidden);
         }
     });

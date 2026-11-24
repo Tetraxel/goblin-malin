@@ -68,6 +68,9 @@ export function computeTaskRevision(attrs: TrackDownloadTask): number {
             results.join(","),
             rows.join(","),
             attrs.parentTaskId ?? "",
+            // Stems (P33): which runs exist and which one each stem uses. Not the runs' progress.
+            (attrs.stemRuns ?? []).map((r) => r.id).join(","),
+            stable(attrs.stemPick ?? {}),
         ].join("\n")
     );
 }

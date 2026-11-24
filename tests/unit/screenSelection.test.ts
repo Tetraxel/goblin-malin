@@ -5,6 +5,7 @@ import {
     clampPoint,
     highlightRow,
     isPaneEdge,
+    isPaneLimit,
     paneBounds,
     rowSpan,
     selectedText,
@@ -160,6 +161,52 @@ describe("the pane around a press", () => {
         expect(clampPoint({ x: 30, y: 2 }, bounds, 5)).toEqual({ x: 11, y: 2 });
         expect(clampPoint({ x: -4, y: -1 }, bounds, 5)).toEqual({ x: 1, y: 0 });
         expect(clampPoint({ x: 5, y: 80 }, bounds, 5)).toEqual({ x: 5, y: 4 });
+    });
+
+    test("a panel whose top border is on the press row is an edge too", () => {
+        // The source list's first row, beside the top of the metadata box (`d…┌── Compiled ──┐`).
+        const frame = screen(
+            "│ Top-ranked sources ┌── Box ──┐ │",
+            "│                    │ TITLE   │ │",
+            "│ one                │ ARTIST  │ │"
+        );
+        const corner = frame[0]!.findIndex((c) => c?.value === "┌");
+        const bounds = paneBounds(frame, 3, 0);
+        expect(bounds).toEqual({ left: 1, right: corner });
+        expect(selectedText(frame, sel([2, 0], [10, 2], { bounds }))).toBe("Top-ranked sources\n\none");
+        // A corner with nothing under it is only a character of the text.
+        expect(paneBounds(screen("a ┌ b"), 4, 0)).toEqual({ left: 0, right: 5 });
+    });
+
+    test("a corner or tee that starts a side is a limit, in any weight or style", () => {
+        for (const corner of ["┍", "┎", "╒", "╓", "╭", "┏", "╔"]) {
+            const frame = screen(`text ${corner}── Box ──┐`, "     │ BODY   │");
+            expect(isPaneLimit(frame, 5, 0)).toBe(true);
+            expect(paneBounds(frame, 1, 0)).toEqual({ left: 0, right: 5 });
+        }
+        for (const corner of ["┕", "┖", "╘", "╙", "╰", "┗", "╚"]) {
+            const frame = screen("     │ BODY   │", `text ${corner}────────┘`);
+            expect(isPaneLimit(frame, 5, 1)).toBe(true);
+        }
+        for (const tee of ["┯", "┰", "╤", "╥", "┳", "╦"]) {
+            const frame = screen(`text ${tee}──┐`, "     │ BODY │");
+            expect(isPaneLimit(frame, 5, 0)).toBe(true);
+        }
+    });
+
+    test("a tee over a horizontal rule is not a limit", () => {
+        const frame = screen("left ┬─── right", "     ──── more", "     ┴─── end");
+        expect(isPaneLimit(frame, 5, 0)).toBe(false);
+        expect(isPaneLimit(frame, 5, 2)).toBe(false);
+        expect(paneBounds(frame, 1, 0)).toEqual({ left: 0, right: frame[0]!.length });
+    });
+
+    test("a press on a corner starts nothing: its pane would be empty", () => {
+        const frame = screen("┌────┬────┐", "│ a  │ b  │", "└────┴────┘");
+        expect(isPaneLimit(frame, 0, 0)).toBe(true);
+        expect(isPaneLimit(frame, 5, 0)).toBe(true);
+        expect(isPaneLimit(frame, 5, 1)).toBe(true);
+        expect(isPaneLimit(frame, 2, 1)).toBe(false);
     });
 
     test("the other pane's text is not taken along", () => {

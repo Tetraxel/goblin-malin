@@ -12,7 +12,18 @@ yarn tsx scripts/tui-test/cli.ts scripts/tui-test/examples/navigate-settings.jso
 yarn tsx scripts/tui-test/cli.ts scripts/tui-test/examples/navigate-settings.json --pretty
 ```
 
-`--pretty` is best for interactive debugging. Plain JSON is best for automated validation — parse `result.snapshots["name"].plain` to assert on screen content.
+```bash
+# Every scenario of examples/ (not perf-* / profile-*), a few at a time, one pass/fail line each
+yarn tsx scripts/tui-test/cli.ts --all [--filter a,b] [--parallel 2] [--include-perf] [--screenshots] [--json]
+
+# Compare with (or, with --update-golden, write) the golden files of assertSnapshot steps
+yarn tsx scripts/tui-test/cli.ts <scenario.json> [--update-golden]
+
+# One app kept running between commands: press a key, read the screen, decide
+yarn tsx scripts/tui-test/sessionCli.ts start
+```
+
+`--pretty` is best for interactive debugging. Plain JSON is best for automated validation — parse `result.snapshots["name"].plain` to assert on screen content. In your own tests, call `runScenario(scenario)` (`runner.ts`): it throws a `ScenarioFailure` when a step fails.
 
 ## Scenario file format
 
@@ -25,6 +36,8 @@ Scenarios are JSON files in `scripts/tui-test/examples/`.
     "scale": { "tasks": 2000 }, // optional: grows the copy of the fixture (see "Large sessions")
     "load": { "tasksPerTick": 40 }, // optional: synthetic activity for startLoad steps
     "settings": { "logs": { "logLevel": "INFO" } }, // optional: deep-merged into the copy's settings.json
+    "network": { "rules": [{ "url": "api.deezer.com/track/1", "json": {} }] }, // optional: fake network (see "Fake network")
+    "clipboard": "https://…", // optional: what is on the (stand-in) clipboard at start (see "Clipboard")
     "command": "node dist/cli.js", // optional: start something else than `yarn dev` (times the built bundle)
     "steps": [/* ...see step types below... */],
 }
@@ -49,6 +62,39 @@ Scenarios are JSON files in `scripts/tui-test/examples/`.
 
 On a machine without Windows Terminal, `screenshot-powershell` falls back to the built-in emulator (with a warning on stderr) instead of crashing the run.
 
+### Checking text
+
+`assert`, `assertNot`, `waitForContent`, `waitForGone` and `pressUntil` all take **one** of `"contains": "text"` (`"text"` also works) or `"matches": "regular expression"` (flags default to `m`, so `^` / `$` are per line; `"flags": "i"` to change), optionally limited with `"row": 2` (1-based) or `"region": { "row": 1, "col": 1, "width": 40, "height": 3 }`. `assert` also takes `count` (exactly), `min` and `max`. Columns and rows are cells, so a wide emoji does not shift what follows it.
+
+- `{ "type": "assertNot", "contains": "Error" }` — fails if the text **is** on screen.
+- `{ "type": "waitForGone", "contains": "Loading", "timeout": 5000 }` — waits for it to disappear.
+- `{ "type": "pressUntil", "key": "↓", "contains": "Logs", "max": 30 }` — presses a key until the text shows up (nothing is pressed if it is there already).
+- `{ "type": "assertStyle", "contains": "v0.3.0", "dim": true }` — every cell of the first match (`"occurrence": 2` for the next) has the style: `fg` / `bg` (`"default"`, a palette index such as `2`, or `"#rrggbb"`; a palette colour is compared through the standard xterm palette), `bold`, `dim`, `italic`, `underline`, `inverse`, `strikethrough`.
+- `{ "type": "snapshot", "name": "bar", "region": {…} }` — a snapshot of a part of the screen.
+- `{ "type": "assertSnapshot", "name": "toolbar", "region": {…}, "mask": ["\\d+ms"] }` — see [Golden snapshots](#golden-snapshots).
+
+### Mouse, paste and resize
+
+A mouse step points at a cell (`"col"`, `"row"`, 1-based) or at a text (`"text"` / `"matches"`, with `"occurrence"` and `"offset"` columns from its left edge; the middle by default), so nothing has to count cells:
+
+- `{ "type": "click", "text": "Settings" }` — also `"button": "right"`, `"double": true`, `"shift"` / `"alt"` / `"ctrl": true`.
+- `{ "type": "hover", "text": "Archive" }` — the pointer moves with no button down.
+- `{ "type": "drag", "from": { "text": "Hooked" }, "to": { "col": 44, "row": 5 }, "alt": true }` — press, motion on the way, release (`"hold": true` keeps the button down to look at the highlight).
+- `{ "type": "wheel", "direction": "down", "count": 3, "col": 30, "row": 10 }`
+- `{ "type": "paste", "text": "https://…" }` — one write (`"bracketed": true` wraps it in the bracketed-paste markers; the app does not ask for them today).
+- `type` and `paste` wait 100 ms afterwards, like `key` (`"delayMs"` to change it): a key sent at once would reach the app in the same chunk as the text and be read as part of it (an `Enter` that confirms nothing).
+- `{ "type": "resize", "cols": 80, "rows": 24 }` — the app is told like it is when the user drags the window's edge.
+
+### The app's state, log and exit
+
+The data folder is the throwaway copy the app runs on (paths are relative to it, and cannot leave it). State checks wait up to `"timeout"` (default 3 s) for the app to get there, since it saves a moment after the change.
+
+- `{ "type": "assertFile", "path": "output/a.flac", "exists": true }` — also `contains`, `matches`.
+- `{ "type": "assertJson", "file": "sessions.json", "path": "sessions[0].tasks.length", "gte": 1 }` — a value of a JSON file by path (`a.b`, `a[0]`, `a[-1]`, and `keybindings["sessionsModal.new"]` for a key with dots in it); `equals`, `exists`, `contains`, `matches`, `gt` / `gte` / `lt` / `lte`, `length`.
+- `{ "type": "assertLog", "contains": "Imported", "level": "info" }` — lines of `app.log` (`count` / `min` / `max`); `{ "type": "assertNoErrors", "ignore": ["regex"] }` — no `error` line (`"level": "warn"` for warnings too).
+- `{ "type": "assertRequest", "url": "api.deezer.com", "min": 1 }` and `{ "type": "network", "rules": […] }` — see [Fake network](#fake-network).
+- `{ "type": "exit", "key": "Ctrl+Q", "code": 0 }` — waits for the app to exit by itself (after the optional key) and checks its exit code.
+
 ## Key reference
 
 Named keys (use in `"key"` field):
@@ -60,6 +106,8 @@ Shift+←  Shift+→  Shift+↑  Shift+↓
 Ctrl+Shift+↑  Ctrl+Shift+↓          (extend the task selection)
 Ctrl+A  Ctrl+C  Ctrl+D  Ctrl+G  Ctrl+N  Ctrl+Q  Ctrl+R  Ctrl+S  Ctrl+T  Ctrl+V  Ctrl+Z
 ```
+
+Any modifier combination works as well: `Ctrl+←`, `Alt+Enter`, `Ctrl+Shift+F5`, `Ctrl+B`, `Alt+x`, `Shift+Home`, `Ctrl+Delete`; and `F1`–`F12`, `Insert`. A name with a modifier that cannot be read is an error, never typed into the app as text.
 
 Single characters pass through as-is: `"D"`, `"E"`, `"1"`, `"y"`, etc.
 
@@ -75,6 +123,22 @@ Single characters pass through as-is: `"D"`, `"E"`, `"1"`, `"y"`, etc.
 { "type": "screenshot-powershell", "name": "after-nav" } // visual proof
 ```
 
+## What the examples cover
+
+| Scenario                                  | What it checks                                                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `actions-menu`                            | The Actions menu: unavailable items listed with their reason, Enter on them does nothing, Esc.   |
+| `archive-restore`                         | Del → Archive or Delete; the Archive window, its search, Enter restores with the metadata.       |
+| `clipboard-copy-paste`                    | `Ctrl+C` copies full titles; `Ctrl+V` adds a link as a `[USER]` source, kept offline, refetched. |
+| `select-copy`                             | Mouse selection: highlight, copy on release, Alt+drag rectangle, never the panel beside it.      |
+| `sessions-manage`                         | New, load, rename, duplicate, search and delete sessions, checked in `sessions.json`.            |
+| `shortcut-rebind`                         | Rebinding a shortcut: saved, the hint follows it, the old key is free.                           |
+| `songlink-consent`                        | A provider that sends data out asks first; "Don't allow" and Esc send nothing.                   |
+| `user-data-survives-failed-run`           | A hand-typed title and a pasted link survive a run with the network down.                        |
+| `fake-network`, `collection-*`, `group-*` | Reading a link through canned answers; playlists and albums; groups.                             |
+| `scroll-*`, `switch-view-column`          | Cursors and scrolling of the task list, the metadata box, the shortcut list; switching views.    |
+| `harness-features`                        | A tour of the harness itself (styles, goldens, mouse, resize, log, exit).                        |
+
 ## Fixtures
 
 | Fixture                  | Sessions | Tasks | State                                                                                                 |
@@ -82,6 +146,10 @@ Single characters pass through as-is: `"D"`, `"E"`, `"1"`, `"y"`, etc.
 | `empty`                  | 0        | 0     | Blank slate — no sessions, no cache. Start here for onboarding flows.                                 |
 | `50-tasks`               | 1        | 50    | Tasks are `pending` — Spotify URLs imported but metadata not yet fetched.                             |
 | `50-tasks-with-metadata` | 1        | 50    | Tasks are `finished` — Spotify + YouTube metadata fetched, Songlink and MusicBrainz anchors resolved. |
+| `collection-failures`    | 1        | 6     | A playlist of five tracks that ended differently: finished, failed (metadata, download), stopped.     |
+| `user-data`              | 1        | 2     | Deezer tracks holding a hand-typed title and a hand-pasted link: they must survive any run.           |
+
+`collection-failures` and `user-data` are generated by `fixtures/buildFixtures.ts` (`yarn tsx scripts/tui-test/fixtures/buildFixtures.ts`): when the session format changes, regenerate them.
 
 Set the fixture with `"dataDir"` in the scenario (default: `empty`):
 
@@ -90,6 +158,68 @@ Set the fixture with `"dataDir"` in the scenario (default: `empty`):
 ```
 
 **A scenario never runs on the fixture itself.** The runner copies it (without `bin/`, logs, locks and `.bak` files) into a fresh temp folder, points `GOBLIN_DATA_DIR` at the copy, sets `music.download.outputDir` and `outputTemporaryDir` to folders inside the copy, and deletes the copy afterwards. So a run cannot modify the tracked fixtures, touch your real data folder or scan `~/Music` (which used to pop up the "temporary downloads are piling up" dialog mid-scenario). Set `GOBLIN_TUI_KEEP_DATA=1` to keep the copy for inspection; its path is printed to stderr.
+
+Most fixtures keep their settings in the old layout (`flows["music-downloader"]`), which the app reads only when there is no `music` section. The copy moves it to `music` before the scenario's `settings` patch is merged, and sets the music folders after the patch, so a patch that adds a `music` key never sends the app back to the real `~/Music` folders (`tests/unit/tuiHarness.test.ts`).
+
+## Clipboard
+
+A scenario never reads nor writes the real clipboard: the harness sets `GOBLIN_TEST_CLIPBOARD` to a file of the data folder, and the app's one clipboard module (`src/base/systemClipboard.ts`) uses it instead of the system's. So a run cannot overwrite what the developer copied, nor depend on it.
+
+- `"clipboard": "text"` in the scenario — on the clipboard when the app starts (empty by default).
+- `{ "type": "setClipboard", "text": "https://www.deezer.com/track/3135556" }` — for what the app reads from it: `Ctrl+V` on a platform column ("Paste link"), the import dialog.
+- `{ "type": "assertClipboard", "equals": "Hooked" }` — what the app copied last (a mouse selection, `Ctrl+C` on a cell or a source); also `contains`, `matches`, `"empty": true`. Waits up to `"timeout"` (default 3 s).
+
+The copy also goes to the terminal as an OSC 52 sequence, which is in a snapshot's `raw` (`tests/e2e/selection.test.ts` reads it). See `examples/clipboard-copy-paste.json` and `examples/select-copy.json`.
+
+## When a step fails
+
+Before the app starts, the steps are checked (`validateScenario.ts`): an unknown step type or a missing field (a `key` without `key`, an `assert` with no `contains` / `matches`) fails at once instead of after the boot. The unit test that loads every example runs the same check.
+
+The error carries what is needed to understand it without running the scenario again: the step (and its number), the message, the screen, the last inputs sent to the app, the last lines of `app.log` and the last requests of the fake network. `runScenario` throws a `ScenarioFailure` whose `report` holds the same parts.
+
+## Golden snapshots
+
+`assertSnapshot` compares the screen with a text file kept in `scripts/tui-test/golden/<scenario name>/<name>.txt` (the scenario's name is its file name, or `name` in the file). Write or refresh the files with `--update-golden`, read the diff in git, commit it. A mismatch prints a line diff (`-` golden, `+` screen). Use `region` to look only at the part a scenario is about, so an unrelated panel does not break it, and `mask` (regular expressions) for what changes from run to run: a version, a duration. `"timeout"` retries the comparison for a moment, for a screen that is still settling.
+
+## Fake network
+
+A scenario with a `network` section never reaches the internet: the app is started with a preload (`preload/fakeNetwork.mjs`, through `NODE_OPTIONS`) that replaces `fetch`. Each request goes through the rules, the first match wins; one with no rule fails like a missing connection (`"mode": "offline"`, the default) or goes out (`"mode": "passthrough"`).
+
+```jsonc
+"network": {
+    "rules": [
+        { "url": "api.deezer.com/track/3135556", "json": { "id": 3135556, "title": "…" } },
+        { "matches": "/search", "status": 429, "times": 2 }, // answers the first two requests only
+        { "url": "api.example.com", "delayMs": 3000 }, // a slow answer (cut short by the request's own abort)
+        { "url": "api.example.com/x", "error": "socket hang up" } // a broken connection
+    ]
+}
+```
+
+`assertRequest` checks what the app asked for; a `network` step changes the rules while the app runs (`"append": true` adds to the current ones) — a provider that fails halfway, say. See `examples/fake-network.json` and `examples/user-data-survives-failed-run.json`.
+
+`data:`, `blob:` and `file:` URLs (a library loading its WebAssembly) are not the network: they go through untouched and are not logged.
+
+It replaces `fetch` only: a provider that starts a program (yt-dlp, ffmpeg, mpv) or opens its own socket (Soulseek) is not covered, so a download cannot be faked this way.
+
+## Interactive sessions
+
+`sessionCli.ts` keeps one app running between commands, so you press a key, read the screen and decide, instead of writing a whole scenario blind. Every action prints the screen it ends on, with row numbers.
+
+```bash
+yarn tsx scripts/tui-test/sessionCli.ts start --data-dir scripts/tui-test/fixtures/50-tasks-with-metadata
+yarn tsx scripts/tui-test/sessionCli.ts key Down Down Enter
+yarn tsx scripts/tui-test/sessionCli.ts find "Settings"        # row, column and width of the text
+yarn tsx scripts/tui-test/sessionCli.ts click "Settings"       # or: click <col> <row>
+yarn tsx scripts/tui-test/sessionCli.ts step '{"type":"assertNot","contains":"Error"}'   # any step of the scenario format
+yarn tsx scripts/tui-test/sessionCli.ts stop
+```
+
+`start` takes `--scenario file.json` (everything but its steps: terminal, `dataDir`, `settings`, `network`, `scale`, `env`), `--data-dir`, `--cols`, `--rows`, `--set a.b=json` (a settings override) and `--name` (to run several at once). A session is a detached process listening on 127.0.0.1 with a random token. It stops with `stop` (`stop --all`), or after 20 minutes without a command. `sessionCli.ts help` lists every command. The server logs to `%TEMP%/goblin-tui-test/sessions/<name>.log`.
+
+## Running them all
+
+`cli.ts --all` runs every scenario of `examples/` and prints one line each, then the failures with their reports; it exits 1 when one failed. It skips `perf-*` / `profile-*` scenarios and those with a custom `command` (`--include-perf`), drops `screenshot*` steps (they open terminal windows; `--screenshots` keeps them) and turns profiling on for a scenario that uses `startLoad`. `--parallel N` (default 2) trades speed for the risk of a `stable` step timing out on a loaded machine. `--filter a,b` keeps the scenarios whose file name contains one of them.
 
 ## Render profiling
 

@@ -1,9 +1,12 @@
 import type { Task } from "#base/task/task";
 import type { MusicDownloadTaskAttributes } from "../types";
 
-/** Whether one of this track task's downloaded files is the file at `filePath`. */
+/** Whether one of this track task's files (a download, a separated or saved stem) is the file at `filePath`. */
 export function attributesPlayFile(attrs: MusicDownloadTaskAttributes | undefined, filePath: string): boolean {
-    return attrs?.kind === "track" && attrs.downloadSources.some((s) => s.localFile?.path === filePath);
+    if (attrs?.kind !== "track") return false;
+    if (attrs.downloadSources.some((s) => s.localFile?.path === filePath)) return true;
+    if (attrs.stemRuns?.some((run) => run.stems.some((stem) => stem.path === filePath))) return true;
+    return Object.values(attrs.savedStems ?? {}).some((stem) => stem.path === filePath);
 }
 
 /** Path of the first non-rejected source of this track task whose downloaded file is on disk. */

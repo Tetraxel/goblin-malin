@@ -27,6 +27,7 @@ function reviveTrackDates(raw: TrackDownloadTask): TrackDownloadTask {
     return {
         ...attrs,
         savedFile: savedFile ? { ...savedFile, savedAt: new Date(savedFile.savedAt) } : undefined,
+        ...reviveStems(attrs),
         metadataGroups: attrs.metadataGroups.map((group) => ({
             ...group,
             results: group.results.map((result) => ({
@@ -44,6 +45,32 @@ function reviveTrackDates(raw: TrackDownloadTask): TrackDownloadTask {
             localFile: source.localFile ? { ...source.localFile } : undefined,
         })),
     };
+}
+
+/**
+ * The stem runs and saved stems with their dates back. Nothing separates in a task that was just loaded: a run saved
+ * while it was queued or separating was cut off (the app closed) and comes back stopped, never busy for ever.
+ */
+function reviveStems(attrs: TrackDownloadTask): Pick<TrackDownloadTask, "stemRuns" | "savedStems"> {
+    const out: Pick<TrackDownloadTask, "stemRuns" | "savedStems"> = {};
+    if (attrs.stemRuns) {
+        out.stemRuns = present(attrs.stemRuns).map((run) => ({
+            ...run,
+            state: run.state === "queued" || run.state === "separating" ? "stopped" : run.state,
+            progress: run.state === "queued" || run.state === "separating" ? undefined : run.progress,
+            startedAt: new Date(run.startedAt),
+            finishedAt: run.finishedAt ? new Date(run.finishedAt) : undefined,
+            stems: present(run.stems),
+        }));
+    }
+    if (attrs.savedStems) {
+        out.savedStems = Object.fromEntries(
+            Object.entries(attrs.savedStems)
+                .filter(([, stem]) => !!stem)
+                .map(([kind, stem]) => [kind, { ...stem, savedAt: new Date(stem.savedAt) }])
+        );
+    }
+    return out;
 }
 
 function reviveCollectionDates(attrs: CollectionDownloadTask): CollectionDownloadTask {

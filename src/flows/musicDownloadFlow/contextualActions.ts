@@ -18,6 +18,8 @@ import { addLinkFromClipboard } from "./utils/addLinkFromClipboard";
 import { discoveryServiceRegistry } from "./registries";
 import { metadataLimiter, downloadLimiter } from "./utils/stageLimiters";
 import { computeCompiledMetadata } from "./utils/compiledMetadata";
+import { buildSeparateStemsAction, buildStemColumnActions } from "./stems/stemColumnActions";
+import { stemKindRegistry } from "./stems/stemKinds";
 import type { Task } from "#base/task/task";
 import type { Semaphore } from "#utils/semaphore";
 import { globalLogger } from "#base/logger/logger";
@@ -389,6 +391,9 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
         });
     }
 
+    // Stems (P33): on the task row, so it is there whatever column the cursor is on.
+    taskActions.push(...buildSeparateStemsAction(task));
+
     // ── Column row (top) ──────────────────────────────────────────────────
     // `column` can be undefined when the selected column index is stale — e.g.
     // right after switching Metadata→Download view, the new (shorter) column set
@@ -458,6 +463,14 @@ function buildTrackContextualActionBar(task: DownloadTask, attributes: BarAttrib
             description: "Add the link in the clipboard to this track as a source (any platform)",
             onClick: () => fire(addLinkFromClipboard(task)),
         });
+    }
+
+    if (column && column.id.startsWith("stem-")) {
+        const kind = column.id.replace("stem-", "");
+        const display = stemKindRegistry.get(kind);
+        columnLabel = display.label;
+        columnColor = display.color;
+        columnActions.push(...buildStemColumnActions(kind, task));
     }
 
     if (column && column.id.startsWith("discoveryService-")) {

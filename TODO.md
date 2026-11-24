@@ -44,6 +44,7 @@ Decide per release whether each is wanted.
 - [ ] Search-based / text import — `P26`
 - [ ] Audio verification (duration / fingerprint) — `P27`
 - [ ] Claude picking the best download source on its own, as a pipeline step (the chat and its tools exist) — `P29/T29.1`
+- [ ] Stems: play several stems together (an instrumental from drums + bass + other, `mpvMix.ts`); "Relocate" for a saved stem that was moved; a committed TUI fixture with stems — `P33`
 
 ## ✅ Done
 
@@ -54,6 +55,7 @@ The details are in [CHANGELOG.md](CHANGELOG.md); the audit fixes are marked in e
 - Downloads: **Soulseek**, one output format (`PROD-03`), YouTube cookies import (`P24`), verified tool downloads with an alert when one is missing (`DL-01`)
 - The saved file is the task's own record; `saveTrack` is tested; MusicBrainz IDs written to the tags (`MD-03`)
 - **Claude chat** with typed tools, preview and undo (`P32`, [docs/agent-tools.md](docs/agent-tools.md))
+- **Stem separation** with audio-separator, on request: Stems view and tab, models chosen by the user, saved next to the track, Claude tools (`P33`)
 - Sessions + archive, groups (`Ctrl+G`), Actions menu (Picard batch), mouse selection, copy / edit cells, restart without the cache
 - Data safety: derived data folder, single-instance lock, quit with `Ctrl+Q`, crash handlers that save (`DATA-04`…`DATA-07`); logging capped and rotated (`DATA-10`)
 - Release pipeline pinned and CI on Windows + Linux, unit and end-to-end (`REL-01`…`REL-03`); docs rewritten (`DOC-01`, `DOC-03`, `DOC-04`)

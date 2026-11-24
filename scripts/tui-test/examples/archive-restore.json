@@ -1,0 +1,62 @@
+{
+    // Del on a task asks: Archive (keeps its metadata and sources, in the Archive window) or Delete (gone). An archived
+    // task is found by search in the Archive window and comes back with Enter, with its metadata. The dialogs are
+    // answered with the mouse, so the scenario does not depend on which button has the focus.
+    "terminal": { "cols": 140, "rows": 45 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "network": { "mode": "offline" },
+    "steps": [
+        { "type": "stable", "timeout": 20000 },
+        { "type": "key", "key": "Tab" },
+        { "type": "assert", "contains": "Task 1/50" },
+
+        // Archive the first task (NOTION - Hooked).
+        { "type": "key", "key": "Delete" },
+        { "type": "waitForContent", "contains": "Remove task", "timeout": 3000 },
+        { "type": "assert", "contains": "Archive 1 task to keep metadata and sources" },
+        { "type": "click", "matches": "Archive(?=\\s+Delete\\s+Cancel)" },
+        { "type": "waitForGone", "contains": "Remove task", "timeout": 3000 },
+        { "type": "waitForGone", "contains": "Hooked", "timeout": 3000 },
+        { "type": "assert", "contains": "Task 1/49" },
+        { "type": "assertJson", "file": "sessions.json", "path": "sessions[0].tasks", "length": 49, "timeout": 5000 },
+        { "type": "assertJson", "file": "sessions.json", "path": "sessions[0].archived", "length": 1 },
+
+        // Delete the next one (Daft Punk - Technologic) for good: it is not in the archive.
+        { "type": "key", "key": "Delete" },
+        { "type": "waitForContent", "contains": "Remove task", "timeout": 3000 },
+        { "type": "click", "matches": "Delete(?=\\s+Cancel)" },
+        { "type": "waitForGone", "contains": "Remove task", "timeout": 3000 },
+        { "type": "waitForGone", "contains": "Technologic", "timeout": 3000 },
+        { "type": "assertJson", "file": "sessions.json", "path": "sessions[0].tasks", "length": 48, "timeout": 5000 },
+        { "type": "assertJson", "file": "sessions.json", "path": "sessions[0].archived", "length": 1 },
+
+        // The Archive window lists the archived track only, and finds it by search.
+        { "type": "click", "text": "Archive" },
+        { "type": "waitForContent", "contains": "▤ ARCHIVE", "timeout": 5000 },
+        { "type": "assert", "matches": "NOTION\\s+Hooked" },
+        { "type": "assertNot", "contains": "Technologic" },
+        { "type": "type", "text": "zzz" },
+        { "type": "waitForContent", "contains": "No archived task matches.", "timeout": 3000 },
+        { "type": "key", "key": "Backspace", "repeat": 3, "delayMs": 60 },
+        { "type": "type", "text": "hook" },
+        { "type": "waitForContent", "matches": "NOTION\\s+Hooked", "timeout": 3000 },
+
+        // Enter restores it, with the metadata it had: it is back at the end of the list.
+        { "type": "key", "key": "↓" },
+        { "type": "key", "key": "Enter" },
+        { "type": "waitForGone", "contains": "▤ ARCHIVE", "timeout": 3000 },
+        { "type": "assertLog", "contains": "Restored 1 archived task" },
+        { "type": "assertJson", "file": "sessions.json", "path": "sessions[0].archived", "length": 0, "timeout": 5000 },
+        { "type": "assertJson", "file": "sessions.json", "path": "sessions[0].tasks", "length": 49 },
+        {
+            "type": "assertJson",
+            "file": "sessions.json",
+            "path": "sessions[0].tasks[-1].attributes.metadataGroups[0].results[0].metadata.trackName",
+            "equals": "Hooked"
+        },
+        { "type": "key", "key": "Tab" },
+        { "type": "pressUntil", "key": "↓", "contains": "Task 49/49", "max": 60, "delayMs": 40 },
+        { "type": "waitForContent", "matches": "☛.*NOTION\\s+Hooked", "timeout": 3000 },
+        { "type": "assertNoErrors" }
+    ]
+}

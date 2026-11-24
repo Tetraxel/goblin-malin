@@ -1,0 +1,79 @@
+{
+    // The Sessions modal: a new (empty) session, loading the old one back, renaming it, duplicating it, searching, and
+    // deleting one, checked on screen and in the saved sessions.json. The delete confirmation is answered with the
+    // mouse, so the scenario does not depend on which of its buttons has the focus.
+    "terminal": { "cols": 140, "rows": 45 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "network": { "mode": "offline" },
+    "steps": [
+        { "type": "stable", "timeout": 20000 },
+        { "type": "click", "text": "Sessions" },
+        { "type": "waitForContent", "contains": "1 session", "timeout": 5000 },
+        { "type": "assert", "contains": "● CURRENT" },
+
+        // Ctrl+N: a new, empty session takes the screen; the old one is not lost.
+        { "type": "key", "key": "Ctrl+N" },
+        { "type": "waitForGone", "contains": "Hooked", "timeout": 5000 },
+        { "type": "assert", "contains": "to import music URLs" },
+
+        // Load the old one back (the empty one is not listed: it has nothing to keep).
+        { "type": "click", "text": "Sessions" },
+        { "type": "waitForContent", "contains": "50 tracks", "timeout": 5000 },
+        { "type": "assertNot", "contains": "● CURRENT" },
+        { "type": "key", "key": "↓" },
+        { "type": "key", "key": "Enter" },
+        { "type": "waitForContent", "contains": "Hooked", "timeout": 5000 },
+        { "type": "assertNot", "contains": "SESSIONS" },
+
+        // Rename it (Ctrl+R edits the name in place; Enter saves it, the modal stays open).
+        { "type": "click", "text": "Sessions" },
+        { "type": "waitForContent", "contains": "● CURRENT", "timeout": 5000 },
+        { "type": "key", "key": "↓" },
+        { "type": "key", "key": "Ctrl+R" },
+        { "type": "key", "key": "Backspace", "repeat": 70, "delayMs": 25 },
+        { "type": "type", "text": "Road trip" },
+        { "type": "stable" },
+        { "type": "key", "key": "Enter" },
+        { "type": "waitForContent", "matches": "☛ Road trip ● CURRENT", "timeout": 3000 },
+        { "type": "assertJson", "file": "sessions.json", "path": "sessions[0].name", "equals": "Road trip" },
+
+        // Duplicate it: the copy becomes the current session, and both are saved with their 50 tracks.
+        { "type": "key", "key": "Ctrl+D" },
+        { "type": "waitForContent", "contains": "Duplicate session?", "timeout": 3000 },
+        { "type": "assert", "contains": "The copy shares its files with the original" },
+        { "type": "key", "key": "Enter" },
+        { "type": "waitForGone", "contains": "Duplicate session?", "timeout": 3000 },
+        { "type": "assertJson", "file": "sessions.json", "path": "sessions", "length": 2 },
+        { "type": "assertJson", "file": "sessions.json", "path": "sessions[0].name", "equals": "Copy of Road trip" },
+        { "type": "assertJson", "file": "sessions.json", "path": "sessions[1].tasks", "length": 50 },
+
+        // Search: the field has the focus when the modal opens.
+        { "type": "click", "text": "Sessions" },
+        { "type": "waitForContent", "contains": "2 sessions", "timeout": 5000 },
+        { "type": "type", "text": "zzz" },
+        { "type": "waitForContent", "contains": "No sessions found.", "timeout": 3000 },
+        { "type": "key", "key": "Backspace", "repeat": 3, "delayMs": 60 },
+        { "type": "waitForContent", "contains": "2 sessions", "timeout": 3000 },
+
+        // Delete the original: Esc keeps it, the Delete button removes it for good.
+        { "type": "key", "key": "↓" },
+        { "type": "key", "key": "↓" },
+        { "type": "assert", "contains": "☛ Road trip" },
+        { "type": "key", "key": "Delete" },
+        { "type": "waitForContent", "contains": "Delete session?", "timeout": 3000 },
+        { "type": "key", "key": "Esc" },
+        { "type": "waitForGone", "contains": "Delete session?", "timeout": 3000 },
+        { "type": "assert", "contains": "2 sessions" },
+        { "type": "key", "key": "Delete" },
+        { "type": "waitForContent", "contains": "Delete session?", "timeout": 3000 },
+        { "type": "click", "matches": "Delete(?=\\s+Cancel)" },
+        { "type": "waitForContent", "contains": "1 session", "timeout": 3000 },
+        { "type": "assertJson", "file": "sessions.json", "path": "sessions", "length": 1 },
+        { "type": "assertJson", "file": "sessions.json", "path": "sessions[0].name", "equals": "Copy of Road trip" },
+
+        { "type": "key", "key": "Esc" },
+        { "type": "waitForGone", "contains": "SESSIONS", "timeout": 3000 },
+        { "type": "assert", "contains": "Hooked" },
+        { "type": "assertNoErrors" }
+    ]
+}

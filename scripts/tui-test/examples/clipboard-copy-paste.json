@@ -1,0 +1,88 @@
+{
+    // The clipboard, both ways, without touching the real one (a file stands in for it: GOBLIN_TEST_CLIPBOARD).
+    // Ctrl+C on the TRACK column copies the full title (not the truncated cell), one line per selected task; Ctrl+V on a
+    // platform column adds the link on the clipboard as a source the user typed: it is saved before anything is
+    // fetched, so it is there even with the network down. A clipboard with no link is explained, never ignored.
+    "terminal": { "cols": 150, "rows": 45 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "network": { "mode": "offline" },
+    "clipboard": "something the developer copied",
+    "steps": [
+        { "type": "stable", "timeout": 20000 },
+        { "type": "key", "key": "Tab" },
+        { "type": "pressUntil", "key": "→", "contains": "Copy track title", "max": 8 },
+
+        // One title, then three (Ctrl+Shift+↓ extends the selection): the full titles, not the "…" of the cells.
+        { "type": "key", "key": "Ctrl+C" },
+        { "type": "assertClipboard", "equals": "Hooked" },
+        { "type": "key", "key": "Ctrl+Shift+↓", "repeat": 2 },
+        { "type": "waitForContent", "contains": "3 selected tasks", "timeout": 3000 },
+        { "type": "key", "key": "Ctrl+C" },
+        {
+            "type": "assertClipboard",
+            "equals": "Hooked\nTechnologic - Le Knight Club Remix\nArmed & Dangerous"
+        },
+        { "type": "key", "key": "Esc" },
+        { "type": "waitForGone", "contains": "3 selected tasks", "timeout": 3000 },
+
+        // Paste link on the Deezer column, with no link on the clipboard: the app says so.
+        { "type": "pressUntil", "key": "→", "contains": "Paste link", "max": 8 },
+        { "type": "setClipboard", "text": "just some words" },
+        { "type": "key", "key": "Ctrl+V" },
+        { "type": "waitForContent", "contains": "No link in the clipboard", "timeout": 5000 },
+        { "type": "key", "key": "Enter" },
+        { "type": "waitForGone", "contains": "No link in the clipboard", "timeout": 3000 },
+
+        // Now a Deezer link (with the line break a copied line ends with), on the 3rd track (Esc kept the cursor there).
+        // The network is down: the link stays, as a row to retry, and in the saved session.
+        { "type": "setClipboard", "text": "https://www.deezer.com/track/3135556\n" },
+        { "type": "key", "key": "Ctrl+V" },
+        { "type": "waitForContent", "matches": "\\[USER\\] ✘ DEEZER::TRACK::3135556 fetch failed", "timeout": 8000 },
+        { "type": "assertRequest", "url": "api.deezer.com/track/3135556", "min": 1 },
+        { "type": "assertLog", "contains": "Added 1 link(s) to the track by hand" },
+        {
+            "type": "assertJson",
+            "file": "sessions.json",
+            "path": "sessions[0].tasks[2].attributes.userSources[-1].uri",
+            "equals": "DEEZER::TRACK::3135556",
+            "timeout": 8000
+        },
+
+        // The network comes back: R on the row (in Metadata Sources) reads it again, and its details fill in.
+        { "type": "key", "key": "Tab" },
+        { "type": "pressUntil", "key": "↓", "matches": "☛\\s*\\[USER\\] ✘ DEEZER", "max": 10 },
+        {
+            "type": "network",
+            "rules": [
+                {
+                    "url": "api.deezer.com/track/3135556",
+                    "json": {
+                        "id": 3135556,
+                        "readable": true,
+                        "title": "Harder, Better, Faster, Stronger",
+                        "isrc": "GBDUW0000059",
+                        "link": "https://www.deezer.com/track/3135556",
+                        "duration": 224,
+                        "artist": { "id": 27, "name": "Daft Punk" },
+                        "contributors": [{ "id": 27, "name": "Daft Punk" }],
+                        "album": { "id": 302127, "title": "Discovery" },
+                        "type": "track"
+                    }
+                }
+            ]
+        },
+        { "type": "key", "key": "r" },
+        {
+            "type": "waitForContent",
+            "matches": "\\[USER\\]\\s+DEEZER::TRACK::3135556\\s+Harder, Better, Faster, Stronger",
+            "timeout": 8000
+        },
+        { "type": "assertNot", "contains": "fetch failed" },
+        { "type": "assert", "contains": "GBDUW0000059" },
+
+        // Ctrl+C on the row copies its link, without the line break.
+        { "type": "key", "key": "Ctrl+C" },
+        { "type": "assertClipboard", "equals": "https://www.deezer.com/track/3135556" },
+        { "type": "assertNoErrors", "ignore": ["Deezer"] }
+    ]
+}

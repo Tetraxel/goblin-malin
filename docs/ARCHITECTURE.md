@@ -54,15 +54,22 @@ A task is a plain serialisable attribute object (`TrackDownloadTask`) plus a sta
 
 ## Providers (the extensibility axis)
 
-Three registries, defined in [registries.ts](../src/flows/musicDownloadFlow/registries.ts):
+Four registries, defined in [registries.ts](../src/flows/musicDownloadFlow/registries.ts):
 
-| Registry                   | Base class                                                                             | Registered today                                                    |
-| -------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `metadataServiceRegistry`  | [MetadataService](../src/flows/musicDownloadFlow/metadataService.ts)                   | `spotify`, `youtube`, `soundcloud`, `deezer`, `appleMusic`, `tidal` |
+| Registry                   | Base class                                                                             | Registered today                                                               |
+| -------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `metadataServiceRegistry`  | [MetadataService](../src/flows/musicDownloadFlow/metadataService.ts)                   | `spotify`, `youtube`, `soundcloud`, `deezer`, `appleMusic`, `tidal`            |
 | `discoveryServiceRegistry` | [DiscoveryMetadataService](../src/flows/musicDownloadFlow/discoveryMetadataService.ts) | `songlink` (opt-in, on request), `musicBrainz`, `claude` (opt-in, last resort) |
-| `downloadServiceRegistry`  | [DownloadService](../src/flows/musicDownloadFlow/downloadService.ts)                   | `ytdlp`, `soulseek`                                                 |
+| `downloadServiceRegistry`  | [DownloadService](../src/flows/musicDownloadFlow/downloadService.ts)                   | `ytdlp`, `soulseek`                                                            |
+| `stemServiceRegistry`      | [StemSeparationService](../src/flows/musicDownloadFlow/stems/stemService.ts)           | `audioSeparator` (off by default)                                              |
 
 Adding a provider = one service class + one `register()` call in `init.ts`. Display info (`static display`), settings (`defaultSettings`), consent, last-resort, URL parsing and its cell component are all declared on the class and read generically, so the UI and the pipeline never branch on a provider key. The details of these static capabilities are in [CLAUDE.md](../CLAUDE.md#provider-extensibility).
+
+## Stems (P33)
+
+Splitting a track into stems (vocals, drums, bass, other) is **not a pipeline stage**: it only runs when the user (or Claude, asking first) starts it. `DownloadTask.startStemSeparation()` adds a **run** (`stemRuns`, one per model tried) and separates the saved file, else the selected download, one run at a time for the whole app (`stemLimiter`). Each stem uses the file of the run the user picked (`stemPick`, else the newest run); saving writes it next to the track's file under a name made from a template (`savedStems`). Runs, picks and saved stems are user data: no reset clears them. The UI is the **Stems view** (one column per stem, `columns/StemCell.tsx`) and the **Stems tab** (`components/SecondaryPanel/StemsPanel/`).
+
+The one provider, `AudioSeparatorService`, runs [python-audio-separator](https://github.com/nomadkaraoke/python-audio-separator) (the engine of Ultimate Vocal Remover) installed through a pinned `uv` into `stems/` in the data folder, only from Settings → Stems; the models are downloaded one by one, when the user picks them. See [P33](projects/p33/tasks.md) for the measurements behind it.
 
 ## The chat agent (P32)
 
@@ -88,7 +95,7 @@ A second, separate way to use Claude (the first is the last-resort discovery pro
 
 ## Data on disk
 
-Everything lives in one folder (`GOBLIN_DATA_DIR`, else the OS default; `<repo>/data` when running from source): `settings.json`, `sessions.json` (+ `.bak`), `.env` (credentials), `cache/`, `bin/` (downloaded tools, `cookies.txt`), `app.log` (+ `app.prev.log`). The folder is derived at start-up and never read back from `settings.json` ([utils/appPaths.ts](../src/utils/appPaths.ts)). A lock file keeps a second instance out of the same folder.
+Everything lives in one folder (`GOBLIN_DATA_DIR`, else the OS default; `<repo>/data` when running from source): `settings.json`, `sessions.json` (+ `.bak`), `.env` (credentials), `cache/`, `bin/` (downloaded tools, `cookies.txt`), `stems/` (the stem separation engine and its models, once installed), `app.log` (+ `app.prev.log`). The folder is derived at start-up and never read back from `settings.json` ([utils/appPaths.ts](../src/utils/appPaths.ts)). A lock file keeps a second instance out of the same folder.
 
 ## Input and hints
 

@@ -35,3 +35,27 @@ export function useShortcutLiteral(idOrIds: string | string[]): string {
         .filter(Boolean)
         .join("/");
 }
+
+/**
+ * The live key of each shortcut id, one entry per id ("" for an id that has none, or an empty id). For a component
+ * that shows several (the tab lines): one subscription for all of them.
+ */
+export function useShortcutLiterals(ids: readonly string[]): string[] {
+    const [, forceUpdate] = useReducer((x: number) => x + 1, 0);
+
+    useEffect(() => {
+        const unsubRegistry = shortcutRegistry.subscribe(forceUpdate);
+        const unsubSettings = SettingsStore.getInstance().onSettingsChanged(forceUpdate);
+        return () => {
+            unsubRegistry();
+            unsubSettings();
+        };
+    }, []);
+
+    const keybindings = SettingsStore.getInstance().getAppSettings().keybindings;
+    return ids.map((id) => {
+        if (!id) return "";
+        const resolved = keybindings[id] ?? shortcutRegistry.getDefaultShortcut(id);
+        return resolved ? getShortcutLiteral([resolved]) : "";
+    });
+}

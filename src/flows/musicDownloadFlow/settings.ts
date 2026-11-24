@@ -2,7 +2,12 @@ import * as os from "os";
 import * as path from "path";
 import { type ServiceRegistry } from "#base/service-registry";
 import { SettingsStore } from "#settings/settingsStore";
-import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
+import {
+    metadataServiceRegistry,
+    discoveryServiceRegistry,
+    downloadServiceRegistry,
+    stemServiceRegistry,
+} from "./registries";
 
 /** Per-provider runtime values (stored in JSON). Keys match ProviderSettingsSchema fields. */
 export type StoredProviderSettings = Record<string, boolean | string>;
@@ -72,6 +77,25 @@ export type MusicDownloadFlowSettings = {
         panelWidth: number;
         /** Keep `agent.log` (in the data folder): everything said to and by Claude, and every tool call, raw. */
         keepLog: boolean;
+    };
+    /**
+     * Stem separation (P33): on request only, never a pipeline stage. The engine and its models are only downloaded
+     * when the user asks (Settings → Stems). Each provider's own settings are under `providers` (its `enabled` is
+     * off by default).
+     */
+    stems: {
+        /** A `STEM_SETS` key: which stems the Stems view has a column for. */
+        stemSet: string;
+        /**
+         * How a stem's file is named after the track's: `{name}` is the track's file name without its extension,
+         * `{stem}` / `{Stem}` the stem's name in lower case / as a title. A `/` makes a sub-folder.
+         */
+        fileNameTemplate: string;
+        /** Write the track's tags into each stem, with the stem's name after the title. */
+        tagStems: boolean;
+        /** Saving a track also saves the stems separated from its download, when they are not saved yet. */
+        saveWithTrack: boolean;
+        providers: Record<string, StoredProviderSettings>;
     };
     /** What the user has been asked once, on a first launch. */
     onboarding: {
@@ -155,6 +179,13 @@ export const BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS: MusicDownloadFlowSetting
         panelWidth: 42,
         keepLog: true,
     },
+    stems: {
+        stemSet: "4 stems",
+        fileNameTemplate: "{name} ({Stem})",
+        tagStems: true,
+        saveWithTrack: true,
+        providers: {},
+    },
     onboarding: {
         providersChosen: false,
     },
@@ -177,6 +208,10 @@ export function computeDefaultMusicSettings(): MusicDownloadFlowSettings {
         download: {
             ...BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS.download,
             providers: extractProviderDefaults(downloadServiceRegistry),
+        },
+        stems: {
+            ...BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS.stems,
+            providers: extractProviderDefaults(stemServiceRegistry),
         },
     };
 }

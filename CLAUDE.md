@@ -41,6 +41,10 @@ Optional static capabilities a service class can declare (all read generically �
 - `searchTracks?(query, limit)` (metadata services, instance method) — a free-text search of the service's catalogue, best matches first. `DownloadTask.searchCatalog` asks every enabled service that has it; the chat agent's `search_music` tool is built on that, so a new provider that can search is found by Claude with no other change.
 - `getAlbumDetails?(album, { withIsrcs })` (metadata services, instance method) — the whole album the track belongs to (barcode, track list, artist pages). A track's own `album` is usually the "simplified" one; the MusicBrainz checks ask the service that owns the album's link (`DownloadTask.fetchAlbumDetails`).
 
+### Stem separation providers (P33)
+
+A fourth registry, `stemServiceRegistry`: a class extending `StemSeparationService` (`stems/stemService.ts`) and one `register()` in `initMusicApp()`. Besides `display`, `summary`, `defaultSettings` (with `enabled: false`), `settingsRows` and `settingsStatus`, it declares `static engine: StemEngine` (install / uninstall / list, download and remove models / separate; shared by every task) and `static defaultModel`. Everything else reads them through `stems/stemProviders.ts` (`activeStemProvider`, `getStemEngine`…), never by key. Separation is **never a pipeline stage**: only `DownloadTask.startStemSeparation()` starts one (the Stems tab, a stem column's action, the Actions menu, Claude's `separate_stems`), and it counts in `isBusy()` and stops with `abortRun()`. A stem's kind comes from the model, its label and colour from `stemKindRegistry` (`stems/stemKinds.ts`). `stemRuns`, `stemPick` and `savedStems` are user data like `savedFile`: no reset path touches them (`tests/unit/stems.test.ts`).
+
 ### The toolbar's Actions menu
 
 Things to do to the whole list (not to one task) go in the **Actions** drop-down under the toolbar (`src/components/ActionsMenu/`), through `actionsMenuRegistry.register({ id, label, description, unavailableReason?, run })` (`src/base/actionsMenu.ts`); the music flow registers its items in `registerActionsMenuItems()`, called by `initMusicApp()`. `unavailableReason` is asked each time the menu opens: an item that cannot be used yet stays listed, greyed, with the reason. `run` goes after the menu has closed, so one that opens a dialog opens it from the toolbar; anything irreversible asks through `dialogBridge.confirm` first, like everywhere else. The menu hangs under the button that opened it (`toolbarAnchor`, set by `ToolbarButtonInvoker`) and is the `actionsMenu` window, with its own rebindable shortcuts (`actionsMenu.up/down/confirm/cancel`).
@@ -51,6 +55,7 @@ The chat agent ([P32](docs/projects/p32/tasks.md)) calls **tools**, each declare
 
 - **After adding or changing a tool, run `yarn run agent:tools --write`**: a unit test fails when the committed `docs/agent-tools.md` is out of date. A tool needs a `summary`, an input schema, a `kind` (`read` / `write` / `confirm`), what it `locks` and an `example`, or it does not register.
 - **A tool changes a track only through a named `DownloadTask` method** (`setMetadataOverride`, `selectDownloadSourceById`…), never `updateAttributes`, and goes through `agentWrite()` (`agent/taskAccess.ts`): it refuses a running task and a stale revision, spends the turn's budget and records the undo. The panels call the **same** methods (wrapped in `runUserEdit`, which turns a "Claude holds this task" refusal into a log line). A new field the user can edit gets a method that validates it and checks `assertWritable`, and goes into `computeTaskRevision` if a stale read of it matters.
+- The exceptions are tools that start or stop work instead of changing a value (`separate_stems`, `stop_stems`): a running task is exactly what they act on, and there is nothing to undo. They still go through the task's own method (which checks the lock) and check and spend the turn's budget (`ctx.turn.checkBudget` / `count`).
 - Anything irreversible or public is a `confirm` tool: it asks through `ctx.confirm` (safe button first, "not done" when nobody answers).
 - The agent session has **no built-in tool and no web**; web research stays in the sandboxed `ClaudeClient`. Text from tasks, titles and logs is untrusted data: views return it inside fields, never inside sentences a tool writes.
 - Text streaming into the chat is gathered by `ChatStore` and shown every 300 ms. Do not add a spinner or a faster timer to the chat: every React commit repaints the whole screen.
@@ -73,7 +78,7 @@ A provider's credentials (the fields of its `static setupWizard`) are read and w
 
 ### Selecting text on the screen
 
-The mouse is reported to the app (clicks, wheel), so the terminal's own selection is off: **the app selects and copies itself** (`src/base/selection/`). A left drag highlights the cells under it, releasing copies them (OSC 52 + the system clipboard tool, `clipboardWrite.ts`), `Alt`+drag is a rectangle. Nothing in a component knows about it, and **new UI gets it for free** — do not add a "copy" button for plain text, and do not read the mouse for a drag of your own without checking the selection's rules:
+The mouse is reported to the app (clicks, wheel), so the terminal's own selection is off: **the app selects and copies itself** (`src/base/selection/`). A left drag highlights the cells under it, releasing copies them (OSC 52 + the system clipboard tool, `clipboardWrite.ts`), `Alt`+drag is a rectangle. Every read or write of the system clipboard goes through `#base/systemClipboard` (never `clipboardy` directly): the test harness swaps it for a file there. Nothing in a component knows about it, and **new UI gets it for free** — do not add a "copy" button for plain text, and do not read the mouse for a drag of your own without checking the selection's rules:
 
 - The text comes from what Ink painted, not from the React tree: the **patched Ink output stage** keeps the cells of the last frame and paints the highlight (`patches/ink/output.js` change [5], shared with the app through `globalThis` — `screenTap.ts`). `<SelectionLayer />` (in `AppInner`) only gives a change of the selection a React commit to repaint in. Stock Ink has no tap: after an Ink upgrade redo [5] (`patches/ink/README.md`) or nothing can be selected (`tests/unit/inkOutputPatch.test.ts` checks it).
 - A selection is limited to the **pane** the press was in: the columns between the vertical box-drawing lines on each side of the press cell (`paneBounds`). So draw a panel with a border (`│`) and a drag in it never takes the neighbour's text. A press **on** a `│` never starts a selection: that is how a drag handle (the chat's left edge) keeps its drag. `Ctrl` / `Shift` + press is the task list's multi-select and is left alone.
@@ -115,7 +120,7 @@ How it fits together:
 
 ## Active vs. disabled code
 
-Registered metadata services: `spotify`, `youtube`, `soundcloud`, `deezer`, `appleMusic` (alias `itunes`), `tidal`. Discovery services: `songlink` (opt-in, on request), `musicBrainz`, `claude` (opt-in, last resort, on request — see [docs/projects/p29/tasks.md](docs/projects/p29/tasks.md)). Download services: `ytdlp`, `soulseek`.
+Registered metadata services: `spotify`, `youtube`, `soundcloud`, `deezer`, `appleMusic` (alias `itunes`), `tidal`. Discovery services: `songlink` (opt-in, on request), `musicBrainz`, `claude` (opt-in, last resort, on request — see [docs/projects/p29/tasks.md](docs/projects/p29/tasks.md)). Download services: `ytdlp`, `soulseek`. Stem separation services: `audioSeparator` (off by default, on request only — see [docs/projects/p33/tasks.md](docs/projects/p33/tasks.md)).
 
 ## Dev commands
 
@@ -135,7 +140,11 @@ yarn test  # Vitest unit + e2e tests (yarn run test:coverage for unit coverage)
 yarn tsx scripts/tui-test/cli.ts <scenario.json>           # JSON output
 yarn tsx scripts/tui-test/cli.ts <scenario.json> --pretty  # human-readable
 yarn tsx scripts/tui-test/cli.ts <scenario.json> --profile # + per-component render profiling
+yarn tsx scripts/tui-test/cli.ts --all                     # every scenario of examples/, pass/fail per line
+yarn tsx scripts/tui-test/sessionCli.ts start             # one app kept running: key / click / find / screen / stop
 ```
+
+**To look at the real UI while changing it, use an interactive session** (`sessionCli.ts`: press a key, read the screen with row numbers, `find` a text to get its cell, `click` it) instead of writing a scenario blind. A scenario can check text (`contains` / `matches`, `assertNot`, `waitForGone`), styles (`assertStyle`), golden snapshots (`assertSnapshot`, `--update-golden`), the mouse (`click`, `drag`, `wheel`), the saved state (`assertJson`, `assertFile`), the log, the clipboard (`setClipboard` / `assertClipboard`: a file stands in for it, the real one is never touched), and run with a **fake network** (`"network"`: canned answers, nothing leaves the machine; `assertRequest`). Steps are checked before the app starts, so a typo fails at once. A failing step prints the screen, the last inputs and the log tail.
 
 ### Render profiling
 

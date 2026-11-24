@@ -13,7 +13,7 @@ import { globalLogger } from "#base/logger/logger";
 export const SETTINGS_PATH = path.join(DEFAULT_APP_DATA_DIR, "settings.json");
 
 /** Bump when the stored shape changes, and add the `SETTINGS_MIGRATIONS[oldVersion]` step that upgrades a file. */
-export const SETTINGS_FILE_VERSION = 3;
+export const SETTINGS_FILE_VERSION = 4;
 
 /**
  * Shape of the JSON file on disk. It holds only what the user changed: every section is an override layer
@@ -36,6 +36,15 @@ const SECTIONS = ["general", "logs", "keybindings", "music"] as const;
 
 /** Shortcut ids that no longer exist: a stored override for one is dead weight. */
 const REMOVED_KEYBINDINGS = ["global.toggleProfiling"];
+
+/** Shortcut ids that were renamed: an override stored under the old id moves to the new one (migration v3 → v4). */
+export const RENAMED_KEYBINDINGS: Readonly<Record<string, string>> = {
+    "global.mode1": "global.metadataView",
+    "global.mode2": "global.downloadView",
+    "global.tab3": "global.metadataSourcesTab",
+    "global.tab4": "global.downloadSourcesTab",
+    "global.tab5": "global.logsTab",
+};
 
 /** `[v]` upgrades a version-`v` file to `v + 1`. Runs once on load; the result is saved on the next write. */
 const SETTINGS_MIGRATIONS: Record<number, (file: StoredSettings) => StoredSettings> = {
@@ -74,6 +83,17 @@ const SETTINGS_MIGRATIONS: Record<number, (file: StoredSettings) => StoredSettin
         if (onboarding.providersChosen === undefined) onboarding.providersChosen = true;
         music.onboarding = onboarding;
         return { ...file, music };
+    },
+    // v3 → v4: the view and tab shortcuts got names instead of numbers when the Stems view and tab came (P33) and
+    // the numbers moved (Logs went from 5 to 7). A key the user chose for one of them stays theirs.
+    3: (file) => {
+        const keybindings = { ...file.keybindings };
+        for (const [from, to] of Object.entries(RENAMED_KEYBINDINGS)) {
+            if (keybindings[from] === undefined) continue;
+            if (keybindings[to] === undefined) keybindings[to] = keybindings[from];
+            delete keybindings[from];
+        }
+        return { ...file, keybindings };
     },
 };
 

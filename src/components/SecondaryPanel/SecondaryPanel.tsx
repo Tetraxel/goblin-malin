@@ -5,20 +5,18 @@ import { useDebouncedValue } from "#hooks/useDebouncedValue";
 import { LogPanel } from "./LogPanel";
 import { MetadataPanel } from "./MetadataPanel/MetadataPanel";
 import { DownloadPanel } from "./DownloadPanel/DownloadPanel";
-import { TabBar } from "../TabBar";
+import { TabBar, type TabDef } from "../TabBar";
+import { StemsPanel } from "./StemsPanel/StemsPanel";
+import { type SecondaryTab } from "#types/focus";
 import { type Task } from "#base/task/task";
 
-const SECONDARY_TABS = [
-    { key: "3", label: "Metadata Sources" },
-    { key: "4", label: "Download Sources" },
-    { key: "5", label: "Logs" },
+/** The tabs below the task list; the brackets show each one's live key (`global.*Tab`). */
+const SECONDARY_TABS: TabDef[] = [
+    { key: "metadataSources", label: "Metadata Sources", shortcutId: "global.metadataSourcesTab" },
+    { key: "downloadSources", label: "Download Sources", shortcutId: "global.downloadSourcesTab" },
+    { key: "stems", label: "Stems", shortcutId: "global.stemsTab" },
+    { key: "logs", label: "Logs", shortcutId: "global.logsTab" },
 ];
-
-const SUB_TAB_BY_KEY: Record<string, "metadataSources" | "downloadSources" | "logs"> = {
-    "3": "metadataSources",
-    "4": "downloadSources",
-    "5": "logs",
-};
 
 interface SecondaryPanelProps {
     tasks: Task[];
@@ -49,8 +47,6 @@ export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) 
     // AUDIT-performance-2.md (PERF2-02).
     const selectedTask = useDebouncedValue(liveSelectedTask, 80, { leading: true });
 
-    const activeTabKey = subTab === "metadataSources" ? "3" : subTab === "downloadSources" ? "4" : "5";
-
     // Derived once here so MetadataPanel can stay a memoized, context-free child:
     // every value below is referentially stable while only the task cursor moves,
     // so MetadataPanel bails out entirely during scroll.
@@ -61,8 +57,8 @@ export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) 
             <TabBar
                 width={width}
                 tabs={SECONDARY_TABS}
-                activeTabKey={activeTabKey}
-                onSelect={(key) => setSecondaryTab(SUB_TAB_BY_KEY[key])}
+                activeTabKey={subTab}
+                onSelect={(key) => setSecondaryTab(key as SecondaryTab)}
             />
 
             {subTab === "metadataSources" && (
@@ -85,6 +81,8 @@ export const SecondaryPanel: React.FC<SecondaryPanelProps> = ({ tasks, width }) 
             {subTab === "downloadSources" && (
                 <DownloadPanel selectedTask={selectedTask} width={width} height={contentHeight} />
             )}
+
+            {subTab === "stems" && <StemsPanel selectedTask={selectedTask} width={width} height={contentHeight} />}
 
             {subTab === "logs" && <LogPanel tasks={tasks} height={contentHeight} width={width} />}
         </Box>

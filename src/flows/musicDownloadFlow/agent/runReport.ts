@@ -4,6 +4,7 @@ import { computeCompiledMetadata, type CompiledMetadata } from "../utils/compile
 import { type TrackDownloadSource, type TrackDownloadTask } from "../types";
 import { getMusicSettings } from "../settings";
 import { isTaskRunning } from "./taskAccess";
+import { isStemRunActive } from "../stems/stemFiles";
 import { TITLE_NOISE_PATTERN, safeText } from "./views";
 
 /**
@@ -26,6 +27,8 @@ export function isTaskBusy(task: DownloadTask): boolean {
     if (isTaskRunning(task)) return true;
     if (a.primaryMetadataInProgress || a.metadataDiscoveringInProgress) return true;
     if (a.downloadSources.some((s) => s.state === "searching" || s.state === "downloading")) return true;
+    // A stem separation queued or running (P33): `wait_for_tasks` waits for it like for a download.
+    if ((a.stemRuns ?? []).some(isStemRunActive)) return true;
     // Queued by the run controller: pending, with the "Queued" status it sets.
     return a.state === "pending" && task.getStatus().get().type === StatusType.Pending;
 }
@@ -143,6 +146,18 @@ export function assessTask(task: DownloadTask): TaskOutcome {
                 );
             }
         }
+    }
+
+    // Stems (P33): only what is worth a look; a track without stems is not a problem.
+    const lastRun = a.stemRuns?.[a.stemRuns.length - 1];
+    if (lastRun?.state === "failed") {
+        worse("needs_attention");
+        reasons.push(`the last stem separation failed: ${clip(lastRun.error ?? "no message")}`);
+    } else if (lastRun?.state === "done") {
+        notes.push(`stems separated with ${lastRun.model}: ${lastRun.stems.map((s) => s.kind).join(", ")}`);
+    }
+    if ((a.stemRuns ?? []).some((r) => r.stems.some((s) => s.state === "not_found"))) {
+        notes.push("some separated stems are no longer on disk (temporary files cleaned up)");
     }
 
     // The rows that tell the most first: the one in use, then the others that downloaded, then the failures.

@@ -55,6 +55,8 @@
         "test:coverage": "vitest run tests/unit --coverage",
         "test:watch": "vitest",
         "test:tui": "tsx scripts/tui-test/cli.ts",
+        "test:tui:all": "tsx scripts/tui-test/cli.ts --all",
+        "tui:session": "tsx scripts/tui-test/sessionCli.ts",
         "type-check:src": "tsc --noEmit",
         "type-check:tui": "tsc --noEmit --project scripts/tui-test/tsconfig.json",
         "agent:tools": "tsx scripts/agent-tools.ts",

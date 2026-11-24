@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useScreenSize } from "./useScreenSize";
 import { type SetupWizardConfig } from "#base/setupWizard";
+import { type PrimaryMode, type SecondaryTab } from "#types/focus";
 import { taskCursorBridge } from "#base/bridges/taskCursorBridge";
 
 export type CursorPosition =
@@ -87,8 +88,8 @@ export interface FocusState {
     };
     prompt: Record<string, never>;
     secondaryPanel: {
-        primaryMode: "metadata" | "download";
-        subTab: "metadataSources" | "downloadSources" | "logs";
+        primaryMode: PrimaryMode;
+        subTab: SecondaryTab;
         selectedRowIndex: number;
         scrollOffset: number;
         sourcesPanel: {
@@ -145,8 +146,8 @@ export const useFocusManager = ({
     /** Ids of the visible tasks, in display order. */
     taskIds: string[];
     taskColumnCount: number;
-    primaryMode: "metadata" | "download";
-    onPrimaryModeChange: (mode: "metadata" | "download") => void;
+    primaryMode: PrimaryMode;
+    onPrimaryModeChange: (mode: PrimaryMode) => void;
 }) => {
     const taskCount = taskIds.length;
     const { height: terminalHeight, width: terminalWidth } = useScreenSize();
@@ -295,12 +296,19 @@ export const useFocusManager = ({
     }, []);
 
     const setPrimaryMode = useCallback(
-        (mode: "metadata" | "download") => {
+        (mode: PrimaryMode) => {
             onPrimaryModeChange(mode);
             setFocusState((prev) => {
                 const currentSubTab = prev.secondaryPanel.subTab;
-                const newSubTab =
-                    currentSubTab === "logs" ? "logs" : mode === "metadata" ? "metadataSources" : "downloadSources";
+                // Each view has its own tab below; Logs stays Logs.
+                const newSubTab: SecondaryTab =
+                    currentSubTab === "logs"
+                        ? "logs"
+                        : mode === "metadata"
+                          ? "metadataSources"
+                          : mode === "stems"
+                            ? "stems"
+                            : "downloadSources";
                 return {
                     ...prev,
                     secondaryPanel: {
@@ -313,7 +321,7 @@ export const useFocusManager = ({
         [onPrimaryModeChange]
     );
 
-    const setSecondaryTab = useCallback((tab: "metadataSources" | "downloadSources" | "logs") => {
+    const setSecondaryTab = useCallback((tab: SecondaryTab) => {
         setFocusState((prev) => ({
             ...prev,
             secondaryPanel: {

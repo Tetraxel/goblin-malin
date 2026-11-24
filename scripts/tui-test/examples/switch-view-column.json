@@ -1,4 +1,6 @@
 {
+    // The column cursor on a column the other view does not have (Deezer, the 7th of the Metadata view): switching to
+    // the Download view (fewer columns) puts it on that view's last column, on the same task, and switching back works.
     "terminal": { "cols": 128, "rows": 50 },
     "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
     "steps": [
@@ -9,11 +11,22 @@
         { "type": "key", "key": "ArrowDown" },
         { "type": "key", "key": "ArrowRight", "repeat": 6 },
         { "type": "stable" },
+        { "type": "assert", "contains": "Deezer › " },
+        { "type": "assert", "contains": "Task 1/50" },
         { "type": "snapshot", "name": "metadata-high-column" },
 
         { "type": "key", "key": "2" },
         { "type": "stable" },
+        { "type": "assert", "matches": "TRACK\\s+YTDLP\\s+STATUS" },
+        { "type": "assert", "contains": "STATUS › " },
+        { "type": "assert", "contains": "Task 1/50" },
         { "type": "assert", "contains": "Hooked" },
-        { "type": "snapshot", "name": "after-switch-to-download" }
+        { "type": "snapshot", "name": "after-switch-to-download" },
+
+        { "type": "key", "key": "1" },
+        { "type": "stable" },
+        { "type": "assert", "matches": "TRACK\\s+SP\\s+YT\\s+SC\\s+DZ" },
+        { "type": "assert", "contains": "Task 1/50" },
+        { "type": "assertNoErrors" }
     ]
 }

@@ -29,6 +29,11 @@ Every tool the chat agent can call, declared once with `defineAgentTool` (see [P
 | `run_metadata`          | write   | none  | no       | no       | taskIds                                 | Runs the metadata part of tracks: for a track that was never run, finds its metadata and the other platforms' versions (nothing is downloaded: it turns DL? off); for a track already run, searches again, keeping what the user typed (overrides, links). It starts them and answers at once: they finish in the background.                                                                                                                                                                                                                                                                                                                                                                                       |
 | `run_download`          | confirm | none  | no       | yes      | taskIds                                 | Runs the download part of tracks whose metadata is ready (a track that was never run must go through run_metadata first): searches the download providers and downloads the sources into the app's temporary folder. Always asks the user first. It starts them and answers at once: they finish in the background. It does not save files to the music folder.                                                                                                                                                                                                                                                                                                                                                     |
 | `run_task`              | confirm | none  | no       | yes      | taskIds                                 | Runs tracks that were never run, from start to end: their metadata, then their downloads (turns TAG? and DL? on). A track that was run before is refused: use run_metadata or run_download for a part of it (a full restart would erase what the user typed). Always asks the user first. It starts them and answers at once: they finish in the background.                                                                                                                                                                                                                                                                                                                                                        |
+| `list_stem_models`      | read    | none  | no       | no       | —                                       | Says whether stem separation is on and installed, the device it runs on, the default model, and the models that are downloaded (only those can be used). Also names the 4-stem models not downloaded yet: downloading one is the user's to do (Settings → Stems).                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `get_stems`             | read    | none  | no       | no       | taskId                                  | Reads a track's stems: each separation run (model, state, the stems it made), which run each stem uses, and the stems saved next to the track. `pick_stem` takes a runId from here.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `separate_stems`        | confirm | none  | no       | yes      | taskIds, model?                         | Separates tracks into stems (vocals, drums, bass, other…) on the user's computer, with a downloaded model (list_stem_models; the default one when left out). A track needs a downloaded or saved file. Always asks the user first. It queues them and answers at once: they finish in the background, one at a time. It never saves stems to the music folder.                                                                                                                                                                                                                                                                                                                                                      |
+| `stop_stems`            | write   | none  | no       | no       | taskId                                  | Stops the separations of a track that are queued or running. What was already separated is kept.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `pick_stem`             | write   | task  | yes      | no       | taskId, kind, runId, revision           | Chooses which separation run's file a track uses for one stem (when several models were tried): the one the Stems view shows and that saving takes. Carries the revision you read (get_stems).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `plan_batch`            | read    | none  | no       | no       | summary, changes                        | Plans metadata changes for several tracks at once WITHOUT changing anything: each entry is what set_metadata_override would do. Returns a planId and the diff; apply it with apply_batch, which shows it to the user first. Use it for more than a couple of tracks.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `plan_bulk_override`    | read    | none  | no       | no       | summary?, filter, patch?, titleCleanup? | Plans the same change for every track matching a filter, worked out in code (so a 200-track job costs one call): a `patch` applied to all of them and/or a `titleCleanup` that removes video-site noise like (Official Video) or given text from each title. Changes nothing: returns a planId for apply_batch.                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `apply_batch`           | confirm | tasks | yes      | yes      | planId                                  | Applies a plan from plan_batch / plan_bulk_override. ALWAYS shows the user the changes first (they can refuse). A plan expires if any of its tracks changed since it was made. The whole batch is one action: /undo reverts all of it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -859,6 +864,181 @@ Example:
 ```json
 {
     "taskIds": ["task:1a2b3c4d5e6f"]
+}
+```
+
+## `list_stem_models`
+
+Says whether stem separation is on and installed, the device it runs on, the default model, and the models that are downloaded (only those can be used). Also names the 4-stem models not downloaded yet: downloading one is the user's to do (Settings → Stems).
+
+Kind **read**, locks **none**, cannot be undone.
+
+Input:
+
+```json
+{
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+}
+```
+
+Example:
+
+```json
+{}
+```
+
+## `get_stems`
+
+Reads a track's stems: each separation run (model, state, the stems it made), which run each stem uses, and the stems saved next to the track. `pick_stem` takes a runId from here.
+
+Kind **read**, locks **none**, cannot be undone.
+
+Input:
+
+```json
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["taskId"],
+    "properties": {
+        "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+        }
+    }
+}
+```
+
+Example:
+
+```json
+{
+    "taskId": "task:1a2b3c4d5e6f"
+}
+```
+
+## `separate_stems`
+
+Separates tracks into stems (vocals, drums, bass, other…) on the user's computer, with a downloaded model (list_stem_models; the default one when left out). A track needs a downloaded or saved file. Always asks the user first. It queues them and answers at once: they finish in the background, one at a time. It never saves stems to the music folder.
+
+Kind **confirm**, locks **none**, cannot be undone.
+
+Input:
+
+```json
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["taskIds"],
+    "properties": {
+        "taskIds": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+            },
+            "minItems": 1,
+            "maxItems": 10
+        },
+        "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "A model id from list_stem_models."
+        }
+    }
+}
+```
+
+Example:
+
+```json
+{
+    "taskIds": ["task:1a2b3c4d5e6f"],
+    "model": "htdemucs_ft.yaml"
+}
+```
+
+## `stop_stems`
+
+Stops the separations of a track that are queued or running. What was already separated is kept.
+
+Kind **write**, locks **none**, cannot be undone.
+
+Input:
+
+```json
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["taskId"],
+    "properties": {
+        "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+        }
+    }
+}
+```
+
+Example:
+
+```json
+{
+    "taskId": "task:1a2b3c4d5e6f"
+}
+```
+
+## `pick_stem`
+
+Chooses which separation run's file a track uses for one stem (when several models were tried): the one the Stems view shows and that saving takes. Carries the revision you read (get_stems).
+
+Kind **write**, locks **task**, can be undone.
+
+Input:
+
+```json
+{
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["taskId", "kind", "runId", "revision"],
+    "properties": {
+        "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+        },
+        "kind": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+        },
+        "runId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+        },
+        "revision": {
+            "type": "integer",
+            "minimum": 0
+        }
+    }
+}
+```
+
+Example:
+
+```json
+{
+    "taskId": "task:1a2b3c4d5e6f",
+    "kind": "vocals",
+    "runId": "0f1e2d3c-…",
+    "revision": 1234567
 }
 ```
 

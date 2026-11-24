@@ -1,0 +1,65 @@
+{
+    // A provider that sends data to a third party (Songlink) is off until the user allows it (CLAUDE.md, `static
+    // consent`). Asking it for a track opens the consent dialog first: "Don't allow" sends nothing and is remembered,
+    // Esc is no answer, "Allow" turns it on and only then is the request made. The fake network shows what left.
+    "terminal": { "cols": 140, "rows": 45 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "settings": { "music": { "metadata": { "discoveryProviders": { "songlink": { "enabled": false } } } } },
+    "network": { "mode": "offline" },
+    "steps": [
+        { "type": "stable", "timeout": 20000 },
+        { "type": "waitForContent", "contains": "Ask Songlink to look for", "timeout": 5000 },
+        { "type": "assertRequest", "url": "song.link", "count": 0, "timeout": 0 },
+
+        // First ask: the dialog. "Don't allow": no request, and the answer is saved.
+        { "type": "waitForContent", "contains": "Ask Songlink", "timeout": 5000 },
+        { "type": "stable" },
+        { "type": "click", "text": "Ask Songlink" },
+        { "type": "waitForContent", "contains": "Don't allow", "timeout": 5000 },
+        { "type": "snapshot", "name": "consent-dialog" },
+        { "type": "click", "text": "Don't allow" },
+        { "type": "waitForGone", "contains": "Don't allow", "timeout": 3000 },
+        { "type": "assertLog", "contains": "User declined discovery provider 'songlink'" },
+        {
+            "type": "assertJson",
+            "file": "settings.json",
+            "path": "music.metadata.discoveryProviders.songlink",
+            "equals": { "enabled": false, "consentAsked": true }
+        },
+        { "type": "wait", "ms": 1000 },
+        { "type": "assertRequest", "url": "song.link", "count": 0, "timeout": 0 },
+        { "type": "assertNot", "contains": "Songlink is looking" },
+
+        // The user asks again by hand: a "no" is not the last word, so the dialog comes back. Esc answers nothing.
+        { "type": "waitForContent", "contains": "Ask Songlink", "timeout": 5000 },
+        { "type": "stable" },
+        { "type": "click", "text": "Ask Songlink" },
+        { "type": "waitForContent", "contains": "Don't allow", "timeout": 5000 },
+        { "type": "key", "key": "Esc" },
+        { "type": "waitForGone", "contains": "Don't allow", "timeout": 3000 },
+        { "type": "assertLog", "contains": "dismissed without an answer" },
+        { "type": "wait", "ms": 1000 },
+        { "type": "assertRequest", "url": "song.link", "count": 0, "timeout": 0 },
+
+        // Allow: it is turned on, and the request goes out (and fails here: the network is down).
+        { "type": "waitForContent", "contains": "Ask Songlink", "timeout": 5000 },
+        { "type": "stable" },
+        { "type": "click", "text": "Ask Songlink" },
+        { "type": "waitForContent", "contains": "Don't allow", "timeout": 5000 },
+        { "type": "click", "matches": "Allow(?=\\s+Don't allow)" },
+        { "type": "waitForGone", "contains": "Don't allow", "timeout": 3000 },
+        { "type": "assertLog", "contains": "User allowed discovery provider 'songlink'" },
+        {
+            "type": "assertJson",
+            "file": "settings.json",
+            "path": "music.metadata.discoveryProviders.songlink.enabled",
+            "equals": true
+        },
+        { "type": "assertRequest", "url": "api.song.link", "min": 1, "timeout": 8000 },
+        {
+            "type": "assertRequest",
+            "matches": "song\\.link.*open\\.spotify\\.com%2Ftrack%2F4v7kKFlEDmpVToHOICsXaM",
+            "min": 1
+        }
+    ]
+}

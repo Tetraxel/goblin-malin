@@ -1,4 +1,4 @@
-import clipboard from "clipboardy";
+import { readSystemClipboard } from "#base/systemClipboard";
 import { dialogBridge } from "#base/bridges/dialogBridge";
 import { globalLogger } from "#base/logger/logger";
 import { detectUrls } from "#components/ImportModal/detectUrls";
@@ -22,7 +22,7 @@ export async function addLinkFromClipboard(task: DownloadTask, text?: string): P
     let raw = text;
     if (raw === undefined) {
         try {
-            raw = await clipboard.read();
+            raw = await readSystemClipboard();
         } catch (error) {
             logger.error("Clipboard read failed", { error });
             await notify(

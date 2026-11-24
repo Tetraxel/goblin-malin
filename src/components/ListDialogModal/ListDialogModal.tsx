@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Box, Text, type DOMElement } from "ink";
 import { AnimatedIcon, Icon } from "#components/AnimatedIcon";
 import open from "open";
-import { useClickTarget, useHoverTarget } from "#base/mouse/useMouseTarget";
+import { useClickTarget, useHoverTarget, useWheelTarget } from "#base/mouse/useMouseTarget";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { siteLabel, siteProviderKey } from "#utils/appLinks";
 import { useShortcuts } from "#hooks/useShortcuts";
@@ -10,6 +10,8 @@ import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
 import { useTheme } from "#base/themeContext";
 import { type DialogLink, type ListAnswer, type ListDialog, type ListDialogBody } from "#base/bridges/dialogBridge";
 import { Hint } from "../Hint";
+import { SearchBar } from "../SearchBar";
+import { filterListItems } from "./filterListItems";
 
 export type PendingListDialog = {
     dialog: ListDialog;
@@ -25,6 +27,21 @@ interface ListDialogModalProps {
 
 // Rows the frame, title, intro and hints take around the list.
 const CHROME_ROWS = 12;
+/** A list this long gets a search field (the stem models: about 170). */
+export const SEARCH_MIN_ITEMS = 8;
+/** Rows the search field takes (its frame and its margin). */
+const SEARCH_ROWS = 4;
+
+/** One record of the list: a click selects it, a click on the selected one chooses it (like the settings rows). */
+function ClickableRow({ onClick, children, last }: { onClick: () => void; children: React.ReactNode; last: boolean }) {
+    const ref = useRef<DOMElement>(null);
+    useClickTarget(ref, onClick, { window: "listDialog" });
+    return (
+        <Box ref={ref} flexDirection="column" marginBottom={last ? 0 : 1}>
+            {children}
+        </Box>
+    );
+}
 
 /** The most links one item can show. */
 const MAX_LINKS = 6;
@@ -88,10 +105,12 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
     const { switchWindow, switchBack } = useFocusActions();
     const { activeWindow } = useFocusChrome();
     const [selected, setSelected] = useState(0);
+    const [query, setQuery] = useState("");
 
     const [prevPending, setPrevPending] = useState(pending);
     if (prevPending !== pending) {
         setPrevPending(pending);
+        setQuery("");
         // Starts on the row the dialog asked for (the current choice), else on the first.
         const start = pending?.dialog.initialIndex ?? 0;
         setSelected(pending && start >= 0 && start < pending.dialog.items.length ? start : 0);
@@ -132,8 +151,36 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
     const loadedBody = loaded && loaded.pending === pending ? loaded.body : undefined;
     const loading = !!pending?.dialog.body && !loadedBody;
     const dialog = pending ? { ...pending.dialog, ...loadedBody } : undefined;
-    const rowCount = loading ? 0 : (dialog?.items.length ?? 0) + (dialog?.noneLabel ? 1 : 0);
+    const searchable = !loading && (dialog?.items.length ?? 0) >= SEARCH_MIN_ITEMS;
+    // The rows on screen, as indexes into `dialog.items` (the search keeps the ones that match).
+    const shown =
+        dialog && !loading ? (searchable ? filterListItems(dialog.items, query) : dialog.items.map((_, i) => i)) : [];
+    const rowCount = loading ? 0 : shown.length + (dialog?.noneLabel ? 1 : 0);
     const isActive = pending !== null && activeWindow === "listDialog";
+    // `selected` counts rows on screen; the answer is the item's own index.
+    const answerFor = (row: number): ListAnswer => (row < shown.length ? { index: shown[row] } : { none: true });
+    const selectedItem = selected < shown.length ? dialog?.items[shown[selected]] : undefined;
+
+    function changeQuery(next: string) {
+        setQuery(next);
+        setSelected(0);
+    }
+
+    function clickRow(row: number) {
+        if (row === selected) {
+            if (dialog && !loading) onAnswer(answerFor(row));
+        } else {
+            setSelected(row);
+        }
+    }
+
+    const listRef = useRef<DOMElement>(null);
+    useWheelTarget(
+        listRef,
+        (delta) =>
+            setSelected((s) => (rowCount === 0 ? 0 : Math.max(0, Math.min(rowCount - 1, s + (delta > 0 ? 1 : -1))))),
+        { window: "listDialog" }
+    );
 
     useShortcuts({
         id: "listDialog",
@@ -158,24 +205,30 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
                 defaultShortcut: { key: "return" },
                 label: "Choose",
                 handler: () => {
-                    if (!dialog || loading) return;
-                    onAnswer(selected < dialog.items.length ? { index: selected } : { none: true });
+                    if (!dialog || loading || rowCount === 0) return;
+                    onAnswer(answerFor(selected));
                 },
             },
-            {
-                id: "listDialog.open",
-                defaultShortcut: { input: "o" },
-                label: "Open in browser",
-                handler: () => {
-                    const url = dialog?.items[selected]?.url;
-                    if (url) open(url).catch(() => {});
-                },
-            },
+            // A letter would also be typed into the search field: a searchable list opens its links by a click only.
+            ...(searchable
+                ? []
+                : [
+                      {
+                          id: "listDialog.open",
+                          defaultShortcut: { input: "o" },
+                          label: "Open in browser",
+                          handler: () => {
+                              const url = selectedItem?.url;
+                              if (url) open(url).catch(() => {});
+                          },
+                      },
+                  ]),
             {
                 id: "listDialog.cancel",
                 defaultShortcut: { key: "escape" },
                 label: "Cancel",
-                handler: () => onAnswer(null),
+                // A search is cleared first; the next Esc closes the dialog.
+                handler: () => (query ? changeQuery("") : onAnswer(null)),
             },
         ],
     });
@@ -187,15 +240,17 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
 
     // Rows as the list draws them: the items, then the "none" row. Show the stretch around the selection that fits.
     const rows: { label: string; detail: string[]; url?: string; links: DialogLink[] }[] = [
-        ...dialog.items.map((item) => ({
-            label: item.label,
-            detail: item.detail ?? [],
-            url: item.url,
-            links: (item.links ?? []).slice(0, MAX_LINKS),
-        })),
+        ...shown
+            .map((i) => dialog.items[i])
+            .map((item) => ({
+                label: item.label,
+                detail: item.detail ?? [],
+                url: item.url,
+                links: (item.links ?? []).slice(0, MAX_LINKS),
+            })),
         ...(dialog.noneLabel ? [{ label: dialog.noneLabel, detail: [] as string[], links: [] as DialogLink[] }] : []),
     ];
-    const budget = Math.max(4, terminalHeight - CHROME_ROWS);
+    const budget = Math.max(4, terminalHeight - CHROME_ROWS - (searchable ? SEARCH_ROWS : 0));
     let start = 0;
     // A row's height: its label, its detail lines, its links and, between records, a blank line.
     const heightOf = (i: number) => 1 + rows[i].detail.length + rows[i].links.length + (i < rows.length - 1 ? 1 : 0);
@@ -238,6 +293,18 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
                         </Box>
                     )}
 
+                    {searchable && (
+                        <SearchBar
+                            value={query}
+                            onChange={changeQuery}
+                            placeholder={`Search ${dialog.items.length} items…`}
+                            highlighted={isActive}
+                            inputFocus={isActive}
+                            mouseWindow="listDialog"
+                            onFocusRequest={() => {}}
+                        />
+                    )}
+
                     {loading && (
                         <Box marginTop={1}>
                             <Text color={theme.text.secondary}>
@@ -247,7 +314,12 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
                         </Box>
                     )}
 
-                    <Box marginTop={loading ? 0 : 1} flexDirection="column">
+                    <Box ref={listRef} marginTop={loading ? 0 : 1} flexDirection="column">
+                        {searchable && shown.length === 0 && (
+                            <Box marginBottom={dialog.noneLabel ? 1 : 0}>
+                                <Text color={theme.text.secondary}>Nothing matches “{query}”.</Text>
+                            </Box>
+                        )}
                         {start > 0 && <Text color={theme.text.secondary}>↑ more</Text>}
                         {rows.slice(start, end + 1).map((row, offset) => {
                             const i = start + offset;
@@ -258,7 +330,7 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
                                 ...row.links.map((l) => l.label.length)
                             );
                             return (
-                                <Box key={i} flexDirection="column" marginBottom={i < rows.length - 1 ? 1 : 0}>
+                                <ClickableRow key={i} onClick={() => clickRow(i)} last={i === rows.length - 1}>
                                     <Box flexDirection="row">
                                         <Box width={2} flexShrink={0}>
                                             <Text color={theme.ui.focusIndicator}>{isSelected ? "☛" : ""}</Text>
@@ -295,7 +367,7 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
                                             labelWidth={labelWidth}
                                         />
                                     ))}
-                                </Box>
+                                </ClickableRow>
                             );
                         })}
                         {end < rows.length - 1 && <Text color={theme.text.secondary}>↓ more</Text>}
@@ -304,7 +376,7 @@ export const ListDialogModal: React.FC<ListDialogModalProps> = ({
                     <Box marginTop={1} flexDirection="row">
                         {!loading && <Hint label="Choose" shortcutId="listDialog.confirm" />}
                         {!loading && <Hint label="Select" shortcutIds={["listDialog.up", "listDialog.down"]} />}
-                        {!loading && rows[selected]?.url && (
+                        {!loading && !searchable && rows[selected]?.url && (
                             <Hint label="Open in browser" shortcutId="listDialog.open" />
                         )}
                         <Hint label="Cancel" shortcutId="listDialog.cancel" />

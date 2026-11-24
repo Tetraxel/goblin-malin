@@ -6,6 +6,7 @@ import { DownloadTask } from "../utils/downloadTask";
 import { computeCompiledMetadata, type CompiledMetadata } from "../utils/compiledMetadata";
 import { downloadSourceIds } from "../utils/taskRevision";
 import { isTaskRunning } from "./taskAccess";
+import { stemKindsOf } from "../stems/stemFiles";
 import { type MetadataResultState, type TrackDownloadSource, type TrackDownloadTask } from "../types";
 
 /**
@@ -268,6 +269,8 @@ export function describeTask(task: Task, locked: boolean): Record<string, unknow
                   releaseId: attrs.musicBrainzIdentity.release?.id,
               }
             : undefined,
+        // Stems (P33): a summary; get_stems has the runs and files.
+        stems: stemsSummary(attrs),
     };
 }
 
@@ -292,4 +295,17 @@ export function taskLogs(task: Task, cursor: string | undefined, pageSize = LOG_
     });
     const next = start + pageSize < entries.length ? String(start + pageSize) : undefined;
     return { lines, ...(next ? { next } : {}), total: entries.length };
+}
+
+/** A one-line summary for `get_task` (the full picture is `get_stems`). */
+export function stemsSummary(attrs: TrackDownloadTask): Record<string, unknown> | undefined {
+    const runs = attrs.stemRuns ?? [];
+    const saved = Object.keys(attrs.savedStems ?? {});
+    if (runs.length === 0 && saved.length === 0) return undefined;
+    return {
+        runs: runs.length,
+        running: runs.some((r) => r.state === "queued" || r.state === "separating") || undefined,
+        kinds: stemKindsOf(attrs),
+        saved,
+    };
 }

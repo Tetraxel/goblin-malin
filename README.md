@@ -44,6 +44,7 @@ Then press **`Ctrl+V`** with a Spotify, YouTube, SoundCloud, Deezer, Apple Music
 - **Clean, tagged files.** FLAC by default, or MP3, Ogg, Opus or M4A, with tags that iTunes, your phone and MusicBrainz Picard can read.
 - **What you type is yours.** A link you pasted or a title you corrected is never wiped by a restart, and anything that would throw work away asks first.
 - **Private.** No account, no telemetry.
+- **Split a track into stems.** Vocals, drums, bass and other, on your own computer, saved next to the track. Optional, nothing is installed until you ask.
 - **Claude can help, if you want it to.** Entirely optional, through your own Claude account.
 - **Made for the keyboard**, with the mouse working too.
 
@@ -66,6 +67,13 @@ When a source can't be found (an unofficial re-upload, say), **paste the right l
 - Candidates from **yt-dlp** (YouTube, SoundCloud) and **Soulseek** are shown with their real format, bitrate and size.
 - A `FLAC*` was converted from a lossy source (YouTube's Opus, for instance): it is not pretending to be lossless.
 - Play any candidate before you choose. When you replace a file you already saved, the old and the new version are shown next to each other.
+
+### Split into stems (optional)
+
+- The **Stems view** (`3`) has one column per stem (vocals, drums, bass, other); the **Stems** tab (`6`) shows the model, every separation of the track and which stem files are saved, missing or not saved yet. Its mixer shows the track and each stem as waveforms and plays them together, with a solo and a mute button on each.
+- It runs [audio-separator](https://github.com/nomadkaraoke/python-audio-separator), the engine of Ultimate Vocal Remover, **on your computer**: nothing is uploaded. Under a minute per track on an NVIDIA card, about 10 minutes on the processor alone.
+- **Off until you turn it on** (Settings → Stems). Installing it downloads its own Python and PyTorch into the app's data folder (about 3.7 GB with CUDA, 1 GB without) and never touches your own Python. You choose which models to download (Demucs `htdemucs_ft`, 4 stems, is a good start) and which one each separation uses; try several and keep the best file of each stem.
+- Stems are saved next to the track, named after it: `Artist - Title (Vocals).flac` (the pattern is a setting). Separation never runs on its own: you start it (`R` in the Stems tab, `T` on a track in the list), or Claude does when you ask.
 
 ### Let Claude help (optional)
 
@@ -150,8 +158,8 @@ Every shortcut can be rebound in Settings → _Shortcuts_. The essentials:
 | `Ctrl+V`        | Import the links on the clipboard. On the **Metadata Sources** list or a **platform's cell**, add the link to _that track_.       |
 | `↑` `↓` `←` `→` | Move in the task list and between columns                                                                                         |
 | `Tab`           | Switch the focused panel                                                                                                          |
-| `1` `2`         | Metadata view / Download view                                                                                                     |
-| `3` `4` `5`     | Metadata sources / Download sources / Logs                                                                                        |
+| `1` `2` `3`     | Metadata view / Download view / Stems view                                                                                        |
+| `4` `5` `6` `7` | Metadata sources / Download sources / Stems / Logs                                                                                |
 | `R`             | Start (or restart) the focused task. `F` re-fetches the metadata, `D` re-discovers on the other platforms, `W` searches downloads |
 | `Space`         | Play a source (`Ctrl+P` pauses)                                                                                                   |
 | `S`             | Save the selected source to the output folder                                                                                     |
@@ -168,15 +176,16 @@ The hints at the bottom of the screen always show the live binding of whatever i
 
 There is no telemetry and no account. The app only talks to these services, and only as needed:
 
-| Service                                   | When                                                                                                                         | What is sent                                                                                                                                                                |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Spotify, YouTube / YouTube Music          | You import a link of that platform, and whenever a download runs (yt-dlp searches and downloads; your `cookies.txt`, if any) | The link, or a search for the track                                                                                                                                         |
-| SoundCloud, Deezer, Apple Music, Tidal    | You import a link of that platform, and during discovery (each can be switched off in Settings → Metadata)                   | The link or its id, the track's ISRC, or a search for its artist and title                                                                                                  |
-| MusicBrainz                               | Discovery (on by default)                                                                                                    | Track title, artists, ISRC                                                                                                                                                  |
-| Soulseek network                          | You enable the Soulseek provider (off by default)                                                                            | Your Soulseek login and the search terms. It is peer-to-peer: the users you download from can see your IP address                                                           |
-| `api.github.com`, `github.com`            | At start-up, to **check for a new version** (can be turned off), and to download `yt-dlp`, `ffmpeg` and (on Windows) `mpv`   | A plain request, no data about you                                                                                                                                          |
-| **Songlink** (`api.song.link`) — _opt-in_ | After you allowed it                                                                                                         | The link of each track                                                                                                                                                      |
-| **Claude** — _opt-in_                     | Only when you click "Ask Claude", or when you chat (after allowing it once)                                                  | Track details (title, artists, album, date, ISRC, duration, link), through the Claude Code CLI on your computer and **your own Claude account** (it uses part of your plan) |
+| Service                                                                                                    | When                                                                                                                         | What is sent                                                                                                                                                                |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Spotify, YouTube / YouTube Music                                                                           | You import a link of that platform, and whenever a download runs (yt-dlp searches and downloads; your `cookies.txt`, if any) | The link, or a search for the track                                                                                                                                         |
+| SoundCloud, Deezer, Apple Music, Tidal                                                                     | You import a link of that platform, and during discovery (each can be switched off in Settings → Metadata)                   | The link or its id, the track's ISRC, or a search for its artist and title                                                                                                  |
+| MusicBrainz                                                                                                | Discovery (on by default)                                                                                                    | Track title, artists, ISRC                                                                                                                                                  |
+| Soulseek network                                                                                           | You enable the Soulseek provider (off by default)                                                                            | Your Soulseek login and the search terms. It is peer-to-peer: the users you download from can see your IP address                                                           |
+| `api.github.com`, `github.com`                                                                             | At start-up, to **check for a new version** (can be turned off), and to download `yt-dlp`, `ffmpeg` and (on Windows) `mpv`   | A plain request, no data about you                                                                                                                                          |
+| **Songlink** (`api.song.link`) — _opt-in_                                                                  | After you allowed it                                                                                                         | The link of each track                                                                                                                                                      |
+| Stem separation downloads (`github.com`, `pypi.org`, `download.pytorch.org`, the models' hosts) — _opt-in_ | Only when you install stem separation or download a model (Settings → Stems)                                                 | A plain request. Separation itself runs offline                                                                                                                             |
+| **Claude** — _opt-in_                                                                                      | Only when you click "Ask Claude", or when you chat (after allowing it once)                                                  | Track details (title, artists, album, date, ISRC, duration, link), through the Claude Code CLI on your computer and **your own Claude account** (it uses part of your plan) |
 
 Songlink and Claude stay off until you allow them; you can change your mind in Settings.
 
@@ -198,6 +207,7 @@ One folder, which you can move with the `GOBLIN_DATA_DIR` environment variable (
 | `.env`                     | Spotify and Soulseek credentials, in plain text                                |
 | `cache/`                   | Cached provider answers (Settings → _Clear cache_)                             |
 | `bin/`                     | Downloaded tools (`yt-dlp`, `ffmpeg`, `ffprobe`, `mpv`) and your `cookies.txt` |
+| `stems/`                   | Stem separation, when you installed it: its Python, PyTorch and the models     |
 | `app.log`, `app.prev.log`  | The log of this session and of the previous one (also in the Logs tab)         |
 
 Saved tracks go to the _Default output directory_; unsaved downloads wait in the _Temporary download directory_ (Settings → Download). `GOBLIN_NO_AUDIO=1` never starts `mpv` (no preview, no intro sound). Only one Goblin Malin can run per data folder.
@@ -246,7 +256,7 @@ Make the terminal at least about 66 columns wide. For the lock, close the other 
 
 </details>
 
-Anything else: look at the Logs tab (`5`) or at `app.log`, then [open an issue](https://github.com/Tetraxel/goblin-malin/issues) with the log.
+Anything else: look at the Logs tab (`7`) or at `app.log`, then [open an issue](https://github.com/Tetraxel/goblin-malin/issues) with the log.
 
 ## Contributing
 

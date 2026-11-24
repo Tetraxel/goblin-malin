@@ -5,7 +5,10 @@
  */
 export const runAllowance = {
     downloads: false,
+    /** Stem separations (P33) without asking each time. */
+    stems: false,
     reset(): void {
         this.downloads = false;
+        this.stems = false;
     },
 };

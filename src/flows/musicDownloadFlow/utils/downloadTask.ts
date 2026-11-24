@@ -28,6 +28,8 @@ import {
     type Platform,
     type LocalFile,
     type MetadataOverrides,
+    type StemKind,
+    type StemRun,
 } from "#flows/musicDownloadFlow/types";
 import { runWithoutCache, isCacheSkipped } from "#utils/cache";
 import { overwriteConfirmBridge } from "#base/bridges/overwriteConfirmBridge";
@@ -63,6 +65,22 @@ import { checkMusicBrainzIdentity, unknownIdentity, type IdentityCheckOptions } 
 import { type MbUserChoice, type MusicBrainzIdentity, type ProviderAlbum } from "../musicbrainz/types";
 import { isMusicBrainzVerdictStale, musicBrainzInputKey } from "../musicbrainz/inputKey";
 import { normalizeUrl } from "../musicbrainz/normalize";
+import { type StemDevice } from "../stems/stemService";
+import {
+    activeStemProvider,
+    defaultStemModel,
+    getStemEngine,
+    getStemSettings,
+    resolveStemDevice,
+} from "../stems/stemProviders";
+import {
+    deleteStemRunFiles,
+    executeStemRun,
+    renameSavedStems,
+    resolveStemInput,
+    saveStemFiles,
+} from "../stems/stemOps";
+import { pickedStem, stemKindsOf } from "../stems/stemFiles";
 
 // The @Cached() decorator persists results to a 90-day disk cache. Old cache entries
 // may still contain a plain TrackMetadata[] (the previous return format). Normalizing
@@ -383,7 +401,7 @@ export class DownloadTask extends Task<TrackDownloadTask> {
 
     /** The pipeline is processing the track, or a part of it runs (a part leaves `state` alone). */
     public override isBusy(): boolean {
-        return super.isBusy() || this.partRunning || this.getAttributes()?.state === "running";
+        return super.isBusy() || this.partRunning || this.stemRunning || this.getAttributes()?.state === "running";
     }
 
     /** Only a track that was never run, or was stopped, is run: the state is saved, `finishedAt` is not. */
@@ -1842,6 +1860,170 @@ export class DownloadTask extends Task<TrackDownloadTask> {
         }, options);
     }
 
+    // ── Stems (P33): on request only, never a pipeline stage ─────────────────────────────────────────────
+
+    // The separations this task runs, each with its own stop (also reached by `abortRun`, like every own run).
+    private stemStops = new Map<string, AbortController>();
+
+    /** Whether a separation of this track is queued or running. */
+    get stemRunning(): boolean {
+        return this.stemStops.size > 0;
+    }
+
+    /**
+     * Starts a separation of the track's file (its saved file, else the selected download) with `model` (the
+     * provider's default when left out). Refused, with the reason, when stem separation is off, not installed, the
+     * model is not downloaded or there is nothing to separate. Answers once the run is queued; `done` settles when it
+     * is over (a failure or a stop is the run's state, never a rejection).
+     */
+    async startStemSeparation(
+        options: WriteOptions & { model?: string; provider?: string } = {}
+    ): Promise<{ run: StemRun; done: Promise<void> }> {
+        this.assertWritable(options);
+        const attrs = this.getAttributes();
+        if (!attrs) throw new Error("No track");
+        const provider = options.provider ?? activeStemProvider();
+        if (!provider) throw new Error("Stem separation is off (Settings → Stems)");
+        const engine = getStemEngine(provider);
+        if (!engine) throw new Error(`No stem separation provider "${provider}"`);
+        // The install record only (no folder sizes): "separate all" asks this once per track.
+        const build = await engine.installedBuild();
+        if (!build) throw new Error("The stem separation engine is not installed (Settings → Stems)");
+        const modelId = options.model ?? defaultStemModel(provider);
+        if (!modelId) throw new Error("No stem model chosen (Settings → Stems → Default model)");
+        this.assertNoActiveStemRun(modelId);
+        const model = (await engine.listModels()).find((m) => m.id === modelId || m.label === modelId);
+        if (!model) throw new Error(`Unknown stem model "${modelId}"`);
+        if (!model.downloaded)
+            throw new Error(`The model ${model.id} is not downloaded (Settings → Stems → Download models)`);
+        const { input, provenance, durationMs } = await resolveStemInput(attrs);
+        // Checked again: the awaits above gave Claude or the user time to take the task, or to start the same run.
+        this.assertWritable(options);
+        this.assertNoActiveStemRun(model.id);
+
+        const run: StemRun = {
+            id: randomUUID(),
+            provider,
+            model: model.id,
+            modelLabel: model.label,
+            device: resolveStemDevice(provider, build),
+            input,
+            state: "queued",
+            startedAt: new Date(),
+            stems: [],
+        };
+        this.updateAttributes({ stemRuns: [...(this.getAttributes()?.stemRuns ?? []), run] });
+
+        const stop = new AbortController();
+        this.stemStops.set(run.id, stop);
+        const { signal, done } = this.beginOwnRun(stop.signal);
+        const finished = executeStemRun(this, run.id, {
+            provider,
+            device: run.device as StemDevice,
+            signal,
+            durationMs,
+            provenance,
+        }).finally(() => {
+            done();
+            this.stemStops.delete(run.id);
+        });
+        return { run, done: finished };
+    }
+
+    /**
+     * Refuses a second separation of this track with the same model while one is queued or running (a key pressed
+     * twice, "separate all" run again): it would only spend the same CPU time twice. Another model may run.
+     */
+    private assertNoActiveStemRun(model: string): void {
+        const active = (this.getAttributes()?.stemRuns ?? []).some(
+            (r) => this.stemStops.has(r.id) && (r.model === model || r.modelLabel === model)
+        );
+        if (active) throw new Error(`Already being separated with ${model}`);
+    }
+
+    /** Stops one separation (`runId`), or every separation of this track. */
+    stopStems(runId?: string, options?: WriteOptions): void {
+        this.assertWritable(options);
+        for (const [id, stop] of this.stemStops) if (!runId || id === runId) stop.abort();
+    }
+
+    /** Which run's file one stem uses (`runId`), for saving and the Stems view. */
+    pickStem(kind: StemKind, runId: string, options?: WriteOptions): void {
+        this.assertWritable(options);
+        const run = this.getAttributes()?.stemRuns?.find((r) => r.id === runId);
+        if (!run) throw new Error(`No stem run ${runId}`);
+        if (run.state !== "done" || !run.stems.some((s) => s.kind === kind)) {
+            throw new Error(`The run ${runId} has no ${kind} stem`);
+        }
+        this.updateAttributes({ stemPick: { ...this.getAttributes()?.stemPick, [kind]: runId } });
+    }
+
+    /** Puts back the stem picks an undo of Claude's `pick_stem` restores (checks the lock like any write). */
+    restoreStemPick(previous: Record<StemKind, string> | undefined, options?: WriteOptions): void {
+        this.assertWritable(options);
+        this.updateAttributes({ stemPick: previous });
+    }
+
+    /**
+     * Saves stems next to the track's saved file (all that have a file when `kinds` is left out). Not for Claude:
+     * it writes into the user's music folder. Returns the kinds saved.
+     */
+    async saveStems(kinds?: StemKind[], options?: WriteOptions): Promise<StemKind[]> {
+        this.assertWritable(options);
+        return saveStemFiles(this, kinds);
+    }
+
+    /**
+     * Deletes a run and its temporary files (the stems saved from it stay: they are the user's). The caller asks
+     * first when files would be lost.
+     */
+    async deleteStemRun(runId: string, options?: WriteOptions): Promise<void> {
+        this.assertWritable(options);
+        const attrs = this.getAttributes();
+        const run = attrs?.stemRuns?.find((r) => r.id === runId);
+        if (!attrs || !run) return;
+        if (this.stemStops.has(runId)) throw new Error("This separation is still running: stop it first");
+        await deleteStemRunFiles(run);
+        const stemPick = Object.fromEntries(Object.entries(attrs.stemPick ?? {}).filter(([, id]) => id !== runId));
+        this.updateAttributes({
+            stemRuns: (this.getAttributes()?.stemRuns ?? []).filter((r) => r.id !== runId),
+            stemPick,
+        });
+    }
+
+    /** Renames the saved stems that no longer follow the track's file name. Returns how many were moved. */
+    async renameStemsToMatch(options?: WriteOptions): Promise<number> {
+        this.assertWritable(options);
+        return renameSavedStems(this);
+    }
+
+    /**
+     * After the track was saved (Settings → Stems → "Save stems with the track"): saves the stems that have a file and
+     * are not saved yet, or were saved from another run or under the track's old name.
+     */
+    private async saveStemsWithTrack(): Promise<void> {
+        const attrs = this.getAttributes();
+        if (!attrs?.savedFile || !getStemSettings().saveWithTrack) return;
+        const trackPath = attrs.savedFile.path;
+        const kinds = stemKindsOf(attrs).filter((kind) => {
+            const picked = pickedStem(attrs, kind);
+            if (!picked || picked.stem.state !== "found") return false;
+            const saved = attrs.savedStems?.[kind];
+            return (
+                !saved || saved.runId !== picked.run.id || !saved.parentPath || !samePath(saved.parentPath, trackPath)
+            );
+        });
+        if (kinds.length > 0) await saveStemFiles(this, kinds);
+    }
+
+    /** Forgets a saved stem whose file is gone (the record only; nothing on disk is touched). */
+    forgetSavedStem(kind: StemKind, options?: WriteOptions): void {
+        this.assertWritable(options);
+        const saved = { ...this.getAttributes()?.savedStems };
+        delete saved[kind];
+        this.updateAttributes({ savedStems: saved });
+    }
+
     selectDownloadSource(index: number, options?: WriteOptions): void {
         this.assertWritable(options);
         const sources = this.getAttributes()?.downloadSources ?? [];
@@ -2254,6 +2436,12 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 }
 
                 this.status.set({ type: StatusType.Success, message: "Saved" });
+                // Stems (P33) follow the track: a failure there is said in the log, never undoes the track's save.
+                await this.saveStemsWithTrack().catch((error) =>
+                    this.logger.warn(
+                        `The stems were not saved with the track: ${error instanceof Error ? error.message : error}`
+                    )
+                );
             } catch (err) {
                 if (outputCreated) {
                     await fs.unlink(outputPath).catch(() => {});

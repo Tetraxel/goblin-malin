@@ -6,7 +6,8 @@ import { useFocusActions, useFocusChrome, useFocusSecondaryPanel } from "#contex
 import { ToolbarButtonInvoker } from "./ToolbarButtonInvoker";
 import { TOOLBAR_BUTTONS } from "./toolbarButtons";
 import { Separator } from "../Separator";
-import { TabBar } from "../TabBar";
+import { TabBar, type TabDef } from "../TabBar";
+import { type PrimaryMode } from "#types/focus";
 import { type UpdateInfo } from "#updater/updateChecker";
 import { UpdateBadge } from "./UpdateBadge";
 import { useCurrentSessionName } from "./useCurrentSessionName";
@@ -125,6 +126,13 @@ export const Toolbar = ({
     );
 };
 
+/** The views of the task list; the brackets show each one's live key (`global.*View`). */
+const PRIMARY_TABS: TabDef[] = [
+    { key: "metadata", label: "Metadata view", shortcutId: "global.metadataView" },
+    { key: "download", label: "Download view", shortcutId: "global.downloadView" },
+    { key: "stems", label: "Stems view", shortcutId: "global.stemsView" },
+];
+
 const PrimaryModeTabBar: React.FC<{ width: number; splitPos: number; chatWidth?: number }> = ({
     width,
     splitPos,
@@ -140,13 +148,10 @@ const PrimaryModeTabBar: React.FC<{ width: number; splitPos: number; chatWidth?:
             width={chatWidth === undefined ? width : width - chatWidth}
             endChar={chatWidth === undefined ? undefined : "┬"}
             trailing={chatWidth === undefined ? undefined : <ChatTitleBar width={chatWidth} />}
-            tabs={[
-                { key: "1", label: "Metadata view" },
-                { key: "2", label: "Download view" },
-            ]}
-            activeTabKey={primaryMode === "metadata" ? "1" : "2"}
+            tabs={PRIMARY_TABS}
+            activeTabKey={primaryMode}
             splitPos={splitPos}
-            onSelect={(key) => setPrimaryMode(key === "1" ? "metadata" : "download")}
+            onSelect={(key) => setPrimaryMode(key as PrimaryMode)}
         />
     );
 };

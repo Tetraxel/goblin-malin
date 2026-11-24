@@ -33,6 +33,7 @@ export const InputRouter: React.FC<{
     const isDetailFocused =
         activeWindow === "secondaryPanel" &&
         secondaryPanel.subTab !== "logs" &&
+        secondaryPanel.subTab !== "stems" &&
         secondaryPanel.sourcesPanel.innerFocus === "detail";
 
     // Global shortcuts — active on the main screen, not while editing a field.
@@ -56,33 +57,47 @@ export const InputRouter: React.FC<{
                     if (!isDetailFocused) openImportFlow();
                 },
             },
+            // The tab lines show these keys (`TAB_SHORTCUT_IDS`): ids by name, not by number, since the numbers moved
+            // when the Stems tabs came (P33; `SETTINGS_MIGRATIONS[3]` carried the user's own keys over).
             {
-                id: "global.mode1",
+                id: "global.metadataView",
                 defaultShortcut: { input: "1" },
-                label: "Metadata mode",
+                label: "Metadata view",
                 handler: () => setPrimaryMode("metadata"),
             },
             {
-                id: "global.mode2",
+                id: "global.downloadView",
                 defaultShortcut: { input: "2" },
-                label: "Download mode",
+                label: "Download view",
                 handler: () => setPrimaryMode("download"),
             },
             {
-                id: "global.tab3",
+                id: "global.stemsView",
                 defaultShortcut: { input: "3" },
+                label: "Stems view",
+                handler: () => setPrimaryMode("stems"),
+            },
+            {
+                id: "global.metadataSourcesTab",
+                defaultShortcut: { input: "4" },
                 label: "Metadata Sources tab",
                 handler: () => setSecondaryTab("metadataSources"),
             },
             {
-                id: "global.tab4",
-                defaultShortcut: { input: "4" },
+                id: "global.downloadSourcesTab",
+                defaultShortcut: { input: "5" },
                 label: "Download Sources tab",
                 handler: () => setSecondaryTab("downloadSources"),
             },
             {
-                id: "global.tab5",
-                defaultShortcut: { input: "5" },
+                id: "global.stemsTab",
+                defaultShortcut: { input: "6" },
+                label: "Stems tab",
+                handler: () => setSecondaryTab("stems"),
+            },
+            {
+                id: "global.logsTab",
+                defaultShortcut: { input: "7" },
                 label: "Logs tab",
                 handler: () => setSecondaryTab("logs"),
             },

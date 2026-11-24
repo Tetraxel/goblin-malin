@@ -1,4 +1,6 @@
 {
+    // The task list follows its cursor: ↓ from the toolbar enters it, each ↓ moves one task ("Task N/50" in the action
+    // bar), the list scrolls to keep the cursor near the middle, and stops on the last task.
     "terminal": { "cols": 128, "rows": 50 },
     "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
     "steps": [
@@ -10,44 +12,32 @@
         { "type": "stable" },
         { "type": "snapshot", "name": "task-list-focused" },
 
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown", "repeat": 10 },
         { "type": "stable" },
+        { "type": "assert", "contains": "Task 10/50" },
+        { "type": "assert", "matches": "☛.*The Paddle" },
+        { "type": "assert", "contains": "Hooked" },
         { "type": "snapshot", "name": "scrolled-10" },
 
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
+        { "type": "key", "key": "ArrowDown", "repeat": 10 },
         { "type": "stable" },
+        { "type": "assert", "contains": "Task 20/50" },
+        { "type": "assert", "matches": "☛", "count": 1 },
         { "type": "snapshot", "name": "scrolled-20" },
 
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
-        { "type": "key", "key": "ArrowDown" },
+        // By now the first tasks have scrolled out of view, and the cursor row stays in the middle of the list.
+        { "type": "key", "key": "ArrowDown", "repeat": 10 },
         { "type": "stable" },
+        { "type": "assert", "contains": "Task 30/50" },
+        { "type": "assert", "matches": "☛.*Rome Is Bur", "row": 14 },
+        { "type": "assertNot", "contains": "Hooked" },
         { "type": "snapshot", "name": "scrolled-30" },
+
+        // Past the end: it stays on the last task.
+        { "type": "key", "key": "ArrowDown", "repeat": 25 },
+        { "type": "stable" },
+        { "type": "assert", "contains": "Task 50/50" },
+        { "type": "assert", "matches": "☛.*Jam Cannon" },
         { "type": "screenshot-powershell", "name": "scrolled-30" }
     ]
 }

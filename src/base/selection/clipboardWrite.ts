@@ -1,4 +1,4 @@
-import clipboard from "clipboardy";
+import { writeSystemClipboard } from "#base/systemClipboard";
 import { globalLogger } from "#base/logger/logger";
 
 /** Past this many bytes of text, terminals start refusing the OSC 52 sequence; the system clipboard takes it all. */
@@ -34,7 +34,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
         }
     }
     try {
-        await clipboard.write(text);
+        await writeSystemClipboard(text);
         return true;
     } catch (error) {
         globalLogger.debug("No system clipboard tool took the selection", { error });

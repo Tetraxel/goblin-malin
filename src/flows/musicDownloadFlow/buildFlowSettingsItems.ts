@@ -5,7 +5,14 @@ import { type SetupWizardConfig, isSetupComplete } from "#base/setupWizard";
 import { providerDisplayRegistry } from "#base/providerDisplay";
 import { type SettingsItem } from "#settings/buildSettingsItems";
 import { BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS, type MusicDownloadFlowSettings } from "./settings";
-import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
+import {
+    metadataServiceRegistry,
+    discoveryServiceRegistry,
+    downloadServiceRegistry,
+    stemServiceRegistry,
+} from "./registries";
+import { DEFAULT_STEM_SET, STEM_SET_KEYS } from "./stems/stemKinds";
+import { DEFAULT_STEM_TEMPLATE } from "./stems/stemFiles";
 import { runTempCleanup } from "./tempCleanupFlow";
 import { describeDownloadLinks, downloadLinkInfo } from "./downloadLinks";
 import { chatStore } from "./agent/chatStore";
@@ -35,7 +42,7 @@ function providerItems(
     ctor: ProviderConstructorLike,
     stored: Record<string, boolean | string>,
     onChange: (patch: DeepPartial<MusicDownloadFlowSettings>) => void,
-    section: "metadata" | "download",
+    section: "metadata" | "download" | "stems",
     providerSubKey: string,
     onOpenWizard: (config: SetupWizardConfig, onDisable?: () => void) => void,
     status: string | undefined
@@ -153,7 +160,12 @@ export type FlowSettingsExtras = {
 /** Asks every provider that has a `settingsStatus` for it. A provider that fails is left out, never thrown. */
 export async function loadProviderStatuses(): Promise<Record<string, string | undefined>> {
     const entries: [string, ProviderConstructorLike][] = [];
-    for (const registry of [metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry]) {
+    for (const registry of [
+        metadataServiceRegistry,
+        discoveryServiceRegistry,
+        downloadServiceRegistry,
+        stemServiceRegistry,
+    ]) {
         for (const [key, ctor] of registry.getAllConstructors()) entries.push([key, ctor as ProviderConstructorLike]);
     }
     const answers = await Promise.all(
@@ -176,7 +188,8 @@ export function buildFlowSettingsItems(
     discoveryProviders: ProviderEntry[],
     onChange: (patch: DeepPartial<MusicDownloadFlowSettings>) => void,
     onOpenWizard: (config: SetupWizardConfig, onDisable?: () => void) => void = () => {},
-    extras: FlowSettingsExtras = {}
+    extras: FlowSettingsExtras = {},
+    stemProviders: ProviderEntry[] = []
 ): SettingsItem[] {
     const items: SettingsItem[] = [];
 
@@ -461,6 +474,66 @@ export function buildFlowSettingsItems(
         }
     }
 
+    // ── Stems (P33) ───────────────────────────────────────────────
+    if (stemProviders.length > 0) {
+        const stems = { ...BASE_DEFAULT_MUSIC_DOWNLOAD_FLOW_SETTINGS.stems, ...flowSettings.stems };
+        items.push({ kind: "sectionHeader", label: "Stems" });
+        items.push({
+            kind: "note",
+            indent: 0,
+            text: "Splits a track into stems on request (the Stems view and the Stems tab); never part of a run.",
+        });
+        items.push({
+            kind: "select",
+            indent: 0,
+            label: "Columns of the Stems view",
+            options: STEM_SET_KEYS,
+            get: () => (STEM_SET_KEYS.includes(stems.stemSet) ? stems.stemSet : DEFAULT_STEM_SET),
+            set: (v) => onChange({ stems: { stemSet: v } }),
+        });
+        items.push({
+            kind: "textInput",
+            indent: 0,
+            label: "Stem file name",
+            get: () => stems.fileNameTemplate,
+            set: (v) => onChange({ stems: { fileNameTemplate: v.trim() || DEFAULT_STEM_TEMPLATE } }),
+        });
+        items.push({
+            kind: "note",
+            indent: 0,
+            text: "Next to the track's file. {name}: the track's file name, {Stem} / {stem}: the stem; a / makes a sub-folder (e.g. Stems/{name} - {stem}).",
+        });
+        items.push({
+            kind: "checkbox",
+            indent: 0,
+            label: "Write the track's tags into the stems (the stem's name after the title)",
+            get: () => stems.tagStems,
+            set: (v) => onChange({ stems: { tagStems: v } }),
+        });
+        items.push({
+            kind: "checkbox",
+            indent: 0,
+            label: "Save the stems when the track is saved",
+            get: () => stems.saveWithTrack,
+            set: (v) => onChange({ stems: { saveWithTrack: v } }),
+        });
+        items.push({ kind: "subHeader", label: "Providers" });
+        for (const { key, ctor } of stemProviders) {
+            items.push(
+                ...providerItems(
+                    key,
+                    ctor,
+                    stems.providers?.[key] ?? {},
+                    onChange,
+                    "stems",
+                    "providers",
+                    onOpenWizard,
+                    extras.providerStatus?.[key]
+                )
+            );
+        }
+    }
+
     return items;
 }
 
@@ -485,6 +558,7 @@ export function buildMusicSettingsItems(
         toEntries(discoveryServiceRegistry),
         onChange as (patch: DeepPartial<MusicDownloadFlowSettings>) => void,
         onOpenWizard,
-        extras
+        extras,
+        toEntries(stemServiceRegistry)
     );
 }

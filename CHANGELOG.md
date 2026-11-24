@@ -4,6 +4,24 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Split a track into stems** (vocals, drums, bass, other), on your own computer. A new **Stems view** above (`3`: one column per stem, saved / not saved / file not found / separating) and a **Stems** tab below (`6`): the file that is separated (the saved track, or the selected download before it is saved), the model, every separation of the track with its stems, and the stems saved next to the track. `Space` plays a stem, `R` separates (or stops), `M` picks the model, `S` / `A` save, `Del` deletes a separation's temporary files. At the top of the tab, a **mixer**: the track, then each stem, each drawn as its waveform, **played together** (one mpv mixes them, so they never drift apart). The track's `▶` (or `Space`) plays and pauses the mix; each layer has a **solo** (`S`, `Enter`) and a **mute** (`M`, `X`) button, clickable. By default the stems play and the track is muted; solo the track to hear the original. The played part of each waveform is in the layer's colour while it is heard, dim while it is muted; `Shift+←/→` seeks, a click on a waveform plays from there. The mixer and the download preview never play over each other. Separate with several models to compare them, and keep the best file of each stem (`Enter`). Stems are saved next to the track as `Artist - Title (Vocals).flac` (the pattern, the tags and "save the stems when the track is saved" are in Settings → Stems), in the format tracks are saved in. A stem whose track was saved again under another name says so, and `N` renames it to match.
+    - It runs [audio-separator](https://github.com/nomadkaraoke/python-audio-separator), the engine of Ultimate Vocal Remover. **Off by default**: Settings → Stems → Install downloads its own Python, audio-separator and PyTorch into the app's data folder (about 3.7 GB with an NVIDIA card's CUDA build, 1 GB for the processor-only one) through a checksum-verified `uv`; your own Python is never used or changed. The Stems tab shows the install with a progress bar (the bytes of each finished package, and an estimate for the one still downloading, said as “about”), and each separation on its own row. You download the models you want (Settings → Stems → Download models…, recommended ones first: Demucs `htdemucs_ft`, then the 6-stem BS-RoFormer SW); a separation never downloads one by itself. On an RTX 3080, Demucs `htdemucs_ft` separates a 3½-minute track in 39 s; on the processor alone it takes about 10 minutes.
+    - **Never part of a run**: a separation only starts when you ask (the Stems tab, `B` on any track of the list, Actions → "Separate stems of every downloaded track"), one at a time, and the task's Stop stops it. What was separated and saved survives a restart of the track.
+    - **Claude** can list the models (`list_stem_models`), read a track's stems (`get_stems`), separate tracks (`separate_stems`, which always asks first), stop a separation and choose a run's file for a stem. It never installs anything, downloads a model or saves stems.
+
+### Changed
+
+- **Long lists in a dialog can be searched and scrolled.** A list of 8 items or more (the stem models: about 170) has a search field: type to keep the items whose name or details hold every word; `Esc` clears the search, then closes. The wheel moves the selection, a click selects an item and a click on the selected one chooses it. On such a list a link opens with a click (`O` would be typed into the search).
+- The buttons of a confirmation dialog go on a second line when they do not fit, instead of running off its edge.
+- **The view and tab keys moved** to make room for the stems: `1` `2` `3` are the Metadata, Download and Stems views; `4` `5` `6` `7` the Metadata Sources, Download Sources, Stems and Logs tabs. The tab lines show your own key when you rebound one, and a key you had set for a view or tab is kept.
+
+### Fixed
+
+- Settings → Shortcuts: a shortcut you rebind shows its new key at once, instead of the old one until you saved.
+- Selecting text with the mouse from the first row of a panel no longer copies the top border and title of the box beside it (e.g. the source list's first row and "Compiled Metadata").
+
 ## [0.3.0] — 2026-11-22
 
 ### Added

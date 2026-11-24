@@ -13,7 +13,7 @@ import { globalLogger } from "#base/logger/logger";
 import { mouseRegistry, type MouseEvent } from "#base/mouse/mouse";
 import { SettingsStore } from "#settings/settingsStore";
 import { copyToClipboard } from "./clipboardWrite";
-import { clampPoint, highlightRow, isPaneEdge, paneBounds, selectedText, type Selection } from "./selection";
+import { clampPoint, highlightRow, isPaneLimit, paneBounds, selectedText, type Selection } from "./selection";
 import { getScreenTap } from "./screenTap";
 
 /**
@@ -99,8 +99,9 @@ class ScreenSelection {
         const frame = getScreenTap().frame;
         const row = frame[event.y];
         if (!row) return;
-        // A press on a border is a handle (the chat's edge), not text.
-        if (isPaneEdge(frame, event.x, event.y)) return;
+        // A press on a border (its side, or the corner / tee where it starts) is a handle (the chat's edge), not text:
+        // the pane around it would be empty.
+        if (isPaneLimit(frame, event.x, event.y)) return;
         this.pressed = {
             anchor: { x: event.x, y: event.y },
             block: event.alt,

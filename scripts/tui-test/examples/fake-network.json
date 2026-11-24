@@ -1,0 +1,58 @@
+{
+    // The fake network (preload/fakeNetwork.mjs): the app never reaches the internet. A pasted Deezer link is read
+    // through a canned answer, every other request fails like a missing connection, and the scenario checks which
+    // requests were made.
+    "terminal": { "cols": 140, "rows": 40 },
+    "dataDir": "scripts/tui-test/fixtures/empty",
+    "settings": { "general": { "cacheEnabled": false } },
+    "network": {
+        "mode": "offline",
+        "rules": [
+            {
+                "url": "api.deezer.com/track/3135556",
+                "json": {
+                    "id": 3135556,
+                    "readable": true,
+                    "title": "Harder, Better, Faster, Stronger",
+                    "isrc": "GBDUW0000059",
+                    "link": "https://www.deezer.com/track/3135556",
+                    "duration": 224,
+                    "track_position": 4,
+                    "release_date": "2001-03-07",
+                    "artist": { "id": 27, "name": "Daft Punk" },
+                    "contributors": [{ "id": 27, "name": "Daft Punk" }],
+                    "album": { "id": 302127, "title": "Discovery", "release_date": "2001-03-07" },
+                    "type": "track"
+                }
+            }
+        ]
+    },
+    "steps": [
+        { "type": "stable", "timeout": 20000 },
+        { "type": "assertNot", "contains": "Daft Punk" },
+        { "type": "assertRequest", "url": "deezer.com", "count": 0, "timeout": 0 },
+
+        // Paste the link, add it "to tag only", run it.
+        { "type": "type", "text": "https://www.deezer.com/track/3135556" },
+        { "type": "waitForContent", "contains": "Add, to tag only", "timeout": 8000 },
+        { "type": "key", "key": "↓" },
+        { "type": "key", "key": "Enter" },
+        { "type": "waitForContent", "contains": "Run 1 task", "timeout": 8000 },
+        { "type": "assertLog", "contains": "Imported 1 new task" },
+        { "type": "click", "text": "Run 1 task" },
+
+        // Read through the canned answer, not through the internet.
+        { "type": "waitForContent", "contains": "Daft Punk", "timeout": 15000 },
+        { "type": "assertRequest", "url": "api.deezer.com/track/3135556", "min": 1 },
+        { "type": "snapshot", "name": "fetched" },
+
+        // The track is saved with the session.
+        {
+            "type": "assertJson",
+            "file": "sessions.json",
+            "path": "sessions[-1].tasks.length",
+            "gte": 1,
+            "timeout": 8000
+        }
+    ]
+}

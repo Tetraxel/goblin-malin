@@ -1,39 +1,53 @@
 {
-    // Drag with the left button over text: it is highlighted and, on release, copied (the terminal's OSC 52
-    // sequence is in the snapshot's `raw`). The mouse is sent as SGR reports (ESC [ < button ; column ; row M/m,
-    // 1-based): button 0 = left, +32 = motion, +8 = Alt. "Hooked" is at columns 39-44 of the first task's row (5).
+    // The app selects and copies text itself (src/base/selection/): a left drag highlights the cells under it and
+    // copies them on release, Alt+drag copies a rectangle, a plain click or a key clears the highlight and copies
+    // nothing. The copy lands on the stand-in clipboard (GOBLIN_TEST_CLIPBOARD), never on the developer's.
     "terminal": { "cols": 110, "rows": 40 },
     "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
     "steps": [
         { "type": "stable", "timeout": 20000 },
-        { "type": "wait", "ms": 1000 },
-        { "type": "snapshot", "name": "before" },
+        { "type": "waitForContent", "contains": "Hooked", "timeout": 5000 },
+        { "type": "assertClipboard", "empty": true, "timeout": 0 },
 
-        { "type": "type", "text": "\u001b[<0;39;5M" },
-        { "type": "type", "text": "\u001b[<32;42;5M" },
-        { "type": "type", "text": "\u001b[<32;44;5M" },
-        { "type": "wait", "ms": 500 },
-        { "type": "snapshot", "name": "dragging" },
-        { "type": "type", "text": "\u001b[<0;44;5m" },
-        { "type": "wait", "ms": 500 },
+        // Drag over "Hooked" in the first task's row: highlighted, and copied on release.
+        { "type": "drag", "from": { "text": "Hooked", "offset": 0 }, "to": { "text": "Hooked", "offset": 5 } },
+        { "type": "assertClipboard", "equals": "Hooked" },
+        // The copy is saved a moment before the last frame of the drag is painted.
+        { "type": "stable" },
+        { "type": "assertStyle", "contains": "Hooked", "bg": "#264f78", "fg": "#ffffff" },
         { "type": "snapshot", "name": "copied" },
 
-        // A plain click removes the highlight and copies nothing.
-        { "type": "type", "text": "\u001b[<0;70;9M" },
-        { "type": "type", "text": "\u001b[<0;70;9m" },
-        { "type": "wait", "ms": 500 },
-        { "type": "snapshot", "name": "clicked" },
+        // A plain click clears the highlight (the row gets its own black background back) and copies nothing.
+        { "type": "click", "text": "Blushin" },
+        { "type": "wait", "ms": 300 },
+        { "type": "assertStyle", "contains": "Hooked", "bg": "#000000" },
+        { "type": "assertClipboard", "equals": "Hooked", "timeout": 0 },
 
-        // Alt+drag: a rectangle, two rows of the artist column.
-        { "type": "type", "text": "\u001b[<8;29;5M" },
-        { "type": "type", "text": "\u001b[<40;34;6M" },
-        { "type": "type", "text": "\u001b[<8;34;6m" },
-        { "type": "wait", "ms": 500 },
+        // Alt+drag: a rectangle over three rows of the artist column (the blanks at the end of a row are dropped).
+        {
+            "type": "drag",
+            "from": { "text": "NOTION", "offset": 0 },
+            "to": { "text": "Oppidan", "offset": 4 },
+            "alt": true
+        },
+        { "type": "assertClipboard", "equals": "NOTIO\nDaft\nOppid" },
         { "type": "snapshot", "name": "block" },
 
+        // A drag from the first row of the source list, on which the metadata box beside it starts (`d…┌── Compiled`),
+        // to the far right of the screen: the box's border and text are not taken along.
+        { "type": "drag", "from": { "text": "Top-ranked", "offset": 0 }, "to": { "col": 109, "row": 24 } },
+        { "type": "assertClipboard", "matches": "^Top-ranked favorite sources" },
+        { "type": "assertClipboard", "matches": "^[^│┌┐─]*$" },
+        { "type": "assertClipboard", "matches": "Compiled Metadata: Arlo - Blushin" },
+
         // A key press removes the highlight.
+        { "type": "drag", "from": { "text": "Hooked", "offset": 0 }, "to": { "text": "Hooked", "offset": 5 } },
+        { "type": "assertClipboard", "equals": "Hooked" },
+        { "type": "stable" },
+        { "type": "assertStyle", "contains": "Hooked", "bg": "#264f78" },
         { "type": "key", "key": "Down" },
-        { "type": "wait", "ms": 500 },
+        { "type": "wait", "ms": 300 },
+        { "type": "assertStyle", "contains": "Hooked", "bg": "#000000" },
         { "type": "snapshot", "name": "after-key" }
     ]
 }

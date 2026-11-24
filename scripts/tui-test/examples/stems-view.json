@@ -1,0 +1,25 @@
+{
+    "terminal": { "cols": 140, "rows": 46 },
+    "dataDir": "scripts/tui-test/fixtures/showcase",
+    "steps": [
+        { "type": "stable", "timeout": 8000 },
+
+        // `3`: the Stems view (one column per stem of Settings → Stems; 4 by default), and the Stems tab below it.
+        { "type": "key", "key": "3" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "VOCALS" },
+        { "type": "assert", "contains": "[6] Stems" },
+        { "type": "snapshot", "name": "stems-view" },
+
+        // Into the Stems tab: separation is off in the fixture, and the tab says where to turn it on.
+        { "type": "key", "key": "Tab", "repeat": 2 },
+        { "type": "stable" },
+        { "type": "assert", "contains": "stem separation is off" },
+        { "type": "snapshot", "name": "stems-tab" },
+
+        // `7` is the Logs tab now (it was `5`).
+        { "type": "key", "key": "7" },
+        { "type": "stable" },
+        { "type": "snapshot", "name": "logs-tab" }
+    ]
+}

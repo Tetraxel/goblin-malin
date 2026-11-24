@@ -1,352 +1,124 @@
-import * as pty from "node-pty";
-import fs from "node:fs";
-import { spawnSync } from "node:child_process";
-import path from "node:path";
-import os from "node:os";
-import { fileURLToPath } from "node:url";
-import { TermEmulator } from "./termEmulator.ts";
-import { resolveKey } from "./keyMap.ts";
-import { renderToImageBrowser } from "./screenshotBrowser.ts";
-import { renderToImagePowerShell } from "./screenshotPowerShell.ts";
 import { analyzeProfileFile } from "./profiling/analyze.ts";
-import { createIsolatedDataDir, DEFAULT_FIXTURE } from "./isolatedDataDir.ts";
-import { scaleSessionsFile } from "./scaleFixture.ts";
+import { TuiSession } from "./session.ts";
+import { StepRunner } from "./steps.ts";
+import { validateScenario } from "./validateScenario.ts";
 import type { InteractionMark } from "./profiling/types.ts";
-import type { HarnessEvent, HarnessResult, RunOptions, Scenario, Snapshot } from "./types.ts";
+import type { FailureReport, HarnessEvent, HarnessResult, RunOptions, Scenario, Step } from "./types.ts";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+/** A scenario that failed at a step: the message carries the report, `report` has the parts. */
+export class ScenarioFailure extends Error {
+    constructor(
+        message: string,
+        readonly report: FailureReport
+    ) {
+        super(message);
+        this.name = "ScenarioFailure";
+    }
+}
+
+const INPUTS_IN_REPORT = 15;
+const LOG_LINES_IN_REPORT = 25;
+const REQUESTS_IN_REPORT = 10;
+
+/** Shown in the report and in the message of a failure: the step, the last inputs, the log and the requests. */
+export function formatFailure(report: FailureReport, includeScreen: boolean): string {
+    const parts = [`step ${report.stepIndex + 1} failed: ${JSON.stringify(report.step)}`, report.message];
+    if (includeScreen) parts.push(`--- screen ---\n${report.screen || "(empty)"}`);
+    if (report.inputs.length > 0) parts.push(`--- last inputs ---\n${report.inputs.join("\n")}`);
+    if (report.logTail.length > 0)
+        parts.push(`--- app.log (last ${report.logTail.length}) ---\n${report.logTail.join("\n")}`);
+    if (report.requests.length > 0)
+        parts.push(`--- network (last ${report.requests.length}) ---\n${report.requests.join("\n")}`);
+    return parts.join("\n");
+}
+
+export async function buildReport(
+    session: TuiSession,
+    stepIndex: number,
+    step: Step,
+    error: unknown
+): Promise<FailureReport> {
+    let screen = "";
+    try {
+        screen = (await session.readScreen()).replace(/\s+$/, "");
+    } catch {
+        /* the emulator is gone: no screen */
+    }
+    return {
+        stepIndex,
+        step,
+        message: error instanceof Error ? error.message : String(error),
+        screen,
+        inputs: session.inputs.slice(-INPUTS_IN_REPORT),
+        logTail: session
+            .readLog()
+            .slice(-LOG_LINES_IN_REPORT)
+            .map((e) => `${e.level.padEnd(5)} ${e.message.slice(0, 220)}`),
+        requests: session
+            .readRequests()
+            .slice(-REQUESTS_IN_REPORT)
+            .map((r) => `${r.outcome.padEnd(11)} ${r.method} ${r.url}`),
+    };
+}
 
 export async function runScenario(scenario: Scenario, options: RunOptions = {}): Promise<HarnessResult> {
     const emit = (event: HarnessEvent) => options.onEvent?.(event);
-    const cols = scenario.terminal?.cols ?? 200;
-    const rows = scenario.terminal?.rows ?? 50;
-
-    const termEmulator = new TermEmulator(cols, rows);
-    const snapshots: Record<string, Snapshot> = {};
-    const metrics: Record<string, number | boolean> = {};
+    // A typo in a step fails now, not after the app has booted.
+    const problems = validateScenario(scenario);
+    if (problems.length > 0) throw new Error(`The scenario is not valid:\n  ${problems.join("\n  ")}`);
 
     // --- Profiling setup ---
     const profileCfg = scenario.profile?.enabled ? scenario.profile : undefined;
     const marks: InteractionMark[] = [];
     let interactionIdx = 0;
-    const runId = `${Date.now()}-${process.pid}`;
-    const profileOut = profileCfg ? path.join(os.tmpdir(), "goblin-tui-test", `profile-${runId}.jsonl`) : undefined;
-    // The profiled app polls this file for `startLoad` / `stopLoad` (see src/profiling/loadDriver.ts).
-    const loadControl = profileCfg ? path.join(os.tmpdir(), "goblin-tui-test", `load-${runId}.json`) : undefined;
-    if (profileOut) {
-        fs.mkdirSync(path.dirname(profileOut), { recursive: true });
-        try {
-            fs.rmSync(profileOut);
-        } catch {
-            /* fresh file */
-        }
-    }
     const markInteraction = (label: string): void => {
         if (profileCfg) marks.push({ index: interactionIdx++, label, t: Date.now() });
     };
 
-    let rawBuffer = "";
-    let lastSnapshotBoundary = 0;
-    let lastDataTime = 0; // 0 means no data yet
-    let totalBytesReceived = 0;
-    // exitCode tracks natural exits only (crashes, explicit app quit).
-    // If the harness kills the process after all steps are done, exitCode stays null.
-    let stepsCompleted = false;
-    let appExitCode: number | null = null;
-
-    const isWin = process.platform === "win32";
-    const shell = isWin ? (process.env["COMSPEC"] ?? "cmd.exe") : "/bin/sh";
-    const shellFlag = isWin ? "/c" : "-c";
-
-    const ptyEnv: Record<string, string> = {};
-    for (const [k, v] of Object.entries(process.env)) {
-        if (v !== undefined) ptyEnv[k] = v;
-    }
-    // The app runs in a real terminal here, like a user's. On a CI runner (`CI=true`), Ink would otherwise think it
-    // is not interactive and draw nothing until it exits (`is-in-ci`), so every scenario would time out.
-    delete ptyEnv["CI"];
-    delete ptyEnv["CONTINUOUS_INTEGRATION"];
-    // The app always runs on a throwaway copy of the fixture, never on the fixture itself (see isolatedDataDir.ts).
-    const fixtureDir = path.resolve(ROOT, scenario.dataDir ?? DEFAULT_FIXTURE);
-    const isolated = createIsolatedDataDir(fixtureDir, scenario.settings);
-    if (scenario.scale) scaleSessionsFile(isolated.dir, scenario.scale);
-    const keepDataDir = !!process.env["GOBLIN_TUI_KEEP_DATA"];
-    if (keepDataDir) console.error(`[tui-test] data folder kept at ${isolated.dir}`);
-    const slowMode = !!(process.env["GOBLIN_SLOW"] ?? scenario.env?.["GOBLIN_SLOW"]);
-    // Truecolor (`FORCE_COLOR=3`) like Windows Terminal, iTerm2 and most Linux terminals give the app: 16 colours
-    // would make every frame ~30 % shorter than a user's. A scenario can
-    // still ask for another level in its `env` (a screenshot test of the 16-colour theme, say).
-    Object.assign(ptyEnv, { FORCE_COLOR: "3" }, scenario.env ?? {}, {
-        TERM: "xterm-256color",
-        COLORTERM: "truecolor",
-        GOBLIN_NO_AUDIO: "1",
-        GOBLIN_DATA_DIR: isolated.dir,
-        ...(profileOut ? { DEV: "true", GOBLIN_PROFILE_OUT: profileOut } : {}),
-        // The build users run (`profile.build: "production"`): see ProfileConfig.build.
-        ...(profileCfg?.build === "production" ? { NODE_ENV: "production" } : {}),
-        ...(loadControl ? { GOBLIN_PROFILE_CONTROL: loadControl } : {}),
+    const session = new TuiSession(scenario);
+    const runner = new StepRunner(session, {
+        scenario,
+        emit,
+        markInteraction,
+        goldenDir: options.goldenDir,
+        updateGolden: options.updateGolden,
     });
 
-    // Profile mode boots through the instrumented entry, which installs the
-    // React devtools hook before Ink loads. Visual output is identical, so all
-    // snapshot/assert steps still work.
-    // `scenario.command` runs something else (e.g. `node dist/cli.js` to time the shipped bundle, which has no
-    // profiling hooks: only the `stable` / `waitForContent` timings are meaningful then).
-    const command = scenario.command ?? (profileCfg ? "yarn tsx src/profiling/profiledEntry.tsx" : "yarn dev");
-    const ptyProcess = pty.spawn(shell, [shellFlag, command], {
-        name: "xterm-256color",
-        cols,
-        rows,
-        cwd: ROOT,
-        env: ptyEnv,
-    });
-
-    // GOBLIN_SLOW: constrain the PTY process to simulate slow/low-end hardware.
-    // Sets idle CPU priority + single-core affinity. Both settings are inherited
-    // by child processes (cmd → yarn → node), so the whole app runs under constraint.
-    if (slowMode) {
-        try {
-            os.setPriority(ptyProcess.pid, os.constants.priority.PRIORITY_LOW);
-        } catch {}
-        if (process.platform === "win32") {
-            spawnSync("powershell.exe", [
-                "-NoProfile",
-                "-NonInteractive",
-                "-Command",
-                `(Get-Process -Id ${ptyProcess.pid}).ProcessorAffinity = 1`,
-            ]);
-        }
-    }
-
-    ptyProcess.onData((data: string) => {
-        lastDataTime = Date.now();
-        totalBytesReceived += data.length;
-        rawBuffer += data;
-        termEmulator.feed(data);
-    });
-
-    ptyProcess.onExit(({ exitCode }) => {
-        if (!stepsCompleted) {
-            appExitCode = exitCode ?? null;
-        }
-    });
-
-    // Resolves false=stable, true=timed out.
-    // minBytes: don't declare stable until this many bytes have been received.
-    // Default 1000: ConPTY init codes are ~16 bytes, tsx dotenv message ~200 bytes — both
-    // are skipped. The app's first render is 50KB+, which crosses the threshold.
-    function waitForStable(timeoutMs = 5000, quiescenceMs = 300, minBytes = 1000): Promise<boolean> {
-        return new Promise<boolean>((resolve) => {
-            const start = Date.now();
-            function check() {
-                const now = Date.now();
-                const elapsed = now - start;
-                // Quiet time counts from the start of the wait at the earliest: output from before a key press is
-                // not an answer to it, and the app may not have started repainting yet.
-                const idle = lastDataTime > 0 ? now - Math.max(lastDataTime, start) : Infinity;
-                const enoughData = totalBytesReceived >= minBytes;
-
-                if (enoughData && idle >= quiescenceMs) {
-                    resolve(false); // stable
-                } else if (elapsed >= timeoutMs) {
-                    resolve(true); // timed out
-                } else {
-                    setTimeout(check, Math.max(1, Math.min(50, timeoutMs - elapsed)));
-                }
-            }
-            setTimeout(check, 10);
-        });
-    }
-
-    async function takeSnapshot(name: string): Promise<void> {
-        await termEmulator.flush();
-        const plain = termEmulator.readScreen();
-        const ansi = termEmulator.readScreenAnsi();
-        const raw = rawBuffer.slice(lastSnapshotBoundary);
-        lastSnapshotBoundary = rawBuffer.length;
-        snapshots[name] = { raw, plain, ansi };
-    }
-
-    let stableIdx = 0;
-    let lastSnapshotTime = Date.now();
-
+    const deadline = options.timeoutMs ? Date.now() + options.timeoutMs : undefined;
+    let failure: ScenarioFailure | undefined;
     try {
-        for (const step of scenario.steps) {
-            switch (step.type) {
-                case "key": {
-                    // delayMs: gap after each press (default 100ms). Set lower to
-                    // simulate held-key autorepeat (~30-50ms). repeat: send N times.
-                    const keyDelay = step.delayMs ?? 100;
-                    const repeat = step.repeat ?? 1;
-                    for (let i = 0; i < repeat; i++) {
-                        emit({ type: "key", key: step.key });
-                        markInteraction(step.key);
-                        ptyProcess.write(resolveKey(step.key));
-                        await new Promise<void>((r) => setTimeout(r, keyDelay));
-                    }
-                    break;
+        for (const [index, step] of scenario.steps.entries()) {
+            try {
+                if (deadline && Date.now() > deadline) {
+                    throw new Error(`the scenario ran longer than ${Math.round(options.timeoutMs! / 1000)}s`);
                 }
-
-                case "type":
-                    emit({ type: "type", text: step.text });
-                    markInteraction(`type ${JSON.stringify(step.text)}`);
-                    ptyProcess.write(step.text);
-                    break;
-
-                case "wait":
-                    emit({ type: "wait", ms: step.ms });
-                    await new Promise<void>((r) => setTimeout(r, step.ms));
-                    break;
-
-                case "stable": {
-                    emit({ type: "stable:start" });
-                    const start = Date.now();
-                    const timedOut = await waitForStable(step.timeout, step.quiescenceMs, step.minBytes);
-                    const ms = Date.now() - start;
-                    emit({ type: "stable:end", ms, timedOut });
-                    metrics[`stable_${stableIdx}_ms`] = ms;
-                    if (timedOut) {
-                        metrics[`stable_${stableIdx}_timed_out`] = true;
-                        await takeSnapshot(`timeout_stable_${stableIdx}`);
-                        const { plain, ansi } = snapshots[`timeout_stable_${stableIdx}`]!;
-                        emit({ type: "snapshot", name: `timeout_stable_${stableIdx}`, plain, ansi });
-                        // What the app showed, so a failure on CI (where nobody sees the terminal) can be read.
-                        const screen = plain.replace(/\s+$/, "");
-                        const raw = rawBuffer.slice(-2000).split("\u001b").join("\\e");
-                        throw new Error(
-                            `stable step ${stableIdx} timed out after ${ms}ms ` +
-                                `(${totalBytesReceived} bytes received, exit code ${appExitCode ?? "none"})\n` +
-                                `--- screen ---\n${screen || "(empty)"}\n--- last raw output ---\n${raw || "(none)"}`
-                        );
-                    }
-                    stableIdx++;
-                    break;
-                }
-
-                case "waitForContent": {
-                    emit({ type: "waitForContent:start", text: step.text });
-                    const timeoutMs = step.timeout ?? 10000;
-                    const start = Date.now();
-                    let found = false;
-                    while (Date.now() - start < timeoutMs) {
-                        await termEmulator.flush();
-                        if (termEmulator.readScreen().includes(step.text)) {
-                            found = true;
-                            break;
-                        }
-                        await new Promise<void>((r) => setTimeout(r, 100));
-                    }
-                    const ms = Date.now() - start;
-                    emit({ type: "waitForContent:end", text: step.text, ms, found });
-                    metrics[`waitForContent_${step.text}_ms`] = ms;
-                    if (!found) {
-                        metrics[`waitForContent_${step.text}_timeout`] = true;
-                        const snapshotName = `timeout_waitForContent_${stableIdx}`;
-                        await takeSnapshot(snapshotName);
-                        const { plain, ansi } = snapshots[snapshotName]!;
-                        emit({ type: "snapshot", name: snapshotName, plain, ansi });
-                        throw new Error(`waitForContent "${step.text}" timed out after ${ms}ms`);
-                    }
-                    break;
-                }
-
-                case "assert": {
-                    await termEmulator.flush();
-                    if (!termEmulator.readScreen().includes(step.contains)) {
-                        const snapshotName = `assert_fail`;
-                        await takeSnapshot(snapshotName);
-                        const { plain, ansi } = snapshots[snapshotName]!;
-                        emit({ type: "snapshot", name: snapshotName, plain, ansi });
-                        throw new Error(`assert failed: screen does not contain "${step.contains}"`);
-                    }
-                    emit({ type: "assert:pass", contains: step.contains });
-                    break;
-                }
-
-                case "snapshot": {
-                    await takeSnapshot(step.name);
-                    const { plain, ansi } = snapshots[step.name]!;
-                    emit({ type: "snapshot", name: step.name, plain, ansi });
-                    metrics[`snapshot_${step.name}_ms`] = Date.now() - lastSnapshotTime;
-                    lastSnapshotTime = Date.now();
-                    break;
-                }
-
-                case "screenshot": {
-                    await termEmulator.flush();
-                    const imgPath = path.join(os.tmpdir(), "goblin-tui-test", `${step.name}.png`);
-                    await termEmulator.renderToImage(imgPath);
-                    emit({ type: "screenshot", name: step.name, path: imgPath });
-                    break;
-                }
-
-                case "screenshot-browser": {
-                    await termEmulator.flush();
-                    const imgPath = path.join(os.tmpdir(), "goblin-tui-test", `${step.name}.png`);
-                    await renderToImageBrowser(termEmulator.cols, termEmulator.rows, rawBuffer, imgPath);
-                    emit({ type: "screenshot", name: step.name, path: imgPath });
-                    break;
-                }
-
-                case "mark":
-                    markInteraction(step.label);
-                    break;
-
-                case "startLoad":
-                case "stopLoad": {
-                    if (!loadControl) throw new Error(`${step.type} needs profiling (run with --profile)`);
-                    markInteraction(step.type === "startLoad" ? "load start" : "load stop");
-                    fs.mkdirSync(path.dirname(loadControl), { recursive: true });
-                    fs.writeFileSync(
-                        loadControl,
-                        JSON.stringify(
-                            step.type === "startLoad" ? { action: "start", ...scenario.load } : { action: "stop" }
-                        )
-                    );
-                    break;
-                }
-
-                case "screenshot-powershell": {
-                    await termEmulator.flush();
-                    const imgPath = path.join(os.tmpdir(), "goblin-tui-test", `${step.name}.png`);
-                    if (process.platform !== "win32") {
-                        // Windows Terminal only exists on Windows: use the built-in emulator instead of crashing the run.
-                        console.error(
-                            `[tui-test] screenshot-powershell needs Windows: "${step.name}" uses the built-in emulator`
-                        );
-                        await termEmulator.renderToImage(imgPath);
-                        emit({ type: "screenshot", name: step.name, path: imgPath });
-                        break;
-                    }
-                    await renderToImagePowerShell(
-                        termEmulator.cols,
-                        termEmulator.rows,
-                        termEmulator.readScreenAnsi(),
-                        imgPath
-                    );
-                    emit({ type: "screenshot", name: step.name, path: imgPath });
-                    break;
-                }
+                await runner.run(step);
+            } catch (error) {
+                const report = await buildReport(session, index, step, error);
+                emit({ type: "failure", report });
+                // Waits already print the screen in their message: do not show it twice.
+                failure = new ScenarioFailure(
+                    formatFailure(report, !report.message.includes("--- screen ---")),
+                    report
+                );
+                break;
             }
         }
-        stepsCompleted = true;
     } finally {
-        if (appExitCode === null) {
-            try {
-                ptyProcess.kill();
-            } catch {}
-        }
-        // Allow time for the exit event to fire
-        await new Promise<void>((r) => setTimeout(r, 300));
-        if (!keepDataDir) isolated.dispose();
+        await session.dispose();
     }
+    if (failure) throw failure;
 
-    const result: HarnessResult = { snapshots, metrics, exitCode: appExitCode };
+    const result: HarnessResult = {
+        snapshots: runner.snapshots,
+        metrics: runner.metrics,
+        exitCode: session.appExitCode,
+    };
 
-    if (profileCfg && profileOut) {
+    if (profileCfg && session.profileOut) {
         // Records are written synchronously per commit, so the file is complete
         // by the time the process is gone. Bucket commits against interaction marks.
-        const report = analyzeProfileFile(profileOut, {
+        const report = analyzeProfileFile(session.profileOut, {
             marks,
             thresholds: profileCfg.thresholds,
             scenario: scenario.name,

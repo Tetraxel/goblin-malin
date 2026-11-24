@@ -1,0 +1,16 @@
+{
+    "general": {
+        "reopenLastSession": true,
+        "animationsEnabled": true,
+        "theme": "dark",
+        "showWelcomeTutorial": false,
+        "checkForUpdates": false,
+        "cacheEnabled": false
+    },
+    "logs": {
+        "logLevel": "DEBUG",
+        "includeGlobalLogsInFocusedTask": false
+    },
+    "keybindings": {},
+    "flows": {}
+}

@@ -1,0 +1,23 @@
+{
+    // A playlist whose tracks ended differently (fixtures/buildFixtures.ts): the rows show each outcome, a click on the
+    // parent collapses and expands them, and the state is the saved one after the app has started.
+    "terminal": { "cols": 130, "rows": 30 },
+    "dataDir": "scripts/tui-test/fixtures/collection-failures",
+    "steps": [
+        { "type": "stable", "timeout": 20000 },
+        { "type": "assert", "contains": "[PLAYLIST]" },
+        { "type": "assert", "matches": "✅\\s+Done", "count": 2 },
+        { "type": "assert", "matches": "❌\\s+Metadata", "count": 1 },
+        { "type": "assert", "matches": "❌\\s+Download", "count": 1 },
+        { "type": "snapshot", "name": "mixed-results" },
+
+        // A click on the playlist collapses it (its tracks leave the list); C expands it again.
+        { "type": "click", "text": "[PLAYLIST]" },
+        { "type": "waitForGone", "contains": "SPOTIFY::TRACK", "timeout": 3000 },
+        { "type": "assert", "contains": "[PLAYLIST]" },
+        { "type": "key", "key": "c" },
+        { "type": "waitForContent", "contains": "SPOTIFY::TRACK", "timeout": 3000 },
+
+        { "type": "assertNoErrors" }
+    ]
+}

@@ -17,32 +17,25 @@ const highlightedRows = (ansi: string): number[] =>
     ansi.split("\n").flatMap((line, index) => (line.includes(HIGHLIGHT) ? [index] : []));
 
 describe("select with the mouse, copy on release", () => {
+    // The scenario checks the highlight and the stand-in clipboard itself (it throws when a step fails); this test adds
+    // what only the raw output shows: the copy also reaches the terminal, through its clipboard sequence (OSC 52).
     test("a drag is highlighted and copied on release; a click and a key remove it", async () => {
         const result = await runScenario(scenario);
         expect(result.exitCode).toBeNull();
-        const { before, dragging, copied, clicked, block, "after-key": afterKey } = result.snapshots;
+        const { copied, block, "after-key": afterKey } = result.snapshots;
 
-        expect(highlightedRows(before!.ansi)).toEqual([]);
-        expect(copiedBy(before!.raw)).toEqual([]);
-
-        // While the button is down the cells are painted, and nothing is copied yet.
-        expect(highlightedRows(dragging!.ansi)).toEqual([4]);
-        expect(copiedBy(dragging!.raw)).toEqual([]);
-
-        // Letting go copies exactly the text under the highlight, through the terminal's clipboard sequence.
         expect(copiedBy(copied!.raw)).toEqual(["Hooked"]);
         expect(highlightedRows(copied!.ansi)).toEqual([4]);
 
-        // A click is only a click: the highlight goes, nothing is copied.
-        expect(highlightedRows(clicked!.ansi)).toEqual([]);
-        expect(copiedBy(clicked!.raw)).toEqual([]);
+        // Alt+drag takes the same columns of three rows; the click before it copied nothing.
+        expect(copiedBy(block!.raw)).toEqual(["NOTIO\nDaft\nOppid"]);
+        expect(highlightedRows(block!.ansi)).toEqual([4, 5, 6]);
 
-        // Alt+drag takes the same columns of both rows.
-        expect(copiedBy(block!.raw)).toEqual(["NOTION\nDaft P"]);
-        expect(highlightedRows(block!.ansi)).toEqual([4, 5]);
-
-        // Any key ends the selection.
+        // A drag in the source list takes none of the metadata box beside it; then any key ends the selection.
+        const [paneCopy, lastCopy] = copiedBy(afterKey!.raw);
+        expect(paneCopy).toMatch(/^Top-ranked favorite sources/);
+        expect(paneCopy).not.toMatch(/[│┌┐─]/);
+        expect(lastCopy).toBe("Hooked");
         expect(highlightedRows(afterKey!.ansi)).toEqual([]);
-        expect(copiedBy(afterKey!.raw)).toEqual([]);
     }, 60000);
 });

@@ -1,0 +1,61 @@
+{
+    // "Every keyboard shortcut is user-rebindable, and every on-screen hint must reflect the live binding" (CLAUDE.md).
+    // Rebind the Sessions modal's "New session" from Ctrl+N to Ctrl+B in Settings → Shortcuts: it is saved, the modal's
+    // hint says Ctrl+B, Ctrl+N no longer does anything there, and Ctrl+B creates the session.
+    "terminal": { "cols": 140, "rows": 45 },
+    "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
+    "network": { "mode": "offline" },
+    "steps": [
+        { "type": "stable", "timeout": 20000 },
+
+        // Before: the default.
+        { "type": "click", "text": "Sessions" },
+        { "type": "waitForContent", "contains": "[Ctrl+N] New", "timeout": 5000 },
+        { "type": "key", "key": "Esc" },
+        { "type": "waitForGone", "contains": "SESSIONS", "timeout": 3000 },
+
+        // Settings → Shortcuts (Tab), find the shortcut by its id, capture a new key, save.
+        { "type": "click", "text": "Settings" },
+        { "type": "waitForContent", "contains": "Search settings", "timeout": 5000 },
+        { "type": "key", "key": "Tab" },
+        { "type": "waitForContent", "contains": "Search shortcuts", "timeout": 3000 },
+        { "type": "type", "text": "sessionsModal.new" },
+        {
+            "type": "waitForContent",
+            "matches": "sessionsModal\\.new\\s+New session\\s+\\[Ctrl\\+N\\]",
+            "timeout": 3000
+        },
+        { "type": "key", "key": "↓" },
+        { "type": "key", "key": "Enter" },
+        { "type": "waitForContent", "contains": "Press new shortcut key", "timeout": 3000 },
+        { "type": "assert", "contains": "Rebinding: sessionsModal.new" },
+        { "type": "key", "key": "Ctrl+B" },
+        { "type": "waitForGone", "contains": "Press new shortcut key", "timeout": 3000 },
+        {
+            "type": "waitForContent",
+            "matches": "sessionsModal\\.new\\s+New session\\s+\\[Ctrl\\+B\\]",
+            "timeout": 3000
+        },
+        { "type": "key", "key": "Ctrl+S" },
+        { "type": "waitForGone", "contains": "Search shortcuts", "timeout": 3000 },
+        {
+            "type": "assertJson",
+            "file": "settings.json",
+            "path": "keybindings[\"sessionsModal.new\"]",
+            "equals": { "input": "b", "ctrl": true }
+        },
+
+        // After: the hint follows the binding, the old key is free, the new one works.
+        { "type": "click", "text": "Sessions" },
+        { "type": "waitForContent", "contains": "[Ctrl+B] New", "timeout": 5000 },
+        { "type": "assertNot", "contains": "[Ctrl+N] New" },
+        { "type": "key", "key": "Ctrl+N" },
+        { "type": "stable" },
+        { "type": "assert", "contains": "SESSIONS" },
+        { "type": "assert", "contains": "Hooked" },
+        { "type": "key", "key": "Ctrl+B" },
+        { "type": "waitForGone", "contains": "SESSIONS", "timeout": 3000 },
+        { "type": "waitForGone", "contains": "Hooked", "timeout": 3000 },
+        { "type": "assertNoErrors" }
+    ]
+}

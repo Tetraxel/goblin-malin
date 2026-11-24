@@ -4,7 +4,7 @@ import * as path from "path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { dataFileNoticeBridge, type DataFileNotice } from "#base/bridges/dataFileNoticeBridge";
 import { DEFAULT_APP_SETTINGS } from "#settings/appSettings";
-import { SettingsStore } from "#settings/settingsStore";
+import { SETTINGS_FILE_VERSION, SettingsStore } from "#settings/settingsStore";
 import { deepDiff } from "#utils/deepDiff";
 import { deepMerge } from "#utils/deepMerge";
 import type { Shortcut } from "#types/actions";
@@ -147,7 +147,7 @@ describe("SettingsStore migrations", () => {
         store.setKeybinding("global.other", key("z")); // any write
 
         const saved = onDisk();
-        expect(saved.version).toBe(3);
+        expect(saved.version).toBe(SETTINGS_FILE_VERSION);
         expect(saved.general).toEqual({ theme: "light" });
         expect(saved.logs).toEqual({});
         expect(Object.keys(saved.keybindings).sort()).toEqual(["global.other", "global.tab"]);
@@ -176,6 +176,28 @@ describe("SettingsStore migrations", () => {
         });
     });
 
+    test("the numbered view and tab shortcuts move to their named ids, keeping the user's keys", () => {
+        fs.writeFileSync(
+            file,
+            JSON.stringify({
+                version: 3,
+                keybindings: {
+                    "global.mode1": key("a"),
+                    "global.tab5": key("l"),
+                    // Both ids set (a hand-edited file): the named one wins and the old one goes.
+                    "global.tab4": key("d"),
+                    "global.downloadSourcesTab": key("x"),
+                },
+            })
+        );
+        const store = new SettingsStore(file);
+        expect(store.getAppSettings().keybindings).toEqual({
+            "global.metadataView": key("a"),
+            "global.logsTab": key("l"),
+            "global.downloadSourcesTab": key("x"),
+        });
+    });
+
     test("an old minutes interval does not override a seconds value that exists", () => {
         fs.writeFileSync(
             file,
@@ -194,7 +216,13 @@ describe("SettingsStore only stores what differs from the defaults", () => {
         const current = store.getAppSettings();
         store.writeAppSettings({ ...current, general: { ...current.general, theme: "light" } });
 
-        expect(onDisk()).toEqual({ version: 3, general: { theme: "light" }, logs: {}, keybindings: {}, music: {} });
+        expect(onDisk()).toEqual({
+            version: SETTINGS_FILE_VERSION,
+            general: { theme: "light" },
+            logs: {},
+            keybindings: {},
+            music: {},
+        });
     });
 
     test("a setting put back to its default leaves the file", () => {

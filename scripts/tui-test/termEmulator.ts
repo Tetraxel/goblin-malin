@@ -9,6 +9,9 @@ import type {
     IBufferCell,
 } from "@xterm/headless";
 
+import { palette256ToRgb } from "./palette.ts";
+import type { CellColor, CellStyle, Line } from "./matchers.ts";
+
 const _require = createRequire(import.meta.url);
 
 const { Terminal } = _require("@xterm/headless") as {
@@ -17,38 +20,6 @@ const { Terminal } = _require("@xterm/headless") as {
 const { Unicode11Addon } = _require("@xterm/addon-unicode11") as {
     Unicode11Addon: new () => ITerminalAddon;
 };
-
-// Standard xterm-256color 256-color palette
-function palette256ToRgb(index: number): [number, number, number] {
-    if (index < 16) {
-        const SYSTEM: [number, number, number][] = [
-            [0, 0, 0],
-            [128, 0, 0],
-            [0, 128, 0],
-            [128, 128, 0],
-            [0, 0, 128],
-            [128, 0, 128],
-            [0, 128, 128],
-            [192, 192, 192],
-            [128, 128, 128],
-            [255, 0, 0],
-            [0, 255, 0],
-            [255, 255, 0],
-            [0, 0, 255],
-            [255, 0, 255],
-            [0, 255, 255],
-            [255, 255, 255],
-        ];
-        return SYSTEM[index] ?? [0, 0, 0];
-    }
-    if (index < 232) {
-        const i = index - 16;
-        const toV = (v: number) => (v === 0 ? 0 : 55 + v * 40);
-        return [toV(Math.floor(i / 36)), toV(Math.floor(i / 6) % 6), toV(i % 6)];
-    }
-    const v = 8 + (index - 232) * 10;
-    return [v, v, v];
-}
 
 function cellColorCss(cell: IBufferCell, role: "fg" | "bg"): string | null {
     const isDefault = role === "fg" ? cell.isFgDefault() : cell.isBgDefault();
@@ -98,8 +69,8 @@ const DEFAULT_FG = "#c0c0c0";
 export class TermEmulator {
     private terminal: ITerminal;
     private pendingWrites = 0;
-    readonly cols: number;
-    readonly rows: number;
+    cols: number;
+    rows: number;
 
     constructor(cols: number, rows: number) {
         this.cols = cols;
@@ -122,6 +93,67 @@ export class TermEmulator {
         while (this.pendingWrites > 0 && Date.now() < deadline) {
             await new Promise<void>((r) => setTimeout(r, 5));
         }
+    }
+
+    /** Resizes the screen, like the user dragging the window's edge (the app is told separately, through the pty). */
+    resize(cols: number, rows: number): void {
+        this.cols = cols;
+        this.rows = rows;
+        this.terminal.resize(cols, rows);
+    }
+
+    /** Where the cursor is, 1-based. */
+    cursor(): { col: number; row: number } {
+        const buffer = this.terminal.buffer.active;
+        return { col: buffer.cursorX + 1, row: buffer.cursorY + 1 };
+    }
+
+    /** The screen line by line, each character with the cell column it starts at (a wide character takes two cells). */
+    readLines(): Line[] {
+        const buffer = this.terminal.buffer.active;
+        const lines: Line[] = [];
+        for (let row = 0; row < this.terminal.rows; row++) {
+            const line = buffer.getLine(row);
+            let text = "";
+            const colOf: number[] = [];
+            if (line) {
+                for (let col = 0; col < this.terminal.cols; col++) {
+                    const cell = line.getCell(col);
+                    if (!cell || cell.getWidth() === 0) continue;
+                    const chars = cell.getChars() || " ";
+                    text += chars;
+                    for (let k = 0; k < chars.length; k++) colOf.push(col);
+                }
+            }
+            const trimmed = text.replace(/\s+$/, "");
+            lines.push({ text: trimmed, colOf: colOf.slice(0, trimmed.length) });
+        }
+        return lines;
+    }
+
+    /** The style of one cell (0-based row and column). */
+    cellStyle(row: number, col: number): CellStyle | undefined {
+        const cell = this.terminal.buffer.active.getLine(row)?.getCell(col);
+        if (!cell) return undefined;
+        const color = (role: "fg" | "bg"): CellColor => {
+            const isDefault = role === "fg" ? cell.isFgDefault() : cell.isBgDefault();
+            if (isDefault) return { kind: "default" };
+            const isRgb = role === "fg" ? cell.isFgRGB() : cell.isBgRGB();
+            const value = role === "fg" ? cell.getFgColor() : cell.getBgColor();
+            return isRgb
+                ? { kind: "rgb", rgb: [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff] }
+                : { kind: "palette", index: value };
+        };
+        return {
+            fg: color("fg"),
+            bg: color("bg"),
+            bold: !!cell.isBold(),
+            dim: !!cell.isDim(),
+            italic: !!cell.isItalic(),
+            underline: !!cell.isUnderline(),
+            inverse: !!cell.isInverse(),
+            strikethrough: !!cell.isStrikethrough(),
+        };
     }
 
     readScreen(): string {

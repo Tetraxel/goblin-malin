@@ -3,7 +3,12 @@ import { SettingsStore } from "#settings/settingsStore";
 import { TaskOrchestrator } from "#base/task/orchestrator";
 import { applyStageConcurrency } from "./utils/stageLimiters";
 import { liveRefreshScheduler } from "./utils/liveRefreshScheduler";
-import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
+import {
+    metadataServiceRegistry,
+    discoveryServiceRegistry,
+    downloadServiceRegistry,
+    stemServiceRegistry,
+} from "./registries";
 import { SpotifyService } from "./services/metadata-providers/spotify/SpotifyService";
 import { YoutubeService } from "./services/metadata-providers/youtube/YoutubeService";
 import { SoundCloudService } from "./services/metadata-providers/soundcloud/SoundCloudService";
@@ -15,6 +20,8 @@ import { MusicBrainzDiscoveryService } from "./services/metadata-providers/music
 import { ClaudeDiscoveryService } from "./services/metadata-providers/claude/ClaudeDiscoveryService";
 import { YtDlpService } from "./services/download-providers/ytdlp/YtDlpService";
 import { SoulseekService } from "./services/download-providers/soulseek/SoulseekService";
+import { AudioSeparatorService } from "./services/stem-providers/audioSeparator/AudioSeparatorService";
+import { AUDIO_SEPARATOR_KEY } from "./services/stem-providers/audioSeparator/settingsRows";
 import { registerAgentTools } from "./agent/registerAgentTools";
 import { registerActionsMenuItems } from "./actionsMenuItems";
 import { registerProviderOnboarding } from "./providerOnboarding";
@@ -50,6 +57,9 @@ export function initMusicApp(): void {
 
     downloadServiceRegistry.register("ytdlp", YtDlpService);
     downloadServiceRegistry.register("soulseek", SoulseekService);
+
+    // Stem separation (P33): off until the user turns it on; on request only, never a pipeline stage.
+    stemServiceRegistry.register(AUDIO_SEPARATOR_KEY, AudioSeparatorService);
 
     // The credentials the providers declare leave the environment, so the programs the app starts never inherit them.
     for (const registry of [metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry]) {

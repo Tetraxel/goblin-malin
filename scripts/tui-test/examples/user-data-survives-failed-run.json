@@ -1,0 +1,45 @@
+{
+    // "User data is never rebuilt away" (CLAUDE.md): a track that holds a hand-typed title and a hand-pasted link is run
+    // while the network is down, so every fetch fails. The title stays on screen and both are still in the saved
+    // session afterwards. The fixture is made by fixtures/buildFixtures.ts.
+    "terminal": { "cols": 130, "rows": 30 },
+    "dataDir": "scripts/tui-test/fixtures/user-data",
+    "network": { "mode": "offline" },
+    "steps": [
+        { "type": "stable", "timeout": 20000 },
+        { "type": "assert", "contains": "My Own Title" },
+        { "type": "assertRequest", "url": "deezer.com", "count": 0, "timeout": 0 },
+
+        { "type": "click", "text": "Run 2 tasks" },
+        { "type": "waitForContent", "contains": "Failed to", "timeout": 20000 },
+        { "type": "assertRequest", "url": "deezer.com", "min": 1 },
+
+        // The failed run changed nothing of what the user typed: on screen and in the saved file.
+        { "type": "assert", "contains": "My Own Title" },
+        {
+            "type": "assertJson",
+            "file": "sessions.json",
+            "path": "sessions[0].tasks[0].attributes.metadataOverride.trackName",
+            "equals": "My Own Title",
+            "timeout": 8000
+        },
+        {
+            "type": "assertJson",
+            "file": "sessions.json",
+            "path": "sessions[0].tasks[0].attributes.metadataOverride.year",
+            "equals": 1999
+        },
+        {
+            "type": "assertJson",
+            "file": "sessions.json",
+            "path": "sessions[0].tasks[0].attributes.userSources",
+            "length": 1
+        },
+        {
+            "type": "assertJson",
+            "file": "sessions.json",
+            "path": "sessions[0].tasks[0].attributes.userSources[0].uri",
+            "equals": "YOUTUBE::TRACK::dQw4w9WgXcQ"
+        }
+    ]
+}

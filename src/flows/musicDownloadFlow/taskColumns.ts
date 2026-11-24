@@ -6,11 +6,15 @@ import { TrackCell } from "./columns/TrackCell";
 import { StatusCell } from "./columns/StatusCell";
 import { ToTagCell } from "./columns/ToTagCell";
 import { ToDownloadCell } from "./columns/ToDownloadCell";
+import { stemCellFor } from "./columns/StemCell";
+import { stemKindRegistry, stemSetKinds } from "./stems/stemKinds";
+import { getStemSettings } from "./stems/stemProviders";
 import { metadataServiceRegistry, discoveryServiceRegistry, downloadServiceRegistry } from "./registries";
 import { getMusicSettings, saveMusicSettings } from "./settings";
 import { type MusicDownloadTaskAttributes } from "./types";
 
-export type PrimaryMode = "metadata" | "download";
+export type { PrimaryMode } from "#types/focus";
+import { type PrimaryMode } from "#types/focus";
 
 type Column = ColumnDefinition<MusicDownloadTaskAttributes>;
 
@@ -115,6 +119,25 @@ export function computeColumns(mode: PrimaryMode): Column[] {
             };
         });
         columns = columns.concat(downloadServiceColumns);
+    }
+
+    if (mode === "stems") {
+        // One column per stem of the set chosen in Settings → Stems (4 by default). A run can make more stems: the
+        // Stems tab below lists them all.
+        const stemColumns: Column[] = stemSetKinds(getStemSettings().stemSet).map((kind) => {
+            const display = stemKindRegistry.get(kind);
+            return {
+                id: `stem-${kind}`,
+                label: display.label.toUpperCase(),
+                acronym: display.acronym,
+                minWidth: Math.max(2, display.acronym.length + 3),
+                color: display.color,
+                weight: 14,
+                flexGrow: 0,
+                component: stemCellFor(kind),
+            };
+        });
+        columns = columns.concat(stemColumns);
     }
 
     const allColumns = [...columns, ...statusColumns];

@@ -1,4 +1,6 @@
 {
+    // The Compiled Metadata box of the Metadata Sources tab: → from the source list moves into it, the cursor walks its
+    // fields with ↓ and stops on the last one (no wrap back to the top).
     "terminal": { "cols": 128, "rows": 50 },
     "dataDir": "scripts/tui-test/fixtures/50-tasks-with-metadata",
     "steps": [
@@ -12,10 +14,20 @@
         { "type": "stable" },
         { "type": "key", "key": "ArrowRight" },
         { "type": "stable" },
+        { "type": "assert", "matches": "☛ TITLE\\s+Hooked" },
         { "type": "snapshot", "name": "detail-focused" },
 
         { "type": "key", "key": "ArrowDown", "repeat": 16, "delayMs": 35 },
         { "type": "stable" },
-        { "type": "snapshot", "name": "fields-scrolled" }
+        { "type": "assert", "matches": "☛ GENRES" },
+        { "type": "assertNot", "contains": "☛ TITLE" },
+        { "type": "assert", "matches": "TITLE\\s+Hooked" },
+        { "type": "snapshot", "name": "fields-scrolled" },
+
+        // ← goes back to the source list, where the cursor was.
+        { "type": "key", "key": "ArrowLeft" },
+        { "type": "stable" },
+        { "type": "assertNot", "contains": "☛ GENRES" },
+        { "type": "assert", "matches": "☛\\s+🏆 Compiled Metadata" }
     ]
 }

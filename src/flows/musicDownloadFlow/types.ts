@@ -523,6 +523,74 @@ export type UserSource = {
     addedAt: string;
 };
 
+//----------------------//
+//        STEMS         //
+//----------------------//
+
+/**
+ * The name of one part of a mix ("vocals", "drums", "bass", "other", "guitar"…), lower case. The model decides which
+ * stems it makes; their labels and colours come from `stemKindRegistry` (`stems/stemKinds.ts`), never a component.
+ */
+export type StemKind = string;
+
+/** One file a separation run wrote (in the temporary folder). */
+export type StemFile = {
+    kind: StemKind;
+    path: string;
+    /** `not_found` once the file disappeared from disk (see `missingLocalFiles.ts`). */
+    state: "found" | "not_found";
+    fileInfo?: FileInfo;
+};
+
+/** The file a separation was made from, and what it was when it was read (the "made from an older file" check). */
+export type StemInput = {
+    path: string;
+    /** The track's saved file, or a download row (before the track was saved). */
+    kind: "saved" | "download";
+    /** Size and modification time of the file at the start of the run (`stemInputFingerprint`). */
+    fingerprint: string;
+};
+
+/**
+ * One separation of a track with one model. A run is found again by its `id`, never by its position. Runs are only
+ * added and removed by the user (or by Claude, for the user): no pipeline step touches them.
+ */
+export type StemRun = {
+    id: string;
+    /** Registry key of the stem separation service (`stemServiceRegistry`). */
+    provider: string;
+    /** The model's file name, as the service knows it (`htdemucs_ft.yaml`). */
+    model: string;
+    /** The model's name for people ("Demucs v4: htdemucs_ft"), when it was known. */
+    modelLabel?: string;
+    /** "cuda" or "cpu": what the run asked for. */
+    device?: string;
+    input: StemInput;
+    state: "queued" | "separating" | "done" | "failed" | "stopped";
+    /** 0–1 of the current step; `progressText` says which step. */
+    progress?: number;
+    progressText?: string;
+    error?: string;
+    startedAt: Date;
+    finishedAt?: Date;
+    stems: StemFile[];
+};
+
+/** A stem saved into the library: like `SavedFile`, a record of the user's file, which no reset removes. */
+export type SavedStem = {
+    kind: StemKind;
+    path: string;
+    /** Where the app wrote it (`path` follows the file when the user relocates it, this does not). */
+    writtenPath: string;
+    savedAt: Date;
+    /** The run it was made from, and its model (the run may have been deleted since). */
+    runId: string;
+    model: string;
+    /** The track's file it follows (its saved file when it was saved): "name does not follow the track" compares it. */
+    parentPath?: string;
+    fileInfo?: FileInfo;
+};
+
 export type TrackDownloadTask = {
     kind: "track";
     state: "pending" | "running" | "finished" | "failed" | "stopped";
@@ -581,6 +649,15 @@ export type TrackDownloadTask = {
      * and the user's decisions. Absent until the checks have run (or when they are switched off).
      */
     musicBrainzIdentity?: MusicBrainzIdentity;
+    /**
+     * Stem separations of this track (P33), oldest first. Never a pipeline stage: only the user (or Claude on their
+     * request) adds or deletes a run; a restart, a re-run or a new download leaves them alone.
+     */
+    stemRuns?: StemRun[];
+    /** The run the user picked for each stem (absent: the newest run that has that stem). User data. */
+    stemPick?: Record<StemKind, string>;
+    /** Stems saved into the library, by kind. User data, like `savedFile`: no reset removes them. */
+    savedStems?: Record<StemKind, SavedStem>;
 };
 
 //----------------------//

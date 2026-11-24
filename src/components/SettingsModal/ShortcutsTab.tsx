@@ -2,6 +2,7 @@ import React, { useReducer, useEffect, useMemo } from "react";
 import { Box, Text } from "ink";
 import type { Key } from "ink";
 import { shortcutRegistry } from "#base/shortcuts/ShortcutRegistry";
+import { type AppSettings } from "#settings/appSettings";
 import { SettingsStore } from "#settings/settingsStore";
 import { type Shortcut, getShortcutLiteral } from "#types/actions";
 import { ClickArea } from "#base/mouse/ClickArea";
@@ -109,6 +110,8 @@ interface ShortcutsTabProps {
     isActive: boolean;
     selectedIndex: number;
     rebindingId: string | null;
+    /** The bindings as they are now (the draft): a row shows a new binding as soon as it is pressed. */
+    keybindings: AppSettings["keybindings"];
     width: number;
     height: number;
     searchQuery: string;
@@ -123,6 +126,7 @@ export const ShortcutsTab: React.FC<ShortcutsTabProps> = ({
     isActive,
     selectedIndex,
     rebindingId,
+    keybindings,
     width,
     height,
     searchQuery,
@@ -135,12 +139,12 @@ export const ShortcutsTab: React.FC<ShortcutsTabProps> = ({
     const [registryVersion, forceUpdate] = useReducer((x: number) => x + 1, 0);
     useEffect(() => shortcutRegistry.subscribe(forceUpdate), []);
 
-    // Rebuilding sorts the whole registry; only redo it when the search or the
-    // registry itself changes — not on every scroll step (selectedIndex change).
+    // Rebuilding sorts the whole registry; only redo it when the search, the registry itself or a binding (a
+    // rebind, a reset) changes — not on every scroll step (selectedIndex change).
     const items = useMemo(
         () => buildShortcutsTabItems(searchQuery),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [searchQuery, registryVersion]
+        [searchQuery, registryVersion, keybindings]
     );
     const safeIdx = Math.max(0, Math.min(selectedIndex, items.length - 1));
 
