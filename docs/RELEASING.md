@@ -4,7 +4,7 @@ Pushing a `v*` tag runs [`release.yml`](../.github/workflows/release.yml): it ch
 
 ## Steps
 
-1. **Write the changelog.** In [CHANGELOG.md](../CHANGELOG.md), rename `## [Unreleased]` to `## [x.y.z] — YYYY-MM-DD` and add a fresh empty `## [Unreleased]` above it. Write it for users (what changed for them, not file names), and cover direct-to-`main` commits too: `git log vPREVIOUS..HEAD --oneline` lists everything. This text becomes the release page, and the release fails if the section is missing.
+1. **Write the changelog.** In [CHANGELOG.md](../CHANGELOG.md), rename `## [Unreleased]` to `## [x.y.z] — YYYY-MM-DD` and add a fresh empty `## [Unreleased]` above it. Write it for people skimming: one short line per change, an emoji first on each bullet, a few bullets per heading, no internals (the `release` skill has the full style guide; the script adds the emoji to the `###` headings). Cover direct-to-`main` commits too: `git log vPREVIOUS..HEAD --oneline` lists everything. This text becomes the release page, and the release fails if the section is missing.
 2. **Bump the version** in `package.json` (`x.y.z`, no `v`).
 3. **Check locally**: `yarn type-check && yarn lint && yarn format:check && yarn test && yarn build`, and preview the release page with `node scripts/release-notes.mjs vx.y.z` (it reads the tag's commits, so it only works once the tag exists; before that, read the CHANGELOG section).
 4. **Commit and push to `main`**: `chore(release): vx.y.z`.

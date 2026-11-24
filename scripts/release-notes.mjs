@@ -20,6 +20,15 @@ if (!tag || !/^v\d+\.\d+\.\d+/.test(tag)) {
 }
 const version = tag.slice(1);
 
+const SECTION_EMOJI = {
+    Added: "✨",
+    Changed: "🔧",
+    Fixed: "🐛",
+    Removed: "🗑️",
+    Deprecated: "⚠️",
+    Security: "🔒",
+};
+
 const git = (...args) => execFileSync("git", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }).trim();
 
 /** The body of the `## [version]` section of CHANGELOG.md, without its heading. */
@@ -32,8 +41,9 @@ function changelogSection() {
         console.error(`CHANGELOG.md has no filled "## [${version}]" section. Move the [Unreleased] entries under it.`);
         process.exit(1);
     }
-    // "### Added" -> "#### Added": the release page already has its own h2s.
-    return body.replace(/^### /gm, "#### ");
+    // "### Added" -> "### ✨ Added": the release page already has its own h2s, so the changelog's h3s become h3s
+    // under "What's new", with an emoji for the usual Keep a Changelog headings.
+    return body.replace(/^### (.+)$/gm, (_, title) => `### ${SECTION_EMOJI[title.trim()] ?? "📌"} ${title}`);
 }
 
 /** The tag released just before this one, or "" for the very first release. */
@@ -61,7 +71,7 @@ const previous = previousTag();
 const commits = commitLines(previous);
 
 const parts = [
-    `## Install
+    `## 📦 Install
 
 You need [Node.js](https://nodejs.org/en/download) **22 or newer**.
 
@@ -71,16 +81,16 @@ ${PACKAGE}
 \`\`\`
 
 Already installed? \`npm install -g ${PACKAGE}@latest\` upgrades it. More options (pnpm, macOS, Linux) are in the [README](https://github.com/${REPO}#installation).`,
-    `## What's new\n\n${changelogSection()}`,
+    `## 🎉 What's new\n\n${changelogSection()}`,
 ];
 
 if (commits.length > 0) {
     parts.push(
-        `<details>\n<summary>All ${commits.length} commits in this release</summary>\n\n${commits.join("\n")}\n\n</details>`
+        `<details>\n<summary>🧾 All ${commits.length} commits in this release</summary>\n\n${commits.join("\n")}\n\n</details>`
     );
 }
 if (previous) {
-    parts.push(`**Full Changelog**: https://github.com/${REPO}/compare/${previous}...${tag}`);
+    parts.push(`🔗 **Full Changelog**:https://github.com/${REPO}/compare/${previous}...${tag}`);
 }
 
 process.stdout.write(`${parts.join("\n\n")}\n`);

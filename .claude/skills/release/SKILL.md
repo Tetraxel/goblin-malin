@@ -26,7 +26,12 @@ Pushing the tag publishes to npm, which cannot be undone. Everything before the 
 
 - List everything since the last tag, including direct pushes: `git log <last tag>..HEAD --no-merges --format='%h %s'`. Open a commit (`git show`) when its subject does not say what changed for the user.
 - In [CHANGELOG.md](../../../CHANGELOG.md), turn `## [Unreleased]` into `## [x.y.z] — <today, YYYY-MM-DD>` and put a new empty `## [Unreleased]` above it. Merge the commits into the existing entries; do not duplicate what is already written there.
-- Write for users, matching the existing entries: bold headline for a notable change, `### Added` / `### Changed` / `### Fixed`, plain words, no audit ids or file names as the only description. Leave out pure docs, tests, refactors and tooling unless a user can notice them. This text is the release page's "What's new", and the release **fails** if the section is missing or empty.
+- This text is the release page's "What's new" (the full commit list is already folded under it), and the release **fails** if the section is missing or empty. Write it for a human skimming it in under a minute, not as a complete record:
+    - **Short.** One line per change, two at most: what the user can now do or no longer suffers, in plain words. No mechanism, no rate limits or internals, no lists of sub-cases, no audit ids or file names. If a feature needs a paragraph to explain, it belongs in the README or docs; link it instead.
+    - **Few.** Group small related fixes into one bullet ("Smaller fixes to Deezer and Apple Music searches"). Aim for about 3–6 bullets under `### Added`, 3–6 under `### Changed`, and a short `### Fixed`. Leave out pure docs, tests, refactors and tooling unless a user can notice them.
+    - **Emoji.** Start every bullet with one emoji that fits it (🎵 music/platforms, 🔍 search/discovery, 🖱️ mouse/UI, ⚙️ settings, 🤖 Claude, ⬇️ downloads, 🐛 a fix, ⚡ speed…), in front of a bold 2–5 word headline, then the sentence: `- 🎵 **Deezer, Apple Music and Tidal.** Paste a link of any of them, read like a Spotify one.` Do not put an emoji in the `###` headings: the release script adds them.
+    - **Friendly tone.** A human wrote this app for humans: say "you", say what is nicer now, skip the formal register.
+    - Open with the one or two changes that make people want to upgrade, in that order, and keep the rest below.
 
 ## 4. Bump the version
 
