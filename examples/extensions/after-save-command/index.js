@@ -1,6 +1,6 @@
 // @ts-check
 import path from "node:path";
-import { expandCommand, shellFor, TIMEOUTS } from "./command.js";
+import { expandCommand, HANDLER_TIMEOUT_MS, shellFor, TIMEOUTS } from "./command.js";
 
 /**
  * After-save command: runs a command line of yours for each saved track. It covers "user scripts" in any language
@@ -48,8 +48,8 @@ export default function activate(goblin) {
                 await goblin.dialog.notify("After-save command failed", `${path.basename(file)}: ${why}\n\n${output}`);
             }
         },
-        // The time limit of the handler itself: the longest the command may take, plus a margin.
-        { timeoutMs: 11 * 60_000 }
+        // The handler's own limit is the bus' longest: above any time limit the command can be given.
+        { timeoutMs: HANDLER_TIMEOUT_MS }
     );
 
     goblin.settings.rows(() => [

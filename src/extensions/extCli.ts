@@ -108,7 +108,12 @@ async function add(out: Out, root: string, source: string | undefined, force: bo
             }
             await fs.cp(from, staging, {
                 recursive: true,
-                filter: (src) => !src.split(path.sep).includes("node_modules") && !src.split(path.sep).includes(".git"),
+                // Judged on the path inside the source folder: a source that itself lives under a `node_modules` or a
+                // `.git` (an extension installed by npm, a checkout in a hidden folder) is still copied.
+                filter: (src) => {
+                    const inside = path.relative(from, src).split(path.sep);
+                    return !inside.includes("node_modules") && !inside.includes(".git");
+                },
             });
         }
         const check = checkManifest(JSON.parse(await fs.readFile(path.join(staging, MANIFEST_FILE), "utf-8")), staging);
@@ -131,8 +136,16 @@ async function add(out: Out, root: string, source: string | undefined, force: bo
                 dependencies?: Record<string, string>;
             };
             if (pkg.dependencies && Object.keys(pkg.dependencies).length > 0) {
-                out.log("Installing its dependencies (npm install --omit=dev)…");
-                if ((await run("npm", ["install", "--omit=dev", "--no-audit", "--no-fund"], target)) !== 0) {
+                // No install scripts: they would run the extension's (and its dependencies') code now, before you
+                // have been asked whether to trust it. A dependency that needs a build step is built by hand.
+                out.log("Installing its dependencies (npm install --omit=dev --ignore-scripts)…");
+                if (
+                    (await run(
+                        "npm",
+                        ["install", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund"],
+                        target
+                    )) !== 0
+                ) {
                     out.error("npm install failed: the extension may not load. Run it again in " + target);
                 }
             }
@@ -263,15 +276,15 @@ async function scaffold(out: Out, name: string | undefined, folder: string | und
 /** Runs `goblin-malin ext <args>`; resolves with the exit code. */
 export async function runExtCommand(args: string[], out: Out = defaultOut, root = getExtensionsDir()): Promise<number> {
     const [command, ...rest] = args;
-    const flags = new Set(rest.filter((a) => a.startsWith("--")));
-    const positional = rest.filter((a) => !a.startsWith("--"));
+    const flags = new Set(rest.filter((a) => a.startsWith("-")));
+    const positional = rest.filter((a) => !a.startsWith("-"));
     switch (command) {
         case "list":
         case "ls":
             return list(out, root);
         case "add":
         case "install":
-            return add(out, root, positional[0], flags.has("--force"));
+            return add(out, root, positional[0], flags.has("--force") || flags.has("-f"));
         case "remove":
         case "rm":
         case "uninstall":

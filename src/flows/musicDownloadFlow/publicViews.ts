@@ -93,7 +93,8 @@ function trackViewOf(task: AnyTask, attrs: TrackDownloadTask): TrackView {
         durationMs: compiled.duration,
         year: compiled.year,
         trackNumber: compiled.trackNumber,
-        genres: compiled.genres ?? [],
+        // A copy: the view is frozen, and the compiled value may be the very array of the track's override.
+        genres: [...(compiled.genres ?? [])],
         fields: compiledFieldValues(compiled),
         overrides: structuredClone(attrs.metadataOverride ?? {}),
         sources,

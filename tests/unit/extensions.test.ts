@@ -33,6 +33,16 @@ async function trust(name: string): Promise<void> {
     await writeTrustEntry(name, { answer: "load", hash: await hashFolder(path.join(root, name)), at: "" }, trustFile);
 }
 
+/** A symbolic link, or false where it cannot be made (Windows without the right to). */
+function trySymlink(target: string, linkPath: string): boolean {
+    try {
+        fs.symlinkSync(target, linkPath);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 beforeAll(async () => {
     const { notificationScheduler } = await import("#base/notificationScheduler");
     notificationScheduler.setSyncMode(true);
@@ -175,15 +185,99 @@ describe("loading and trust", () => {
         expect(record["never-me"]?.answer).toBe("off");
     });
 
-    test("the folder hash ignores node_modules but follows every other file", async () => {
+    test("the folder hash follows every file, and node_modules by package (name and package.json), not by its code", async () => {
         const { hashFolder } = await import("#extensions/trust");
         const folder = writeExtension("hashed", ``);
         const before = await hashFolder(folder);
         fs.mkdirSync(path.join(folder, "node_modules", "dep"), { recursive: true });
-        fs.writeFileSync(path.join(folder, "node_modules", "dep", "index.js"), "x");
-        expect(await hashFolder(folder)).toBe(before);
+        fs.writeFileSync(path.join(folder, "node_modules", "dep", "package.json"), '{"name":"dep","version":"1.0.0"}');
+        const withDep = await hashFolder(folder);
+        expect(withDep).not.toBe(before); // a package was installed
+        fs.writeFileSync(path.join(folder, "node_modules", "dep", "index.js"), "x"); // a file inside a package: not read
+        expect(await hashFolder(folder)).toBe(withDep);
+        fs.writeFileSync(path.join(folder, "node_modules", "dep", "package.json"), '{"name":"dep","version":"1.0.1"}');
+        expect(await hashFolder(folder)).not.toBe(withDep); // an update
         fs.writeFileSync(path.join(folder, "package-lock.json"), "{}");
-        expect(await hashFolder(folder)).not.toBe(before);
+        expect(await hashFolder(folder)).not.toBe(withDep);
+    });
+
+    test("a link is hashed by where it points; one that leaves the folder is refused, for that extension only", async () => {
+        const { hashFolder, ExtensionFolderError } = await import("#extensions/trust");
+        const outside = fs.mkdtempSync(path.join(os.tmpdir(), "goblin-ext-outside-"));
+        fs.writeFileSync(path.join(outside, "evil.js"), "export default function activate() {}\n");
+        const linky = writeExtension("linky", ``);
+        fs.rmSync(path.join(linky, "index.js"));
+        if (!trySymlink(path.join(outside, "evil.js"), path.join(linky, "index.js"))) return; // no right to link here
+
+        await expect(hashFolder(linky)).rejects.toBeInstanceOf(ExtensionFolderError);
+
+        // Inside the folder, retargeting a link changes the hash although no file does.
+        const inner = writeExtension("inner", ``);
+        fs.writeFileSync(path.join(inner, "a.js"), "export const a = 1;\n");
+        fs.writeFileSync(path.join(inner, "b.js"), "export const b = 1;\n");
+        fs.symlinkSync("a.js", path.join(inner, "link.js"));
+        const toA = await hashFolder(inner);
+        fs.rmSync(path.join(inner, "link.js"));
+        fs.symlinkSync("b.js", path.join(inner, "link.js"));
+        expect(await hashFolder(inner)).not.toBe(toA);
+
+        // The bad one fails alone; the others load.
+        writeExtension("fine", `goblin.log.info("ok");`);
+        await trust("fine");
+        await load();
+        expect(store.get("linky")?.state).toBe("failed");
+        expect(store.get("linky")?.reason).toContain("outside the extension's folder");
+        expect(store.get("fine")?.state).toBe("loaded");
+    });
+
+    test("an entry file that is a link out of the folder is not imported, even with a hash that matches", async () => {
+        const { newRecord } = await import("#extensions/extensionStore");
+        const outside = fs.mkdtempSync(path.join(os.tmpdir(), "goblin-ext-outside-"));
+        fs.writeFileSync(
+            path.join(outside, "evil.js"),
+            "globalThis.__evilRan = true;\nexport default function activate() {}\n"
+        );
+        const folder = writeExtension("entry-link", ``);
+        fs.rmSync(path.join(folder, "index.js"));
+        if (!trySymlink(path.join(outside, "evil.js"), path.join(folder, "index.js"))) return;
+        const record = newRecord({
+            name: "entry-link",
+            folder,
+            development: false,
+            state: "untrusted",
+            entry: "index.js",
+        });
+        store.add(record);
+        expect(await loader.activateExtension(record)).toBe(false);
+        expect(store.get("entry-link")?.reason).toContain("outside its folder");
+        expect((globalThis as { __evilRan?: boolean }).__evilRan).toBeUndefined();
+    });
+
+    test("the answer cannot be changed for a copy shadowed by --extension, nor in a run with --no-extensions", async () => {
+        const { buildExtensionSettingsItems, emptyExtensionsDraft } = await import("#extensions/settingsItems");
+        const devRoot = fs.mkdtempSync(path.join(os.tmpdir(), "goblin-ext-dev-"));
+        const dev = writeExtension("twin", ``, {}, devRoot);
+        writeExtension("twin", ``);
+        await load({ devPaths: [dev] });
+        const shadowed = store.get("twin@installed")!;
+        expect(shadowed.shadowed).toBe(true);
+        const switches = (): number =>
+            buildExtensionSettingsItems(emptyExtensionsDraft(), () => {}).filter(
+                (i) => i.kind === "checkbox" && i.label === "On"
+            ).length;
+        expect(switches()).toBe(0); // the development copy and the shadowed one have none
+        expect(await loader.trustAndLoad(shadowed)).toBe(false);
+        expect(shadowed.state).toBe("off");
+
+        loader.resetExtensionLoader();
+        writeExtension("alone", `throw new Error("must not run");`);
+        await load({ disabled: true });
+        const alone = store.get("alone")!;
+        expect(alone.state).toBe("disabled");
+        expect(switches()).toBe(0);
+        expect(await loader.trustAndLoad(alone)).toBe(false);
+        await loader.askTrustFromSettings(alone);
+        expect(store.get("alone")?.state).toBe("disabled");
     });
 });
 
@@ -293,7 +387,7 @@ describe("the goblin object", () => {
 describe("events", () => {
     test("handlers run after the fact, in order per track, and a failing or slow one never reaches the emitter", async () => {
         const { AppEventBus } = await import("#base/appEvents");
-        const bus = new AppEventBus<{ ping: { n: number } }>();
+        const bus = new AppEventBus<{ ping: { n: number } }>({ abortGraceMs: 20 });
         const errors: string[] = [];
         bus.setErrorReporter(({ owner, error, timedOut }) =>
             errors.push(`${owner}:${timedOut ? "timeout" : String(error)}`)
@@ -335,6 +429,91 @@ describe("events", () => {
         });
         await bus.drain();
         expect(built).toBe(false);
+    });
+
+    test("a handler that ran out of time is waited for a moment, so the next one does not run beside it", async () => {
+        const { AppEventBus } = await import("#base/appEvents");
+        const bus = new AppEventBus<{ ping: number }>({ abortGraceMs: 400 });
+        bus.setErrorReporter(() => {});
+        const log: string[] = [];
+        bus.on(
+            "ping",
+            async (n) => {
+                log.push(`start ${n}`);
+                await new Promise((resolve) => setTimeout(resolve, n === 1 ? 80 : 1)); // ignores its signal
+                log.push(`end ${n}`);
+            },
+            { owner: "a", timeoutMs: 20 }
+        );
+        bus.emit("ping", 1, "track");
+        bus.emit("ping", 2, "track");
+        await bus.drain();
+        expect(log).toEqual(["start 1", "end 1", "start 2", "end 2"]);
+    });
+
+    test("collection.done is announced for what finishes in the list, never for albums already done when they appear", async () => {
+        const { musicEvents, watchCollectionsDone } = await import("#flows/musicDownloadFlow/appEvents");
+        const { createTasksFromSnapshots } = await import("#flows/musicDownloadFlow/taskFactory");
+        const { TaskOrchestrator } = await import("#base/task/orchestrator");
+        const o = TaskOrchestrator.getInstance();
+        o.setTasks([]);
+        watchCollectionsDone(); // an extension's activate(), before any session is loaded
+
+        const saved = { path: "/m/a.flac", savedAt: "2026-01-01T00:00:00.000Z", provider: "ytdlp", track: {} };
+        const album = (id: string, doneTracks: boolean[]) => [
+            {
+                id,
+                initialInput: `https://plat.test/album/${id}`,
+                status: {},
+                prompt: null,
+                attributes: {
+                    kind: "collection",
+                    collectionKind: "album",
+                    state: "finished",
+                    userInput: { type: "url", url: `https://plat.test/album/${id}` },
+                    childTaskIds: doneTracks.map((_, i) => `${id}-${i}`),
+                },
+            },
+            ...doneTracks.map((isDone, i) =>
+                snapshot(`${id}-${i}`, { parentTaskId: id, ...(isDone ? { savedFile: saved } : { state: "pending" }) })
+            ),
+        ];
+        const heard: string[] = [];
+        musicEvents.on(
+            "collection.done",
+            ({ collection, saved: n, total }) => void heard.push(`${collection.id} ${n}/${total}`)
+        );
+
+        // A session opened with a finished album: not news.
+        o.setTasks(createTasksFromSnapshots(album("old", [true, true]) as never));
+        // …and a track of it changing afterwards is not either.
+        o.getTasks()
+            .at(-1)!
+            .getStatus()
+            .set({ type: 1 as never, message: "x" });
+        await musicEvents.drain();
+        expect(heard).toEqual([]);
+
+        // One that is half done, and finishes while it is in the list.
+        const half = createTasksFromSnapshots(album("half", [true, false]) as never);
+        o.setTasks(half);
+        await musicEvents.drain();
+        expect(heard).toEqual([]);
+        half.find((t) => t.getId() === "half-1")!.updateAttributes({ savedFile: saved, state: "finished" } as never);
+        await musicEvents.drain();
+        expect(heard).toEqual(["half 2/2"]);
+        o.setTasks([]);
+    });
+
+    test("a view never freezes the arrays of the task it describes", async () => {
+        const { createTasksFromSnapshots } = await import("#flows/musicDownloadFlow/taskFactory");
+        const { taskView } = await import("#flows/musicDownloadFlow/publicViews");
+        const [task] = createTasksFromSnapshots([snapshot("task:gen", { metadataOverride: { genres: ["rock"] } })]);
+        const view = taskView(task);
+        expect(view?.kind === "track" && view.genres).toEqual(["rock"]);
+        const own = (task.getAttributes() as { metadataOverride: { genres: string[] } }).metadataOverride.genres;
+        expect(Object.isFrozen(own)).toBe(false);
+        expect(() => own.push("pop")).not.toThrow();
     });
 
     test("an extension hears tasks.added with the ids, and track views are frozen copies", async () => {
@@ -508,6 +687,18 @@ describe("the ext command", () => {
         expect(lines.join("\n")).toContain("hello-world 0.1.0  not allowed yet");
         expect(await runExtCommand(["remove", "hello-world", "--yes"], out, root)).toBe(0);
         expect(fs.existsSync(path.join(root, "hello-world"))).toBe(false);
+    });
+
+    test("-y answers the question of remove, and a source that lives under node_modules is still copied", async () => {
+        const { runExtCommand } = await import("#extensions/extCli");
+        const out = { log: () => {}, error: () => {} };
+        const work = fs.mkdtempSync(path.join(os.tmpdir(), "goblin-ext-cli-"));
+        const source = path.join(work, "node_modules", "some-pkg", "my-ext");
+        expect(await runExtCommand(["new", "my-ext", source], out, root)).toBe(0);
+        expect(await runExtCommand(["add", source], out, root)).toBe(0);
+        expect(fs.existsSync(path.join(root, "my-ext", "index.js"))).toBe(true);
+        expect(await runExtCommand(["remove", "my-ext", "-y"], out, root)).toBe(0);
+        expect(fs.existsSync(path.join(root, "my-ext"))).toBe(false);
     });
 
     test("the scaffolded extension loads and runs", async () => {

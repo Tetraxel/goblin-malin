@@ -17,4 +17,11 @@ describe("an extension in the real app (P34)", () => {
         expect(settings).toContain("Library dedupe 1.0.0");
         expect(settings).toContain("Library folder");
     });
+
+    test("an extension that leaves a rejected promise while it loads does not end the app", async () => {
+        const strayPath = path.resolve(__dirname, "../../scripts/tui-test/examples/extension-stray-rejection.json");
+        const result = await runScenario(parseScenario(fs.readFileSync(strayPath, "utf-8")));
+        // The scenario waited for the toolbar and for the logged rejection: the process is still running.
+        expect(result.exitCode).toBeNull();
+    });
 });

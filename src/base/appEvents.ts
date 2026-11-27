@@ -9,11 +9,16 @@
  *  - handlers of one owner for one key (a track's id) run one after the other, in order: two `track.saved` handlers of
  *    the same extension never overlap for the same track.
  *
+ * A handler that runs past its limit is aborted (its `signal`) and given a short grace to end before the next handler of
+ * its chain starts, so two handlers of one owner overlap only when one ignores its signal for longer than that.
+ *
  * Payloads are built only when someone listens (pass a function), so an event nobody listens to costs nothing.
  */
 
 export const DEFAULT_HANDLER_TIMEOUT_MS = 30_000;
 export const MAX_HANDLER_TIMEOUT_MS = 10 * 60_000;
+/** How long a handler that ran out of time is waited for (after its signal aborted) before the next one starts. */
+export const DEFAULT_ABORT_GRACE_MS = 2_000;
 
 export type EventHandlerContext = {
     /** Aborted when the handler's time is up (or the app is closing). */
@@ -46,6 +51,8 @@ export class AppEventBus<TEvents extends { [K in keyof TEvents]: unknown }> {
     /** Every handler still running: `drain` waits for them. */
     private running = new Set<Promise<void>>();
     private reportError: EventErrorReporter = () => {};
+
+    constructor(private readonly options: { abortGraceMs?: number } = {}) {}
 
     /** Where handler failures go (the app sends them to the log, named after their owner). */
     setErrorReporter(reporter: EventErrorReporter): void {
@@ -164,11 +171,13 @@ export class AppEventBus<TEvents extends { [K in keyof TEvents]: unknown }> {
         outer?.addEventListener("abort", onOuterAbort, { once: true });
         let timedOut = false;
         let timer: ReturnType<typeof setTimeout> | undefined;
+        let handling: Promise<unknown> = Promise.resolve();
         try {
             // The handler starts on a later tick: whoever emitted is never slowed by its synchronous part.
             await Promise.resolve();
+            handling = Promise.resolve().then(() => entry.handler(payload, { signal: controller.signal, event }));
             await Promise.race([
-                Promise.resolve().then(() => entry.handler(payload, { signal: controller.signal, event })),
+                handling,
                 new Promise<never>((_, reject) => {
                     timer = setTimeout(() => {
                         timedOut = true;
@@ -182,9 +191,28 @@ export class AppEventBus<TEvents extends { [K in keyof TEvents]: unknown }> {
             ]);
         } catch (error) {
             this.reportError({ owner: entry.owner, event, error, timedOut });
+            // Out of time: its signal is aborted, and the next handler of the chain waits for it to actually end (up to
+            // the grace), so the two do not run side by side.
+            if (timedOut) await this.waitForEnd(handling, this.options.abortGraceMs ?? DEFAULT_ABORT_GRACE_MS);
         } finally {
             if (timer) clearTimeout(timer);
             outer?.removeEventListener("abort", onOuterAbort);
         }
+    }
+
+    /** Waits until `work` has ended (however it ended) or `ms` passed. */
+    private async waitForEnd(work: Promise<unknown>, ms: number): Promise<void> {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        await Promise.race([
+            work.then(
+                () => undefined,
+                () => undefined
+            ),
+            new Promise<void>((resolve) => {
+                timer = setTimeout(resolve, ms);
+                timer.unref?.();
+            }),
+        ]);
+        if (timer) clearTimeout(timer);
     }
 }

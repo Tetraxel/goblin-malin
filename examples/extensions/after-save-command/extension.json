@@ -16,7 +16,7 @@
             "kind": "select",
             "label": "Time limit",
             "defaultValue": "2 minutes",
-            "options": ["30 seconds", "2 minutes", "10 minutes"]
+            "options": ["30 seconds", "2 minutes", "8 minutes"]
         },
         "notifyFailures": { "kind": "checkbox", "label": "Tell me when the command fails", "defaultValue": false }
     }

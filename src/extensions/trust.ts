@@ -13,22 +13,84 @@ export type TrustAnswer = "load" | "off";
 export type TrustEntry = { answer: TrustAnswer; hash: string; at: string };
 export type TrustRecord = Record<string, TrustEntry>;
 
-/** Folders never hashed: their content follows from the lock files, which are. */
+/** Folders whose files are not hashed one by one (see `nodeModulesDigest`). */
 const SKIPPED_DIRS = new Set(["node_modules", ".git"]);
 /** A file bigger than this is hashed by its size and date only (a model, a big asset): reading it at every start would be slow. */
 const FULL_HASH_MAX_BYTES = 8 * 1024 * 1024;
 
+/** The folder holds something that would let its code change without changing its hash (a link out of the folder). */
+export class ExtensionFolderError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "ExtensionFolderError";
+    }
+}
+
+const isInside = (root: string, target: string): boolean => target === root || target.startsWith(root + path.sep);
+
 /**
- * A hash of every file of the folder (their relative paths and contents), except `node_modules/` and `.git/`.
- * Asynchronous: no synchronous file system call at start-up.
+ * `node_modules/` is imported by the extension, so it cannot be ignored, and reading all of it at each start is too
+ * slow: what is hashed is each installed package's name and `package.json` (its version and the fields that decide
+ * what is loaded), which is what an install or an update changes. Code edited in place inside a package, with its
+ * version kept, is not seen: only install extensions whose dependencies you got from a registry.
+ */
+async function nodeModulesDigest(
+    dir: string,
+    hash: ReturnType<typeof createHash>,
+    prefix = "node_modules"
+): Promise<void> {
+    let entries;
+    try {
+        entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+        return;
+    }
+    entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    for (const entry of entries) {
+        if (entry.name.startsWith(".")) continue;
+        const full = path.join(dir, entry.name);
+        if (entry.name.startsWith("@") && entry.isDirectory()) {
+            await nodeModulesDigest(full, hash, `${prefix}/${entry.name}`);
+            continue;
+        }
+        hash.update(`${prefix}/${entry.name}\u0000`);
+        if (entry.isSymbolicLink()) hash.update(`link:${await fs.readlink(full).catch(() => "")}\u0000`);
+        try {
+            hash.update(await fs.readFile(path.join(full, "package.json")));
+        } catch {
+            /* not a package folder (a .bin, a file): its name is enough */
+        }
+        hash.update("\u0000");
+    }
+}
+
+/**
+ * A hash of every file of the folder (their relative paths and contents), `node_modules/` by package (see
+ * {@link nodeModulesDigest}), without `.git/`. A symbolic link is hashed by where it points, and one that leaves the
+ * folder is refused ({@link ExtensionFolderError}): its target could change without any file of the folder changing,
+ * and new code would load with no new question. Asynchronous: no synchronous file system call at start-up.
  */
 export async function hashFolder(folder: string): Promise<string> {
+    const root = await fs.realpath(folder);
     const files: string[] = [];
+    const links: string[] = [];
     const walk = async (dir: string): Promise<void> => {
         const entries = await fs.readdir(dir, { withFileTypes: true });
         for (const entry of entries) {
             const full = path.join(dir, entry.name);
-            if (entry.isDirectory()) {
+            if (entry.isSymbolicLink()) {
+                const relative = path.relative(folder, full).split(path.sep).join("/");
+                const target = await fs.realpath(full).catch(() => undefined);
+                if (target === undefined) {
+                    links.push(`${relative}->(missing:${await fs.readlink(full).catch(() => "")})`);
+                } else if (!isInside(root, target)) {
+                    throw new ExtensionFolderError(
+                        `${relative} is a link to ${target}, outside the extension's folder`
+                    );
+                } else {
+                    links.push(`${relative}->${path.relative(root, target).split(path.sep).join("/")}`);
+                }
+            } else if (entry.isDirectory()) {
                 if (!SKIPPED_DIRS.has(entry.name)) await walk(full);
             } else if (entry.isFile()) {
                 files.push(full);
@@ -37,6 +99,7 @@ export async function hashFolder(folder: string): Promise<string> {
     };
     await walk(folder);
     files.sort();
+    links.sort();
     const hash = createHash("sha256");
     for (const file of files) {
         const relative = path.relative(folder, file).split(path.sep).join("/");
@@ -46,6 +109,8 @@ export async function hashFolder(folder: string): Promise<string> {
         else hash.update(await fs.readFile(file));
         hash.update("\u0000");
     }
+    for (const link of links) hash.update(`link:${link}\u0000`);
+    await nodeModulesDigest(path.join(folder, "node_modules"), hash);
     return `sha256:${hash.digest("hex")}`;
 }
 

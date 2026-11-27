@@ -132,7 +132,12 @@ export function buildExtensionSettingsItems(
         if (record.description) items.push({ kind: "note", indent: 4, text: record.description });
         items.push({ kind: "readonlyText", indent: 4, label: "State", value: describeState(record) });
 
-        const canSwitch = !record.development && record.state !== "invalid" && record.state !== "incompatible";
+        const canSwitch =
+            !record.development &&
+            !record.shadowed &&
+            record.state !== "invalid" &&
+            record.state !== "incompatible" &&
+            record.state !== "disabled";
         if (canSwitch) {
             items.push({
                 kind: "checkbox",

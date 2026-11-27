@@ -14,7 +14,7 @@ import { adoptExtensionSecrets, createGoblinApi, EXTENSION_SECRET_PREFIX, extens
 import { appSecrets } from "#base/appSecrets";
 import { extensionStore, newRecord, type ExtensionRecord } from "./extensionStore";
 import { checkManifest, getExtensionsDir, MANIFEST_FILE } from "./manifest";
-import { hashFolder, readTrustRecord, writeTrustEntry, type TrustRecord } from "./trust";
+import { ExtensionFolderError, hashFolder, readTrustRecord, writeTrustEntry, type TrustRecord } from "./trust";
 
 /** How long `activate` may take before the extension counts as failed. */
 export const ACTIVATE_TIMEOUT_MS = 5_000;
@@ -142,6 +142,13 @@ export async function activateExtension(record: ExtensionRecord): Promise<boolea
     try {
         adoptExtensionSecrets(record.name);
         const entry = path.resolve(record.folder, record.entry ?? "index.js");
+        if (!record.development) {
+            // The trust hash covers what is in the folder: an entry that is a link to a file outside it would load code
+            // that was never hashed.
+            const [real, root] = await Promise.all([fs.realpath(entry), fs.realpath(record.folder)]);
+            if (!real.startsWith(root + path.sep))
+                throw new Error(`its entry file is a link to ${real}, outside its folder`);
+        }
         // The hash in the URL: files changed since the last import of this run are imported anew, not from Node's cache.
         const url = `${pathToFileURL(entry).href}${record.hash ? `?v=${record.hash.slice(-12)}` : ""}`;
         const module = (await withTimeout(import(url), ACTIVATE_TIMEOUT_MS, `importing ${record.name}`)) as {
@@ -228,6 +235,61 @@ function registerEventErrors(): void {
     });
 }
 
+/** Records an extension's failure (what it says is shown in Settings and the log); never throws. */
+function failRecord(record: ExtensionRecord, error: unknown): void {
+    const reason = error instanceof Error ? error.message : String(error);
+    extensionStore.update(record.name, { state: "failed", reason });
+    extensionStore.appendLog(record.name, { at: new Date().toISOString(), level: "error", message: reason });
+    extensionLogger(record.name).error(
+        `Could not load ${record.name}: ${reason}`,
+        error instanceof ExtensionFolderError ? {} : { error }
+    );
+}
+
+/** The hash of the extension's files; on a folder that cannot be hashed, the extension is marked failed and this is undefined. */
+async function hashOf(record: ExtensionRecord): Promise<string | undefined> {
+    if (record.hash) return record.hash;
+    try {
+        const hash = await hashFolder(record.folder);
+        extensionStore.update(record.name, { hash });
+        return hash;
+    } catch (error) {
+        failRecord(record, error);
+        return undefined;
+    }
+}
+
+/** Decides what becomes of one extension found at start-up: loaded, off, waiting for an answer, or failed. */
+async function settle(record: ExtensionRecord, trust: TrustRecord, opts: LoadOptions): Promise<void> {
+    if (opts.disabled && record.state !== "invalid") {
+        extensionStore.update(record.name, {
+            state: "disabled",
+            reason: "every extension is off for this run (--no-extensions)",
+        });
+        return;
+    }
+    if (record.state !== "untrusted") return;
+    if (record.development) {
+        logger.warn(
+            `Loading the extension "${record.name}" from ${record.folder} without asking (--extension): never use this for an extension you did not write`
+        );
+        await activateExtension(record);
+        return;
+    }
+    const answer = trust[record.name];
+    if (answer?.answer === "off") {
+        extensionStore.update(record.name, { state: "off" });
+        return;
+    }
+    const hash = await hashOf(record);
+    if (hash === undefined) return;
+    if (answer?.answer === "load" && answer.hash === hash) {
+        await activateExtension(record);
+    } else {
+        extensionStore.update(record.name, { state: "untrusted", changed: answer?.answer === "load" });
+    }
+}
+
 /**
  * Finds the extensions and loads the ones that are on and trusted (and every `--extension` folder). Called by
  * `start()` after `initMusicApp()` and before the first render. Never throws: an extension that breaks is recorded as
@@ -252,38 +314,21 @@ export async function loadExtensions(opts: LoadOptions = {}): Promise<void> {
             // A folder loaded with --extension takes the name: the installed copy waits for the next normal start.
             if (records.some((r) => r.name === record.name)) {
                 record.state = "off";
+                record.shadowed = true;
                 record.reason = "a development copy (--extension) is loaded instead";
                 record.name = `${record.name}@installed`;
             }
             records.push(record);
         }
 
+        // One by one, each on its own: whatever goes wrong with an extension (a link out of its folder, a file that
+        // cannot be read) is that extension's failure, never the others'.
         for (const record of records) {
             extensionStore.add(record);
-            if (opts.disabled && record.state !== "invalid") {
-                record.state = "disabled";
-                record.reason = "every extension is off for this run (--no-extensions)";
-                continue;
-            }
-            if (record.state !== "untrusted") continue;
-            if (record.development) {
-                logger.warn(
-                    `Loading the extension "${record.name}" from ${record.folder} without asking (--extension): never use this for an extension you did not write`
-                );
-                await activateExtension(record);
-                continue;
-            }
-            const answer = trust[record.name];
-            if (answer?.answer === "off") {
-                extensionStore.update(record.name, { state: "off" });
-                continue;
-            }
-            const hash = await hashFolder(record.folder);
-            extensionStore.update(record.name, { hash });
-            if (answer?.answer === "load" && answer.hash === hash) {
-                await activateExtension(record);
-            } else {
-                extensionStore.update(record.name, { state: "untrusted", changed: answer?.answer === "load" });
+            try {
+                await settle(record, trust, opts);
+            } catch (error) {
+                failRecord(record, error);
             }
         }
     } catch (error) {
@@ -321,10 +366,17 @@ async function askTrust(record: ExtensionRecord): Promise<"load" | "never" | "la
     return answer === 2 ? "load" : answer === 1 ? "never" : "later";
 }
 
+/** Whether the user's answers may change this extension now: not a copy shadowed by `--extension`, nor in a run with no extensions. */
+function isAnswerable(record: ExtensionRecord): boolean {
+    return !record.shadowed && !options.disabled && record.state !== "invalid" && record.state !== "incompatible";
+}
+
 /** Records the user's yes and loads the extension at once (its providers reach the tracks added from now on). */
 export async function trustAndLoad(record: ExtensionRecord): Promise<boolean> {
-    const hash = record.hash ?? (await hashFolder(record.folder));
-    extensionStore.update(record.name, { hash, changed: false, wantedOn: true });
+    if (!isAnswerable(record)) return false;
+    const hash = await hashOf(record);
+    if (hash === undefined) return false;
+    extensionStore.update(record.name, { changed: false, wantedOn: true });
     await writeTrustEntry(record.name, { answer: "load", hash, at: new Date().toISOString() }, options.trustFile);
     if (record.state === "loaded") return true;
     return activateExtension(record);
@@ -332,7 +384,9 @@ export async function trustAndLoad(record: ExtensionRecord): Promise<boolean> {
 
 /** Records "off" (Never, or the switch in Settings). It stays loaded until the app restarts, if it was. */
 export async function turnOff(record: ExtensionRecord): Promise<void> {
-    const hash = record.hash ?? (await hashFolder(record.folder));
+    if (!isAnswerable(record)) return;
+    const hash = await hashOf(record);
+    if (hash === undefined) return;
     await writeTrustEntry(record.name, { answer: "off", hash, at: new Date().toISOString() }, options.trustFile);
     if (record.state !== "loaded") extensionStore.update(record.name, { state: "off", wantedOn: false });
     else extensionStore.update(record.name, { wantedOn: false, reason: "turned off: it goes at the next start" });
@@ -343,11 +397,14 @@ export async function turnOff(record: ExtensionRecord): Promise<void> {
  * answered before. A yes loads it at once.
  */
 export async function askTrustFromSettings(record: ExtensionRecord): Promise<void> {
+    if (!isAnswerable(record)) return;
     if (record.state === "loaded") {
         await trustAndLoad(record);
         return;
     }
-    record.hash = await hashFolder(record.folder);
+    // The files are hashed again: the question is about what is in the folder now.
+    extensionStore.update(record.name, { hash: undefined });
+    if ((await hashOf(record)) === undefined) return;
     const answer = await askTrust(record);
     if (answer === "load") await trustAndLoad(record);
     else if (answer === "never") await turnOff(record);

@@ -32,10 +32,6 @@ export async function start(): Promise<void> {
     // Register providers + apply concurrency budgets before the first render.
     initMusicApp();
 
-    // Extensions (P34): what they add is registered before the first render, like the built-in providers. A broken
-    // one is recorded and skipped; `--no-extensions` (or GOBLIN_NO_EXTENSIONS=1) starts without any.
-    await loadExtensions({ devPaths: devExtensionPaths(), disabled: extensionsDisabledByEnv() });
-
     process.on("unhandledRejection", (reason) => {
         // The promise itself says nothing (it logs as an empty object): the reason is what to look at.
         globalLogger.error("Unhandled Rejection", { reason });
@@ -47,6 +43,12 @@ export async function start(): Promise<void> {
     for (const signal of ["SIGTERM", "SIGHUP", "SIGINT"] as const) {
         process.on(signal, () => emergencyExit(`received ${signal}`, 128 + os.constants.signals[signal]));
     }
+
+    // Extensions (P34): what they add is registered before the first render, like the built-in providers. A broken
+    // one is recorded and skipped; `--no-extensions` (or GOBLIN_NO_EXTENSIONS=1) starts without any. After the crash
+    // and signal handlers above: an extension's stray rejection or exception while it loads must not end the app (or
+    // leave the instance lock behind).
+    await loadExtensions({ devPaths: devExtensionPaths(), disabled: extensionsDisabledByEnv() });
 
     try {
         if (process.stdin && process.stdin.isTTY) {

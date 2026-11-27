@@ -13,6 +13,7 @@
 - **`goblin-malin ext new <name>`** scaffolds an extension, next to `list` / `add` / `remove` (T34.11). `add` takes a folder or a git URL; npm packages are not supported yet.
 - **The API snapshot** (T34.1) is `docs/extension-api.snapshot.d.ts`: `types.ts` printed from its syntax tree without comments, then formatted, so only a change of shape fails the test.
 - **Extension tools cannot be undone** by `/undo`: a tool declares no way to put a change back. Their summary names their extension.
+- **After review** (PR #21): `collection.done` is taken in silently for an album already done when it first appears in the list (a session opened after the extension loaded); the crash and rejection handlers are installed before the extensions load; `ext add` never runs install scripts; the trust hash covers symbolic links (one leaving the folder is refused) and `node_modules/` by package, and the entry file is checked with `realpath`; a handler that ran out of time is waited for 2 s so the next one does not overlap it; the switch is not offered for a copy shadowed by `--extension` nor under `--no-extensions`. Still the rule of the design: an exception that reaches `uncaughtException`, from an extension or not, ends the app through the emergency exit (it saves and releases the lock first).
 - **Not done**: `yarn run agent:tools` does not list extension tools (it never loads extensions); the `add-extension` skill is a first version (`.claude/skills/add-extension/`).
 
 ## Context

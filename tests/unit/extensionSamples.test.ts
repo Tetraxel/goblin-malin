@@ -2,8 +2,10 @@ import { describe, expect, test } from "vitest";
 // The sample extensions (examples/extensions/) are plain JavaScript: their pure parts are tested here.
 // @ts-expect-error -- a plain .js file of an example, no types
 import { findOwned, normalise } from "../../examples/extensions/library-dedupe/match.js";
+// prettier-ignore
 // @ts-expect-error -- a plain .js file of an example, no types
-import { expandCommand, quote } from "../../examples/extensions/after-save-command/command.js";
+import { expandCommand, HANDLER_TIMEOUT_MS, quote, TIMEOUTS } from "../../examples/extensions/after-save-command/command.js";
+import { MAX_HANDLER_TIMEOUT_MS } from "#base/appEvents";
 
 describe("library-dedupe: matching the list against a library", () => {
     const tracks = [
@@ -46,5 +48,12 @@ describe("after-save-command: building the command line", () => {
         );
         expect(expandCommand("echo {title} {nope}", { title: 'Say "hi"' }, "win32")).toBe(`echo "Say ""hi""" {nope}`);
         expect(quote("$(rm -rf ~)", "linux")).toBe("'$(rm -rf ~)'");
+    });
+});
+
+describe("after-save-command: its time limits fit the event bus", () => {
+    test("the longest command limit ends before the handler's own limit, which the bus allows", () => {
+        expect(HANDLER_TIMEOUT_MS).toBeLessThanOrEqual(MAX_HANDLER_TIMEOUT_MS);
+        expect(Math.max(...(Object.values(TIMEOUTS) as number[]))).toBeLessThan(HANDLER_TIMEOUT_MS);
     });
 });

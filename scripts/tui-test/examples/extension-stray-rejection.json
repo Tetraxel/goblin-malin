@@ -1,0 +1,13 @@
+{
+    // An extension that leaves rejected promises behind while it loads (P34): the app still starts, the rejections
+    // are logged, and the extension is listed as loaded. (Node would end a process that has no handler for them.)
+    "terminal": { "cols": 140, "rows": 40 },
+    "dataDir": "scripts/tui-test/fixtures/empty",
+    "network": { "mode": "offline" },
+    "env": { "GOBLIN_EXTENSION": "scripts/tui-test/fixtures/extensions/stray-rejection" },
+    "steps": [
+        { "type": "stable", "timeout": 20000 },
+        { "type": "waitForContent", "contains": "No task to run", "timeout": 5000 },
+        { "type": "assertLog", "contains": "Unhandled Rejection", "timeout": 5000 }
+    ]
+}

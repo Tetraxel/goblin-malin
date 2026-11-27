@@ -61,14 +61,14 @@ Edit `index.js`, restart the app, and look at Settings → Extensions (its state
 }
 ```
 
-| Field                                        | Required | What it is                                                                                                                              |
-| -------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`                                       | yes      | 2–40 lower case letters, digits and dashes, starting with a letter. It prefixes everything the extension registers.                      |
-| `version`                                    | yes      | Its own version (`1.0.0`).                                                                                                               |
-| `apiVersion`                                 | yes      | The API version it was written for. The app loads it only when it is the app's own (today: **1**).                                       |
-| `entry`                                      | no       | The ES module to load, inside the folder. Default `index.js`.                                                                            |
-| `displayName`, `description`, `author`, `homepage` | no | Shown in Settings → Extensions and in the trust question.                                                                               |
-| `settings`                                   | no       | Its settings, drawn in Settings → Extensions with the app's own rows: `checkbox`, `textInput`, `select` (each with a `label` and a `defaultValue`). |
+| Field                                              | Required | What it is                                                                                                                                          |
+| -------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                                             | yes      | 2–40 lower case letters, digits and dashes, starting with a letter. It prefixes everything the extension registers.                                 |
+| `version`                                          | yes      | Its own version (`1.0.0`).                                                                                                                          |
+| `apiVersion`                                       | yes      | The API version it was written for. The app loads it only when it is the app's own (today: **1**).                                                  |
+| `entry`                                            | no       | The ES module to load, inside the folder. Default `index.js`.                                                                                       |
+| `displayName`, `description`, `author`, `homepage` | no       | Shown in Settings → Extensions and in the trust question.                                                                                           |
+| `settings`                                         | no       | Its settings, drawn in Settings → Extensions with the app's own rows: `checkbox`, `textInput`, `select` (each with a `label` and a `defaultValue`). |
 
 The entry is an **ES module**: `export default function activate(goblin) { … }` (an `export function activate` works too). A `.js` file is an ES module when the folder's `package.json` says `"type": "module"`, or name it `index.mjs`.
 
@@ -78,7 +78,12 @@ The entry is an **ES module**: `export default function activate(goblin) { … }
 // @ts-check
 /** @param {import("goblin-malin/extension-api").GoblinApi} goblin */
 export default async function activate(goblin) {
-    goblin.actions.register({ id: "hello", label: "Say hello", description: "…", run: () => goblin.dialog.notify("Hi", "Hello!") });
+    goblin.actions.register({
+        id: "hello",
+        label: "Say hello",
+        description: "…",
+        run: () => goblin.dialog.notify("Hi", "Hello!"),
+    });
     const off = goblin.on("track.saved", ({ track, path }) => goblin.log.info(`Saved ${track.title} to ${path}`));
     return () => off(); // called when the app closes (or return { dispose })
 }
@@ -267,19 +272,19 @@ goblin.reveal("/music/a.flac"); // in the file manager
 const off = goblin.on("track.saved", async ({ track, path, format }, { signal }) => { … }, { timeoutMs: 120_000 });
 ```
 
-| Event             | Payload                                          | When                                                               |
-| ----------------- | ------------------------------------------------ | ------------------------------------------------------------------ |
-| `app.ready`       | —                                                | The interface is up, the session loaded, the intro over            |
-| `app.exit`        | —                                                | Before the app quits (about 1 s for every handler)                 |
-| `tasks.added`     | `{ ids }`                                        | Tasks joined the list (pasted, imported, by Claude or an extension) |
-| `track.saved`     | `{ track, path, format }`                        | The tagged file is in the output folder                            |
-| `track.failed`    | `{ track, stage, message }`                      | A run ended in error (`stage`: `metadata`, `download` or `run`)    |
-| `collection.done` | `{ collection, saved, failed, total }`           | Every track of an album / playlist / group is saved or failed      |
-| `stems.saved`     | `{ track, stems }`                               | Stem files were saved (`stems`: kind → path)                       |
+| Event             | Payload                                | When                                                                |
+| ----------------- | -------------------------------------- | ------------------------------------------------------------------- |
+| `app.ready`       | —                                      | The interface is up, the session loaded, the intro over             |
+| `app.exit`        | —                                      | Before the app quits (about 1 s for every handler)                  |
+| `tasks.added`     | `{ ids }`                              | Tasks joined the list (pasted, imported, by Claude or an extension) |
+| `track.saved`     | `{ track, path, format }`              | The tagged file is in the output folder                             |
+| `track.failed`    | `{ track, stage, message }`            | A run ended in error (`stage`: `metadata`, `download` or `run`)     |
+| `collection.done` | `{ collection, saved, failed, total }` | Every track of an album / playlist / group is saved or failed       |
+| `stems.saved`     | `{ track, stems }`                     | Stem files were saved (`stems`: kind → path)                        |
 
 - Handlers run **after** the fact, asynchronously: they never slow the pipeline, and an error is logged with the extension's name, never thrown at it.
-- Each has a time limit, 30 s by default (`timeoutMs`, up to 10 minutes). When it is up, `signal` aborts; pass it on to `spawn` and `fetch`.
-- The handlers of one extension for one track run one after the other: two `track.saved` of the same track never overlap.
+- Each has a time limit, 30 s by default (`timeoutMs`, up to 10 minutes). When it is up, `signal` aborts; pass it on to `spawn` and `fetch`. Leave a margin between what your handler really needs and its limit: past it the handler is reported as too slow, whatever it was doing.
+- The handlers of one extension for one track run one after the other: two `track.saved` of the same track never overlap. A handler that ran out of time is given 2 seconds after its `signal` aborted to end before the next one starts; one that ignores its signal for longer is abandoned (and could then run beside the next).
 - Payloads are frozen views, like `tasks.get()`.
 
 ## Providers
@@ -291,7 +296,13 @@ export default function activate(goblin) {
     const key = goblin.providers.keyOf("myserver"); // "my-extension.myserver"
 
     class MyServerService extends goblin.MetadataService {
-        static display = { label: "My server", acronym: "MYSRV", color: "#3b8db2", colorSubtle: "#0a5060", colorBright: "#1da0c3" };
+        static display = {
+            label: "My server",
+            acronym: "MYSRV",
+            color: "#3b8db2",
+            colorSubtle: "#0a5060",
+            colorBright: "#1da0c3",
+        };
         static summary = "Reads track links of my own music server.";
         static parseUrl(url) {
             const m = /^https:\/\/music\.example\.org\/t\/(\w+)/.exec(url);
@@ -303,8 +314,19 @@ export default function activate(goblin) {
         async getTrackMetadata(url) {
             const res = await goblin.fetch(`https://music.example.org/api/track?url=${encodeURIComponent(url)}`);
             const t = await res.json();
-            return { id: t.id, trackName: t.title, artists: [{ type: "artist", name: t.artist }], duration: t.ms, isrc: t.isrc,
-                url, uri: `${key.toUpperCase()}::TRACK::${t.id}`, platform: key, apiProvider: key, fetchedAt: new Date(), type: "track" };
+            return {
+                id: t.id,
+                trackName: t.title,
+                artists: [{ type: "artist", name: t.artist }],
+                duration: t.ms,
+                isrc: t.isrc,
+                url,
+                uri: `${key.toUpperCase()}::TRACK::${t.id}`,
+                platform: key,
+                apiProvider: key,
+                fetchedAt: new Date(),
+                type: "track",
+            };
         }
         async searchTrack() {
             return [];
@@ -377,7 +399,7 @@ An extension runs inside the app: the app's rules are its rules.
 Node has no real sandbox, and the app does not pretend to have one: **an extension can do anything the app can** (read and change files, use the network, read the credentials). So:
 
 - The first time the app finds an extension, it asks once the interface is up: _Not now_ (asked again at the next start), _Never_ (off until turned on in Settings), _Load it_ (loaded at once).
-- The answer is kept in `extensions.json` in the data folder, with a hash of every file of the extension's folder (except `node_modules/`, whose content follows from the lock file, which is hashed). **When a file changes, the question is asked again**: an update is a new decision.
+- The answer is kept in `extensions.json` in the data folder, with a hash of the extension's folder: every file's path and content, each symbolic link by where it points, and `node_modules/` by package (the name and `package.json` of each, so an install or an update shows; code edited in place inside a package with its version kept does not). **When anything changes, the question is asked again**: an update is a new decision. A folder holding a link that leaves it is refused (its target could change with nothing in the folder changing), as is an entry file that is such a link.
 - **Settings → Extensions** lists every extension found: its state (loaded · off · waiting for your answer · its files changed · failed: _reason_ · needs API v2), its switch, its settings, what it adds, its log lines and its folder. Switching one off takes effect at the next start; switching one on asks the question again.
 - `--extension <folder>` (or `GOBLIN_EXTENSION`) loads a folder without asking, for its author. It is never recorded, and the log says so at every start. It takes the name over an installed copy for that run.
 - A crash report names the loaded extensions; `--no-extensions` is the first thing to try.
@@ -390,11 +412,11 @@ goblin-malin ext list                                  # what is installed, and 
 goblin-malin ext add ./my-extension                    # copies a folder (without node_modules / .git)
 goblin-malin ext add https://github.com/you/my-ext.git # clones it
 goblin-malin ext add ./my-extension --force            # replaces an installed one
-goblin-malin ext remove my-extension                   # deletes its folder (asks; --yes to skip); its settings stay
+goblin-malin ext remove my-extension                   # deletes its folder (asks; --yes or -y to skip); its settings stay
 goblin-malin ext new my-extension [folder]             # a new one, ready to edit
 ```
 
-`add` runs `npm install --omit=dev` when the extension's `package.json` has dependencies. Installing never trusts it: the app still asks before its first load.
+`add` runs `npm install --omit=dev --ignore-scripts` when the extension's `package.json` has dependencies: **install scripts are not run**, since they would run the extension's (and its dependencies') code before you were asked whether to trust it. A dependency that needs a build step is built by hand (`npm rebuild` in its folder) once you trust the extension. Installing never trusts it: the app still asks before its first load.
 
 ## TypeScript
 

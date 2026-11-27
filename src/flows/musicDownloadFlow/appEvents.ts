@@ -62,31 +62,45 @@ let appReadyWired = false;
 /**
  * `collection.done` is derived, not emitted by the collection itself: a collection is done when it has tracks and
  * every one of them is saved or failed. Watched with `Task.subscribeToAny` (once per frame, never a subscription per
- * task), and only once someone listens. A collection already done when the watch starts is not announced.
+ * task), and only once someone listens.
+ *
+ * A collection is announced only for something that happens to it while it is in the list: one that is already done
+ * the first time the watch sees it (the session loaded after the extension, a session switched to, an archived album
+ * restored) is taken as done silently. Tracked by task object, not by id: opening a session makes new objects.
  */
 export function watchCollectionsDone(): void {
     if (collectionWatch) return;
-    const done = new Set<string>();
-    let primed = false;
-    const check = (): void => {
+    const seen = new WeakSet<AnyTask>();
+    const done = new WeakSet<AnyTask>();
+    const look = (announce: boolean): void => {
         const orchestrator = TaskOrchestrator.getInstance();
         for (const task of orchestrator.getTasks()) {
             const attrs = task.getAttributes() as MusicDownloadTaskAttributes | undefined;
             if (attrs?.kind !== "collection") continue;
+            const first = !seen.has(task);
+            seen.add(task);
+            // Already there when the list was replaced (a session opened): nothing to announce, only to remember.
+            if (announce === false && !first) continue;
             const counts = countChildren(attrs, (id) => orchestrator.getTask(id));
             const isDone = counts.total > 0 && counts.saved + counts.failed === counts.total;
             if (!isDone) {
-                done.delete(task.getId());
+                done.delete(task);
                 continue;
             }
-            if (done.has(task.getId())) continue;
-            done.add(task.getId());
-            if (primed) musicEvents.emit("collection.done", () => ({ collection: collectionView(task), ...counts }));
+            if (done.has(task)) continue;
+            done.add(task);
+            if (!first) musicEvents.emit("collection.done", () => ({ collection: collectionView(task), ...counts }));
         }
-        primed = true;
     };
-    check();
-    collectionWatch = Task.subscribeToAny(check);
+    // Whenever the list is replaced or grows, what is in it is taken in without announcing anything; only the changes
+    // that come after are announced.
+    look(false);
+    const offList = TaskOrchestrator.getInstance().subscribe(() => look(false));
+    const offTasks = Task.subscribeToAny(() => look(true));
+    collectionWatch = () => {
+        offList();
+        offTasks();
+    };
 }
 
 function countChildren(

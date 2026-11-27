@@ -28,4 +28,10 @@ export function shellFor(commandLine, platform = process.platform) {
         : { command: "/bin/sh", args: ["-c", commandLine] };
 }
 
-export const TIMEOUTS = { "30 seconds": 30_000, "2 minutes": 120_000, "10 minutes": 600_000 };
+/**
+ * The command's time limits. The handler's own limit (index.js) is the event bus' longest, 10 minutes: the longest
+ * choice stays well under it, so a hung command is stopped and reported by the example itself ("the command failed").
+ */
+export const TIMEOUTS = { "30 seconds": 30_000, "2 minutes": 120_000, "8 minutes": 480_000 };
+/** The handler's limit: the bus' maximum (10 minutes). */
+export const HANDLER_TIMEOUT_MS = 600_000;

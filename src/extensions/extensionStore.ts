@@ -33,6 +33,8 @@ export type ExtensionRecord = {
     apiVersion?: number;
     folder: string;
     entry?: string;
+    /** An installed copy that an `--extension` copy of the same name replaces for this run: its switch is not offered. */
+    shadowed?: boolean;
     /** Loaded with `--extension` (no trust record, never saved). */
     development: boolean;
     state: ExtensionState;
