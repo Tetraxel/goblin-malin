@@ -24,6 +24,7 @@
             "#contexts/*": ["./src/contexts/*"],
             "#exceptions": ["./src/exceptions"],
             "#exceptions/*": ["./src/exceptions/*"],
+            "#extensions/*": ["./src/extensions/*"],
             "#flows": ["./src/flows"],
             "#flows/*": ["./src/flows/*"],
             "#hooks": ["./src/hooks"],

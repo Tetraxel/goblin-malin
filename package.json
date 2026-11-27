@@ -14,6 +14,7 @@
         "#contexts": "./src/contexts/index.ts",
         "#contexts/*": "./src/contexts/*.ts",
         "#exceptions": "./src/exceptions/index.ts",
+        "#extensions/*": "./src/extensions/*.ts",
         "#exceptions/*": "./src/exceptions/*.ts",
         "#flows": "./src/flows/index.ts",
         "#flows/*": "./src/flows/*.ts",
@@ -34,6 +35,10 @@
         ".": {
             "types": "./dist/index.d.ts",
             "default": "./dist/index.js"
+        },
+        "./extension-api": {
+            "types": "./dist/extension-api.d.ts",
+            "default": "./dist/extension-api.js"
         }
     },
     "bin": {
@@ -60,6 +65,7 @@
         "type-check:src": "tsc --noEmit",
         "type-check:tui": "tsc --noEmit --project scripts/tui-test/tsconfig.json",
         "agent:tools": "tsx scripts/agent-tools.ts",
+        "extension-api": "tsx scripts/extension-api.ts",
         "lint": "eslint src/ tests/ scripts/",
         "check:utf8": "node scripts/check-utf8.mjs",
         "format": "prettier --write src/ tests/ scripts/",

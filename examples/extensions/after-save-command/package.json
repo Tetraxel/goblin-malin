@@ -1,0 +1,6 @@
+{
+    "name": "goblin-malin-extension-after-save-command",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module"
+}

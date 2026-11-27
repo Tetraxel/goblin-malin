@@ -220,6 +220,23 @@ describe("saveTrack — a first save from a download", () => {
         expect(status(task)).toMatchObject({ type: StatusType.Success, message: "Saved" });
     });
 
+    test("tells the extensions (track.saved) once the file is in place, with a view of the track", async () => {
+        const { musicEvents } = await import("#flows/musicDownloadFlow/appEvents");
+        const heard: { path: string; format: string; title?: string; saved?: string }[] = [];
+        const off = musicEvents.on("track.saved", ({ track, path: file, format }) => {
+            heard.push({ path: file, format, title: track.title, saved: track.savedFile?.path });
+        });
+        try {
+            const task = makeTask([await download("dl.flac", "AUDIO")]);
+            await task.saveTrack();
+            await musicEvents.drain();
+            const target = path.join(outDir, "Artist - Song.flac");
+            expect(heard).toEqual([{ path: target, format: "flac", title: "Song", saved: target }]);
+        } finally {
+            off();
+        }
+    });
+
     test("with the tags switched off for this track, the file is copied as it came", async () => {
         const task = makeTask([await download("dl.flac", "AUDIO")]);
         task.setOverwriteTags(false);

@@ -9,6 +9,7 @@ import { resolveCollectionRecognition } from "./utils/resolveCollectionRecogniti
 import { reviveTaskDates } from "./utils/reviveTaskDates";
 import { type MusicDownloadTaskAttributes, type TrackDownloadTask, type CollectionDownloadTask } from "./types";
 import { metadataServiceRegistry } from "./registries";
+import { emitTasksAdded } from "./appEvents";
 
 const logger = globalLogger.createChild({ service: "MusicDownload" });
 
@@ -92,5 +93,6 @@ export function importTasks(tasks: MusicTask[]): void {
     if (newTasks.length > 0) {
         orchestrator.addTasks(newTasks);
         logger.info(`Imported ${newTasks.length} new task(s)`);
+        emitTasksAdded(newTasks.map((t) => t.getId()));
     }
 }

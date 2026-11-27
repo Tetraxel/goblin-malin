@@ -1,0 +1,29 @@
+{
+    // Extensions (P34): the sample "library-dedupe" is loaded the way its author would (GOBLIN_EXTENSION, like
+    // --extension: no trust question). Its Actions item is listed with the app's own, and Settings → Extensions shows
+    // it with its state, its settings and what it adds.
+    "terminal": { "cols": 140, "rows": 40 },
+    "dataDir": "scripts/tui-test/fixtures/empty",
+    "network": { "mode": "offline" },
+    "env": { "GOBLIN_EXTENSION": "examples/extensions/library-dedupe" },
+    "steps": [
+        { "type": "stable", "timeout": 20000 },
+        { "type": "waitForContent", "contains": "No task to run", "timeout": 5000 },
+
+        { "type": "click", "text": "Actions" },
+        { "type": "waitForContent", "contains": "Remove tracks already in my library", "timeout": 3000 },
+        { "type": "assert", "contains": "No track of the list is left to compare" },
+        { "type": "snapshot", "name": "menu" },
+        { "type": "key", "key": "Esc" },
+        { "type": "waitForGone", "contains": "Remove tracks already in my library", "timeout": 3000 },
+
+        { "type": "click", "text": "Settings" },
+        { "type": "waitForContent", "contains": "SETTINGS", "timeout": 3000 },
+        { "type": "type", "text": "dedupe" },
+        { "type": "waitForContent", "contains": "Library dedupe 1.0.0", "timeout": 3000 },
+        { "type": "assert", "contains": "loaded (development, --extension)" },
+        { "type": "assert", "contains": "Library folder" },
+        { "type": "assert", "contains": "Adds 1 action, 1 Claude tool." },
+        { "type": "snapshot", "name": "settings" }
+    ]
+}

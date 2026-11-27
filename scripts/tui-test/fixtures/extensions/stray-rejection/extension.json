@@ -1,0 +1,6 @@
+{
+    "name": "stray-rejection",
+    "version": "1.0.0",
+    "apiVersion": 1,
+    "description": "Test fixture: leaves a rejected promise nobody handles while it loads"
+}

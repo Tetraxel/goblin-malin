@@ -1,4 +1,6 @@
 import fs from "fs/promises";
+import { emitStemsSaved } from "../appEvents";
+import { type Task } from "#base/task/task";
 import * as path from "path";
 import { type Logger } from "#base/logger/logger";
 import { overwriteConfirmBridge } from "#base/bridges/overwriteConfirmBridge";
@@ -268,7 +270,10 @@ export async function saveStemFiles(host: StemHost, kinds?: StemKind[]): Promise
             release();
         }
     }
-    if (saved.length > 0) logger.info(`Stems saved: ${saved.join(", ")}`);
+    if (saved.length > 0) {
+        logger.info(`Stems saved: ${saved.join(", ")}`);
+        emitStemsSaved(host as unknown as Task, saved);
+    }
     if (failures.length > 0) {
         logger.warn(`Some stems were not saved: ${failures.join("; ")}`);
         if (saved.length === 0) throw new Error(failures.join("; "));
