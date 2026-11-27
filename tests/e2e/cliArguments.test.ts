@@ -32,6 +32,29 @@ describe("the command line", () => {
         expect(r.stdout).toMatch(/Usage: goblin-malin/);
     });
 
+    test("ext works without a terminal and never opens the interface", () => {
+        // A data folder of its own: the one above must stay empty for the next test.
+        const extDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "goblin-cli-ext-test-"));
+        try {
+            const env = { ...process.env, GOBLIN_DATA_DIR: extDataDir };
+            const ext = (...args: string[]) =>
+                spawnSync(process.execPath, ["--import", "tsx", "src/cli.ts", "ext", ...args], {
+                    cwd: path.resolve(__dirname, "../.."),
+                    env,
+                    input: "",
+                    encoding: "utf8",
+                    timeout: 60_000,
+                });
+            const r = ext("list");
+            expect(r.status).toBe(0);
+            expect(r.stdout).toMatch(/No extension in/);
+            expect(ext("nope").status).toBe(2);
+            expect(fs.existsSync(path.join(extDataDir, "goblin-malin.lock"))).toBe(false);
+        } finally {
+            fs.rmSync(extDataDir, { recursive: true, force: true });
+        }
+    });
+
     test("without a terminal it says so and exits with an error, instead of hanging", () => {
         const r = run();
         expect(r.signal).toBeNull();

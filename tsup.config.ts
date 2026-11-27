@@ -20,6 +20,8 @@ export default defineConfig({
   entry: {
     index: "src/index.tsx",
     cli: "src/cli.ts",
+    // The types of the extension API (P34), published as `goblin-malin/extension-api` (type-only: its .js is empty).
+    "extension-api": "src/extensions/api/types.ts",
   },
   format: ["esm"],
   dts: true,

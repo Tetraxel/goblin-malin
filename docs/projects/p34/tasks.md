@@ -1,6 +1,19 @@
 # P34 — Extensions: Tasks
 
-> **Status: proposed** (2026-11-25). Nothing is built yet.
+> **Status: first version built** (2026-11-27). T34.1 to T34.11 are in; the author's guide is [docs/extensions.md](../../extensions.md). Where the build differs from the plan below, it says so here.
+
+### What was built, and where it differs from the plan
+
+- **Code**: `src/extensions/` (manifest, trust, loader, store, Settings rows, `ext` command) and `src/extensions/api/` (the public `types.ts`, `createApi.ts`, tasks, processes, files, Claude, tools); `src/base/appEvents.ts` (the generic bus), `src/base/exitHooks.ts`, `src/base/bridges/taskSelectionBridge.ts`; `flows/musicDownloadFlow/appEvents.ts` (emit sites) and `publicViews.ts` (frozen views). Tests: `tests/unit/extensions.test.ts`, `extensionSamples.test.ts`, `extensionApiSnapshot.test.ts`, `tests/e2e/extensions.test.ts` (+ `scripts/tui-test/examples/extensions.json`).
+- **"Load it" loads at once**, instead of at the next start: loading (not unloading) is safe at any time, and asking the user to restart right after they said yes reads as broken. Its providers reach the tasks added from then on (a task's provider scope is made when the task is); the rest at the next start. Turning an extension **off** still takes effect at the next start.
+- **Turning one on in Settings always asks again** (not only when it was never trusted): the trust record keeps one answer, and "off then on" is a new decision anyway.
+- **More members** than the table, each because a sample or a test needed it: `goblin.paths`, `goblin.storage` (a JSON file in the extension's own `dataDir`), `goblin.clipboard`, `goblin.open`, `goblin.reveal`, `goblin.dialog.notify`, `goblin.tasks.selected()`, `goblin.tasks.archive()`, `goblin.settings.declare/rows/status`, `goblin.providers.keyOf()`, and a `tasks.added` event.
+- **Secrets** are kept in `.env` as `GOBLIN_EXT_<NAME>__<KEY>` (`<name>.<key>` is not a valid variable name everywhere). Every `GOBLIN_EXT_*` variable leaves the environment at start-up, whether its extension loads or not.
+- **`GOBLIN_EXTENSION=<folders>`** works like `--extension` (the TUI harness can set an environment variable, not arguments).
+- **`goblin-malin ext new <name>`** scaffolds an extension, next to `list` / `add` / `remove` (T34.11). `add` takes a folder or a git URL; npm packages are not supported yet.
+- **The API snapshot** (T34.1) is `docs/extension-api.snapshot.d.ts`: `types.ts` printed from its syntax tree without comments, then formatted, so only a change of shape fails the test.
+- **Extension tools cannot be undone** by `/undo`: a tool declares no way to put a change back. Their summary names their extension.
+- **Not done**: `yarn run agent:tools` does not list extension tools (it never loads extensions); the `add-extension` skill is a first version (`.claude/skills/add-extension/`).
 
 ## Context
 

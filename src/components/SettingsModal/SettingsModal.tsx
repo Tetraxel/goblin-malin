@@ -12,6 +12,14 @@ import { filterSettingsItems, isInteractive, type SettingsItem } from "#settings
 import { getMusicSettings, saveMusicSettings } from "#flows/musicDownloadFlow/settings";
 import { buildMusicSettingsItems, loadProviderStatuses } from "#flows/musicDownloadFlow/buildFlowSettingsItems";
 import { describeTempUsage, getTempUsage, type TempUsage } from "#flows/musicDownloadFlow/tempCleanupFlow";
+import {
+    buildExtensionSettingsItems,
+    commitExtensionsDraft,
+    emptyExtensionsDraft,
+    isExtensionsDraftDirty,
+    loadExtensionStatuses,
+    type ExtensionsDraft,
+} from "#extensions/settingsItems";
 import { deepMerge } from "#utils/deepMerge";
 import { type DeepPartial } from "#utils/types";
 import { shortcutRegistry } from "#base/shortcuts/ShortcutRegistry";
@@ -42,6 +50,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
 
     const [appDraft, setAppDraft] = useState<AppSettings>(() => SettingsStore.getInstance().getAppSettings());
     const [flowPatch, setFlowPatch] = useState<Record<string, unknown>>({});
+    // Settings → Extensions (P34): switches and the extensions' own settings, saved with the rest.
+    const [extDraft, setExtDraft] = useState<ExtensionsDraft>(emptyExtensionsDraft);
+    const [extStatus, setExtStatus] = useState<Record<string, string | undefined>>({});
     // How much the temporary folder holds. Measured in the background once the modal is open (it can be
     // hundreds of files): the rest of the page works meanwhile and the row says "calculating…".
     const [tempUsage, setTempUsage] = useState<TempUsage | undefined>(undefined);
@@ -73,6 +84,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
             setAppDraft(freshSettings);
             setOriginalKeybindings(freshSettings.keybindings);
             setFlowPatch({});
+            setExtDraft(emptyExtensionsDraft());
+            setExtStatus({});
             setTempUsage(undefined);
             setProviderStatus({});
             setSelectedIndex(0);
@@ -118,6 +131,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
         void loadProviderStatuses().then((status) => {
             if (!cancelled) setProviderStatus(status);
         });
+        void loadExtensionStatuses().then((status) => {
+            if (!cancelled) setExtStatus(status);
+        });
         return () => {
             cancelled = true;
         };
@@ -134,9 +150,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
             openWizard,
             { tempUsageText: describeTempUsage(tempUsage), providerStatus }
         );
-        return [...globalItems, ...musicItems];
+        const extensionItems = buildExtensionSettingsItems(extDraft, setExtDraft, extStatus);
+        return [...globalItems, ...musicItems, ...extensionItems];
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [appDraft, flowPatch, returningFromWindow, tempUsage, providerStatus]);
+    }, [appDraft, flowPatch, returningFromWindow, tempUsage, providerStatus, extDraft, extStatus]);
 
     const filteredItems = useMemo(() => filterSettingsItems(allItems, searchQuery), [allItems, searchQuery]);
     const safeSelectedIndex = Math.min(selectedIndex, Math.max(0, filteredItems.length - 1));
@@ -145,17 +162,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ terminalHeight, te
         const saved = SettingsStore.getInstance().getAppSettings();
         if (JSON.stringify(saved.general) !== JSON.stringify(appDraft.general)) return true;
         if (Object.keys(flowPatch).length > 0) return true;
+        if (isExtensionsDraftDirty(extDraft)) return true;
         // appDraft.keybindings is kept in sync with the store after each rebind,
         // so comparing it to the snapshot taken at modal-open detects shortcut changes.
         if (JSON.stringify(appDraft.keybindings) !== JSON.stringify(originalKeybindings)) return true;
         return false;
-    }, [appDraft, flowPatch, originalKeybindings]);
+    }, [appDraft, flowPatch, originalKeybindings, extDraft]);
 
     function commitAndExit() {
         SettingsStore.getInstance().writeAppSettings(appDraft);
         if (Object.keys(flowPatch).length > 0) {
             saveMusicSettings(deepMerge(getMusicSettings() as unknown as Record<string, unknown>, flowPatch));
         }
+        if (isExtensionsDraftDirty(extDraft)) commitExtensionsDraft(extDraft);
         switchBack();
     }
 

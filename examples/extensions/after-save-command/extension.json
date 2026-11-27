@@ -1,0 +1,23 @@
+{
+    "name": "after-save-command",
+    "displayName": "After-save command",
+    "version": "1.0.0",
+    "apiVersion": 1,
+    "entry": "index.js",
+    "description": "Runs a command of yours for every saved track (beets import, a copy to a NAS, ReplayGain, a notification…)",
+    "author": "Goblin Malin",
+    "settings": {
+        "command": {
+            "kind": "textInput",
+            "label": "Command ({path} {dir} {file} {artist} {title} {album} {isrc} {format}; JSON on stdin)",
+            "defaultValue": ""
+        },
+        "timeout": {
+            "kind": "select",
+            "label": "Time limit",
+            "defaultValue": "2 minutes",
+            "options": ["30 seconds", "2 minutes", "10 minutes"]
+        },
+        "notifyFailures": { "kind": "checkbox", "label": "Tell me when the command fails", "defaultValue": false }
+    }
+}

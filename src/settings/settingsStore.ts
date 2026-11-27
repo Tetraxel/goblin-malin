@@ -25,6 +25,11 @@ type StoredSettings = {
     logs: DeepPartial<AppSettings["logs"]>;
     keybindings: AppSettings["keybindings"];
     music: Record<string, unknown>;
+    /**
+     * The extensions' own settings (P34), by extension name: only what the user changed. Never diffed against
+     * defaults by this store: an extension that is off or missing keeps its section as it is.
+     */
+    extensions?: Record<string, Record<string, unknown>>;
 };
 
 /** Pre-P20b file shape: music settings lived under flows["music-downloader"]. */
@@ -129,6 +134,9 @@ function parseSettingsFile(raw: unknown): Parsed<StoredSettings> {
             sections[key] = {};
         }
     }
+
+    // Only written once an extension stored something; a wrong-typed one is dropped (it holds nothing usable).
+    if (sections.extensions !== undefined && !isPlainObject(sections.extensions)) delete sections.extensions;
 
     // The data folder is derived from `GOBLIN_DATA_DIR`/the OS default, never stored: older files froze their
     // absolute path in here, which then pulled `cache/`, `bin/` and `app.log` away from the real folder.
@@ -317,6 +325,26 @@ export class SettingsStore {
 
     patchMusicSettings(patch: DeepPartial<Record<string, unknown>>): void {
         this.writeMusicSettings(deepMerge(this.getMusicSettings({}), patch));
+    }
+
+    // ── Extension settings (P34) ───────────────────────────────────────────────
+
+    /** What is stored for one extension (no defaults merged in). */
+    getExtensionSettings(name: string): Record<string, unknown> {
+        const all = this.getCached().extensions ?? {};
+        const own = all[name];
+        return isPlainObject(own) ? { ...own } : {};
+    }
+
+    /** Replaces what is stored for one extension (an empty object removes its section). The others are untouched. */
+    writeExtensionSettings(name: string, values: Record<string, unknown>): void {
+        const current = this.getCached();
+        const extensions = { ...(current.extensions ?? {}) };
+        if (Object.keys(values).length === 0) delete extensions[name];
+        else extensions[name] = values;
+        const rest = { ...current };
+        delete rest.extensions;
+        this.writeToDisk(Object.keys(extensions).length > 0 ? { ...rest, extensions } : rest);
     }
 
     // ── Change notifications ───────────────────────────────────────────────────

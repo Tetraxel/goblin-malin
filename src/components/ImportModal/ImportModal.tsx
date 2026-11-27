@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useLayoutEffect, useState } from "react";
 import { Box, Text } from "ink";
 import { useShortcuts } from "#hooks/useShortcuts";
 import { useFocusActions, useFocusChrome } from "#contexts/FocusContext";
@@ -66,8 +66,9 @@ export const ImportModal: React.FC<ImportModalProps> = ({
         setSelectedIndex(0);
     }
 
-    // Take focus while the modal is rendered; restore on unmount
-    useEffect(() => {
+    // Take focus while the modal is rendered; restore on unmount. A layout effect: the focus moves before the frame that
+    // shows the dialog is written, so a key pressed as soon as it appears (↓, Enter) reaches it instead of being lost.
+    useLayoutEffect(() => {
         if (!pendingImport) return;
         switchWindow("importModal");
         return () => {

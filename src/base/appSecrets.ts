@@ -44,6 +44,11 @@ export const appSecrets = {
         });
     },
 
+    /** Every key the store holds (to strip them from an environment a program is given). */
+    keys(): string[] {
+        return [...store.keys()];
+    },
+
     /** Forgets everything (tests). */
     clear(): void {
         store.clear();

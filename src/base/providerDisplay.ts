@@ -86,13 +86,22 @@ const FALLBACK: ProviderDisplay = {
 
 class ProviderDisplayRegistry {
     private map = new Map<string, ProviderDisplay>(Object.entries(BUILTIN_PROVIDERS));
+    private fallback: ((key: string) => Partial<ProviderDisplay> | undefined) | undefined;
 
     register(key: string, display: ProviderDisplay): void {
         this.map.set(key, display);
     }
 
+    /**
+     * What a key nobody registered shows, beyond its bare name: e.g. the key of a provider whose extension is not
+     * loaded (P34) says so, since saved tracks still carry it.
+     */
+    setFallback(fallback: ((key: string) => Partial<ProviderDisplay> | undefined) | undefined): void {
+        this.fallback = fallback;
+    }
+
     get(key: string): ProviderDisplay {
-        return this.map.get(key) ?? { ...FALLBACK, label: key, acronym: key.toUpperCase() };
+        return this.map.get(key) ?? { ...FALLBACK, label: key, acronym: key.toUpperCase(), ...this.fallback?.(key) };
     }
 }
 

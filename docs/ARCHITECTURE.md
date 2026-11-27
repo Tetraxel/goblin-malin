@@ -93,9 +93,24 @@ A second, separate way to use Claude (the first is the last-resort discovery pro
 - Claude can also **search music** (`search_music`: free text, on every metadata service that implements `searchTracks`) and **add tasks** (`add_tasks`: the same as pasting links, not started, undone by `/undo` while untouched).
 - The UI is `src/components/ChatPanel/`: docked beside the task list from 108 columns, a window over the screen below it. Each tool line keeps the raw call and answer (`ChatMessage.detail`), opened with `Ctrl+O` or a click. The last conversation is saved to `agent-chat.json` in the data folder (`agent/chatHistory.ts`) and offered, never reopened by itself: a launch starts empty because resuming costs the user's plan.
 
+## Extensions (P34)
+
+Folders of JavaScript in `<data folder>/extensions/`, loaded by `src/extensions/loader.ts` between `initMusicApp()` and the first render. Each receives a `goblin` object (`src/extensions/api/`) whose members are thin wrappers over what the app already has: `actionsMenuRegistry`, the four provider registries, `agentToolRegistry`, `dialogBridge`, `appSecrets`, `SettingsStore` (the `extensions` section), the task list through frozen views (`publicViews.ts`) and named `DownloadTask` methods, and the music events (`appEvents.ts`). Nothing in the pipeline knows about extensions: it emits events and reads registries, as before.
+
+```
+ <data>/extensions/<name>/extension.json ──► manifest check ──► trust (extensions.json + hash of the files)
+                                                                    │ yes                    │ not yet / changed
+                                                                    ▼                        ▼
+                                                  import(entry) → activate(goblin)   asked after the first render
+                                                                    │
+                    registries: Actions · providers · Claude tools · musicEvents handlers · settings rows
+```
+
+What an extension leaves behind (sessions with its platform's tracks, its settings) survives its removal; Settings → Extensions shows each one's state, settings and log. The author's guide is [extensions.md](extensions.md).
+
 ## Data on disk
 
-Everything lives in one folder (`GOBLIN_DATA_DIR`, else the OS default; `<repo>/data` when running from source): `settings.json`, `sessions.json` (+ `.bak`), `.env` (credentials), `cache/`, `bin/` (downloaded tools, `cookies.txt`), `stems/` (the stem separation engine and its models, once installed), `app.log` (+ `app.prev.log`). The folder is derived at start-up and never read back from `settings.json` ([utils/appPaths.ts](../src/utils/appPaths.ts)). A lock file keeps a second instance out of the same folder.
+Everything lives in one folder (`GOBLIN_DATA_DIR`, else the OS default; `<repo>/data` when running from source): `settings.json`, `sessions.json` (+ `.bak`), `.env` (credentials), `cache/`, `bin/` (downloaded tools, `cookies.txt`), `stems/` (the stem separation engine and its models, once installed), `extensions/` (P34: the user's extensions; `extensions.json` is what they allowed, `extension-data/` what extensions keep), `app.log` (+ `app.prev.log`). The folder is derived at start-up and never read back from `settings.json` ([utils/appPaths.ts](../src/utils/appPaths.ts)). A lock file keeps a second instance out of the same folder.
 
 ## Input and hints
 

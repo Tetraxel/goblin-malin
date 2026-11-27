@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { emitTrackFailed, emitTrackSaved } from "../appEvents";
 import fs from "fs/promises";
 import * as path from "path";
 import { Task } from "#base/task/task";
@@ -489,6 +490,16 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 throw error;
             }
             this.updateAttributes({ state: "failed" });
+            const a = this.getAttributes();
+            emitTrackFailed(
+                this,
+                a?.toDownload && (a.primaryMetadataFetched || !a.toTag) && (a.metadataDiscovered || !a.toTag)
+                    ? "download"
+                    : a?.toTag
+                      ? "metadata"
+                      : "run",
+                error
+            );
             throw error;
         } finally {
             done();
@@ -2436,6 +2447,8 @@ export class DownloadTask extends Task<TrackDownloadTask> {
                 }
 
                 this.status.set({ type: StatusType.Success, message: "Saved" });
+                // Extensions (P34) hear about it after the fact: nothing here waits for them.
+                emitTrackSaved(this, outputPath);
                 // Stems (P33) follow the track: a failure there is said in the log, never undoes the track's save.
                 await this.saveStemsWithTrack().catch((error) =>
                     this.logger.warn(

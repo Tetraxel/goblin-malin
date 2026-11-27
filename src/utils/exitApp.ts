@@ -6,6 +6,8 @@ import { shutdownState } from "#utils/shutdownState";
 import { DISABLE_MOUSE } from "#base/mouse/mouse";
 import { releaseInstanceLock } from "#utils/instanceLock";
 import { runAgentCleanups } from "#base/agent/cleanup";
+import { runExitHooks } from "#base/exitHooks";
+import { extensionStore } from "#extensions/extensionStore";
 import { TaskOrchestrator } from "#base/task/orchestrator";
 
 const LEAVE_ALT_SCREEN_COMMAND = "\x1b[?1049l";
@@ -75,6 +77,8 @@ async function runStep(label: string, work: () => void | Promise<void>): Promise
 async function shutdown(): Promise<void> {
     const startedAt = performance.now();
     let sessionSaved = true;
+    // Extensions first (their `app.exit` handlers and `dispose()`): they may still want to read the tasks as they are.
+    await runStep("Closing extensions…", () => runExitHooks(2000));
     // First: the tasks are told to stop (synchronously) before any program is killed, so a conversion cut by the
     // clean-ups below is a stop, not an ffmpeg failure that would be saved as the task's outcome.
     await runStep("Stopping downloads…", () => stopRunningWork());
@@ -134,7 +138,12 @@ export function emergencyExit(reason: string, exitCode: number, error?: unknown)
     restoreTerminal();
     if (error !== undefined) {
         const detail = error instanceof Error ? (error.stack ?? error.message) : String(error);
-        process.stderr.write(`Goblin Malin stopped: ${reason}\n${detail}\nDetails are in app.log.\n`);
+        // Extensions run in the app's process: name them, so a crash one caused can be told apart.
+        const loaded = extensionStore.describeLoaded();
+        const extensions = loaded.length
+            ? `Extensions loaded: ${loaded.join(", ")} (start with --no-extensions to rule them out)\n`
+            : "";
+        process.stderr.write(`Goblin Malin stopped: ${reason}\n${detail}\n${extensions}Details are in app.log.\n`);
     }
     globalLogger.error(`Emergency exit: ${reason}`, error === undefined ? {} : { error });
 
@@ -147,6 +156,7 @@ export function emergencyExit(reason: string, exitCode: number, error?: unknown)
         try {
             // The tasks are told to stop before any program is killed (a conversion cut first would be saved as an
             // ffmpeg failure, not a stop). The clean-ups are not awaited: killing the process is enough.
+            void runExitHooks(500);
             stopRunningWork();
             void runAgentCleanups(500);
             // The same short wait as a normal close: the tasks report "stopped" a moment after the kill, and the

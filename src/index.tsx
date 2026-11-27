@@ -15,8 +15,9 @@ import { screenSelection } from "./base/selection/screenSelection";
 import { getAppDataDir } from "./utils/appPaths";
 import { acquireInstanceLock, releaseInstanceLock } from "./utils/instanceLock";
 import { emergencyExit, restoreTerminal } from "./utils/exitApp";
+import { devExtensionPaths, extensionsDisabledByEnv, loadExtensions } from "./extensions/loader";
 
-export function start(): void {
+export async function start(): Promise<void> {
     // One app per data folder: a second one would silently overwrite the first one's sessions.
     const lock = acquireInstanceLock();
     if (!lock.acquired) {
@@ -30,6 +31,10 @@ export function start(): void {
 
     // Register providers + apply concurrency budgets before the first render.
     initMusicApp();
+
+    // Extensions (P34): what they add is registered before the first render, like the built-in providers. A broken
+    // one is recorded and skipped; `--no-extensions` (or GOBLIN_NO_EXTENSIONS=1) starts without any.
+    await loadExtensions({ devPaths: devExtensionPaths(), disabled: extensionsDisabledByEnv() });
 
     process.on("unhandledRejection", (reason) => {
         // The promise itself says nothing (it logs as an empty object): the reason is what to look at.

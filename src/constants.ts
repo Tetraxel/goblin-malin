@@ -38,3 +38,9 @@ function resolveAppVersion(): string {
 }
 
 export const APP_VERSION = resolveAppVersion();
+
+/**
+ * The version of the API handed to extensions (`goblin.apiVersion`, P34). Bump it when a change breaks extensions
+ * written for the current one, and record it with `yarn run extension-api --write`.
+ */
+export const EXTENSION_API_VERSION = 1;

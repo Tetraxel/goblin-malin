@@ -1,8 +1,9 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useScreenSize } from "./useScreenSize";
 import { type SetupWizardConfig } from "#base/setupWizard";
 import { type PrimaryMode, type SecondaryTab } from "#types/focus";
 import { taskCursorBridge } from "#base/bridges/taskCursorBridge";
+import { taskSelectionBridge } from "#base/bridges/taskSelectionBridge";
 
 export type CursorPosition =
     | { type: "compiled" }
@@ -204,6 +205,19 @@ export const useFocusManager = ({
         wizardOnDisable: null,
         isEditingField: false,
     }));
+
+    // What extensions read as "the selection" (P34): kept in a ref, so publishing it never causes a render.
+    const selectionRef = useRef<() => string[]>(() => []);
+    const { selectedTaskIds: selectedIdsNow, selectedTaskIndex: cursorNow } = focusState.taskList;
+    useEffect(() => {
+        selectionRef.current = () => {
+            const ids = [...selectedIdsNow];
+            if (ids.length > 0) return ids;
+            const atCursor = taskIds[cursorNow];
+            return atCursor ? [atCursor] : [];
+        };
+    }, [selectedIdsNow, cursorNow, taskIds]);
+    useEffect(() => taskSelectionBridge.publish(() => selectionRef.current()), []);
 
     // Keep the selected column in range when the column set shrinks (e.g. switching
     // Metadata→Download view drops the metadata/discovery columns). Without this the

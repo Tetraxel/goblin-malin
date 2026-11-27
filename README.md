@@ -90,6 +90,7 @@ When a source can't be found (an unofficial re-upload, say), **paste the right l
 - Choose the **providers**, the **output format** (or keep each download as it came), the **folders** and how many tracks run at once.
 - Every **keyboard shortcut** can be rebound, and the hints on screen always show your own keys.
 - Your list is saved as a **session** and re-opened next time. Keep several, and archive what is finished.
+- **Extensions** add what is too specific for the app itself: an Actions item ("remove the tracks already in my library"), a command run for each saved track (beets, a copy to a NAS, ReplayGain), a tool for Claude, a whole new platform. An extension is a folder of JavaScript, asked about before its first load (and again when its files change), listed in Settings → Extensions. `goblin-malin ext new my-extension` starts one; see [docs/extensions.md](docs/extensions.md). If one misbehaves, `goblin-malin --no-extensions` starts without any.
 
 ## What it can read, search and download
 

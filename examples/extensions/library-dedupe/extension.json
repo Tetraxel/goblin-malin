@@ -1,0 +1,17 @@
+{
+    "name": "library-dedupe",
+    "displayName": "Library dedupe",
+    "version": "1.0.0",
+    "apiVersion": 1,
+    "entry": "index.js",
+    "description": "Remove from the list the tracks already in a music folder of yours",
+    "author": "Goblin Malin",
+    "settings": {
+        "libraryFolder": { "kind": "textInput", "label": "Library folder", "defaultValue": "" },
+        "matchDuration": {
+            "kind": "checkbox",
+            "label": "Without an ISRC, also compare durations (within 3 s; slower scan)",
+            "defaultValue": true
+        }
+    }
+}
